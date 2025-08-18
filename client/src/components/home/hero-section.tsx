@@ -1,14 +1,17 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useScrollFadeIn } from "@/hooks/useScrollFadeIn";
 
-const HeroSection: React.FC = () => {
-  // Add particles background (simple starfield dots)
-  useEffect(() => {
-    const existing = document.querySelectorAll(".hero-particle");
-    existing.forEach((el) => el.remove());
+const MASCOT_WEBP = "/assets/usdfg-mascot-trophy-illustration.webp";
+const MASCOT_PNG  = "/assets/usdfg-mascot-trophy-illustration.png";
+// Last-resort absolute URL (works regardless of base path issues)
+const MASCOT_ABS  = "https://tangerine-valkyrie-b2552f.netlify.app/assets/usdfg-mascot-trophy-illustration.webp";
 
+const HeroSection: React.FC = () => {
+  // starfield particles
+  useEffect(() => {
+    document.querySelectorAll(".hero-particle").forEach(el => el.remove());
     const container = document.querySelector(".hero");
     if (container) {
       for (let i = 0; i < 50; i++) {
@@ -21,20 +24,27 @@ const HeroSection: React.FC = () => {
         container.appendChild(p);
       }
     }
-
-    return () => {
-      const cleanup = document.querySelectorAll(".hero-particle");
-      cleanup.forEach((el) => el.remove());
-    };
+    return () => document.querySelectorAll(".hero-particle").forEach(el => el.remove());
   }, []);
 
   const mascotRef = useScrollFadeIn<HTMLDivElement>();
+  const imgRef = useRef<HTMLImageElement | null>(null);
+
+  const handleImgError = () => {
+    if (!imgRef.current) return;
+    const tried = imgRef.current.getAttribute("data-tried") || "";
+    if (!tried.includes("png")) {
+      imgRef.current.src = MASCOT_PNG;                     // 1st fallback: PNG in /public/assets
+      imgRef.current.setAttribute("data-tried", tried + " png");
+    } else if (!tried.includes("abs")) {
+      imgRef.current.src = MASCOT_ABS;                     // 2nd fallback: absolute URL
+      imgRef.current.setAttribute("data-tried", tried + " abs");
+    }
+  };
 
   return (
     <section className="hero relative py-20 lg:py-32 overflow-hidden">
-      {/* Particles layer */}
       <div className="particles-container absolute inset-0 z-0" />
-
       <div className="container mx-auto px-4 relative z-10">
         <div className="flex flex-col lg:flex-row items-center">
           {/* Left copy */}
@@ -86,35 +96,24 @@ const HeroSection: React.FC = () => {
 
           {/* Right mascot */}
           <div className="lg:w-1/2 flex justify-center lg:justify-end">
-            <div
-              ref={mascotRef}
-              className="relative w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 ghost-float group"
-            >
+            <div ref={mascotRef} className="relative w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96">
               <div className="mascot-glow-pulse absolute inset-0 z-0 pointer-events-none" />
-
-              {/* Prefer WEBP; fallback available via <img> within <picture> */}
-              <picture>
-                <source
-                  srcSet="/assets/usdfg-mascot-trophy-illustration.webp"
-                  type="image/webp"
-                />
-                <img
-                  src="/assets/usdfg-mascot-trophy-illustration.webp"
-                  alt="USDFG mascot holding trophy - skill-based gaming rewards"
-                  loading="eager"
-                  decoding="async"
-                  className="w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 max-w-full object-contain relative z-10 mascot-float"
-                />
-              </picture>
+              <img
+                ref={imgRef}
+                src={MASCOT_WEBP}
+                alt="USDFG mascot holding trophy - skill-based gaming rewards"
+                loading="eager"
+                decoding="async"
+                onError={handleImgError}
+                className="w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 max-w-full object-contain relative z-10 mascot-float"
+              />
             </div>
           </div>
         </div>
       </div>
 
       <style>{`
-        .conquer-glow {
-          text-shadow: 0 0 16px #ff005c, 0 0 32px #ff005c99, 0 0 2px #fff;
-        }
+        .conquer-glow { text-shadow: 0 0 16px #ff005c, 0 0 32px #ff005c99, 0 0 2px #fff; }
         .mascot-glow-pulse {
           border-radius: 50%;
           background: radial-gradient(circle, #00e8fc 0%, #00e8fc44 60%, transparent 80%);
@@ -122,35 +121,15 @@ const HeroSection: React.FC = () => {
           opacity: 0.7;
           animation: mascotGlowPulse 2.8s ease-in-out infinite alternate;
         }
-        @keyframes mascotGlowPulse {
-          0% { opacity: 0.5; filter: blur(12px); }
-          100% { opacity: 0.85; filter: blur(22px); }
-        }
-        .mascot-float {
-          animation: mascotFloat 4.5s ease-in-out infinite alternate;
-        }
-        @keyframes mascotFloat {
-          0% { transform: translateY(0); }
-          100% { transform: translateY(-18px); }
-        }
-        /* tiny stars */
+        @keyframes mascotGlowPulse { 0% { opacity: .5; filter: blur(12px);} 100% { opacity:.85; filter: blur(22px);} }
+        .mascot-float { animation: mascotFloat 4.5s ease-in-out infinite alternate; }
+        @keyframes mascotFloat { 0% { transform: translateY(0);} 100% { transform: translateY(-18px);} }
         .hero-particle {
-          position: absolute;
-          width: 2px;
-          height: 2px;
-          border-radius: 9999px;
-          background: #9adfff;
-          opacity: 0.8;
-          box-shadow: 0 0 6px #66d5ff;
-          animation-name: twinkle;
-          animation-iteration-count: infinite;
-          animation-timing-function: ease-in-out;
+          position: absolute; width: 2px; height: 2px; border-radius: 9999px;
+          background: #9adfff; opacity: .8; box-shadow: 0 0 6px #66d5ff;
+          animation: twinkle var(--twinkle, 8s) ease-in-out infinite;
         }
-        @keyframes twinkle {
-          0%   { transform: translateY(0); opacity: 0.6; }
-          50%  { opacity: 1; }
-          100% { transform: translateY(-12px); opacity: 0.6; }
-        }
+        @keyframes twinkle { 0% { transform: translateY(0); opacity:.6;} 50% {opacity:1;} 100% { transform: translateY(-12px); opacity:.6;} }
       `}</style>
     </section>
   );
