@@ -1,0 +1,10 @@
+[build]
+  # run from repo root
+  command = "npm ci && npm run build"
+  # your production files will be here after build
+  publish = "client/dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+  # fall back to pure JS build so we don't need the native Rollup binary
+  ROLLUP_DISABLE_NATIVE = "1"
