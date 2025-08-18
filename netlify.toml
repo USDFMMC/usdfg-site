@@ -1,10 +1,9 @@
 [build]
-  # run from repo root
-  command = "npm ci && npm run build"
-  # your production files will be here after build
-  publish = "client/dist"
+  # Use npm install (NOT npm ci) to avoid the Rollup optional–deps bug
+  command = "npm install && npm run build"
+  # Vite outputs here for this project (matches your local build logs)
+  publish = "dist"
 
 [build.environment]
   NODE_VERSION = "20"
-  # fall back to pure JS build so we don't need the native Rollup binary
   ROLLUP_DISABLE_NATIVE = "1"
