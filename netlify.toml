@@ -1,9 +1,9 @@
 [build]
-  # Use npm install (NOT npm ci) to avoid the Rollup optional–deps bug
+  base = "client"
   command = "npm install && npm run build"
-  # Vite outputs here for this project (matches your local build logs)
-  publish = "dist"
+  publish = "client/dist"
 
 [build.environment]
   NODE_VERSION = "20"
   ROLLUP_DISABLE_NATIVE = "1"
+
