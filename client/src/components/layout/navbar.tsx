@@ -30,7 +30,7 @@ const Navbar: React.FC = () => {
           {/* Logo */}
           <Link href="/" className="flex items-center navbar-brand" title="Built for the ones who don't blink.">
             <img 
-              src="/assets/usdfg-logo-transparent.webp" 
+              src="/assets/usdfg-logo-transparent.png" 
               alt="USDFG Logo" 
               className="w-10 h-10 object-contain mr-3 mascot-glow"
               style={{filter: 'drop-shadow(0 0 10px rgba(0, 232, 252, 0.5))'}} 

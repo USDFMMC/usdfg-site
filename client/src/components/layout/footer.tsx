@@ -20,7 +20,7 @@ const Footer: React.FC<FooterProps> = ({ isRevealed }) => {
           {/* Left: Mascot + Tagline */}
           <div className="flex items-center justify-center md:justify-start">
             <img 
-              src="/assets/usdfg-logo-transparent.webp" 
+              src="/assets/usdfg-logo-transparent.png" 
               alt="USDFG Logo" 
               className="w-10 h-10 sm:w-12 sm:h-12 object-contain mr-3 mascot-glow"
               style={{filter: 'drop-shadow(0 0 10px rgba(0, 232, 252, 0.5))'}} 
