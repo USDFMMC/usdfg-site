@@ -12,10 +12,12 @@ import CTASection from "@/components/home/cta-section";
 import { Helmet } from "react-helmet";
 
 const Home: React.FC = () => {
+  const ogImage = "https://usdfg.pro/assets/usdfg-og-banner.webp"; // matches your file
+  const canonical = "https://usdfg.pro/";
+
   return (
     <>
       <Helmet>
-        {/* Keep only basic, non-social meta here. Social cards live in /public/index.html */}
         <title>USDFGAMING – Skill-Based Crypto Gaming Platform | Game. Earn. Conquer.</title>
         <meta
           name="description"
@@ -25,9 +27,29 @@ const Home: React.FC = () => {
           name="keywords"
           content="USDFG, $USDFG, skill-based crypto gaming, earn from skill not luck, leaderboard, non-custodial, fair play, Game. Earn. Conquer., USDFGAMING, gaming token"
         />
-        <link rel="canonical" href="https://usdfg.pro/" />
+        <link rel="canonical" href={canonical} />
 
-        {/* Optional: JSON-LD (nice to have for search engines; harmless for crawlers) */}
+        {/* Open Graph */}
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="USDFGAMING" />
+        <meta property="og:url" content={canonical} />
+        <meta property="og:title" content="USDFGAMING – Skill-Based Crypto Gaming Platform" />
+        <meta property="og:description" content="Compete in verified challenges, earn $USDFG, and prove your skill. No gambling, 100% on-chain." />
+        <meta property="og:image" content={ogImage} />
+        <meta property="og:image:type" content="image/webp" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="USDFG mascot entering neon arcade: ENTER THE CHALLENGE" />
+
+        {/* Twitter / X */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:site" content="@USDFGAMING" />
+        <meta name="twitter:url" content={canonical} />
+        <meta name="twitter:title" content="USDFGAMING – Skill-Based Crypto Gaming Platform" />
+        <meta name="twitter:description" content="Compete in verified challenges, earn $USDFG, and prove your skill. No gambling, 100% on-chain." />
+        <meta name="twitter:image" content={ogImage} />
+
+        {/* JSON-LD */}
         <script type="application/ld+json">{`
           {
             "@context": "https://schema.org",
@@ -35,8 +57,8 @@ const Home: React.FC = () => {
               {
                 "@type": "Organization",
                 "name": "USDFGAMING",
-                "url": "https://usdfg.pro",
-                "logo": "https://usdfg.pro/assets/usdfg-og-banner.png",
+                "url": "${canonical}",
+                "logo": "${ogImage}",
                 "sameAs": [
                   "https://twitter.com/USDFGAMING",
                   "https://t.me/+TPjhAyJiAF9mZTI0",
@@ -46,10 +68,10 @@ const Home: React.FC = () => {
               },
               {
                 "@type": "WebSite",
-                "url": "https://usdfg.pro",
+                "url": "${canonical}",
                 "potentialAction": {
                   "@type": "SearchAction",
-                  "target": "https://usdfg.pro/search?q={search_term_string}",
+                  "target": "${canonical}search?q={search_term_string}",
                   "query-input": "required name=search_term_string"
                 }
               }
@@ -59,45 +81,32 @@ const Home: React.FC = () => {
       </Helmet>
 
       <Navbar />
-      <main
-        id="main-content"
-        role="main"
-        aria-label="Homepage Main Content"
-        className="min-h-screen bg-background flex-1"
-      >
+      <main id="main-content" role="main" aria-label="Homepage Main Content" className="min-h-screen bg-background flex-1">
         <section aria-label="Hero Section">
           <HeroSection />
         </section>
-
         <section aria-label="About Section">
           <AboutSection />
         </section>
-
         <section aria-label="Platform Features Section">
           <PlatformFeatures />
         </section>
-
         <section aria-label="Challenge System Section">
           <ChallengeSystem />
         </section>
-
         <section aria-label="Leaderboard Preview Section">
           <LeaderboardPreview />
         </section>
-
         <section aria-label="Tokenomics Section">
           <Tokenomics />
         </section>
-
         <section aria-label="Game Categories Section">
           <GameCategories />
         </section>
-
         <section aria-label="CTA Section">
           <CTASection />
         </section>
       </main>
-
       <Footer isRevealed={true} />
     </>
   );
