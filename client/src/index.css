@@ -1,73 +1,84 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>
-      USDFGAMING – Skill-Based Crypto Gaming Platform | Game. Earn. Conquer.
-    </title>
-    <meta
-      name="description"
-      content="USDFGAMING is the elite, skill-based crypto gaming platform. Compete in verified challenges, earn $USDFG, and prove your skill. No gambling. No chance. 100% on-chain rewards."
-    />
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-    <!-- Open Graph -->
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://usdfg.pro/" />
-    <meta
-      property="og:title"
-      content="USDFGAMING – Skill-Based Crypto Gaming Platform"
-    />
-    <meta
-      property="og:description"
-      content="Compete in verified challenges, earn $USDFG, and prove your skill. No gambling, 100% on-chain."
-    />
-    <meta
-      property="og:image"
-      content="https://usdfg.pro/assets/usdfg-og-banner.webp"
-    />
+@layer base {
+  :root {
+    /* Original Site Colors */
+    --primary-color: #6c11f3; /* Purple */
+    --secondary-color: #00e8fc; /* Cyan */
+    --accent-color: #ff0055; /* Red/Pink */
+    --text-light: #f5f5f5;
+    --text-dark: #202020;
+    --background-light: #242742;
+    --background-dark: #121421;
+    --star-color: #ffeb3b;
+    --neon-glow: 0 0 10px rgba(0, 232, 252, 0.7),
+      0 0 20px rgba(0, 232, 252, 0.5),
+      0 0 30px rgba(0, 232, 252, 0.3);
+    --accent-glow: 0 0 10px rgba(255, 0, 85, 0.7),
+      0 0 20px rgba(255, 0, 85, 0.5),
+      0 0 30px rgba(255, 0, 85, 0.3);
+    --primary-glow: 0 0 10px rgba(108, 17, 243, 0.7),
+      0 0 20px rgba(108, 17, 243, 0.5),
+      0 0 30px rgba(108, 17, 243, 0.3);
+    
+    /* Base colors - Mapped to original colors */
+    --background: 240 33% 8%;
+    --foreground: 0 0% 100%;
+    
+    /* Card colors */
+    --card: 240 30% 11%;
+    --card-foreground: 0 0% 100%;
+    
+    /* Popover colors */
+    --popover: 240 30% 11%;
+    --popover-foreground: 0 0% 100%;
+    
+    /* Border colors */
+    --border: 240 15% 20%;
+    --input: 240 15% 20%;
+    
+    /* Primary colors - Purple */
+    --primary: 270 81% 51%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Secondary colors - Cyan */
+    --secondary: 187 100% 50%;
+    --secondary-foreground: 240 33% 8%;
+    
+    /* Accent colors - Pink */
+    --accent: 340 100% 50%;
+    --accent-foreground: 0 0% 100%;
+    
+    /* Destructive colors */
+    --destructive: 0 100% 50%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Muted colors */
+    --muted: 240 15% 20%;
+    --muted-foreground: 0 0% 70%;
+    
+    /* Chart colors */
+    --chart-1: 270 81% 51%;
+    --chart-2: 187 100% 50%;
+    --chart-3: 340 100% 50%;
+    --chart-4: 60 100% 50%;
+    --chart-5: 135 100% 50%;
+    
+    /* Sidebar colors */
+    --sidebar-background: 240 33% 8%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 270 81% 51%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 187 100% 50%;
+    --sidebar-accent-foreground: 240 33% 8%;
+    --sidebar-border: 240 15% 20%;
+    --sidebar-ring: 240 15% 20%;
+    
+    --ring: 187 100% 50%;
+    --radius: 0.5rem;
+  }
+}
 
-    <!-- Twitter -->
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@USDFGAMING" />
-    <meta
-      name="twitter:title"
-      content="USDFGAMING – Skill-Based Crypto Gaming Platform"
-    />
-    <meta
-      name="twitter:description"
-      content="Compete in verified challenges, earn $USDFG, and prove your skill. No gambling, 100% on-chain."
-    />
-    <meta
-      name="twitter:image"
-      content="https://usdfg.pro/assets/usdfg-og-banner.webp"
-    />
-
-    <!-- Favicon & App Icons -->
-    <link rel="icon" type="image/x-icon" href="/assets/favicon.ico" />
-    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
-
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700&family=Chakra+Petch:wght@700&display=swap"
-      rel="stylesheet"
-    />
-
-    <!-- Canonical & Theme -->
-    <link rel="canonical" href="https://usdfg.pro" />
-    <meta name="theme-color" content="#0b0b0c" />
-
-    <!-- Author & Keywords -->
-    <meta name="author" content="Hussein Ali" />
-    <meta
-      name="keywords"
-      content="USDFG, $USDFG, skill-based crypto gaming, earn from skill not luck, leaderboard, non-custodial, fair play, Game. Earn. Conquer., USDFGAMING, gaming token"
-    />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+/* (keep all your @layer base, components, and animations here — the rest of your CSS you pasted earlier is fine) */
