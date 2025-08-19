@@ -98,15 +98,18 @@ const HeroSection: React.FC = () => {
           <div className="lg:w-1/2 flex justify-center lg:justify-end">
             <div ref={mascotRef} className="relative w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96">
               <div className="mascot-glow-pulse absolute inset-0 z-0 pointer-events-none" />
-              <img
-                ref={imgRef}
-                src={MASCOT_WEBP}
-                alt="USDFG mascot holding trophy - skill-based gaming rewards"
-                loading="eager"
-                decoding="async"
-                onError={handleImgError}
-                className="w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 max-w-full object-contain relative z-10 mascot-float"
-              />
+              <picture>
+                <source srcSet={MASCOT_WEBP} type="image/webp" />
+                <img
+                  ref={imgRef}
+                  src={MASCOT_PNG}
+                  alt="USDFG mascot holding trophy - skill-based gaming rewards"
+                  loading="eager"
+                  decoding="async"
+                  onError={handleImgError}
+                  className="w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 max-w-full object-contain relative z-10 mascot-float"
+                />
+              </picture>
             </div>
           </div>
         </div>

@@ -8,13 +8,16 @@ const AboutSection: React.FC = () => {
       <div className="absolute inset-0 bg-gradient-radial from-transparent via-black/50 to-black/80"></div>
       
       {/* Mascot Echo Watermark with enhanced glow */}
-      <img
-        src="/assets/usdfg-mascot-trophy-illustration.webp"
-        alt=""
-        className="absolute inset-0 w-full h-full object-contain opacity-10 pointer-events-none select-none z-0 filter blur-[2px]"
-        style={{ top: 0, left: 0 }}
-        loading="lazy" decoding="async"
-      />
+      <picture>
+        <source srcSet="/assets/usdfg-mascot-trophy-illustration.webp" type="image/webp" />
+        <img
+          src="/assets/usdfg-mascot-trophy-illustration.png"
+          alt=""
+          className="absolute inset-0 w-full h-full object-contain opacity-10 pointer-events-none select-none z-0 filter blur-[2px]"
+          style={{ top: 0, left: 0 }}
+          loading="lazy" decoding="async"
+        />
+      </picture>
       
       <div className="relative z-10 w-full max-w-4xl mx-auto px-4">
         <div className="relative w-full max-w-4xl mx-auto px-8 py-12 rounded-2xl bg-gradient-to-br from-white/10 to-[#00ffff22] border border-cyan-400/30 shadow-xl backdrop-blur-md flex flex-col items-center group transition-all duration-500 hover:shadow-[0_0_30px_rgba(0,255,255,0.2)]">
