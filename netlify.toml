@@ -1,0 +1,7 @@
+[build]
+  command = "npm install && npm run build"
+  publish = "dist/public"
+
+[build.environment]
+  NODE_VERSION = "20"
+  ROLLUP_DISABLE_NATIVE = "1"
