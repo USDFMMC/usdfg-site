@@ -380,7 +380,10 @@ const Whitepaper: React.FC = () => {
                 <p className="text-white mb-4">For questions, compliance inquiries, or media, contact <a href="mailto:founder@usdfg.pro" className="text-cyan-300 underline">founder@usdfg.pro</a> or <a href="mailto:support@usdfg.pro" className="text-cyan-300 underline">support@usdfg.pro</a> or DM <a href="https://twitter.com/USDFGAMING" className="text-cyan-300 underline" target="_blank" rel="noopener noreferrer">@USDFGAMING</a> on Twitter.</p>
                 <div className="mt-8 text-left max-w-md mx-auto">
                   <div className="flex items-center gap-3 mb-2">
-                    <img src="/assets/usdfg-logo-transparent.png" alt="USDFG Logo" className="w-10 h-10 rounded-full border border-cyan-400" />
+                    <picture>
+                      <source srcSet="/assets/usdfg-logo-transparent.webp" type="image/webp" />
+                      <img src="/assets/usdfg-logo-transparent.png" alt="USDFG Logo" className="w-10 h-10 rounded-full border border-cyan-400" />
+                    </picture>
                     <span className="font-bold text-cyan-300">Hussein Ali</span>
                   </div>
                   <div className="text-xs text-cyan-200 italic">Founder & Lead Developer, USDFGAMING</div>
