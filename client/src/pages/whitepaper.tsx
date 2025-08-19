@@ -252,12 +252,15 @@ const Whitepaper: React.FC = () => {
           <div className="container mx-auto px-4 py-12 sm:py-16 md:py-20">
             {/* Animated Logo */}
             <div className="flex justify-center mb-6 mt-8">
-              <img
-                src="/assets/usdfg-logo-transparent.png"
-                alt="USDFG Logo"
-                className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full border-2 border-cyan-400 shadow-[0_0_32px_#22d3ee99] animate-float"
-                style={{ background: 'rgba(11,11,12,0.7)' }}
-              />
+              <picture>
+                <source srcSet="/assets/usdfg-logo-transparent.webp" type="image/webp" />
+                <img
+                  src="/assets/usdfg-logo-transparent.png"
+                  alt="USDFG Logo"
+                  className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full border-2 border-cyan-400 shadow-[0_0_32px_#22d3ee99] animate-float"
+                  style={{ background: 'rgba(11,11,12,0.7)' }}
+                />
+              </picture>
             </div>
             <div className="max-w-2xl mx-auto mb-8 mt-8 px-6 py-4 rounded-xl bg-gradient-to-br from-white/10 to-[#a78bfa22] border border-purple-700/40 shadow-lg backdrop-blur-md animate-fade-in">
               <p className="text-base md:text-lg text-white/90 text-center">

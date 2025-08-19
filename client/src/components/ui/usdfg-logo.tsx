@@ -17,12 +17,15 @@ const USFDGLogo: React.FC<USFDGLogoProps> = ({
   
   return (
     <div className={`mascot-float ${sizeClasses[size]} ${className}`}>
-      <img 
-        src="/assets/usdfg-logo-transparent.png" 
-        alt=""
-        className="w-full h-full object-contain"
-        style={{filter: 'drop-shadow(0 0 10px rgba(0, 232, 252, 0.5))'}} 
-      />
+      <picture>
+        <source srcSet="/assets/usdfg-logo-transparent.webp" type="image/webp" />
+        <img 
+          src="/assets/usdfg-logo-transparent.png" 
+          alt=""
+          className="w-full h-full object-contain"
+          style={{filter: 'drop-shadow(0 0 10px rgba(0, 232, 252, 0.5))'}} 
+        />
+      </picture>
     </div>
   );
 };

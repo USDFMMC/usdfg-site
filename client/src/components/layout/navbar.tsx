@@ -29,13 +29,16 @@ const Navbar: React.FC = () => {
         <div className="container mx-auto px-4 py-3 flex flex-wrap items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center navbar-brand" title="Built for the ones who don't blink.">
-            <img 
-              src="/assets/usdfg-logo-transparent.png" 
-              alt="USDFG Logo" 
-              className="w-10 h-10 object-contain mr-3 mascot-glow"
-              style={{filter: 'drop-shadow(0 0 10px rgba(0, 232, 252, 0.5))'}} 
-              loading="lazy" decoding="async"
-            />
+            <picture>
+              <source srcSet="/assets/usdfg-logo-transparent.webp" type="image/webp" />
+              <img 
+                src="/assets/usdfg-logo-transparent.png" 
+                alt="USDFG Logo" 
+                className="w-10 h-10 object-contain mr-3 mascot-glow"
+                style={{filter: 'drop-shadow(0 0 10px rgba(0, 232, 252, 0.5))'}} 
+                loading="lazy" decoding="async"
+              />
+            </picture>
             <span 
               className="bg-gradient-to-r from-cyan-400 via-purple-500 to-rose-400 bg-clip-text text-transparent font-extrabold drop-shadow-[0_0_20px_rgba(255,255,255,0.4)] text-xl tracking-wide"
             >USDFG</span>
