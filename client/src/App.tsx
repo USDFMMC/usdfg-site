@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
+import AppRedirect from "@/pages/app-redirect";
 import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
 import Whitepaper from "@/pages/whitepaper";
@@ -17,7 +18,7 @@ function Router() {
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
       <Route path="/whitepaper" component={Whitepaper} />
-      <Route path="/app" component={Home} />
+      <Route path="/app" component={AppRedirect} />
       <Route path="/login" component={Home} />
       <Route component={NotFound} />
     </Switch>
