@@ -1,0 +1,64 @@
+name: Deploy landing + app to GitHub Pages
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout landing site
+        uses: actions/checkout@v4
+
+      - name: Prepare publish dir
+        run: mkdir -p _site
+
+      # Copy landing site content into _site (adjust if your site is built)
+      - name: Stage landing content
+        run: |
+          rsync -av --delete \
+            --exclude ".git" \
+            --exclude ".github" \
+            --exclude "node_modules" \
+            ./ _site/
+
+      # Build the app from the other repo and place it at /app
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Fetch app repo (public clone)
+        run: |
+          git clone --depth=1 https://github.com/USDFMMC/usdfg-app.git app-src
+
+      - name: Build app
+        working-directory: app-src
+        run: |
+          npm ci
+          npm run build
+
+      - name: Put app build into /app
+        run: |
+          mkdir -p _site/app
+          rsync -av app-src/dist/ _site/app/
+
+      # Upload and deploy Pages
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
