@@ -9,33 +9,44 @@
     <meta property="og:type" content="website" />
     <meta property="og:title" content="USDFGAMING – Skill-Based Crypto Gaming Platform" />
     <meta property="og:description" content="Compete in verified challenges, earn $USDFG, and prove your skill. No gambling, 100% on-chain." />
-    <meta property="og:image" content="https://usdfg.pro/assets/usdfg-logo-transparent.png?v=9" />
-    <meta property="og:image:width" content="742" />
-    <meta property="og:image:height" content="742" />
-    <meta property="og:image:type" content="image/png" />
-    <meta property="og:image:alt" content="USDFGAMING Logo" />
+    <meta property="og:image" content="https://usdfg.pro/assets/usdfg-challenge-simple-144.png?v=24" />
     <meta property="og:url" content="https://usdfg.pro/" />
-    <meta property="og:site_name" content="USDFGAMING" />
-    <meta property="og:locale" content="en_US" />
     
     <!-- Twitter -->
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="USDFGAMING – Skill-Based Crypto Gaming Platform" />
     <meta name="twitter:description" content="Compete in verified challenges, earn $USDFG, and prove your skill. No gambling, 100% on-chain." />
-    <meta name="twitter:image" content="https://usdfg.pro/assets/usdfg-logo-transparent.png?v=9" />
-    <meta name="twitter:image:alt" content="USDFGAMING Logo" />
-    <meta name="twitter:site" content="@usdfgaming" />
-    <meta name="twitter:creator" content="@usdfgaming" />
+    <meta name="twitter:image" content="https://usdfg.pro/assets/usdfg-challenge-simple-144.png?v=24" />
     <link rel="icon" type="image/png" href="/assets/usdfg-logo-transparent.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#0B0F1A" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="USDFG Arena" />
+    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700&family=Chakra+Petch:wght@700&display=swap" rel="stylesheet">
-    <script type="module" crossorigin src="/assets/index-BkyVOB_e.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/vendor-BoiGRjUv.js">
-    <link rel="modulepreload" crossorigin href="/assets/ui-C4Gd4QnU.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-BEMTBgMr.css">
+    <script type="module" crossorigin src="/assets/index-Dg1b3Wk9.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/vendor-CMV0L3Jz.js">
+    <link rel="modulepreload" crossorigin href="/assets/ui-BvUBh0ww.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-CduRQG82.css">
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Register service worker for PWA functionality
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('SW registered: ', registration);
+            })
+            .catch((registrationError) => {
+              console.log('SW registration failed: ', registrationError);
+            });
+        });
+      }
+    </script>
   </body>
 </html> 

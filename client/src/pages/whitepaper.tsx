@@ -4,55 +4,7 @@ import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
 import { FaLock, FaTrophy, FaUsers, FaChartLine, FaRocket, FaMobileAlt, FaGamepad, FaCheckCircle, FaGavel, FaUserShield, FaShieldAlt, FaBalanceScale, FaGlobe } from "react-icons/fa";
 
-// Custom hooks for animations
-const useSectionFadeIn = (direction = 'left') => {
-  const ref = useRef(null);
-  useEffect(() => {
-    const node = ref.current;
-    if (!node) return;
-    const handleIntersect = (entries: IntersectionObserverEntry[]) => {
-      entries.forEach((entry: IntersectionObserverEntry) => {
-        if (entry.isIntersecting) {
-          if (direction === 'left') {
-            entry.target.classList.add('animate-slide-in-left');
-          } else {
-            entry.target.classList.add('animate-slide-in-right');
-          }
-        }
-      });
-    };
-    const observer = new window.IntersectionObserver(handleIntersect, { threshold: 0.15 });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [direction]);
-  return ref;
-};
-
-// Tokenomics count-up hook
-const useCountUp = (target: number, duration = 1000) => {
-  const [value, setValue] = useState(0);
-  const ref = useRef(null);
-  const animRef = useRef();
-  const start = () => {
-    let startTime: number | undefined;
-    const animate = (timestamp: number) => {
-      if (!startTime) startTime = timestamp;
-      const progress = Math.min((timestamp - startTime) / duration, 1);
-      setValue(Math.floor(progress * target));
-      if (progress < 1) {
-        animRef.current = requestAnimationFrame(animate);
-      } else {
-        setValue(target);
-      }
-    };
-    animRef.current = requestAnimationFrame(animate);
-  };
-  const reset = () => {
-    setValue(0);
-    if (animRef.current) cancelAnimationFrame(animRef.current);
-  };
-  return [value, start, reset];
-};
+// Removed custom hooks - they were causing useRef dispatcher errors
 
 const toc = [
   { id: "intro", label: "Why This Whitepaper Matters" },
@@ -120,20 +72,20 @@ const Whitepaper: React.FC = () => {
     }
   }, []);
 
-  // Section refs (alternate left/right)
-  const visionRef = useSectionFadeIn('left');
-  const principlesRef = useSectionFadeIn('right');
-  const categoriesRef = useSectionFadeIn('left');
-  const modesRef = useSectionFadeIn('right');
-  const flowRef = useSectionFadeIn('left');
-  const utilityRef = useSectionFadeIn('right');
-  const tokenFlowRef = useSectionFadeIn('left');
-  const disputeRef = useSectionFadeIn('right');
-  const legalRef = useSectionFadeIn('left');
-  const roadmapRef = useSectionFadeIn('right');
-  const tokenomicsRef = useSectionFadeIn('left');
-  const founderRef = useSectionFadeIn('right');
-  const linksRef = useSectionFadeIn('left');
+  // Section refs (simple refs without custom hooks)
+  const visionRef = useRef<HTMLDivElement>(null);
+  const principlesRef = useRef<HTMLDivElement>(null);
+  const categoriesRef = useRef<HTMLDivElement>(null);
+  const modesRef = useRef<HTMLDivElement>(null);
+  const flowRef = useRef<HTMLDivElement>(null);
+  const utilityRef = useRef<HTMLDivElement>(null);
+  const tokenFlowRef = useRef<HTMLDivElement>(null);
+  const disputeRef = useRef<HTMLDivElement>(null);
+  const legalRef = useRef<HTMLDivElement>(null);
+  const roadmapRef = useRef<HTMLDivElement>(null);
+  const tokenomicsRef = useRef<HTMLDivElement>(null);
+  const founderRef = useRef<HTMLDivElement>(null);
+  const linksRef = useRef<HTMLDivElement>(null);
 
   // Tokenomics count-up states
   const [val1, setVal1] = useState(0);

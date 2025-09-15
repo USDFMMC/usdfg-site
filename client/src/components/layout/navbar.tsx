@@ -55,7 +55,7 @@ const Navbar: React.FC = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-6" role="navigation" aria-label="Main Navigation">
-            <Link href="/app">
+            <Link to="/app">
               <Button className="bg-gradient-to-r from-purple-600 to-pink-500 text-white px-5 py-2 rounded-full font-semibold shadow-[0_0_24px_#a78bfa99] hover:brightness-110 flex items-center gap-2 transition-all duration-200">
                 <span role="img" aria-label="controller">🎮</span> Enter the Arena
               </Button>
@@ -74,7 +74,7 @@ const Navbar: React.FC = () => {
                   <X className="w-6 h-6" />
                 </button>
                 <nav className="flex flex-col space-y-4">
-                  <Link href="/app" onClick={toggleMobileMenu}>
+                  <Link to="/app" onClick={toggleMobileMenu}>
                     <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-500 text-white px-5 py-2 rounded-full font-semibold shadow-[0_0_24px_#a78bfa99] hover:brightness-110 flex items-center gap-2 transition-all duration-200">
                       <span role="img" aria-label="controller">🎮</span> Enter the Arena
                     </Button>
