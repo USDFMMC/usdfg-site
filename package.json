@@ -44,6 +44,7 @@
     "@radix-ui/react-tooltip": "^1.2.7",
     "@replit/vite-plugin-cartographer": "^0.0.11",
     "@replit/vite-plugin-shadcn-theme-json": "^0.0.4",
+    "@solana/web3.js": "^1.98.4",
     "@tanstack/react-query": "^5.60.5",
     "@types/cors": "^2.8.17",
     "@types/react-helmet": "^6.1.11",
@@ -82,7 +83,6 @@
     "zod-validation-error": "^3.4.0"
   },
   "devDependencies": {
-    "rollup": "4.9.6",
     "@replit/vite-plugin-runtime-error-modal": "^0.0.3",
     "@tailwindcss/typography": "^0.5.15",
     "@types/connect-pg-simple": "^7.0.3",
@@ -99,6 +99,7 @@
     "drizzle-kit": "^0.31.1",
     "esbuild": "^0.25.4",
     "postcss": "^8.4.47",
+    "rollup": "4.9.6",
     "tailwindcss": "^3.4.14",
     "terser": "^5.40.0",
     "tsx": "^4.19.4",

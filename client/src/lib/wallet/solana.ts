@@ -1,4 +1,8 @@
 // Simple wallet connection functions - no React hooks, no useRef
+import { Connection, PublicKey, SystemProgram, Transaction, clusterApiUrl } from "@solana/web3.js";
+
+// Create connection to Solana devnet
+const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
 
 export const connectPhantom = async () => {
   if (typeof window === 'undefined') {
@@ -84,9 +88,55 @@ export const formatPublicKey = (publicKey: string, length: number = 8) => {
   return `${publicKey.slice(0, length)}...${publicKey.slice(-length)}`;
 };
 
+export const getSOLBalance = async (publicKey: string): Promise<number> => {
+  try {
+    const balanceLamports = await connection.getBalance(new PublicKey(publicKey));
+    return balanceLamports / 1e9; // convert lamports to SOL
+  } catch (err) {
+    console.error("Error fetching SOL balance:", err);
+    return 0;
+  }
+};
+
 export const getUSDFGBalance = async (publicKey: string): Promise<number> => {
   // Mock balance for now - replace with actual Solana RPC call
   return Math.floor(Math.random() * 5000) + 1000;
+};
+
+export const sendSOL = async (senderPublicKey: string, recipientPublicKey: string, amount: number): Promise<string> => {
+  try {
+    // Get the connected wallet provider
+    const provider = (window as any).solana;
+    if (!provider) {
+      throw new Error("No wallet provider found");
+    }
+
+    // Create transaction
+    const transaction = new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: new PublicKey(senderPublicKey),
+        toPubkey: new PublicKey(recipientPublicKey),
+        lamports: amount * 1e9, // convert SOL to lamports
+      })
+    );
+
+    // Get recent blockhash
+    const { blockhash } = await connection.getLatestBlockhash();
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = new PublicKey(senderPublicKey);
+
+    // Sign and send transaction
+    const signedTransaction = await provider.signTransaction(transaction);
+    const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+
+    // Confirm transaction
+    await connection.confirmTransaction(signature, "confirmed");
+
+    return signature;
+  } catch (err) {
+    console.error("Error sending SOL:", err);
+    throw err;
+  }
 };
 
 export const hasPhantomInstalled = () => {

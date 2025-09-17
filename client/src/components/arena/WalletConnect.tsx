@@ -6,7 +6,8 @@ import {
   getWalletPublicKey, 
   isWalletConnected,
   formatPublicKey,
-  getUSDFGBalance,
+  getSOLBalance,
+  sendSOL,
   hasPhantomInstalled,
   hasSolflareInstalled,
   hasAnyWalletInstalled
@@ -27,6 +28,7 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
   const [balance, setBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
 
   // Check if wallet is already connected on mount
   useEffect(() => {
@@ -36,8 +38,8 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
         if (pubkey) {
           setAddress(pubkey);
           onConnect();
-          // Fetch balance
-          getUSDFGBalance(pubkey).then(setBalance).catch(console.error);
+          // Fetch real SOL balance
+          getSOLBalance(pubkey).then(setBalance).catch(console.error);
         }
       }
     };
@@ -52,7 +54,7 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
     try {
       const pubkey = await connectPhantom();
       setAddress(pubkey);
-      const bal = await getUSDFGBalance(pubkey);
+      const bal = await getSOLBalance(pubkey);
       setBalance(bal);
       onConnect();
     } catch (err) {
@@ -70,7 +72,7 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
     try {
       const pubkey = await connectSolflare();
       setAddress(pubkey);
-      const bal = await getUSDFGBalance(pubkey);
+      const bal = await getSOLBalance(pubkey);
       setBalance(bal);
       onConnect();
     } catch (err) {
@@ -93,6 +95,30 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
     }
   };
 
+  const handleTestTransaction = async () => {
+    if (!address) return;
+    
+    setSending(true);
+    setError(null);
+    
+    try {
+      // Send 0.01 SOL to a test address (you can change this)
+      const testRecipient = "11111111111111111111111111111112"; // System program address as test
+      const signature = await sendSOL(address, testRecipient, 0.01);
+      
+      // Refresh balance after transaction
+      const newBalance = await getSOLBalance(address);
+      setBalance(newBalance);
+      
+      alert(`Test transaction sent! Signature: ${signature.slice(0, 8)}...`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Transaction failed");
+      console.error("Test transaction failed:", err);
+    } finally {
+      setSending(false);
+    }
+  };
+
   // If connected, show connected state
   if (address) {
     return (
@@ -102,12 +128,19 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
             {formatPublicKey(address)}
           </div>
           <div className="text-white font-semibold">
-            {balance ? `${balance.toFixed(2)} $USDFG` : "Loading..."}
+            {balance !== null ? `${balance.toFixed(4)} SOL` : "Loading..."}
           </div>
         </div>
         <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
           🟢 Connected
         </span>
+        <button 
+          onClick={handleTestTransaction}
+          disabled={sending || (balance !== null && balance < 0.01)}
+          className="px-3 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded hover:bg-blue-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {sending ? "Sending..." : "Test 0.01 SOL"}
+        </button>
         <button 
           onClick={handleDisconnect}
           className="px-3 py-1 border border-gray-600 text-white rounded hover:bg-gray-800 transition-colors"
