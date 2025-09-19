@@ -31,7 +31,7 @@ const ArenaHome: React.FC = () => {
     
     const newChallenge = {
       id: `ch_${Date.now()}`,
-      title: `${challengeData.game} ${challengeData.mode}`,
+      title: challengeData.title || `${challengeData.game} ${challengeData.mode}`,
       game: challengeData.game,
       mode: challengeData.mode,
       entryFee: challengeData.entryFee,
@@ -39,7 +39,12 @@ const ArenaHome: React.FC = () => {
       players: 1,
       capacity: 8,
       category: challengeData.category,
-      creator: getWalletPublicKey() || "unknown" // Track who created the challenge
+      creator: getWalletPublicKey() || "unknown", // Track who created the challenge
+      description: challengeData.description || "",
+      rules: challengeData.rules || "",
+      matchFormat: challengeData.matchFormat || "",
+      requirements: challengeData.requirements || "",
+      restrictions: challengeData.restrictions || ""
     };
     setChallenges(prev => [newChallenge, ...prev]);
   };
@@ -217,6 +222,51 @@ const ArenaHome: React.FC = () => {
                             <div className="text-gray-400 text-xs">Players</div>
                           </div>
                         </div>
+
+                        {/* Challenge Details - Collapsible */}
+                        {(challenge.description || challenge.rules || challenge.requirements) && (
+                          <div className="mb-4">
+                            <details className="group">
+                              <summary className="cursor-pointer text-sm text-cyan-400 hover:text-cyan-300 flex items-center">
+                                <span className="mr-2">📋</span>
+                                Challenge Details
+                                <span className="ml-auto group-open:rotate-180 transition-transform">▼</span>
+                              </summary>
+                              <div className="mt-3 space-y-3 text-sm">
+                                {challenge.description && (
+                                  <div>
+                                    <span className="text-gray-400 font-medium">Description:</span>
+                                    <p className="text-gray-300 mt-1">{challenge.description}</p>
+                                  </div>
+                                )}
+                                {challenge.rules && (
+                                  <div>
+                                    <span className="text-gray-400 font-medium">Rules:</span>
+                                    <p className="text-gray-300 mt-1">{challenge.rules}</p>
+                                  </div>
+                                )}
+                                {challenge.requirements && (
+                                  <div>
+                                    <span className="text-gray-400 font-medium">Requirements:</span>
+                                    <p className="text-gray-300 mt-1">{challenge.requirements}</p>
+                                  </div>
+                                )}
+                                {challenge.matchFormat && (
+                                  <div>
+                                    <span className="text-gray-400 font-medium">Format:</span>
+                                    <p className="text-gray-300 mt-1">{challenge.matchFormat}</p>
+                                  </div>
+                                )}
+                                {challenge.restrictions && (
+                                  <div>
+                                    <span className="text-gray-400 font-medium">Restrictions:</span>
+                                    <p className="text-gray-300 mt-1">{challenge.restrictions}</p>
+                                  </div>
+                                )}
+                              </div>
+                            </details>
+                          </div>
+                        )}
                         
                         {isOwner ? (
                           <div className="flex space-x-2">
@@ -322,11 +372,17 @@ const CreateChallengeModal: React.FC<{ onClose: () => void; isConnected: boolean
     category: 'Fighting',
     game: 'Street Fighter',
     mode: '1v1',
-    entryFee: 50
+    entryFee: 50,
+    title: '',
+    description: '',
+    rules: '',
+    matchFormat: '',
+    requirements: '',
+    restrictions: ''
   });
 
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 4;
+  const totalSteps = 6;
   const [connecting, setConnecting] = useState(false);
 
   const categories = {
@@ -513,8 +569,83 @@ const CreateChallengeModal: React.FC<{ onClose: () => void; isConnected: boolean
               </div>
             )}
 
-            {/* Step 4: Entry & Prize */}
+            {/* Step 4: Challenge Details */}
             {currentStep === 4 && (
+              <div className="space-y-4">
+                <Field label="Challenge Title">
+                  <input
+                    type="text"
+                    value={formData.title}
+                    onChange={(e) => setFormData({...formData, title: e.target.value})}
+                    className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-white"
+                    placeholder={`${formData.game} ${formData.mode} Challenge`}
+                  />
+                </Field>
+                
+                <Field label="Challenge Description">
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({...formData, description: e.target.value})}
+                    className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-white h-24 resize-none"
+                    placeholder="Describe your challenge, what makes it unique, and what challengers can expect..."
+                  />
+                </Field>
+
+                <Field label="Rules & Regulations">
+                  <textarea
+                    value={formData.rules}
+                    onChange={(e) => setFormData({...formData, rules: e.target.value})}
+                    className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-white h-24 resize-none"
+                    placeholder="List specific rules, banned items, time limits, scoring system, etc..."
+                  />
+                </Field>
+
+                <div className="flex justify-between">
+                  <TertiaryButton onClick={prevStep}>Back</TertiaryButton>
+                  <PrimaryButton onClick={nextStep}>Next</PrimaryButton>
+                </div>
+              </div>
+            )}
+
+            {/* Step 5: Match Format & Requirements */}
+            {currentStep === 5 && (
+              <div className="space-y-4">
+                <Field label="Match Format">
+                  <textarea
+                    value={formData.matchFormat}
+                    onChange={(e) => setFormData({...formData, matchFormat: e.target.value})}
+                    className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-white h-20 resize-none"
+                    placeholder="Best of 3 rounds, 5-minute matches, specific map/mode, etc..."
+                  />
+                </Field>
+
+                <Field label="Requirements">
+                  <textarea
+                    value={formData.requirements}
+                    onChange={(e) => setFormData({...formData, requirements: e.target.value})}
+                    className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-white h-20 resize-none"
+                    placeholder="Minimum rank, required equipment, platform requirements, etc..."
+                  />
+                </Field>
+
+                <Field label="Restrictions">
+                  <textarea
+                    value={formData.restrictions}
+                    onChange={(e) => setFormData({...formData, restrictions: e.target.value})}
+                    className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-white h-20 resize-none"
+                    placeholder="Banned characters, items, strategies, or any other limitations..."
+                  />
+                </Field>
+
+                <div className="flex justify-between">
+                  <TertiaryButton onClick={prevStep}>Back</TertiaryButton>
+                  <PrimaryButton onClick={nextStep}>Next</PrimaryButton>
+                </div>
+              </div>
+            )}
+
+            {/* Step 6: Entry & Prize */}
+            {currentStep === 6 && (
               <div className="space-y-4">
                 <div className="space-y-4">
                   <Field label="Entry Fee (USDFG)">
