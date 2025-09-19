@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Helmet } from "react-helmet";
 import { Link } from "react-router-dom";
 import WalletConnect from "@/components/arena/WalletConnect";
-import { connectPhantom, hasPhantomInstalled } from "@/lib/wallet/solana";
+import { connectPhantom, hasPhantomInstalled, getWalletPublicKey } from "@/lib/wallet/solana";
 
 const ArenaHome: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -19,7 +19,8 @@ const ArenaHome: React.FC = () => {
       prizePool: 95, // 50 * 2 - 5% platform fee = 100 - 5 = 95
       players: 2,
       capacity: 8,
-      category: "Fighting"
+      category: "Fighting",
+      creator: "system" // System-generated challenge
     }
   ]);
 
@@ -37,9 +38,21 @@ const ArenaHome: React.FC = () => {
       prizePool: Math.round(prizePool), // Round to whole number
       players: 1,
       capacity: 8,
-      category: challengeData.category
+      category: challengeData.category,
+      creator: getWalletPublicKey() || "unknown" // Track who created the challenge
     };
     setChallenges(prev => [newChallenge, ...prev]);
+  };
+
+  const handleDeleteChallenge = (challengeId: string) => {
+    if (window.confirm("Are you sure you want to delete this challenge? This action cannot be undone.")) {
+      setChallenges(prev => prev.filter(challenge => challenge.id !== challengeId));
+    }
+  };
+
+  const isChallengeOwner = (challenge: any) => {
+    const currentWallet = getWalletPublicKey();
+    return currentWallet && challenge.creator === currentWallet;
   };
 
   return (
@@ -166,50 +179,75 @@ const ArenaHome: React.FC = () => {
               </div>
               <div className="p-6">
                 <div className="space-y-4">
-                  {challenges.map((challenge) => (
-                    <div key={challenge.id} className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-gradient-to-r from-red-500 to-pink-500 rounded-lg flex items-center justify-center">
-                            <span className="text-white">🥊</span>
+                  {challenges.map((challenge) => {
+                    const isOwner = isChallengeOwner(challenge);
+                    return (
+                      <div key={challenge.id} className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-gradient-to-r from-red-500 to-pink-500 rounded-lg flex items-center justify-center">
+                              <span className="text-white">🥊</span>
+                            </div>
+                            <div>
+                              <h3 className="text-white font-semibold">{challenge.title}</h3>
+                              <p className="text-gray-400 text-sm">{challenge.category} • {challenge.game}</p>
+                              {isOwner && (
+                                <span className="inline-block px-2 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-xs mt-1">
+                                  Your Challenge
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <div>
-                            <h3 className="text-white font-semibold">{challenge.title}</h3>
-                            <p className="text-gray-400 text-sm">{challenge.category} • {challenge.game}</p>
+                          <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
+                            Active
+                          </span>
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-4 mb-4">
+                          <div className="text-center">
+                            <div className="text-white font-semibold">{challenge.entryFee} $USDFG</div>
+                            <div className="text-gray-400 text-xs">Entry Fee</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-white font-semibold">{challenge.prizePool} $USDFG</div>
+                            <div className="text-gray-400 text-xs">Prize Pool</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-white font-semibold">{challenge.players}/{challenge.capacity}</div>
+                            <div className="text-gray-400 text-xs">Players</div>
                           </div>
                         </div>
-                        <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
-                          Active
-                        </span>
+                        
+                        {isOwner ? (
+                          <div className="flex space-x-2">
+                            <button 
+                              onClick={() => handleDeleteChallenge(challenge.id)}
+                              className="flex-1 px-4 py-2 bg-red-600/20 text-red-400 border border-red-600/30 font-semibold rounded-lg hover:bg-red-600/30 transition-all"
+                            >
+                              🗑️ Delete
+                            </button>
+                            <button 
+                              className="flex-1 px-4 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 font-semibold rounded-lg hover:bg-gray-600/30 transition-all"
+                              disabled
+                            >
+                              ✏️ Edit (Coming Soon)
+                            </button>
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={() => {
+                              setSelectedChallenge(challenge);
+                              setShowJoinModal(true);
+                            }}
+                            className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50"
+                            disabled={!isConnected}
+                          >
+                            {!isConnected ? "Connect to Join" : "Join Challenge"}
+                          </button>
+                        )}
                       </div>
-                      
-                      <div className="grid grid-cols-3 gap-4 mb-4">
-                        <div className="text-center">
-                          <div className="text-white font-semibold">{challenge.entryFee} $USDFG</div>
-                          <div className="text-gray-400 text-xs">Entry Fee</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-white font-semibold">{challenge.prizePool} $USDFG</div>
-                          <div className="text-gray-400 text-xs">Prize Pool</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-white font-semibold">{challenge.players}/{challenge.capacity}</div>
-                          <div className="text-gray-400 text-xs">Players</div>
-                        </div>
-                      </div>
-                      
-                      <button 
-                        onClick={() => {
-                          setSelectedChallenge(challenge);
-                          setShowJoinModal(true);
-                        }}
-                        className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50"
-                        disabled={!isConnected}
-                      >
-                        {!isConnected ? "Connect to Join" : "Join Challenge"}
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>

@@ -45,7 +45,7 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
     };
 
     checkConnection();
-  }, [onConnect]);
+  }, []); // Removed onConnect dependency to prevent infinite loop
 
   const handleConnectPhantom = async () => {
     setLoading(true);
