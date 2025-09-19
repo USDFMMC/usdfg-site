@@ -322,8 +322,7 @@ const CreateChallengeModal: React.FC<{ onClose: () => void; isConnected: boolean
     category: 'Fighting',
     game: 'Street Fighter',
     mode: '1v1',
-    entryFee: 50,
-    prizePool: 150
+    entryFee: 50
   });
 
   const [currentStep, setCurrentStep] = useState(1);
@@ -517,8 +516,8 @@ const CreateChallengeModal: React.FC<{ onClose: () => void; isConnected: boolean
             {/* Step 4: Entry & Prize */}
             {currentStep === 4 && (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Entry (USDFG)">
+                <div className="space-y-4">
+                  <Field label="Entry Fee (USDFG)">
                     <input
                       type="number"
                       value={formData.entryFee}
@@ -527,15 +526,33 @@ const CreateChallengeModal: React.FC<{ onClose: () => void; isConnected: boolean
                       placeholder="50"
                     />
                   </Field>
-                  <Field label="Prize Pool (USDFG)">
-                    <input
-                      type="number"
-                      value={formData.prizePool}
-                      onChange={(e) => setFormData({...formData, prizePool: Number(e.target.value)})}
-                      className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-white"
-                      placeholder="150"
-                    />
-                  </Field>
+                  
+                  {/* Prize Calculation Display */}
+                  <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+                    <h4 className="text-white font-semibold mb-3">Prize Pool Calculation</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Entry Fee:</span>
+                        <span className="text-white">{formData.entryFee} USDFG</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Challenger Match:</span>
+                        <span className="text-white">{formData.entryFee} USDFG</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Total Pool:</span>
+                        <span className="text-white">{formData.entryFee * 2} USDFG</span>
+                      </div>
+                      <div className="flex justify-between border-t border-white/10 pt-2">
+                        <span className="text-gray-400">Platform Fee (5%):</span>
+                        <span className="text-red-400">-{Math.round(formData.entryFee * 2 * 0.05)} USDFG</span>
+                      </div>
+                      <div className="flex justify-between border-t border-white/10 pt-2">
+                        <span className="text-cyan-400 font-semibold">Winner Gets:</span>
+                        <span className="text-cyan-400 font-semibold">{Math.round(formData.entryFee * 2 * 0.95)} USDFG</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Review Summary */}
@@ -560,7 +577,7 @@ const CreateChallengeModal: React.FC<{ onClose: () => void; isConnected: boolean
                     </div>
                     <div className="flex justify-between">
                       <span>Prize Pool:</span>
-                      <span className="text-cyan-400">{formData.prizePool} USDFG</span>
+                      <span className="text-cyan-400">{Math.round(formData.entryFee * 2 * 0.95)} USDFG</span>
                     </div>
                   </div>
                 </div>
