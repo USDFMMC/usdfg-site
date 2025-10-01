@@ -27,10 +27,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700&family=Chakra+Petch:wght@700&display=swap" rel="stylesheet">
-    <script type="module" crossorigin src="/assets/index-IupdRwAQ.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/vendor-guW7Vb5_.js">
-    <link rel="modulepreload" crossorigin href="/assets/ui-B3p36Ftk.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-yTMe6Lss.css">
+    <script type="module" crossorigin src="/assets/index-Bl2_uANK.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/vendor-DAtjdg_E.js">
+    <link rel="modulepreload" crossorigin href="/assets/ui-fFnAVTM0.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-gkkeCc8K.css">
   </head>
   <body>
     <div id="root"></div>
@@ -47,6 +47,46 @@
             });
         });
       }
+
+      // Crosshair functionality - runs after DOM loads
+      document.addEventListener('DOMContentLoaded', () => {
+        let horizontal, vertical;
+
+        const initCrosshair = () => {
+          horizontal = document.querySelector('.crosshair-horizontal');
+          vertical = document.querySelector('.crosshair-vertical');
+        };
+
+        const handleMouseMove = (e) => {
+          if (horizontal && vertical) {
+            horizontal.style.opacity = '0.6';
+            vertical.style.opacity = '0.6';
+            horizontal.style.top = e.clientY + 'px';
+            vertical.style.left = e.clientX + 'px';
+          }
+        };
+
+        const handleMouseLeave = () => {
+          if (horizontal && vertical) {
+            horizontal.style.opacity = '0';
+            vertical.style.opacity = '0';
+          }
+        };
+
+        // Initialize when component loads
+        const checkForCrosshair = () => {
+          if (document.querySelector('.crosshair-container')) {
+            initCrosshair();
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseleave', handleMouseLeave);
+          } else {
+            // Check again in 100ms if crosshair isn't ready yet
+            setTimeout(checkForCrosshair, 100);
+          }
+        };
+
+        checkForCrosshair();
+      });
     </script>
   </body>
 </html> 
