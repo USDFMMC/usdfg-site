@@ -65,9 +65,9 @@
     "lucide-react": "^0.511.0",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
-    "react": "^18.3.1",
+    "react": "^19.1.1",
     "react-day-picker": "^8.10.1",
-    "react-dom": "^18.3.1",
+    "react-dom": "^19.1.1",
     "react-helmet": "^6.1.0",
     "react-hook-form": "^7.53.1",
     "react-icons": "^5.4.0",
@@ -88,28 +88,28 @@
     "@types/connect-pg-simple": "^7.0.3",
     "@types/express": "4.17.21",
     "@types/express-session": "^1.18.0",
-    "@types/node": "20.16.11",
+    "@types/node": "^24.6.1",
     "@types/passport": "^1.0.16",
     "@types/passport-local": "^1.0.38",
-    "@types/react": "^18.3.11",
-    "@types/react-dom": "^18.3.1",
+    "@types/react": "^19.1.17",
+    "@types/react-dom": "^19.1.11",
     "@types/ws": "^8.5.13",
-    "@vitejs/plugin-react": "^4.3.2",
+    "@vitejs/plugin-react": "^5.0.4",
     "autoprefixer": "^10.4.20",
-    "drizzle-kit": "^0.31.1",
-    "esbuild": "^0.25.4",
+    "drizzle-kit": "^0.18.1",
+    "esbuild": "^0.25.10",
     "postcss": "^8.4.47",
-    "rollup": "4.9.6",
+    "rollup": "4.52.3",
     "tailwindcss": "^3.4.14",
     "terser": "^5.40.0",
     "tsx": "^4.19.4",
     "typescript": "5.6.3",
-    "vite": "^6.3.5"
+    "vite": "^7.1.7"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
   },
   "overrides": {
-    "rollup": "4.9.6"
+    "rollup": "4.52.3"
   }
 }
