@@ -70,7 +70,7 @@ const HeroSection: React.FC = () => {
             </p>
 
             <div className="flex flex-col sm:flex-row justify-center lg:justify-start gap-4">
-              <Link href="#platform">
+              <a href="#platform">
                 <Button
                   className="w-full sm:w-auto px-6 py-5 transition-all btn-animation"
                   style={{
@@ -81,9 +81,9 @@ const HeroSection: React.FC = () => {
                 >
                   EXPLORE PLATFORM
                 </Button>
-              </Link>
+              </a>
 
-              <Link href="/whitepaper">
+              <Link to="/whitepaper">
                 <Button
                   className="w-full sm:w-auto px-6 py-5 transition-all btn-animation border-2 border-cyan-400 text-white font-bold bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 hover:brightness-125 hover:scale-105"
                   style={{ boxShadow: "0 0 16px #00e8fc99, 0 0 4px #fff1", fontWeight: 700 }}
