@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "wouter";
+import { Link } from "react-router-dom";
 import { Twitter, Send, Instagram, Music2 } from "lucide-react";
 
 interface FooterProps {

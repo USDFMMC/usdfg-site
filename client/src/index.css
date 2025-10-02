@@ -84,6 +84,16 @@
     @apply bg-background text-foreground;
     background: linear-gradient(135deg, var(--background-dark) 0%, #1a142e 100%) !important;
     background-color: #121421 !important;
+    cursor: none; /* Hide default cursor for crosshair effect */
+  }
+
+  /* Crosshair styles */
+  .crosshair-horizontal {
+    transition: opacity 0.2s ease-out, top 0.02s linear;
+  }
+  
+  .crosshair-vertical {
+    transition: opacity 0.2s ease-out, left 0.02s linear;
   }
   
   h1, h2, h3, h4, h5, h6 {

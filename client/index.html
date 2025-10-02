@@ -44,6 +44,46 @@
             });
         });
       }
+
+      // Crosshair functionality - runs after DOM loads
+      document.addEventListener('DOMContentLoaded', () => {
+        let horizontal, vertical;
+
+        const initCrosshair = () => {
+          horizontal = document.querySelector('.crosshair-horizontal');
+          vertical = document.querySelector('.crosshair-vertical');
+        };
+
+        const handleMouseMove = (e) => {
+          if (horizontal && vertical) {
+            horizontal.style.opacity = '0.6';
+            vertical.style.opacity = '0.6';
+            horizontal.style.top = e.clientY + 'px';
+            vertical.style.left = e.clientX + 'px';
+          }
+        };
+
+        const handleMouseLeave = () => {
+          if (horizontal && vertical) {
+            horizontal.style.opacity = '0';
+            vertical.style.opacity = '0';
+          }
+        };
+
+        // Initialize when component loads
+        const checkForCrosshair = () => {
+          if (document.querySelector('.crosshair-container')) {
+            initCrosshair();
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseleave', handleMouseLeave);
+          } else {
+            // Check again in 100ms if crosshair isn't ready yet
+            setTimeout(checkForCrosshair, 100);
+          }
+        };
+
+        checkForCrosshair();
+      });
     </script>
   </body>
 </html> 

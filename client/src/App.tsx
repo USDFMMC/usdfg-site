@@ -11,6 +11,7 @@ import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
 import Whitepaper from "@/pages/whitepaper";
 import StarBackground from "@/components/effects/star-background";
+import Crosshair from "@/components/effects/Crosshair";
 import { Helmet } from "react-helmet";
 
 function AppRouter() {
@@ -71,6 +72,7 @@ function App() {
 
       <div className="min-h-screen flex flex-col relative overflow-hidden">
         <StarBackground />
+        <Crosshair color="#00ffff" />
         <AppRouter />
         <Toaster />
       </div>

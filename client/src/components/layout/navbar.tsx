@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "wouter";
+import { Link } from "react-router-dom";
 import { X, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -28,7 +28,7 @@ const Navbar: React.FC = () => {
       <header className="sticky top-0 bg-gradient-to-r from-[#181c2f] via-[#1a142e] to-[#181c2f] bg-opacity-95 backdrop-blur-md z-50 border-b border-cyan-400/30 shadow-[0_2px_24px_#00e8fc22]">
         <div className="container mx-auto px-4 py-3 flex flex-wrap items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center navbar-brand" title="Built for the ones who don't blink.">
+          <Link to="/" className="flex items-center navbar-brand" title="Built for the ones who don't blink.">
             <picture>
               <source srcSet="/assets/usdfg-logo-transparent.webp" type="image/webp" />
               <img 
@@ -55,7 +55,7 @@ const Navbar: React.FC = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-6" role="navigation" aria-label="Main Navigation">
-            <Link href="/app">
+            <Link to="/app">
               <Button className="bg-gradient-to-r from-purple-600 to-pink-500 text-white px-5 py-2 rounded-full font-semibold shadow-[0_0_24px_#a78bfa99] hover:brightness-110 flex items-center gap-2 transition-all duration-200">
                 <span role="img" aria-label="controller">🎮</span> Enter the Arena
               </Button>
