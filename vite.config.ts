@@ -26,53 +26,53 @@ export default defineConfig({
   },
   root: path.resolve(import.meta.dirname, "client"),
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    outDir: path.resolve(import.meta.dirname, "dist"), // ✅ output directly to dist/
     emptyOutDir: true,
     sourcemap: false,
-    minify: 'terser',
+    minify: "terser",
     terserOptions: {
       compress: {
         drop_console: true,
-        drop_debugger: true
-      }
+        drop_debugger: true,
+      },
     },
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
+          vendor: ["react", "react-dom", "react-router-dom"],
           ui: [
-            '@radix-ui/react-popover',
-            '@radix-ui/react-toast',
-            '@radix-ui/react-hover-card',
-            '@radix-ui/react-tooltip',
-            '@radix-ui/react-context-menu',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-aspect-ratio',
-            '@radix-ui/react-toggle',
-            '@radix-ui/react-radio-group',
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-alert-dialog',
-            '@radix-ui/react-collapsible',
-            '@radix-ui/react-toggle-group',
-            '@radix-ui/react-separator',
-            '@radix-ui/react-select',
-            '@radix-ui/react-label',
-            '@radix-ui/react-checkbox',
-            '@radix-ui/react-navigation-menu',
-            '@radix-ui/react-menubar',
-            '@radix-ui/react-slot',
-            '@radix-ui/react-scroll-area'
-          ]
-        }
-      }
-    }
+            "@radix-ui/react-popover",
+            "@radix-ui/react-toast",
+            "@radix-ui/react-hover-card",
+            "@radix-ui/react-tooltip",
+            "@radix-ui/react-context-menu",
+            "@radix-ui/react-dropdown-menu",
+            "@radix-ui/react-aspect-ratio",
+            "@radix-ui/react-toggle",
+            "@radix-ui/react-radio-group",
+            "@radix-ui/react-dialog",
+            "@radix-ui/react-alert-dialog",
+            "@radix-ui/react-collapsible",
+            "@radix-ui/react-toggle-group",
+            "@radix-ui/react-separator",
+            "@radix-ui/react-select",
+            "@radix-ui/react-label",
+            "@radix-ui/react-checkbox",
+            "@radix-ui/react-navigation-menu",
+            "@radix-ui/react-menubar",
+            "@radix-ui/react-slot",
+            "@radix-ui/react-scroll-area",
+          ],
+        },
+      },
+    },
   },
   server: {
     headers: {
-      'Cache-Control': 'public, max-age=31536000, immutable',
-      'X-Content-Type-Options': 'nosniff',
-      'X-Frame-Options': 'DENY',
-      'X-XSS-Protection': '1; mode=block'
-    }
-  }
+      "Cache-Control": "public, max-age=31536000, immutable",
+      "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
+      "X-XSS-Protection": "1; mode=block",
+    },
+  },
 });
