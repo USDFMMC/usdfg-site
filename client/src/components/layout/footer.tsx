@@ -59,7 +59,7 @@ const Footer: React.FC<FooterProps> = ({ isRevealed }) => {
               {footerLinks.map((link, index) => (
                 <div key={index} className="whitespace-nowrap">
                   <Link
-                    href={link.href}
+                    to={link.href}
                     className="text-sm sm:text-base font-medium hover:text-primary transition-colors duration-200 block"
                   >
                     {link.title}
