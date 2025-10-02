@@ -1,7 +1,7 @@
 [build]
   base = "client"
-  command = "npm install && npm run build"
-  publish = "dist/public"
+  command = "npm install --force && npm run build"
+  publish = "../dist" # ✅ match outDir in vite.config.ts
 
 [build.environment]
   NODE_VERSION = "20"
