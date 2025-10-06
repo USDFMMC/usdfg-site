@@ -9,23 +9,7 @@ const MASCOT_PNG  = "/assets/usdfg-mascot-trophy-illustration.png";
 const MASCOT_ABS  = "https://tangerine-valkyrie-b2552f.netlify.app/assets/usdfg-mascot-trophy-illustration.webp";
 
 const HeroSection: React.FC = () => {
-  // starfield particles
-  useEffect(() => {
-    document.querySelectorAll(".hero-particle").forEach(el => el.remove());
-    const container = document.querySelector(".hero");
-    if (container) {
-      for (let i = 0; i < 50; i++) {
-        const p = document.createElement("div");
-        p.className = "hero-particle";
-        p.style.left = `${Math.random() * 100}%`;
-        p.style.top = `${Math.random() * 100}%`;
-        p.style.animationDelay = `${Math.random() * 5}s`;
-        p.style.animationDuration = `${5 + Math.random() * 10}s`;
-        container.appendChild(p);
-      }
-    }
-    return () => document.querySelectorAll(".hero-particle").forEach(el => el.remove());
-  }, []);
+  // Removed redundant hero particles - using StarBackground instead
 
   const mascotRef = useScrollFadeIn<HTMLDivElement>();
   const imgRef = useRef<HTMLImageElement | null>(null);
@@ -44,7 +28,7 @@ const HeroSection: React.FC = () => {
 
   return (
     <section className="hero relative py-20 lg:py-32 overflow-hidden">
-      <div className="particles-container absolute inset-0 z-0" />
+      {/* Removed particles-container - using StarBackground */}
       <div className="container mx-auto px-4 relative z-10">
         <div className="flex flex-col lg:flex-row items-center">
           {/* Left copy */}
@@ -121,18 +105,12 @@ const HeroSection: React.FC = () => {
           border-radius: 50%;
           background: radial-gradient(circle, #00e8fc 0%, #00e8fc44 60%, transparent 80%);
           filter: blur(16px);
-          opacity: 0.7;
+          opacity: 0.4;
           animation: mascotGlowPulse 2.8s ease-in-out infinite alternate;
         }
-        @keyframes mascotGlowPulse { 0% { opacity: .5; filter: blur(12px);} 100% { opacity:.85; filter: blur(22px);} }
+        @keyframes mascotGlowPulse { 0% { opacity: .3; filter: blur(12px);} 100% { opacity:.5; filter: blur(22px);} }
         .mascot-float { animation: mascotFloat 4.5s ease-in-out infinite alternate; }
         @keyframes mascotFloat { 0% { transform: translateY(0);} 100% { transform: translateY(-18px);} }
-        .hero-particle {
-          position: absolute; width: 2px; height: 2px; border-radius: 9999px;
-          background: #9adfff; opacity: .8; box-shadow: 0 0 6px #66d5ff;
-          animation: twinkle var(--twinkle, 8s) ease-in-out infinite;
-        }
-        @keyframes twinkle { 0% { transform: translateY(0); opacity:.6;} 50% {opacity:1;} 100% { transform: translateY(-12px); opacity:.6;} }
       `}</style>
     </section>
   );

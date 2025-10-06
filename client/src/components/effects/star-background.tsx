@@ -18,7 +18,7 @@ const StarBackground: React.FC = () => {
     // Clear existing stars first
     container.innerHTML = '';
     
-    const numberOfStars = 75; // Reduced from 150 for performance
+    const numberOfStars = 40; // Minimal stars for clean performance
     const stars: Star[] = [];
     
     // Generate random stars
@@ -80,12 +80,7 @@ const StarBackground: React.FC = () => {
                       M0,820 Q960,950 1920,820 L1920,1080 L0,1080 Z;
                       M0,800 Q960,1000 1920,800 L1920,1080 L0,1080 Z" />
           </path>
-          <path d="M0,900 Q960,1100 1920,900 L1920,1080 L0,1080 Z" fill="url(#aurora2)">
-            <animate attributeName="d" dur="16s" repeatCount="indefinite"
-              values="M0,900 Q960,1100 1920,900 L1920,1080 L0,1080 Z;
-                      M0,880 Q960,1050 1920,880 L1920,1080 L0,1080 Z;
-                      M0,900 Q960,1100 1920,900 L1920,1080 L0,1080 Z" />
-          </path>
+          {/* Second aurora layer removed for performance */}
         </svg>
       </div>
       {/* Neon Glow Orbs */}
