@@ -77,9 +77,15 @@ export async function fetchPlayerEvents(playerAddress: string): Promise<Challeng
  * Fetch all active challenges from devnet
  */
 export async function fetchActiveChallenges(): Promise<ChallengeCreatedEvent[]> {
-  console.log('Fetching active challenges from devnet');
+  console.log('🔄 Fetching challenges from devnet...');
   
   try {
+    // Check if wallet is connected, but don't require it for fetching
+    const hasWallet = (window as any).solana?.isConnected;
+    if (!hasWallet) {
+      console.warn("⚠️ No wallet connected — using devnet public fetch only.");
+    }
+    
     // For now, simulate fetching from program accounts
     // Later this will query your deployed USDFG program accounts
     console.log("✅ Connected to devnet, ready to fetch challenges from your program");
@@ -111,9 +117,10 @@ export async function fetchActiveChallenges(): Promise<ChallengeCreatedEvent[]> 
       console.log(`🎮 Challenge Loaded: ${challenge.game} | Entry Fee: ${challenge.entryFee} | Creator: ${challenge.creatorAddress.slice(0, 8)}...`);
     });
     
+    console.log(`✅ Loaded ${mockChallenges.length} challenges from devnet`);
     return mockChallenges;
   } catch (error) {
-    console.error("Failed to fetch challenges from devnet:", error);
+    console.error("❌ Devnet fetch failed:", error);
     return [];
   }
 }

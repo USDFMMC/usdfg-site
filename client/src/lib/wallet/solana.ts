@@ -1,8 +1,21 @@
 // Simple wallet connection functions - no React hooks, no useRef
 import { Connection, PublicKey, SystemProgram, Transaction, clusterApiUrl } from "@solana/web3.js";
 
-// Create connection to Solana devnet
-const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+// Create connection to Solana devnet with mobile CORS support
+const connection = new Connection(clusterApiUrl("devnet"), {
+  commitment: "confirmed",
+  fetchMiddleware: (url, options) => {
+    return fetch(url, { 
+      ...options, 
+      mode: "cors", 
+      keepalive: true,
+      headers: {
+        ...options?.headers,
+        'Content-Type': 'application/json',
+      }
+    });
+  }
+});
 
 export const connectPhantom = async () => {
   if (typeof window === 'undefined') {

@@ -147,6 +147,7 @@ const ArenaHome: React.FC = () => {
   useEffect(() => {
     const fetchChallengesFromDevnet = async () => {
       try {
+        console.log("🔄 Starting devnet challenge fetch...");
         const devnetChallenges = await fetchActiveChallenges();
         
         // Convert devnet challenges to the format expected by the UI
@@ -167,24 +168,30 @@ const ArenaHome: React.FC = () => {
           createdAt: new Date(challenge.timestamp).toISOString()
         }));
         
-        // Get local challenges (user-created ones)
-        const localChallenges = JSON.parse(localStorage.getItem('challenges') || '[]');
+        // FORCE DEVNET AS PRIMARY: Only use devnet challenges, skip localStorage
+        console.log(`✅ Setting ${formattedChallenges.length} devnet challenges as primary data source`);
+        setChallenges(formattedChallenges);
         
-        // Combine devnet challenges with local challenges, prioritizing devnet
-        const allChallenges = [...formattedChallenges, ...localChallenges];
+        // Also save to localStorage for offline fallback, but don't use it as primary
+        localStorage.setItem('devnet_challenges', JSON.stringify(formattedChallenges));
         
-        // Remove duplicates based on ID
-        const uniqueChallenges = allChallenges.filter((challenge, index, self) => 
-          index === self.findIndex(c => c.id === challenge.id)
-        );
-        
-        console.log(`🔄 Synced ${formattedChallenges.length} devnet challenges + ${localChallenges.length} local challenges`);
-        setChallenges(uniqueChallenges);
       } catch (error) {
-        console.error("Failed to fetch challenges from devnet:", error);
-        // Fallback to local challenges only
-        const localChallenges = JSON.parse(localStorage.getItem('challenges') || '[]');
-        setChallenges(localChallenges);
+        console.error("❌ Failed to fetch challenges from devnet:", error);
+        
+        // Only fallback to localStorage if devnet completely fails
+        try {
+          const fallbackChallenges = JSON.parse(localStorage.getItem('devnet_challenges') || '[]');
+          if (fallbackChallenges.length > 0) {
+            console.log("🔄 Using cached devnet challenges as fallback");
+            setChallenges(fallbackChallenges);
+          } else {
+            console.log("⚠️ No cached challenges available");
+            setChallenges([]);
+          }
+        } catch (fallbackError) {
+          console.error("❌ Fallback also failed:", fallbackError);
+          setChallenges([]);
+        }
       }
     };
 
