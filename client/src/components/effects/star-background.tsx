@@ -18,7 +18,7 @@ const StarBackground: React.FC = () => {
     // Clear existing stars first
     container.innerHTML = '';
     
-    const numberOfStars = 150;
+    const numberOfStars = 75; // Reduced from 150 for performance
     const stars: Star[] = [];
     
     // Generate random stars
@@ -125,18 +125,18 @@ const StarBackground: React.FC = () => {
           animation: orbMove 24s linear infinite alternate;
         }
         .orb1 {
-          width: 340px; height: 340px;
-          background: radial-gradient(circle, #00fff0 0%, #0ff 60%, transparent 100%);
+          width: 240px; height: 240px;
+          background: radial-gradient(circle, #00fff0 0%, transparent 70%);
           top: 10%; left: 5%; animation-delay: 0s;
         }
         .orb2 {
-          width: 260px; height: 260px;
-          background: radial-gradient(circle, #a78bfa 0%, #7c3aed 60%, transparent 100%);
+          width: 180px; height: 180px;
+          background: radial-gradient(circle, #a78bfa 0%, transparent 70%);
           top: 60%; left: 70%; animation-delay: 8s;
         }
         .orb3 {
-          width: 200px; height: 200px;
-          background: radial-gradient(circle, #67e8f9 0%, #0ff 60%, transparent 100%);
+          width: 140px; height: 140px;
+          background: radial-gradient(circle, #67e8f9 0%, transparent 70%);
           top: 80%; left: 20%; animation-delay: 16s;
         }
         @keyframes orbMove {

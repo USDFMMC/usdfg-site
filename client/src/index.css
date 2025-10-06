@@ -233,17 +233,7 @@
     @apply animate-float;
   }
   
-  .star {
-    @apply fixed w-0.5 h-0.5 bg-white rounded-full opacity-20 z-0;
-  }
-  
-  .star.medium {
-    @apply w-[3px] h-[3px];
-  }
-  
-  .star.large {
-    @apply w-1 h-1;
-  }
+  /* Star styles moved to StarBackground component */
   
   /* Hero section styles */
   .hero {
@@ -447,10 +437,7 @@
   50% { transform: translateY(-10px); }
 }
 
-@keyframes starPulse {
-  0%, 100% { opacity: 0.2; }
-  50% { opacity: 0.7; }
-}
+/* starPulse keyframes moved to StarBackground component */
 
 @keyframes particleFade {
   0% {
