@@ -12,8 +12,93 @@ export const connectPhantom = async () => {
   if ("solana" in window) {
     const provider = (window as any).solana;
     if (provider?.isPhantom) {
-      await provider.connect();
-      return provider.publicKey.toString();
+      try {
+        // For mobile devices, we need to handle the connection differently
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        if (isMobile) {
+          // On mobile, we need to wait for the user to return from the Phantom app
+          return new Promise((resolve, reject) => {
+            let timeoutId: NodeJS.Timeout;
+            let resolved = false;
+            
+            const handleConnection = async () => {
+              if (resolved) return;
+              resolved = true;
+              clearTimeout(timeoutId);
+              
+              try {
+                // Check if we're connected after returning from the app
+                if (provider.publicKey) {
+                  resolve(provider.publicKey.toString());
+                } else {
+                  // Try to connect again
+                  await provider.connect();
+                  resolve(provider.publicKey.toString());
+                }
+              } catch (error) {
+                reject(error);
+              }
+            };
+            
+            // Set up event listeners for mobile
+            const handleFocus = () => {
+              // User returned to the app, check connection
+              setTimeout(handleConnection, 1000); // Give it a moment for the app to sync
+            };
+            
+            const handleVisibilityChange = () => {
+              if (!document.hidden) {
+                handleFocus();
+              }
+            };
+            
+            // Add event listeners
+            window.addEventListener('focus', handleFocus);
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+            
+            // Set timeout
+            timeoutId = setTimeout(() => {
+              if (!resolved) {
+                resolved = true;
+                window.removeEventListener('focus', handleFocus);
+                document.removeEventListener('visibilitychange', handleVisibilityChange);
+                reject(new Error("Connection timeout - please try again"));
+              }
+            }, 30000); // 30 second timeout
+            
+            // Try initial connection
+            provider.connect().then(() => {
+              if (provider.publicKey) {
+                if (!resolved) {
+                  resolved = true;
+                  clearTimeout(timeoutId);
+                  window.removeEventListener('focus', handleFocus);
+                  document.removeEventListener('visibilitychange', handleVisibilityChange);
+                  resolve(provider.publicKey.toString());
+                }
+              }
+            }).catch((error: any) => {
+              // If it's a mobile redirect error, that's expected
+              if (error.message && error.message.includes('User rejected')) {
+                if (!resolved) {
+                  resolved = true;
+                  clearTimeout(timeoutId);
+                  window.removeEventListener('focus', handleFocus);
+                  document.removeEventListener('visibilitychange', handleVisibilityChange);
+                  reject(error);
+                }
+              }
+            });
+          });
+        } else {
+          // Desktop connection
+          await provider.connect();
+          return provider.publicKey.toString();
+        }
+      } catch (error) {
+        throw error;
+      }
     }
   }
   throw new Error("Phantom not found");
@@ -27,8 +112,93 @@ export const connectSolflare = async () => {
   if ("solflare" in window) {
     const provider = (window as any).solflare;
     if (provider) {
-      await provider.connect();
-      return provider.publicKey.toString();
+      try {
+        // For mobile devices, we need to handle the connection differently
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        if (isMobile) {
+          // On mobile, we need to wait for the user to return from the Solflare app
+          return new Promise((resolve, reject) => {
+            let timeoutId: NodeJS.Timeout;
+            let resolved = false;
+            
+            const handleConnection = async () => {
+              if (resolved) return;
+              resolved = true;
+              clearTimeout(timeoutId);
+              
+              try {
+                // Check if we're connected after returning from the app
+                if (provider.publicKey) {
+                  resolve(provider.publicKey.toString());
+                } else {
+                  // Try to connect again
+                  await provider.connect();
+                  resolve(provider.publicKey.toString());
+                }
+              } catch (error) {
+                reject(error);
+              }
+            };
+            
+            // Set up event listeners for mobile
+            const handleFocus = () => {
+              // User returned to the app, check connection
+              setTimeout(handleConnection, 1000); // Give it a moment for the app to sync
+            };
+            
+            const handleVisibilityChange = () => {
+              if (!document.hidden) {
+                handleFocus();
+              }
+            };
+            
+            // Add event listeners
+            window.addEventListener('focus', handleFocus);
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+            
+            // Set timeout
+            timeoutId = setTimeout(() => {
+              if (!resolved) {
+                resolved = true;
+                window.removeEventListener('focus', handleFocus);
+                document.removeEventListener('visibilitychange', handleVisibilityChange);
+                reject(new Error("Connection timeout - please try again"));
+              }
+            }, 30000); // 30 second timeout
+            
+            // Try initial connection
+            provider.connect().then(() => {
+              if (provider.publicKey) {
+                if (!resolved) {
+                  resolved = true;
+                  clearTimeout(timeoutId);
+                  window.removeEventListener('focus', handleFocus);
+                  document.removeEventListener('visibilitychange', handleVisibilityChange);
+                  resolve(provider.publicKey.toString());
+                }
+              }
+            }).catch((error: any) => {
+              // If it's a mobile redirect error, that's expected
+              if (error.message && error.message.includes('User rejected')) {
+                if (!resolved) {
+                  resolved = true;
+                  clearTimeout(timeoutId);
+                  window.removeEventListener('focus', handleFocus);
+                  document.removeEventListener('visibilitychange', handleVisibilityChange);
+                  reject(error);
+                }
+              }
+            });
+          });
+        } else {
+          // Desktop connection
+          await provider.connect();
+          return provider.publicKey.toString();
+        }
+      } catch (error) {
+        throw error;
+      }
     }
   }
   throw new Error("Solflare not found");

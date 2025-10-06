@@ -29,6 +29,7 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Check if wallet is already connected on mount
   useEffect(() => {
@@ -43,6 +44,10 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
         }
       }
     };
+
+    // Detect mobile device
+    const mobileCheck = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    setIsMobile(mobileCheck);
 
     checkConnection();
   }, []); // Removed onConnect dependency to prevent infinite loop
@@ -188,6 +193,18 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
         >
           {loading ? "Connecting..." : "👻 Connect Phantom"}
         </button>
+      )}
+      
+      {loading && isMobile && (
+        <div className="text-sm text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded p-2">
+          📱 Mobile detected: Please approve the connection in your Phantom app and return to this page. The connection will complete automatically when you return.
+        </div>
+      )}
+      
+      {loading && !isMobile && (
+        <div className="text-sm text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded p-2">
+          🔗 Please approve the connection in your Phantom wallet popup.
+        </div>
       )}
       
       {hasSolflareInstalled() && (
