@@ -29,34 +29,35 @@ const CreateChallenge: React.FC = () => {
         <meta name="description" content="Create a new skill-based gaming challenge in the USDFG Arena." />
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-card">
+      <div className="min-h-screen bg-app-background-dark relative">
+        <div className="app-vignette"></div>
         {/* Header */}
-        <header className="border-b border-gray-800 bg-background/80 backdrop-blur-sm">
+        <header className="border-b border-app-accent-color/20 bg-black/80 backdrop-blur-sm">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center space-x-4">
               <Link to="/app">
-                <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                <Button variant="ghost" size="sm" className="text-app-foreground/60 hover:text-app-foreground">
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back to Arena
                 </Button>
               </Link>
               <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-lg flex items-center justify-center">
+                <div className="w-8 h-8 bg-gradient-to-r from-app-accent-color to-app-primary-color rounded-lg flex items-center justify-center">
                   <Gamepad2 className="w-5 h-5 text-black" />
                 </div>
-                <h1 className="text-xl font-bold text-white">Create Challenge</h1>
+                <h1 className="text-xl font-bold text-app-foreground" style={{fontFamily: "'Inter Tight', sans-serif", fontWeight: 700, textTransform: 'uppercase', letterSpacing: '-0.5px'}}>Create Challenge</h1>
               </div>
             </div>
           </div>
         </header>
 
         {/* Main Content */}
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 py-8 relative z-10">
           <div className="max-w-2xl mx-auto">
-            <Card className="bg-card/50 border-gray-800">
+            <Card className="app-card border-app-accent-color/20">
               <CardHeader>
-                <CardTitle className="text-white text-2xl">New Gaming Challenge</CardTitle>
-                <p className="text-gray-400">
+                <CardTitle className="text-app-foreground text-2xl" style={{fontFamily: "'Inter Tight', sans-serif", fontWeight: 700}}>New Gaming Challenge</CardTitle>
+                <p className="text-app-foreground/60">
                   Set up a skill-based challenge and let the best gamer win.
                 </p>
               </CardHeader>

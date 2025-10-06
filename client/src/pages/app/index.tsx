@@ -184,24 +184,26 @@ const ArenaHome: React.FC = () => {
         <meta name="description" content="Enter the USDFG Arena - Compete in skill-based challenges, earn $USDFG, and prove your gaming prowess." />
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900">
+      <div className="min-h-screen bg-app-background-dark relative">
+        <div className="app-vignette"></div>
         {/* Header */}
-        <div className="border-b border-gray-800 bg-black/20 backdrop-blur-sm">
+        <div className="border-b border-app-accent-color/20 bg-black/80 backdrop-blur-sm">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <Link to="/" className="flex items-center space-x-2">
-                  <div className="w-8 h-8 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-lg flex items-center justify-center">
+                  <div className="w-8 h-8 bg-gradient-to-r from-app-accent-color to-app-primary-color rounded-lg flex items-center justify-center">
                     <span className="text-black font-bold">🎮</span>
                   </div>
-                  <span className="text-xl font-bold text-white">USDFG Arena</span>
+                  <span className="text-xl font-bold text-app-foreground" style={{fontFamily: "'Inter Tight', sans-serif", fontWeight: 700, textTransform: 'uppercase', letterSpacing: '-0.5px'}}>USDFG Arena</span>
                 </Link>
               </div>
               
               <div className="flex items-center space-x-4">
                 <button 
                   onClick={() => setShowCreateModal(true)}
-                  className="bg-gradient-to-r from-cyan-400 to-purple-500 text-black px-4 py-2 rounded-full font-semibold hover:brightness-110 transition-all"
+                  className="app-button text-app-foreground px-4 py-2 rounded-full font-semibold uppercase tracking-wide"
+                  style={{fontFamily: "'Inter Tight', sans-serif", fontWeight: 700, letterSpacing: '-0.5px'}}
                 >
                   Create Challenge
                 </button>
@@ -216,34 +218,35 @@ const ArenaHome: React.FC = () => {
         </div>
 
         {/* Main Content */}
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 py-8 relative z-10">
           {/* Hero Section */}
           <div className="text-center mb-12">
             {/* USDFG Price Ticker */}
-            <div className="inline-flex items-center bg-cyan-400/10 border border-cyan-400/20 rounded-full px-4 py-2 mb-6">
-              <div className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse"></div>
-              <span className="text-sm text-gray-300 mr-2">USDFG Price:</span>
-              <span className="text-cyan-400 font-semibold">${usdfgPrice.toFixed(4)}</span>
-              <span className="text-xs text-gray-400 ml-2">Live</span>
+            <div className="inline-flex items-center bg-app-accent-color/10 border border-app-accent-color/20 rounded-full px-4 py-2 mb-6">
+              <div className="w-2 h-2 bg-app-accent-color rounded-full mr-2 animate-pulse"></div>
+              <span className="text-sm text-app-foreground/60 mr-2">USDFG Price:</span>
+              <span className="text-app-accent-color font-semibold">${usdfgPrice.toFixed(4)}</span>
+              <span className="text-xs text-app-foreground/40 ml-2">Live</span>
             </div>
             
-            <h1 className="text-4xl md:text-6xl font-bold text-white mb-4">
-              Welcome to the <span className="bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">Arena</span>
+            <h1 className="text-4xl md:text-6xl font-bold text-app-foreground mb-4" style={{fontFamily: "'Inter Tight', sans-serif", fontWeight: 700, letterSpacing: '-0.5px'}}>
+              Welcome to the <span className="bg-gradient-to-r from-app-accent-color to-app-primary-color bg-clip-text text-transparent">Arena</span>
             </h1>
-            <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
+            <p className="text-xl text-app-foreground/80 mb-8 max-w-2xl mx-auto">
               Compete in skill-based challenges, earn $USDFG, and prove your gaming prowess against players worldwide.
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
               <button 
                 onClick={() => setShowCreateModal(true)}
-                className="bg-gradient-to-r from-cyan-400 to-purple-500 text-black px-6 py-3 rounded-full font-semibold hover:brightness-110 transition-all"
+                className="app-button text-app-foreground px-6 py-3 rounded-full font-semibold uppercase tracking-wide"
+                style={{fontFamily: "'Inter Tight', sans-serif", fontWeight: 700, letterSpacing: '-0.5px'}}
               >
                 Create Challenge
               </button>
               <Link 
                 to="#challenges"
-                className="text-cyan-400 underline underline-offset-4 hover:text-cyan-300 transition-colors"
+                className="text-app-accent-color underline underline-offset-4 hover:text-app-accent-color/80 transition-colors"
               >
                 Browse Challenges
               </Link>
@@ -372,27 +375,27 @@ const ArenaHome: React.FC = () => {
                     filteredChallenges.map((challenge) => {
                     const isOwner = isChallengeOwner(challenge);
                     return (
-                      <div key={challenge.id} className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                      <div key={challenge.id} className="app-card rounded-lg p-4">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-gradient-to-r from-red-500 to-pink-500 rounded-lg flex items-center justify-center">
+                            <div className="w-10 h-10 bg-gradient-to-r from-app-secondary-color to-app-accent-color rounded-lg flex items-center justify-center">
                               <span className="text-white">🥊</span>
                             </div>
                             <div>
-                              <h3 className="text-white font-semibold">{challenge.title}</h3>
-                              <p className="text-gray-400 text-sm">{challenge.category} • {challenge.game}</p>
+                              <h3 className="text-app-foreground font-semibold" style={{fontFamily: "'Inter Tight', sans-serif", fontWeight: 700}}>{challenge.title}</h3>
+                              <p className="text-app-foreground/60 text-sm">{challenge.category} • {challenge.game}</p>
                               {challenge.platform && challenge.username && (
-                                <p className="text-gray-500 text-xs">
+                                <p className="text-app-foreground/40 text-xs">
                                   🖥️ {challenge.platform} • 👤 {challenge.username}
                                 </p>
                               )}
                               {challenge.createdAt && (
-                                <p className="text-gray-500 text-xs">
+                                <p className="text-app-foreground/40 text-xs">
                                   Created {new Date(challenge.createdAt).toLocaleDateString()} at {new Date(challenge.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </p>
                               )}
                               {isOwner && (
-                                <span className="inline-block px-2 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-xs mt-1">
+                                <span className="inline-block px-2 py-1 bg-app-primary-color/20 text-app-primary-color border border-app-primary-color/30 rounded text-xs mt-1">
                                   Your Challenge
                                 </span>
                               )}
