@@ -224,7 +224,7 @@ const ArenaHome: React.FC = () => {
             <div className="inline-flex items-center bg-background-2/60 border border-glow/20 rounded-full px-4 py-2 mb-6 backdrop-blur-sm glow-soft">
               <div className="w-2 h-2 bg-glow-cyan rounded-full mr-2 animate-pulse"></div>
               <span className="text-sm text-text-dim mr-2 neocore-body">USDFG Price:</span>
-              <span className="text-glow-cyan font-semibold neocore-body">${usdfgPrice.toFixed(4)}</span>
+              <span className="text-glow-cyan font-semibold neocore-body">{usdfgPrice.toFixed(4)} USDFG</span>
               <span className="text-xs text-text-dim ml-2 neocore-body">Live</span>
             </div>
             
@@ -408,12 +408,12 @@ const ArenaHome: React.FC = () => {
                           <div className="text-center">
                             <div className="text-white font-semibold">{challenge.entryFee} USDFG</div>
                             <div className="text-gray-400 text-xs">Entry Fee</div>
-                            <div className="text-gray-500 text-xs">${usdfgToUsd(challenge.entryFee).toFixed(2)}</div>
+                            <div className="text-gray-500 text-xs">{usdfgToUsd(challenge.entryFee).toFixed(2)} USD</div>
                           </div>
                           <div className="text-center">
                             <div className="text-white font-semibold">{challenge.prizePool} USDFG</div>
                             <div className="text-gray-400 text-xs">Prize Pool</div>
-                            <div className="text-gray-500 text-xs">${usdfgToUsd(challenge.prizePool).toFixed(2)}</div>
+                            <div className="text-gray-500 text-xs">{usdfgToUsd(challenge.prizePool).toFixed(2)} USD</div>
                           </div>
                           <div className="text-center">
                             <div className="text-white font-semibold">{challenge.players}/{challenge.capacity}</div>
@@ -1080,15 +1080,15 @@ const CreateChallengeModal: React.FC<{
                       <div className="flex items-center space-x-2">
                         <span className="text-cyan-400 text-sm">💵 USD Equivalent:</span>
                         <span className="text-white font-semibold">
-                          ${usdfgToUsd(formData.entryFee).toFixed(2)}
+{usdfgToUsd(formData.entryFee).toFixed(2)} USD
                         </span>
                       </div>
                       <div className="text-xs text-gray-400">
-                        1 USDFG = ${usdfgPrice.toFixed(4)}
+1 USDFG = {usdfgPrice.toFixed(4)} USD
                       </div>
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
-                      Prize pool: ${(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5% platform fee)
+Prize pool: {(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5% platform fee)
                     </div>
                   </div>
                 </Field>
@@ -1181,7 +1181,7 @@ const CreateChallengeModal: React.FC<{
                       <span className="text-gray-400">💰 Entry Fee:</span>
                       <div className="text-right">
                         <span className="text-cyan-400 font-bold">{formData.entryFee} USDFG</span>
-                        <div className="text-xs text-gray-400">${usdfgToUsd(formData.entryFee).toFixed(2)} USD</div>
+                        <div className="text-xs text-gray-400">{usdfgToUsd(formData.entryFee).toFixed(2)} USD</div>
                       </div>
                       </div>
                     <div className="flex justify-between items-center py-2 border-b border-white/10">
