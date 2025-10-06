@@ -48,6 +48,17 @@ module.exports = {
         'background-light': 'var(--background-light)',
         'background-dark': 'var(--background-dark)',
         'star-color': 'var(--star-color)',
+        // NeoCore colors
+        'background-1': 'var(--background-1)',
+        'background-2': 'var(--background-2)',
+        'background-3': 'var(--background-3)',
+        'glow-cyan': 'var(--glow-cyan)',
+        'glow-electric': 'var(--glow-electric)',
+        'glow-pink': 'var(--glow-pink)',
+        'border-soft': 'var(--border-soft)',
+        'border-glow': 'var(--border-glow)',
+        'text-primary': 'var(--text-primary)',
+        'text-dim': 'var(--text-dim)',
       },
       borderRadius: {
         lg: 'var(--radius)',

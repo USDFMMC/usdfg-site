@@ -184,24 +184,25 @@ const ArenaHome: React.FC = () => {
         <meta name="description" content="Enter the USDFG Arena - Compete in skill-based challenges, earn $USDFG, and prove your gaming prowess." />
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900">
+      <div className="min-h-screen bg-background-1 relative">
+        <div className="parallax-glow"></div>
         {/* Header */}
-        <div className="border-b border-gray-800 bg-black/20 backdrop-blur-sm">
+        <div className="border-b border-soft bg-background-2/80 backdrop-blur-sm neocore-panel">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <Link to="/" className="flex items-center space-x-2">
-                  <div className="w-8 h-8 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-lg flex items-center justify-center">
+                  <div className="w-8 h-8 bg-gradient-to-r from-glow-cyan to-glow-electric rounded-lg flex items-center justify-center">
                     <span className="text-black font-bold">🎮</span>
                   </div>
-                  <span className="text-xl font-bold text-white">USDFG Arena</span>
+                  <span className="neocore-h2 text-text-primary">USDFG Arena</span>
                 </Link>
               </div>
               
               <div className="flex items-center space-x-4">
                 <button 
                   onClick={() => setShowCreateModal(true)}
-                  className="bg-gradient-to-r from-cyan-400 to-purple-500 text-black px-4 py-2 rounded-full font-semibold hover:brightness-110 transition-all"
+                  className="elite-btn neocore-button"
                 >
                   Create Challenge
                 </button>
@@ -220,30 +221,30 @@ const ArenaHome: React.FC = () => {
           {/* Hero Section */}
           <div className="text-center mb-12">
             {/* USDFG Price Ticker */}
-            <div className="inline-flex items-center bg-cyan-400/10 border border-cyan-400/20 rounded-full px-4 py-2 mb-6">
-              <div className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse"></div>
-              <span className="text-sm text-gray-300 mr-2">USDFG Price:</span>
-              <span className="text-cyan-400 font-semibold">${usdfgPrice.toFixed(4)}</span>
-              <span className="text-xs text-gray-400 ml-2">Live</span>
+            <div className="inline-flex items-center bg-background-2/60 border border-glow border-glow/20 rounded-full px-4 py-2 mb-6 backdrop-filter backdrop-blur-sm">
+              <div className="w-2 h-2 bg-glow-cyan rounded-full mr-2 animate-pulse"></div>
+              <span className="text-sm text-text-dim mr-2 neocore-body">USDFG Price:</span>
+              <span className="text-glow-cyan font-semibold neocore-body">${usdfgPrice.toFixed(4)}</span>
+              <span className="text-xs text-text-dim ml-2 neocore-body">Live</span>
             </div>
             
-            <h1 className="text-4xl md:text-6xl font-bold text-white mb-4">
-              Welcome to the <span className="bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">Arena</span>
+            <h1 className="neocore-h1 text-text-primary mb-4">
+              Welcome to the <span className="bg-gradient-to-r from-glow-cyan to-glow-electric bg-clip-text text-transparent">Arena</span>
             </h1>
-            <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
+            <p className="text-xl text-text-dim mb-8 max-w-2xl mx-auto neocore-body">
               Compete in skill-based challenges, earn $USDFG, and prove your gaming prowess against players worldwide.
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
               <button 
                 onClick={() => setShowCreateModal(true)}
-                className="bg-gradient-to-r from-cyan-400 to-purple-500 text-black px-6 py-3 rounded-full font-semibold hover:brightness-110 transition-all"
+                className="elite-btn neocore-button px-6 py-3"
               >
                 Create Challenge
               </button>
               <Link 
                 to="#challenges"
-                className="text-cyan-400 underline underline-offset-4 hover:text-cyan-300 transition-colors"
+                className="text-glow-cyan underline underline-offset-4 hover:text-glow-cyan/80 transition-colors neocore-body"
               >
                 Browse Challenges
               </Link>
@@ -372,27 +373,27 @@ const ArenaHome: React.FC = () => {
                     filteredChallenges.map((challenge) => {
                     const isOwner = isChallengeOwner(challenge);
                     return (
-                      <div key={challenge.id} className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                      <div key={challenge.id} className="challenge-card p-4">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-gradient-to-r from-red-500 to-pink-500 rounded-lg flex items-center justify-center">
+                            <div className="w-10 h-10 bg-gradient-to-r from-glow-pink to-glow-electric rounded-lg flex items-center justify-center">
                               <span className="text-white">🥊</span>
                             </div>
                             <div>
-                              <h3 className="text-white font-semibold">{challenge.title}</h3>
-                              <p className="text-gray-400 text-sm">{challenge.category} • {challenge.game}</p>
+                              <h3 className="text-text-primary font-semibold neocore-body">{challenge.title}</h3>
+                              <p className="text-text-dim text-sm neocore-body">{challenge.category} • {challenge.game}</p>
                               {challenge.platform && challenge.username && (
-                                <p className="text-gray-500 text-xs">
+                                <p className="text-text-dim/60 text-xs neocore-body">
                                   🖥️ {challenge.platform} • 👤 {challenge.username}
                                 </p>
                               )}
                               {challenge.createdAt && (
-                                <p className="text-gray-500 text-xs">
+                                <p className="text-text-dim/60 text-xs neocore-body">
                                   Created {new Date(challenge.createdAt).toLocaleDateString()} at {new Date(challenge.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </p>
                               )}
                               {isOwner && (
-                                <span className="inline-block px-2 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-xs mt-1">
+                                <span className="inline-block px-2 py-1 bg-glow-electric/20 text-glow-electric border border-glow-electric/30 rounded text-xs mt-1 neocore-body">
                                   Your Challenge
                                 </span>
                               )}

@@ -17,28 +17,31 @@ export default function ArenaRoute() {
 
   if (!entered) {
     return (
-      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center">
-        <h1 className="text-xl font-bold mb-4">Enter Arena Password</h1>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="px-3 py-2 rounded-md text-black"
-          placeholder="Password"
-        />
-        <button
-          onClick={() => {
-            if (password === correctPassword) {
-              setEntered(true);
-              localStorage.setItem('arena-access', 'true');
-            } else {
-              alert("Wrong password");
-            }
-          }}
-          className="mt-3 px-4 py-2 rounded-md bg-cyan-500 text-black font-semibold"
-        >
-          Enter
-        </button>
+      <div className="min-h-screen bg-background-1 text-text-primary flex flex-col items-center justify-center relative">
+        <div className="parallax-glow"></div>
+        <div className="relative z-10 flex flex-col items-center neocore-panel p-8">
+          <h1 className="neocore-h2 mb-4 text-glow-cyan">Enter Arena Password</h1>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="px-3 py-2 rounded-md bg-background-2/60 border border-glow/30 text-text-primary backdrop-blur-sm focus:border-glow-cyan/60 focus:outline-none neocore-body"
+            placeholder="Password"
+          />
+          <button
+            onClick={() => {
+              if (password === correctPassword) {
+                setEntered(true);
+                localStorage.setItem('arena-access', 'true');
+              } else {
+                alert("Wrong password");
+              }
+            }}
+            className="mt-3 elite-btn neocore-button"
+          >
+            Enter
+          </button>
+        </div>
       </div>
     );
   }
