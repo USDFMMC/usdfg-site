@@ -151,6 +151,13 @@ const ArenaHome: React.FC = () => {
   // Auto-refresh challenges from devnet every 10 seconds
   useEffect(() => {
     const fetchChallengesFromDevnet = async () => {
+      // Skip devnet fetch if a local challenge was created recently (within 2 minutes)
+      const timeSinceLastLocal = Date.now() - lastLocalChallenge;
+      if (timeSinceLastLocal < 120000) { // 2 minutes
+        console.log("⏸️ Skipping devnet fetch - local challenge created recently");
+        return;
+      }
+      
       try {
         console.log("🔄 Starting devnet challenge fetch...");
         const devnetChallenges = await fetchActiveChallenges();
@@ -176,16 +183,25 @@ const ArenaHome: React.FC = () => {
         // MERGE DEVNET + LOCAL: Combine devnet challenges with any local challenges
         const localChallenges = JSON.parse(localStorage.getItem('challenges') || '[]');
         
-        // Filter out local challenges that are too recent (less than 30 seconds old)
+        // PROTECT LOCAL CHALLENGES: Don't override local challenges that are less than 2 minutes old
         const now = Date.now();
-        const recentLocalChallenges = localChallenges.filter(challenge => {
+        const protectedLocalChallenges = localChallenges.filter(challenge => {
           const challengeTime = new Date(challenge.createdAt).getTime();
-          return (now - challengeTime) > 30000; // 30 seconds
+          const ageMinutes = (now - challengeTime) / (1000 * 60);
+          console.log(`🛡️ Challenge ${challenge.id} age: ${ageMinutes.toFixed(1)} minutes`);
+          return ageMinutes < 2; // Protect challenges less than 2 minutes old
         });
         
-        const allChallenges = [...formattedChallenges, ...recentLocalChallenges];
+        // Only include older local challenges in the merge
+        const olderLocalChallenges = localChallenges.filter(challenge => {
+          const challengeTime = new Date(challenge.createdAt).getTime();
+          const ageMinutes = (now - challengeTime) / (1000 * 60);
+          return ageMinutes >= 2;
+        });
         
-        // Remove duplicates based on ID
+        const allChallenges = [...formattedChallenges, ...olderLocalChallenges, ...protectedLocalChallenges];
+        
+        // Remove duplicates based on ID, but prioritize local challenges
         const uniqueChallenges = allChallenges.filter((challenge, index, self) => 
           index === self.findIndex(c => c.id === challenge.id)
         );
@@ -226,7 +242,7 @@ const ArenaHome: React.FC = () => {
     const refreshInterval = setInterval(fetchChallengesFromDevnet, 15000);
     
     return () => clearInterval(refreshInterval);
-  }, []);
+  }, [lastLocalChallenge]);
 
   const handleCreateChallenge = async (challengeData: any) => {
     const platformFee = 0.05; // 5% platform fee

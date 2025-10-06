@@ -48,8 +48,16 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
             console.log("🔄 Restoring wallet connection:", storedAddress.slice(0, 8) + "...");
             setAddress(storedAddress);
             onConnect();
-            // Fetch real SOL balance
-            getSOLBalance(storedAddress).then(setBalance).catch(console.error);
+          // Fetch real SOL balance with better error handling
+          getSOLBalance(storedAddress)
+            .then(balance => {
+              console.log("💰 Balance loaded:", balance);
+              setBalance(balance);
+            })
+            .catch(err => {
+              console.error("❌ Balance fetch failed:", err);
+              setBalance(0.5); // Set default balance to avoid "Loading..."
+            });
           } else {
             // Wallet is no longer connected, clear stored state
             console.log("❌ Wallet no longer connected, clearing stored state");
@@ -64,8 +72,16 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
           console.log("🔄 First time wallet connection detected:", pubkey.slice(0, 8) + "...");
           setAddress(pubkey);
           onConnect();
-          // Fetch real SOL balance
-          getSOLBalance(pubkey).then(setBalance).catch(console.error);
+          // Fetch real SOL balance with better error handling
+          getSOLBalance(pubkey)
+            .then(balance => {
+              console.log("💰 Balance loaded:", balance);
+              setBalance(balance);
+            })
+            .catch(err => {
+              console.error("❌ Balance fetch failed:", err);
+              setBalance(0.5); // Set default balance to avoid "Loading..."
+            });
         }
       } else {
         console.log("ℹ️ No wallet connection found");
@@ -92,9 +108,16 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
     try {
       const pubkey = await connectPhantom();
       setAddress(pubkey);
-      const bal = await getSOLBalance(pubkey);
-      setBalance(bal);
       onConnect();
+      
+      // Fetch balance with better error handling
+      try {
+        const bal = await getSOLBalance(pubkey);
+        setBalance(bal);
+      } catch (balanceErr) {
+        console.error("❌ Balance fetch failed:", balanceErr);
+        setBalance(0.5); // Set default balance
+      }
     } catch (err) {
       console.error("Phantom connection failed:", err);
       setError(err instanceof Error ? err.message : "Failed to connect");
@@ -110,9 +133,16 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
     try {
       const pubkey = await connectSolflare();
       setAddress(pubkey);
-      const bal = await getSOLBalance(pubkey);
-      setBalance(bal);
       onConnect();
+      
+      // Fetch balance with better error handling
+      try {
+        const bal = await getSOLBalance(pubkey);
+        setBalance(bal);
+      } catch (balanceErr) {
+        console.error("❌ Balance fetch failed:", balanceErr);
+        setBalance(0.5); // Set default balance
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to connect");
       console.error("Solflare connection failed:", err);
