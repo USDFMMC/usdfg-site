@@ -219,23 +219,23 @@ const ArenaHome: React.FC = () => {
         {/* Main Content */}
         <div className="container mx-auto px-4 py-8">
           {/* Hero Section */}
-          <div className="text-center mb-12">
+          <div className="text-center neocore-section">
             {/* USDFG Price Ticker */}
-            <div className="inline-flex items-center bg-background-2/60 border border-glow border-glow/20 rounded-full px-4 py-2 mb-6 backdrop-filter backdrop-blur-sm">
+            <div className="inline-flex items-center bg-background-2/60 border border-glow/20 rounded-full px-4 py-2 mb-6 backdrop-blur-sm glow-soft">
               <div className="w-2 h-2 bg-glow-cyan rounded-full mr-2 animate-pulse"></div>
               <span className="text-sm text-text-dim mr-2 neocore-body">USDFG Price:</span>
               <span className="text-glow-cyan font-semibold neocore-body">${usdfgPrice.toFixed(4)}</span>
               <span className="text-xs text-text-dim ml-2 neocore-body">Live</span>
             </div>
             
-            <h1 className="neocore-h1 text-text-primary mb-4">
+            <h1 className="neocore-h1">
               Welcome to the <span className="bg-gradient-to-r from-glow-cyan to-glow-electric bg-clip-text text-transparent">Arena</span>
             </h1>
-            <p className="text-xl text-text-dim mb-8 max-w-2xl mx-auto neocore-body">
+            <p className="text-xl max-w-2xl mx-auto neocore-body mb-8">
               Compete in skill-based challenges, earn $USDFG, and prove your gaming prowess against players worldwide.
             </p>
             
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <button 
                 onClick={() => setShowCreateModal(true)}
                 className="elite-btn neocore-button px-6 py-3"
