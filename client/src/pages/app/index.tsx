@@ -5,7 +5,10 @@ import WalletConnect from "@/components/arena/WalletConnect";
 import { connectPhantom, hasPhantomInstalled, getWalletPublicKey } from "@/lib/wallet/solana";
 
 const ArenaHome: React.FC = () => {
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(() => {
+    // Check if wallet was previously connected
+    return localStorage.getItem('wallet_connected') === 'true';
+  });
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<any>(null);
@@ -39,7 +42,18 @@ const ArenaHome: React.FC = () => {
   const usdfgToUsd = useCallback((usdfgAmount: number) => {
     return usdfgAmount * usdfgPrice;
   }, [usdfgPrice]);
-  const [challenges, setChallenges] = useState([
+  // Load challenges from localStorage on mount
+  const [challenges, setChallenges] = useState(() => {
+    const savedChallenges = localStorage.getItem('challenges');
+    if (savedChallenges) {
+      try {
+        return JSON.parse(savedChallenges);
+      } catch (error) {
+        console.error('Error parsing saved challenges:', error);
+      }
+    }
+    // Default challenges if none saved
+    return [
     {
       id: "ch_01",
       title: "Street Fighter 6 Versus Match",
@@ -120,7 +134,13 @@ const ArenaHome: React.FC = () => {
       rules: "• 5v5 competitive format\n• Standard map pool\n• Agent restrictions by team agreement\n• Communication allowed\n• Standard economy rules\n• Overtime rules apply",
       createdAt: new Date(Date.now() - 600000).toISOString() // 10 min ago
     }
-  ]);
+    ];
+  });
+
+  // Save challenges to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('challenges', JSON.stringify(challenges));
+  }, [challenges]);
 
   const handleCreateChallenge = (challengeData: any) => {
     const platformFee = 0.05; // 5% platform fee
@@ -208,8 +228,15 @@ const ArenaHome: React.FC = () => {
                 </button>
                 <WalletConnect 
                   isConnected={isConnected}
-                  onConnect={() => setIsConnected(true)}
-                  onDisconnect={() => setIsConnected(false)}
+                  onConnect={() => {
+                    setIsConnected(true);
+                    localStorage.setItem('wallet_connected', 'true');
+                  }}
+                  onDisconnect={() => {
+                    setIsConnected(false);
+                    localStorage.removeItem('wallet_connected');
+                    localStorage.removeItem('wallet_address');
+                  }}
                 />
               </div>
             </div>

@@ -90,7 +90,19 @@ export const getWalletPublicKey = () => {
 };
 
 export const isWalletConnected = () => {
-  return getWalletPublicKey() !== null;
+  // First check if wallet is actually connected
+  const pubkey = getWalletPublicKey();
+  if (pubkey) {
+    // Store connection state in localStorage for persistence
+    localStorage.setItem('wallet_connected', 'true');
+    localStorage.setItem('wallet_address', pubkey);
+    return true;
+  } else {
+    // Clear stored state if not actually connected
+    localStorage.removeItem('wallet_connected');
+    localStorage.removeItem('wallet_address');
+    return false;
+  }
 };
 
 export const formatPublicKey = (publicKey: string, length: number = 8) => {
@@ -161,4 +173,14 @@ export const hasSolflareInstalled = () => {
 
 export const hasAnyWalletInstalled = () => {
   return hasPhantomInstalled() || hasSolflareInstalled();
+};
+
+export const wasWalletConnected = () => {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem('wallet_connected') === 'true';
+};
+
+export const getStoredWalletAddress = () => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('wallet_address');
 };

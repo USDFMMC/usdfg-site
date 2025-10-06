@@ -10,7 +10,9 @@ import {
   sendSOL,
   hasPhantomInstalled,
   hasSolflareInstalled,
-  hasAnyWalletInstalled
+  hasAnyWalletInstalled,
+  wasWalletConnected,
+  getStoredWalletAddress
 } from "@/lib/wallet/solana";
 
 interface WalletConnectProps {
@@ -33,8 +35,25 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
 
   // Check if wallet is already connected on mount
   useEffect(() => {
-    const checkConnection = () => {
-      if (isWalletConnected()) {
+    const checkConnection = async () => {
+      // First check if wallet was previously connected
+      if (wasWalletConnected()) {
+        const storedAddress = getStoredWalletAddress();
+        if (storedAddress) {
+          // Check if wallet is still actually connected
+          if (isWalletConnected()) {
+            setAddress(storedAddress);
+            onConnect();
+            // Fetch real SOL balance
+            getSOLBalance(storedAddress).then(setBalance).catch(console.error);
+          } else {
+            // Wallet is no longer connected, clear stored state
+            localStorage.removeItem('wallet_connected');
+            localStorage.removeItem('wallet_address');
+          }
+        }
+      } else if (isWalletConnected()) {
+        // Wallet is connected but not stored (first time)
         const pubkey = getWalletPublicKey();
         if (pubkey) {
           setAddress(pubkey);
@@ -94,6 +113,9 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
       setAddress(null);
       setBalance(null);
       setError(null);
+      // Clear stored connection state
+      localStorage.removeItem('wallet_connected');
+      localStorage.removeItem('wallet_address');
       onDisconnect();
     } catch (err) {
       console.error("Disconnect failed:", err);
