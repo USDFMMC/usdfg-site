@@ -42,9 +42,9 @@ const PlatformFeatures: React.FC = () => {
         {features.map((feature, idx) => (
           <div
             key={feature.title}
-            className="feature-card group bg-[#111]/90 border border-[#22d3ee] rounded-lg shadow-lg backdrop-blur-md p-8 transition-all duration-300 hover:scale-105 hover:shadow-[0_0_48px_#22d3ee99] hover:border-cyan-300/90 relative overflow-hidden animate-fade-in-up"
+            className="feature-card group bg-[#111]/90 border border-[#22d3ee] rounded-lg shadow-lg backdrop-blur-md p-8 transition-all duration-300 hover:scale-102 hover:shadow-[0_0_24px_#22d3ee66] hover:border-cyan-300/70 relative overflow-hidden animate-fade-in-up"
             tabIndex={0}
-            style={{ boxShadow: '0 0 32px #22d3ee33, 0 0 8px #a78bfa33' }}
+            style={{ boxShadow: '0 0 16px #22d3ee22, 0 0 4px #a78bfa22' }}
           >
             <span className="block text-4xl mb-4 drop-shadow-glow animate-bounce-slow">{feature.icon}</span>
             <h3 className="text-xl font-extrabold tracking-wide text-cyan-300 mb-2 drop-shadow-glow">{feature.title}</h3>
@@ -55,22 +55,22 @@ const PlatformFeatures: React.FC = () => {
       {/* Custom Animations & Neon Glow */}
       <style>{`
         .drop-shadow-glow {
-          filter: drop-shadow(0 0 8px #00ffff);
+          filter: drop-shadow(0 0 4px #00ffff66);
         }
         .neon-glow {
-          box-shadow: 0 0 24px #00ffff44, 0 0 48px #00ffff22;
-          animation: neonPulse 2.5s infinite alternate;
+          box-shadow: 0 0 16px #00ffff44, 0 0 32px #00ffff22;
+          animation: neonPulse 4s ease-in-out infinite alternate;
         }
         @keyframes neonPulse {
-          0% { box-shadow: 0 0 24px #00ffff44, 0 0 48px #00ffff22; border-color: #22d3ee44; }
-          100% { box-shadow: 0 0 48px #00ffff99, 0 0 96px #00ffff33; border-color: #00ffffcc; }
+          0% { box-shadow: 0 0 16px #00ffff44, 0 0 32px #00ffff22; }
+          100% { box-shadow: 0 0 24px #00ffff66, 0 0 48px #00ffff33; }
         }
         .animate-bounce-slow {
-          animation: bounceSlow 2.2s infinite;
+          animation: bounceSlow 4s ease-in-out infinite;
         }
         @keyframes bounceSlow {
           0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-8px); }
+          50% { transform: translateY(-4px); }
         }
         .animate-fade-in-up {
           opacity: 0;
