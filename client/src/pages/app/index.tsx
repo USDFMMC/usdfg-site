@@ -12,10 +12,14 @@ const ArenaHome: React.FC = () => {
   });
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<any>(null);
   const [filterCategory, setFilterCategory] = useState<string>('All');
   const [filterGame, setFilterGame] = useState<string>('All');
+  const [showMyChallenges, setShowMyChallenges] = useState<boolean>(false);
   const [usdfgPrice, setUsdfgPrice] = useState<number>(0.15); // Mock price: $0.15 per USDFG
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [isLive, setIsLive] = useState<boolean>(true);
   
   // Mock price API - simulates real-time price updates
   const fetchUsdfgPrice = useCallback(async () => {
@@ -171,6 +175,8 @@ const ArenaHome: React.FC = () => {
         // FORCE DEVNET AS PRIMARY: Only use devnet challenges, skip localStorage
         console.log(`✅ Setting ${formattedChallenges.length} devnet challenges as primary data source`);
         setChallenges(formattedChallenges);
+        setLastUpdated(new Date());
+        setIsLive(true);
         
         // Also save to localStorage for offline fallback, but don't use it as primary
         localStorage.setItem('devnet_challenges', JSON.stringify(formattedChallenges));
@@ -270,7 +276,8 @@ const ArenaHome: React.FC = () => {
   const filteredChallenges = challenges.filter(challenge => {
     const categoryMatch = filterCategory === 'All' || challenge.category === filterCategory;
     const gameMatch = filterGame === 'All' || challenge.game === filterGame;
-    return categoryMatch && gameMatch;
+    const myChallengesMatch = !showMyChallenges || challenge.creator === getWalletPublicKey();
+    return categoryMatch && gameMatch && myChallengesMatch;
   });
 
   // Get unique games for filter dropdown
@@ -319,6 +326,21 @@ const ArenaHome: React.FC = () => {
                   }}
                 />
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Live Data Tracker */}
+        <div className="container mx-auto px-4 py-2">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center space-x-2">
+              <div className={`w-2 h-2 rounded-full ${isLive ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
+              <span className="text-text-dim">
+                {isLive ? 'Live' : 'Offline'} • Last updated {Math.floor((Date.now() - lastUpdated.getTime()) / 1000)}s ago
+              </span>
+            </div>
+            <div className="text-text-dim">
+              {challenges.length} active challenges
             </div>
           </div>
         </div>
@@ -448,11 +470,27 @@ const ArenaHome: React.FC = () => {
                     </select>
                   </div>
                   
-                  {(filterCategory !== 'All' || filterGame !== 'All') && (
+                  {isConnected && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setShowMyChallenges(!showMyChallenges)}
+                        className={`px-3 py-1.5 rounded-lg border text-sm transition-all ${
+                          showMyChallenges 
+                            ? 'bg-cyan-500/20 border-cyan-500/30 text-cyan-400' 
+                            : 'bg-gray-800 border-gray-600 text-white hover:bg-gray-700'
+                        }`}
+                      >
+                        {showMyChallenges ? '👤 My Challenges' : '🌐 All Challenges'}
+                      </button>
+                    </div>
+                  )}
+                  
+                  {(filterCategory !== 'All' || filterGame !== 'All' || showMyChallenges) && (
                     <button
                       onClick={() => {
                         setFilterCategory('All');
                         setFilterGame('All');
+                        setShowMyChallenges(false);
                       }}
                       className="px-3 py-1.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-sm hover:bg-red-500/30 transition-colors"
                     >
@@ -480,7 +518,14 @@ const ArenaHome: React.FC = () => {
                     filteredChallenges.map((challenge) => {
                     const isOwner = isChallengeOwner(challenge);
                     return (
-                      <div key={challenge.id} className="challenge-card p-4">
+                      <div 
+                        key={challenge.id} 
+                        className="challenge-card p-4 cursor-pointer hover:bg-background-2/40 transition-colors"
+                        onClick={() => {
+                          setSelectedChallenge(challenge);
+                          setShowDetailsModal(true);
+                        }}
+                      >
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center space-x-3">
                             <div className="w-10 h-10 bg-gradient-to-r from-glow-pink to-glow-electric rounded-lg flex items-center justify-center">
@@ -654,6 +699,20 @@ const ArenaHome: React.FC = () => {
           <JoinChallengeModal 
             challenge={selectedChallenge}
             onClose={() => setShowJoinModal(false)}
+            isConnected={isConnected}
+            onConnect={() => setIsConnected(true)}
+          />
+        )}
+
+        {/* Challenge Details Modal */}
+        {showDetailsModal && selectedChallenge && (
+          <ChallengeDetailsModal 
+            challenge={selectedChallenge}
+            onClose={() => setShowDetailsModal(false)}
+            onJoin={() => {
+              setShowDetailsModal(false);
+              setShowJoinModal(true);
+            }}
             isConnected={isConnected}
             onConnect={() => setIsConnected(true)}
           />
@@ -1469,6 +1528,159 @@ const JoinChallengeModal: React.FC<{
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+};
+
+// Challenge Details Modal Component
+const ChallengeDetailsModal: React.FC<{ 
+  challenge: any; 
+  onClose: () => void; 
+  onJoin: () => void;
+  isConnected: boolean;
+  onConnect: () => void;
+}> = ({ challenge, onClose, onJoin, isConnected, onConnect }) => {
+  const [connecting, setConnecting] = useState(false);
+
+  const handleConnect = async () => {
+    if (!hasPhantomInstalled()) {
+      window.open('https://phantom.app/download', '_blank');
+      return;
+    }
+
+    setConnecting(true);
+    try {
+      await connectPhantom();
+      onConnect();
+    } catch (error) {
+      console.error('Connection failed:', error);
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-background-2/95 border border-glow/20 rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto backdrop-blur-sm glow-soft">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-text-primary neocore-h2">
+            Challenge Details
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-text-dim hover:text-text-primary transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="space-y-6">
+          {/* Challenge Header */}
+          <div className="flex items-center space-x-4">
+            <div className="w-16 h-16 bg-gradient-to-r from-glow-pink to-glow-electric rounded-xl flex items-center justify-center">
+              <span className="text-2xl">🥊</span>
+            </div>
+            <div>
+              <h3 className="text-xl font-semibold text-text-primary neocore-body">
+                {challenge.title}
+              </h3>
+              <p className="text-text-dim neocore-body">
+                {challenge.category} • {challenge.game}
+              </p>
+            </div>
+          </div>
+
+          {/* Challenge Info */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-background/50 rounded-lg p-4">
+              <div className="text-sm text-text-dim mb-1">Entry Fee</div>
+              <div className="text-lg font-semibold text-text-primary">
+                {challenge.entryFee} USDFG
+              </div>
+            </div>
+            <div className="bg-background/50 rounded-lg p-4">
+              <div className="text-sm text-text-dim mb-1">Prize Pool</div>
+              <div className="text-lg font-semibold text-text-primary">
+                {challenge.prizePool} USDFG
+              </div>
+            </div>
+            <div className="bg-background/50 rounded-lg p-4">
+              <div className="text-sm text-text-dim mb-1">Players</div>
+              <div className="text-lg font-semibold text-text-primary">
+                {challenge.players}/{challenge.capacity}
+              </div>
+            </div>
+            <div className="bg-background/50 rounded-lg p-4">
+              <div className="text-sm text-text-dim mb-1">Platform</div>
+              <div className="text-lg font-semibold text-text-primary">
+                {challenge.platform}
+              </div>
+            </div>
+          </div>
+
+          {/* Rules */}
+          <div>
+            <h4 className="text-lg font-semibold text-text-primary mb-3 neocore-body">
+              Rules & Requirements
+            </h4>
+            <div className="bg-background/50 rounded-lg p-4">
+              <pre className="text-text-primary whitespace-pre-wrap neocore-body">
+                {challenge.rules}
+              </pre>
+            </div>
+          </div>
+
+          {/* Creator Info */}
+          <div>
+            <h4 className="text-lg font-semibold text-text-primary mb-3 neocore-body">
+              Challenge Creator
+            </h4>
+            <div className="bg-background/50 rounded-lg p-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-full flex items-center justify-center">
+                  <span className="text-white font-semibold">
+                    {challenge.username?.charAt(0) || '👤'}
+                  </span>
+                </div>
+                <div>
+                  <div className="text-text-primary font-semibold neocore-body">
+                    {challenge.username || 'Anonymous Player'}
+                  </div>
+                  <div className="text-text-dim text-sm neocore-body">
+                    Created {new Date(challenge.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex space-x-3">
+            {isConnected ? (
+              <button
+                onClick={onJoin}
+                className="flex-1 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-semibold py-3 px-6 rounded-lg hover:brightness-110 transition-all neocore-button"
+              >
+                Join Challenge
+              </button>
+            ) : (
+              <button
+                onClick={handleConnect}
+                disabled={connecting}
+                className="flex-1 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-semibold py-3 px-6 rounded-lg hover:brightness-110 transition-all disabled:opacity-50 neocore-button"
+              >
+                {connecting ? 'Connecting...' : 'Connect Wallet to Join'}
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="px-6 py-3 border border-gray-600 text-text-primary rounded-lg hover:bg-gray-800 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
