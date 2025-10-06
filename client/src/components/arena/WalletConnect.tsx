@@ -169,7 +169,7 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
             {formatPublicKey(address)}
           </div>
           <div className="text-white font-semibold">
-            {balance !== null ? `${balance.toFixed(4)} SOL` : "Loading..."}
+            {balance !== null ? `${balance.toFixed(4)} SOL` : "Connected"}
           </div>
         </div>
         <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">

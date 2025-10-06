@@ -20,6 +20,7 @@ const ArenaHome: React.FC = () => {
   const [usdfgPrice, setUsdfgPrice] = useState<number>(0.15); // Mock price: $0.15 per USDFG
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [isLive, setIsLive] = useState<boolean>(true);
+  const [lastLocalChallenge, setLastLocalChallenge] = useState<number>(0);
   
   // Mock price API - simulates real-time price updates
   const fetchUsdfgPrice = useCallback(async () => {
@@ -172,13 +173,30 @@ const ArenaHome: React.FC = () => {
           createdAt: new Date(challenge.timestamp).toISOString()
         }));
         
-        // FORCE DEVNET AS PRIMARY: Only use devnet challenges, skip localStorage
-        console.log(`✅ Setting ${formattedChallenges.length} devnet challenges as primary data source`);
-        setChallenges(formattedChallenges);
+        // MERGE DEVNET + LOCAL: Combine devnet challenges with any local challenges
+        const localChallenges = JSON.parse(localStorage.getItem('challenges') || '[]');
+        
+        // Filter out local challenges that are too recent (less than 30 seconds old)
+        const now = Date.now();
+        const recentLocalChallenges = localChallenges.filter(challenge => {
+          const challengeTime = new Date(challenge.createdAt).getTime();
+          return (now - challengeTime) > 30000; // 30 seconds
+        });
+        
+        const allChallenges = [...formattedChallenges, ...recentLocalChallenges];
+        
+        // Remove duplicates based on ID
+        const uniqueChallenges = allChallenges.filter((challenge, index, self) => 
+          index === self.findIndex(c => c.id === challenge.id)
+        );
+        
+        console.log(`✅ Merged ${formattedChallenges.length} devnet + ${localChallenges.length} local = ${uniqueChallenges.length} total challenges`);
+        setChallenges(uniqueChallenges);
         setLastUpdated(new Date());
         setIsLive(true);
         
-        // Also save to localStorage for offline fallback, but don't use it as primary
+        // Save merged challenges to localStorage
+        localStorage.setItem('challenges', JSON.stringify(uniqueChallenges));
         localStorage.setItem('devnet_challenges', JSON.stringify(formattedChallenges));
         
       } catch (error) {
@@ -204,8 +222,8 @@ const ArenaHome: React.FC = () => {
     // Fetch immediately on mount
     fetchChallengesFromDevnet();
     
-    // Set up auto-refresh every 10 seconds
-    const refreshInterval = setInterval(fetchChallengesFromDevnet, 10000);
+    // Set up auto-refresh every 15 seconds (give local challenges time to be created)
+    const refreshInterval = setInterval(fetchChallengesFromDevnet, 15000);
     
     return () => clearInterval(refreshInterval);
   }, []);
@@ -243,6 +261,7 @@ const ArenaHome: React.FC = () => {
     
     // Add to local challenges immediately
     setChallenges(prev => [newChallenge, ...prev]);
+    setLastLocalChallenge(Date.now());
     
     // Also try to sync with devnet (this will make it visible across devices)
     try {
