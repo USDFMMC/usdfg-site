@@ -3,6 +3,7 @@ import { Helmet } from "react-helmet";
 import { Link } from "react-router-dom";
 import WalletConnect from "@/components/arena/WalletConnect";
 import { connectPhantom, hasPhantomInstalled, getWalletPublicKey } from "@/lib/wallet/solana";
+import { fetchActiveChallenges } from "@/lib/chain/events";
 
 const ArenaHome: React.FC = () => {
   const [isConnected, setIsConnected] = useState(() => {
@@ -141,6 +142,51 @@ const ArenaHome: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('challenges', JSON.stringify(challenges));
   }, [challenges]);
+
+  // Auto-refresh challenges from devnet every 10 seconds
+  useEffect(() => {
+    const fetchChallengesFromDevnet = async () => {
+      try {
+        const devnetChallenges = await fetchActiveChallenges();
+        if (devnetChallenges.length > 0) {
+          // Convert devnet challenges to the format expected by the UI
+          const formattedChallenges = devnetChallenges.map(challenge => ({
+            id: challenge.id,
+            title: `${challenge.game} Challenge`,
+            game: challenge.game,
+            mode: "Head-to-Head",
+            platform: "PS5",
+            username: challenge.creatorAddress.slice(0, 8) + "...",
+            entryFee: challenge.entryFee,
+            prizePool: challenge.entryFee * 1.9, // Approximate after platform fee
+            players: 1,
+            capacity: challenge.maxPlayers,
+            category: "Fighting", // Default category
+            creator: "devnet",
+            rules: "• Standard competitive rules\n• Best of 3 rounds\n• No cheating allowed",
+            createdAt: new Date(challenge.timestamp).toISOString()
+          }));
+          
+          // Merge with existing challenges, avoiding duplicates
+          setChallenges(prev => {
+            const existingIds = new Set(prev.map(c => c.id));
+            const newChallenges = formattedChallenges.filter(c => !existingIds.has(c.id));
+            return [...newChallenges, ...prev];
+          });
+        }
+      } catch (error) {
+        console.error("Failed to fetch challenges from devnet:", error);
+      }
+    };
+
+    // Fetch immediately on mount
+    fetchChallengesFromDevnet();
+    
+    // Set up auto-refresh every 10 seconds
+    const refreshInterval = setInterval(fetchChallengesFromDevnet, 10000);
+    
+    return () => clearInterval(refreshInterval);
+  }, []);
 
   const handleCreateChallenge = (challengeData: any) => {
     const platformFee = 0.05; // 5% platform fee
