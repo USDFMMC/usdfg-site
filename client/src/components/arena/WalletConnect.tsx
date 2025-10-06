@@ -36,18 +36,23 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
   // Check if wallet is already connected on mount
   useEffect(() => {
     const checkConnection = async () => {
+      // Wait a bit for wallet provider to load (especially important for Firefox)
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // First check if wallet was previously connected
       if (wasWalletConnected()) {
         const storedAddress = getStoredWalletAddress();
         if (storedAddress) {
           // Check if wallet is still actually connected
           if (isWalletConnected()) {
+            console.log("🔄 Restoring wallet connection:", storedAddress.slice(0, 8) + "...");
             setAddress(storedAddress);
             onConnect();
             // Fetch real SOL balance
             getSOLBalance(storedAddress).then(setBalance).catch(console.error);
           } else {
             // Wallet is no longer connected, clear stored state
+            console.log("❌ Wallet no longer connected, clearing stored state");
             localStorage.removeItem('wallet_connected');
             localStorage.removeItem('wallet_address');
           }
@@ -56,11 +61,14 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
         // Wallet is connected but not stored (first time)
         const pubkey = getWalletPublicKey();
         if (pubkey) {
+          console.log("🔄 First time wallet connection detected:", pubkey.slice(0, 8) + "...");
           setAddress(pubkey);
           onConnect();
           // Fetch real SOL balance
           getSOLBalance(pubkey).then(setBalance).catch(console.error);
         }
+      } else {
+        console.log("ℹ️ No wallet connection found");
       }
     };
 
@@ -68,7 +76,13 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
     const mobileCheck = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     setIsMobile(mobileCheck);
 
+    // Try connection check immediately
     checkConnection();
+    
+    // Also try again after a longer delay for Firefox compatibility
+    const retryTimeout = setTimeout(checkConnection, 1000);
+    
+    return () => clearTimeout(retryTimeout);
   }, []); // Removed onConnect dependency to prevent infinite loop
 
   const handleConnectPhantom = async () => {

@@ -73,7 +73,7 @@ export const getWalletPublicKey = () => {
   // Check Phantom first
   if ("solana" in window) {
     const provider = (window as any).solana;
-    if (provider?.publicKey) {
+    if (provider?.publicKey && provider.isConnected) {
       return provider.publicKey.toString();
     }
   }
@@ -81,7 +81,7 @@ export const getWalletPublicKey = () => {
   // Check Solflare
   if ("solflare" in window) {
     const provider = (window as any).solflare;
-    if (provider?.publicKey) {
+    if (provider?.publicKey && provider.isConnected) {
       return provider.publicKey.toString();
     }
   }
@@ -96,11 +96,13 @@ export const isWalletConnected = () => {
     // Store connection state in localStorage for persistence
     localStorage.setItem('wallet_connected', 'true');
     localStorage.setItem('wallet_address', pubkey);
+    console.log("✅ Wallet connected:", pubkey.slice(0, 8) + "...");
     return true;
   } else {
     // Clear stored state if not actually connected
     localStorage.removeItem('wallet_connected');
     localStorage.removeItem('wallet_address');
+    console.log("❌ Wallet not connected");
     return false;
   }
 };
