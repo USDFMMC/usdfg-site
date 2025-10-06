@@ -13,11 +13,11 @@ const Crosshair: React.FC<CrosshairProps> = ({ color = '#00ffff' }) => {
       if (horizontalRef.current && verticalRef.current) {
         // Update horizontal line position
         horizontalRef.current.style.top = `${e.clientY}px`;
-        horizontalRef.current.style.opacity = '0.4';
+        horizontalRef.current.style.opacity = '0.6';
         
         // Update vertical line position  
         verticalRef.current.style.left = `${e.clientX}px`;
-        verticalRef.current.style.opacity = '0.4';
+        verticalRef.current.style.opacity = '0.6';
       }
     };
 
@@ -28,23 +28,14 @@ const Crosshair: React.FC<CrosshairProps> = ({ color = '#00ffff' }) => {
       }
     };
 
-    const handleMouseEnter = () => {
-      if (horizontalRef.current && verticalRef.current) {
-        horizontalRef.current.style.opacity = '0.4';
-        verticalRef.current.style.opacity = '0.4';
-      }
-    };
-
     // Add event listeners
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseleave', handleMouseLeave);
-    document.addEventListener('mouseenter', handleMouseEnter);
 
     // Cleanup
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseleave', handleMouseLeave);
-      document.removeEventListener('mouseenter', handleMouseEnter);
     };
   }, []);
 
@@ -60,9 +51,8 @@ const Crosshair: React.FC<CrosshairProps> = ({ color = '#00ffff' }) => {
         ref={horizontalRef}
         className="absolute w-full h-[1px] pointer-events-none opacity-0 crosshair-horizontal"
         style={{ 
-          background: `linear-gradient(90deg, transparent 0%, transparent 40%, ${color} 45%, ${color} 55%, transparent 60%, transparent 100%)`,
-          filter: `drop-shadow(0 0 1px ${color})`,
-          transform: 'translateY(-0.5px)'
+          background: `linear-gradient(90deg, transparent 0%, ${color} 50%, transparent 100%)`,
+          filter: `drop-shadow(0 0 2px ${color})`
         }}
       />
       {/* Vertical Line */}
@@ -70,9 +60,8 @@ const Crosshair: React.FC<CrosshairProps> = ({ color = '#00ffff' }) => {
         ref={verticalRef}
         className="absolute h-full w-[1px] pointer-events-none opacity-0 crosshair-vertical"
         style={{ 
-          background: `linear-gradient(180deg, transparent 0%, transparent 40%, ${color} 45%, ${color} 55%, transparent 60%, transparent 100%)`,
-          filter: `drop-shadow(0 0 1px ${color})`,
-          transform: 'translateX(-0.5px)'
+          background: `linear-gradient(180deg, transparent 0%, ${color} 50%, transparent 100%)`,
+          filter: `drop-shadow(0 0 2px ${color})`
         }}
       />
     </div>

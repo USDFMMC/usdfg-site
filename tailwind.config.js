@@ -48,12 +48,6 @@ module.exports = {
         'background-light': 'var(--background-light)',
         'background-dark': 'var(--background-dark)',
         'star-color': 'var(--star-color)',
-        // Elite app colors
-        'app-background-dark': 'var(--app-background-dark)',
-        'app-foreground': 'var(--app-foreground)',
-        'app-accent-color': 'var(--app-accent-color)',
-        'app-primary-color': 'var(--app-primary-color)',
-        'app-secondary-color': 'var(--app-secondary-color)',
       },
       borderRadius: {
         lg: 'var(--radius)',

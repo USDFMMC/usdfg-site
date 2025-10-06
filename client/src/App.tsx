@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -14,26 +14,9 @@ import StarBackground from "@/components/effects/star-background";
 import Crosshair from "@/components/effects/Crosshair";
 import { Helmet } from "react-helmet";
 
-function ConditionalBackground() {
-  const location = useLocation();
-  const isAppRoute = location.pathname.startsWith('/app');
-  
-  if (isAppRoute) {
-    return null; // No background effects for app routes
-  }
-  
-  return (
-    <>
-      <StarBackground />
-      <Crosshair color="#00ffff" />
-    </>
-  );
-}
-
 function AppRouter() {
   return (
     <Router>
-      <ConditionalBackground />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/privacy" element={<Privacy />} />
@@ -88,6 +71,8 @@ function App() {
       </Helmet>
 
       <div className="min-h-screen flex flex-col relative overflow-hidden">
+        <StarBackground />
+        {/* <Crosshair color="#00ffff" /> */}
         <AppRouter />
         <Toaster />
       </div>
