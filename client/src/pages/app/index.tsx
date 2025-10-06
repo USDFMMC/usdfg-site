@@ -181,7 +181,7 @@ const ArenaHome: React.FC = () => {
     <>
       <Helmet>
         <title>USDFG Arena - Gaming Platform | USDFGAMING</title>
-        <meta name="description" content="Enter the USDFG Arena - Compete in skill-based challenges, earn $USDFG, and prove your gaming prowess." />
+        <meta name="description" content="Enter the USDFG Arena - Compete in skill-based challenges, earn USDFG, and prove your gaming prowess." />
       </Helmet>
 
       <div className="min-h-screen bg-background-1 relative">
@@ -232,7 +232,7 @@ const ArenaHome: React.FC = () => {
               Welcome to the <span className="bg-gradient-to-r from-glow-cyan to-glow-electric bg-clip-text text-transparent">Arena</span>
             </h1>
             <p className="text-xl max-w-2xl mx-auto neocore-body mb-8">
-              Compete in skill-based challenges, earn $USDFG, and prove your gaming prowess against players worldwide.
+              Compete in skill-based challenges, earn USDFG, and prove your gaming prowess against players worldwide.
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -276,7 +276,7 @@ const ArenaHome: React.FC = () => {
             <div className="bg-black/20 border border-gray-800 rounded-lg p-6 text-center backdrop-blur-sm">
               <div className="text-4xl mb-2">⚡</div>
               <div className="text-2xl font-bold text-white">45,678</div>
-              <div className="text-gray-400 text-sm">$USDFG Rewarded</div>
+              <div className="text-gray-400 text-sm">USDFG Rewarded</div>
             </div>
             
             <div className="bg-black/20 border border-gray-800 rounded-lg p-6 text-center backdrop-blur-sm">
@@ -517,7 +517,7 @@ const ArenaHome: React.FC = () => {
                         </div>
                         <div>
                           <h3 className="text-white font-semibold">CryptoGamer_Pro</h3>
-                          <p className="text-gray-400 text-sm">2,847 $USDFG earned</p>
+                          <p className="text-gray-400 text-sm">2,847 USDFG earned</p>
                         </div>
                       </div>
                       <div className="text-right">

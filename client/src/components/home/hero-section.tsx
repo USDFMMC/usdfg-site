@@ -37,7 +37,7 @@ const HeroSection: React.FC = () => {
               className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4"
               style={{ color: "var(--secondary-color)", textShadow: "var(--neon-glow)" }}
             >
-              $USDFG
+USDFG
             </div>
 
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">

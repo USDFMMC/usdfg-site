@@ -77,11 +77,11 @@ const AppRedirect: React.FC = () => {
                     <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center mx-auto mb-2">
                       <Zap className="w-6 h-6 text-black" />
                     </div>
-                    <CardTitle className="text-white">Earn $USDFG</CardTitle>
+                    <CardTitle className="text-white">Earn USDFG</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-gray-400 text-center">
-                      Win challenges and earn $USDFG tokens. 
+                      Win challenges and earn USDFG tokens. 
                       Your skill directly translates to rewards.
                     </p>
                   </CardContent>

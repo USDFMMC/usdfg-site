@@ -92,7 +92,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div>
           <Label htmlFor="entryFee" className="text-sm font-medium text-gray-400 mb-2 block">
-            Entry Fee ($USDFG)
+            Entry Fee (USDFG)
           </Label>
           <Input
             id="entryFee"
@@ -197,7 +197,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                 <DollarSign className="w-4 h-4 text-green-400" />
                 <div>
                   <p className="text-sm text-gray-400">Entry Fee</p>
-                  <p className="text-white font-semibold">{formData.entryFee} $USDFG</p>
+                  <p className="text-white font-semibold">{formData.entryFee} USDFG</p>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
@@ -219,7 +219,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
               <div className="flex items-center justify-between">
                 <span className="text-gray-400">Total Prize Pool:</span>
                 <span className="text-2xl font-bold text-cyan-400">
-                  {(parseFloat(formData.entryFee) * parseInt(formData.maxPlayers)).toFixed(2)} $USDFG
+                  {(parseFloat(formData.entryFee) * parseInt(formData.maxPlayers)).toFixed(2)} USDFG
                 </span>
               </div>
             </div>

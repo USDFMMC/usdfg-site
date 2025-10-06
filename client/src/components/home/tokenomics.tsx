@@ -65,13 +65,13 @@ const Tokenomics: React.FC = () => {
       {/* Why Tokenomics Matters Intro */}
       <div className="max-w-2xl mx-auto mb-8 px-6 py-4 rounded-xl bg-gradient-to-br from-white/10 to-[#a78bfa22] border border-purple-700/40 shadow-lg backdrop-blur-md animate-fade-in" style={{ textAlign: 'center' }}>
         <p className="text-lg md:text-xl font-bold text-purple-300 mb-2 drop-shadow-glow">Why Tokenomics Matters</p>
-        <p className="text-base md:text-lg text-white/90 font-medium">Transparent tokenomics ensures every $USDFG token is allocated for platform access and utility, with no hidden distributions. Our structure is designed for platform integrity and fair access—so you always know exactly how tokens are used within the ecosystem.</p>
+        <p className="text-base md:text-lg text-white/90 font-medium">Transparent tokenomics ensures every USDFG token is allocated for platform access and utility, with no hidden distributions. Our structure is designed for platform integrity and fair access—so you always know exactly how tokens are used within the ecosystem.</p>
       </div>
       <h2 className="text-3xl md:text-5xl font-bold mb-4 text-white" style={{ textShadow: 'var(--primary-glow)' }}>
         TOKENOMICS
       </h2>
       <p className="text-lg text-muted-foreground mb-12 max-w-xl mx-auto">
-        $USDFG Token allocation structure for platform access and utility.
+        USDFG Token allocation structure for platform access and utility.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 max-w-5xl mx-auto mb-8">
@@ -101,9 +101,9 @@ const Tokenomics: React.FC = () => {
         </div>
       </div>
       <div className="text-center mt-6">
-        <p className="text-gray-400 text-sm">$USDFG has a fixed supply of 21,000,000 tokens. No inflation. No dilution. No burning. Just hard supply — like it should be.</p>
+        <p className="text-gray-400 text-sm">USDFG has a fixed supply of 21,000,000 tokens. No inflation. No dilution. No burning. Just hard supply — like it should be.</p>
         <p className="text-gray-400 text-sm mt-2">The percentages shown reflect platform utility allocation only. These are not financial indicators or investment guidance.</p>
-        <p className="text-gray-400 text-sm mt-2">$USDFG is used strictly for access, skill-based gameplay, and challenge participation within the platform.</p>
+        <p className="text-gray-400 text-sm mt-2">USDFG is used strictly for access, skill-based gameplay, and challenge participation within the platform.</p>
         <p className="text-gray-400 text-sm mt-2">No income, interest, or financial benefit is promised or implied. USDFG is not a security.</p>
       </div>
       <style>{`

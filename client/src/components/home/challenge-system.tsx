@@ -406,7 +406,7 @@ const ChallengeSystem: React.FC = () => {
                 {/* Amount */}
                 <div>
                   <Label htmlFor="entry-amount" className="text-sm font-medium text-muted-foreground mb-1">
-                    Entry Amount ($USDFG)
+                    Entry Amount (USDFG)
                   </Label>
                   <Input
                     id="entry-amount"

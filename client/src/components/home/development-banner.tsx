@@ -25,17 +25,17 @@ const AboutSection: React.FC = () => {
           <div className="absolute inset-0 rounded-2xl bg-gradient-radial from-cyan-400/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
           
           <div className="relative z-10 w-full flex flex-col items-center text-center space-y-8">
-            <h2 className="text-4xl font-bold text-center mb-6">What is <span className="text-cyan-400">$USDFG?</span></h2>
+            <h2 className="text-4xl font-bold text-center mb-6">What is <span className="text-cyan-400">USDFG?</span></h2>
             <div className="max-w-2xl mx-auto text-center">
               <p className="text-lg text-center mb-4 font-bold">
-                $USDFG is the access token for a decentralized competition platform—built for those who outperform, not those who get lucky.
+                USDFG is the access token for a decentralized competition platform—built for those who outperform, not those who get lucky.
               </p>
               <p className="text-base text-center mb-4">
                 <strong>No gambling. No randomness. Only verified performance.</strong>
               </p>
               <p className="text-base text-center mb-4">
                 Every challenge is <span className="text-cyan-400 font-medium">merit-based</span>, and every reward is <span className="text-cyan-400 font-medium">earned</span>.<br/>
-                $USDFG exists to reward skill—not speculation.
+                USDFG exists to reward skill—not speculation.
               </p>
               <p className="text-base text-center mb-4">
                 This isn't a passive asset. It's a <strong>competitive layer for digital performance</strong>, tied to strategy, execution, and outcome.
@@ -44,7 +44,7 @@ const AboutSection: React.FC = () => {
                 <strong>Fixed supply.</strong> No inflation. No hidden mechanics. Just a clean contract and a clear goal: <span className="text-cyan-400 font-medium">reward performance</span>.
               </p>
               <p className="text-base text-center mt-6 font-bold">
-                $USDFG is for players who win on skill—nothing else.<br/>
+                USDFG is for players who win on skill—nothing else.<br/>
                 If that's you, step forward. The next challenge awaits.
               </p>
             </div>

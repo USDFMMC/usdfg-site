@@ -14,7 +14,7 @@ const Terms: React.FC = () => {
       <Helmet>
         <title>Terms of Service | USDFGAMING – Skill-Based Crypto Gaming Platform</title>
         <meta name="description" content="Read the Terms of Service for USDFGAMING, the elite, skill-based crypto gaming platform. Understand your rights, responsibilities, and our commitment to fair, on-chain competition." />
-        <meta name="keywords" content="USDFG, $USDFG, terms of service, crypto gaming terms, skill-based gaming, fair play, non-custodial, USDFGAMING" />
+        <meta name="keywords" content="USDFG, USDFG, terms of service, crypto gaming terms, skill-based gaming, fair play, non-custodial, USDFGAMING" />
         <link rel="canonical" href="https://usdfg.pro/terms" />
 
         {/* Open Graph */}
@@ -190,7 +190,7 @@ const Terms: React.FC = () => {
                       <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 1. Legal Classification Statement</h3>
                     </div>
                     <div className="border-t border-cyan-400/30 mb-4"></div>
-                  <p>USDFG is a skill-based digital competition platform operated solely by its Founder. It does not offer any form of gambling, wagering, lotteries, or games of chance. Participation is voluntary and rewards are based exclusively on user skill and verified performance. $USDFG is a utility token used solely to access platform features and has no guaranteed monetary value. These Terms are designed to comply with applicable laws related to gaming, digital assets, and consumer protections.</p>
+                  <p>USDFG is a skill-based digital competition platform operated solely by its Founder. It does not offer any form of gambling, wagering, lotteries, or games of chance. Participation is voluntary and rewards are based exclusively on user skill and verified performance. USDFG is a utility token used solely to access platform features and has no guaranteed monetary value. These Terms are designed to comply with applicable laws related to gaming, digital assets, and consumer protections.</p>
                 </div>
 
                   <div id="section-2" className="animate-fade-in">
@@ -199,7 +199,7 @@ const Terms: React.FC = () => {
                       <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 2. Service Overview</h3>
                     </div>
                     <div className="border-t border-cyan-400/30 mb-4"></div>
-                  <p>USDFG is a skill-based digital platform where users participate in challenges, earn rewards, and engage with competitive content. The platform is powered by the $USDFG token, used strictly for in-platform utilities and skill-based competitions. No gambling, betting, or games of chance are offered or supported. All competitions are based solely on user skill and verified performance metrics.</p>
+                  <p>USDFG is a skill-based digital platform where users participate in challenges, earn rewards, and engage with competitive content. The platform is powered by the USDFG token, used strictly for in-platform utilities and skill-based competitions. No gambling, betting, or games of chance are offered or supported. All competitions are based solely on user skill and verified performance metrics.</p>
                 </div>
 
                   <div id="section-3" className="animate-fade-in">
@@ -227,7 +227,7 @@ const Terms: React.FC = () => {
                       <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 5. Token Use & Risk Disclosure</h3>
                     </div>
                     <div className="border-t border-cyan-400/30 mb-4"></div>
-                  <p>$USDFG is a utility token with no guaranteed value, used exclusively for platform participation and skill-based competitions.</p>
+                  <p>USDFG is a utility token with no guaranteed value, used exclusively for platform participation and skill-based competitions.</p>
                   <ul className="list-disc pl-5 space-y-2">
                     <li>Token values may fluctuate and are not guaranteed.</li>
                     <li>USDFG is non-custodial - we do not store or control your wallet or private keys.</li>
@@ -357,7 +357,7 @@ const Terms: React.FC = () => {
                       <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 18. Naming Notice</h3>
                     </div>
                     <div className="border-t border-cyan-400/30 mb-4"></div>
-                  <p>The official name is United We Stand Divided We Fall Gaming. The Solana-registered token is United We Stand Gaming. The brand is USDFGAMING and the ticker is $USDFG. All references refer to the same entity.</p>
+                  <p>The official name is United We Stand Divided We Fall Gaming. The Solana-registered token is United We Stand Gaming. The brand is USDFGAMING and the ticker is USDFG. All references refer to the same entity.</p>
                 </div>
 
                   <div id="section-19" className="animate-fade-in">
@@ -393,7 +393,7 @@ const Terms: React.FC = () => {
                       <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 22. No Ownership Rights</h3>
                     </div>
                     <div className="border-t border-cyan-400/30 mb-4"></div>
-                  <p>Holding $USDFG does not grant ownership, equity, voting power, or legal claim over the platform.</p>
+                  <p>Holding USDFG does not grant ownership, equity, voting power, or legal claim over the platform.</p>
                 </div>
 
                   <div id="section-23" className="animate-fade-in">
@@ -402,7 +402,7 @@ const Terms: React.FC = () => {
                       <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 23. Token Acquisition and Use</h3>
                     </div>
                     <div className="border-t border-cyan-400/30 mb-4"></div>
-                  <p>Users may acquire $USDFG tokens to access features, create or join challenges, and participate in skill-based competitions. Acquiring tokens is not a bet, wager, or speculative investment, and using tokens to enter a challenge is not gambling. Challenge rewards are based solely on measurable performance and outcome verification. Users may withdraw earned tokens to their wallets and convert them using external platforms at their discretion. USDFG does not offer, facilitate, or control currency exchange or financial speculation.</p>
+                  <p>Users may acquire USDFG tokens to access features, create or join challenges, and participate in skill-based competitions. Acquiring tokens is not a bet, wager, or speculative investment, and using tokens to enter a challenge is not gambling. Challenge rewards are based solely on measurable performance and outcome verification. Users may withdraw earned tokens to their wallets and convert them using external platforms at their discretion. USDFG does not offer, facilitate, or control currency exchange or financial speculation.</p>
                 </div>
 
                   <div id="section-24" className="animate-fade-in">
@@ -456,7 +456,7 @@ const Terms: React.FC = () => {
                       <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 27. Token Use Limitation</h3>
                     </div>
                     <div className="border-t border-cyan-400/30 mb-4"></div>
-                  <p>Holding or acquiring $USDFG does not entitle users to revenue, profits, dividends, ownership, or governance influence.</p>
+                  <p>Holding or acquiring USDFG does not entitle users to revenue, profits, dividends, ownership, or governance influence.</p>
                 </div>
 
                   <div id="section-30" className="animate-fade-in">
@@ -699,7 +699,7 @@ const Terms: React.FC = () => {
                       <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 54. Token Migration and Upgrade</h3>
                     </div>
                     <div className="border-t border-cyan-400/30 mb-4"></div>
-                  <p>USDFG reserves the right to migrate or upgrade the $USDFG token, smart contracts, or platform infrastructure to a new blockchain, contract address, or versioned system. Users may be required to follow official migration instructions. Failure to do so may result in permanent loss of legacy tokens or access.</p>
+                  <p>USDFG reserves the right to migrate or upgrade the USDFG token, smart contracts, or platform infrastructure to a new blockchain, contract address, or versioned system. Users may be required to follow official migration instructions. Failure to do so may result in permanent loss of legacy tokens or access.</p>
                 </div>
 
                   <div id="section-57" className="animate-fade-in">
@@ -778,7 +778,7 @@ const Terms: React.FC = () => {
                       <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 62. Not a Security</h3>
                     </div>
                     <div className="border-t border-cyan-400/30 mb-4"></div>
-                    <p>$USDFG is not offered or intended to be a security, investment vehicle, or financial product. It has no profit expectation, voting rights, or dividend structure. USDFG is a utility token for skill-based participation only, and its legal structure is designed to comply with U.S. and global regulatory guidelines regarding digital assets.</p>
+                    <p>USDFG is not offered or intended to be a security, investment vehicle, or financial product. It has no profit expectation, voting rights, or dividend structure. USDFG is a utility token for skill-based participation only, and its legal structure is designed to comply with U.S. and global regulatory guidelines regarding digital assets.</p>
                   </div>
 
                   <div id="section-65" className="animate-fade-in">
@@ -832,7 +832,7 @@ const Terms: React.FC = () => {
                       <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 68. Fixed Supply Statement</h3>
                     </div>
                     <div className="border-t border-cyan-400/30 mb-4"></div>
-                    <p>The $USDFG token has a permanently fixed maximum supply of 21 million tokens. No additional minting, inflation, or hidden reserves exist. All token-related functions are transparent and verifiable on-chain.</p>
+                    <p>The USDFG token has a permanently fixed maximum supply of 21 million tokens. No additional minting, inflation, or hidden reserves exist. All token-related functions are transparent and verifiable on-chain.</p>
                   </div>
 
                   <div id="section-71" className="animate-fade-in">

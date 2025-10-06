@@ -70,7 +70,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
               </Badge>
               <Badge variant="secondary" className="bg-cyan-500/20 text-cyan-400">
                 <Zap className="w-3 h-3 mr-1" />
-                {stats.totalEarnings} $USDFG
+                {stats.totalEarnings} USDFG
               </Badge>
             </div>
           </div>

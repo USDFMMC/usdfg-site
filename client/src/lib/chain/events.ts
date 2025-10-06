@@ -157,7 +157,7 @@ export async function createChallenge(
   maxPlayers: number,
   rules: string
 ): Promise<string> {
-  console.log(`Creating challenge: ${game}, ${entryFee} $USDFG`);
+  console.log(`Creating challenge: ${game}, ${entryFee} USDFG`);
   
   // Simulate transaction time
   await new Promise(resolve => setTimeout(resolve, 3000));

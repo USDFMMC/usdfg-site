@@ -169,7 +169,7 @@ const PlayerProfile: React.FC = () => {
                       </Badge>
                       <Badge variant="secondary" className="bg-cyan-500/20 text-cyan-400">
                         <Zap className="w-3 h-3 mr-1" />
-                        {profile.stats.totalEarnings} $USDFG
+                        {profile.stats.totalEarnings} USDFG
                       </Badge>
                     </div>
                   </div>
@@ -205,7 +205,7 @@ const PlayerProfile: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-cyan-400">{profile.stats.totalEarnings}</div>
-                  <p className="text-sm text-gray-400">$USDFG</p>
+                  <p className="text-sm text-gray-400">USDFG</p>
                 </CardContent>
               </Card>
 
@@ -249,7 +249,7 @@ const PlayerProfile: React.FC = () => {
                         <p className={`font-semibold ${
                           challenge.amount > 0 ? "text-green-400" : "text-red-400"
                         }`}>
-                          {challenge.amount > 0 ? "+" : ""}{challenge.amount} $USDFG
+                          {challenge.amount > 0 ? "+" : ""}{challenge.amount} USDFG
                         </p>
                         <p className={`text-sm ${
                           challenge.result === 'win' ? "text-green-400" : "text-red-400"

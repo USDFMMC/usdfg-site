@@ -9,9 +9,9 @@ interface Feature {
 const PlatformFeatures: React.FC = () => {
   const features: Feature[] = [
     {
-      title: "Fuel Your Wallet with $USDFG",
+      title: "Fuel Your Wallet with USDFG",
       icon: "🪙",
-      description: "Buy, earn, or claim $USDFG directly into your wallet. Use tokens to access skill-based challenges — not for speculation or staking."
+      description: "Buy, earn, or claim USDFG directly into your wallet. Use tokens to access skill-based challenges — not for speculation or staking."
     },
     {
       title: "Create Skill Challenges",
@@ -21,7 +21,7 @@ const PlatformFeatures: React.FC = () => {
     {
       title: "Earn Verified Results",
       icon: "🏆",
-      description: "$USDFG is unlocked through proof of performance — not by chance, not by hype."
+      description: "USDFG is unlocked through proof of performance — not by chance, not by hype."
     },
     {
       title: "Track Wallet Stats",
@@ -33,7 +33,7 @@ const PlatformFeatures: React.FC = () => {
   return (
     <section id="platform" className="py-20 px-4 text-white text-center relative overflow-hidden">
       <h2 className="text-4xl md:text-5xl font-bold text-center mb-4 text-white animate-fade-in" style={{ textShadow: 'var(--primary-glow)' }}>
-        $USDFG – The Bitcoin of Gaming
+        USDFG – The Bitcoin of Gaming
       </h2>
       <p className="text-center text-lg text-muted-foreground mb-12 animate-fade-in" style={{ textShadow: 'var(--neon-glow)' }}>
         A decentralized arena where skill is the only currency.

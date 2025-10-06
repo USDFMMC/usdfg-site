@@ -123,7 +123,7 @@ const LeaderboardPreview: React.FC = () => {
         </div> */}
         <div className="text-center mb-6">
           <h2 className="text-3xl md:text-4xl font-extrabold mb-2 drop-shadow-glow">
-            $USDFG <span className="text-primary">LEADERBOARD</span>
+            USDFG <span className="text-primary">LEADERBOARD</span>
           </h2>
           {/* Neon-glow underline/divider */}
           <div className="mx-auto mb-4 h-1 w-40 rounded-full bg-gradient-to-r from-cyan-400 via-purple-500 to-cyan-400 animate-pulse shadow-[0_0_32px_#22d3ee99] shimmer-underline" />
@@ -181,7 +181,7 @@ const LeaderboardPreview: React.FC = () => {
                   <TableHead className="text-center">Streak</TableHead>
                   <TableHead className="w-36 text-center" style={{ overflow: 'visible', position: 'relative' }}>
                     <div className="flex items-center justify-center gap-1 relative">
-                      Skill Rewards ($USDFG)
+                      Skill Rewards (USDFG)
                     </div>
                   </TableHead>
                   <TableHead className="w-24 text-center">Tier</TableHead>

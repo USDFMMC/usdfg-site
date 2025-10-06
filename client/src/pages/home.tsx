@@ -21,11 +21,11 @@ const Home: React.FC = () => {
         <title>USDFGAMING – Skill-Based Crypto Gaming Platform | Game. Earn. Conquer.</title>
         <meta
           name="description"
-          content="USDFGAMING is the elite, skill-based crypto gaming platform. Compete in verified challenges, earn $USDFG, and prove your skill. No gambling. No chance. 100% on-chain rewards."
+          content="USDFGAMING is the elite, skill-based crypto gaming platform. Compete in verified challenges, earn USDFG, and prove your skill. No gambling. No chance. 100% on-chain rewards."
         />
         <meta
           name="keywords"
-          content="USDFG, $USDFG, skill-based crypto gaming, earn from skill not luck, leaderboard, non-custodial, fair play, Game. Earn. Conquer., USDFGAMING, gaming token"
+          content="USDFG, USDFG, skill-based crypto gaming, earn from skill not luck, leaderboard, non-custodial, fair play, Game. Earn. Conquer., USDFGAMING, gaming token"
         />
         <link rel="canonical" href={canonical} />
 
@@ -34,7 +34,7 @@ const Home: React.FC = () => {
         <meta property="og:site_name" content="USDFGAMING" />
         <meta property="og:url" content={canonical} />
         <meta property="og:title" content="USDFGAMING – Skill-Based Crypto Gaming Platform" />
-        <meta property="og:description" content="Compete in verified challenges, earn $USDFG, and prove your skill. No gambling, 100% on-chain." />
+        <meta property="og:description" content="Compete in verified challenges, earn USDFG, and prove your skill. No gambling, 100% on-chain." />
         <meta property="og:image" content={ogImage} />
         <meta property="og:image:type" content="image/webp" />
         <meta property="og:image:width" content="1200" />
@@ -46,7 +46,7 @@ const Home: React.FC = () => {
         <meta name="twitter:site" content="@USDFGAMING" />
         <meta name="twitter:url" content={canonical} />
         <meta name="twitter:title" content="USDFGAMING – Skill-Based Crypto Gaming Platform" />
-        <meta name="twitter:description" content="Compete in verified challenges, earn $USDFG, and prove your skill. No gambling, 100% on-chain." />
+        <meta name="twitter:description" content="Compete in verified challenges, earn USDFG, and prove your skill. No gambling, 100% on-chain." />
         <meta name="twitter:image" content={ogImage} />
 
         {/* JSON-LD */}

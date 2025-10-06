@@ -14,7 +14,7 @@ const Privacy: React.FC = () => {
       <Helmet>
         <title>Privacy Policy | USDFGAMING – Skill-Based Crypto Gaming Platform</title>
         <meta name="description" content="Read the Privacy Policy for USDFGAMING. Learn how we protect your data and privacy on the elite, skill-based crypto gaming platform." />
-        <meta name="keywords" content="USDFG, $USDFG, privacy policy, crypto gaming privacy, skill-based gaming, data protection, non-custodial, USDFGAMING" />
+        <meta name="keywords" content="USDFG, USDFG, privacy policy, crypto gaming privacy, skill-based gaming, data protection, non-custodial, USDFGAMING" />
         <link rel="canonical" href="https://usdfg.pro/privacy" />
 
         {/* Open Graph */}
@@ -308,7 +308,7 @@ const Privacy: React.FC = () => {
                       <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 16. Not a Security</h3>
                     </div>
                     <div className="border-t border-cyan-400/30 mb-4"></div>
-                    <p>$USDFG is not offered or intended to be a security, investment vehicle, or financial product. It has no profit expectation, voting rights, or dividend structure. USDFG is a utility token for skill-based participation only, and its legal structure is designed to comply with U.S. and global regulatory guidelines regarding digital assets.</p>
+                    <p>USDFG is not offered or intended to be a security, investment vehicle, or financial product. It has no profit expectation, voting rights, or dividend structure. USDFG is a utility token for skill-based participation only, and its legal structure is designed to comply with U.S. and global regulatory guidelines regarding digital assets.</p>
                   </div>
 
                   {/* Content & Governance */}

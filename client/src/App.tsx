@@ -39,7 +39,7 @@ function App() {
         <title>USDFGAMING – Skill-Based Crypto Gaming | Game. Earn. Conquer.</title>
         <meta
           name="description"
-          content="USDFGAMING is the elite, skill-based crypto gaming platform. Compete, verify results, and earn $USDFG. No gambling. 100% on-chain."
+          content="USDFGAMING is the elite, skill-based crypto gaming platform. Compete, verify results, and earn USDFG. No gambling. 100% on-chain."
         />
         <link rel="canonical" href="https://usdfg.pro/" />
 
@@ -50,7 +50,7 @@ function App() {
         <meta property="og:title" content="USDFGAMING – Skill-Based Crypto Gaming" />
         <meta
           property="og:description"
-          content="Compete in verified challenges, earn $USDFG, and prove your skill."
+          content="Compete in verified challenges, earn USDFG, and prove your skill."
         />
         <meta property="og:image" content="https://usdfg.pro/assets/usdfg-og-banner.png" />
         <meta property="og:image:width" content="1200" />
@@ -62,7 +62,7 @@ function App() {
         <meta name="twitter:title" content="USDFGAMING – Skill-Based Crypto Gaming" />
         <meta
           name="twitter:description"
-          content="Compete in verified challenges, earn $USDFG, and prove your skill."
+          content="Compete in verified challenges, earn USDFG, and prove your skill."
         />
         <meta name="twitter:image" content="https://usdfg.pro/assets/usdfg-og-banner.png" />
 

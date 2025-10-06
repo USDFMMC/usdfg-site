@@ -145,7 +145,7 @@ const Whitepaper: React.FC = () => {
       <Helmet>
         <title>Whitepaper | USDFGAMING – Skill-Based Crypto Gaming Platform</title>
         <meta name="description" content="Read the USDFGAMING Whitepaper. Discover the vision, tokenomics, and mechanics behind the elite, skill-based crypto gaming platform." />
-        <meta name="keywords" content="USDFG, $USDFG, whitepaper, crypto gaming whitepaper, skill-based gaming, tokenomics, non-custodial, USDFGAMING" />
+        <meta name="keywords" content="USDFG, USDFG, whitepaper, crypto gaming whitepaper, skill-based gaming, tokenomics, non-custodial, USDFGAMING" />
         <link rel="canonical" href="https://usdfg.pro/whitepaper" />
 
         {/* Open Graph */}
@@ -217,10 +217,10 @@ const Whitepaper: React.FC = () => {
             <div className="max-w-2xl mx-auto mb-8 mt-8 px-6 py-4 rounded-xl bg-gradient-to-br from-white/10 to-[#a78bfa22] border border-purple-700/40 shadow-lg backdrop-blur-md animate-fade-in">
               <p className="text-base md:text-lg text-white/90 text-center">
                 <span className="font-bold text-cyan-300">Disclaimer</span><br />
-                $USDFG is a decentralized utility token for gameplay and access within the USDFGAMING platform. It is not a security, equity, or financial investment. There are no promises of profit, yield, or guaranteed value. All use is performance-based, skill-driven, and non-custodial. Participation is optional and self-directed. See our <a href="/terms" className="text-blue-400 hover:text-cyan-300 transition-colors underline">Terms of Service</a> and <a href="/privacy" className="text-blue-400 hover:text-cyan-300 transition-colors underline">Privacy Policy</a> for full details.
+                USDFG is a decentralized utility token for gameplay and access within the USDFGAMING platform. It is not a security, equity, or financial investment. There are no promises of profit, yield, or guaranteed value. All use is performance-based, skill-driven, and non-custodial. Participation is optional and self-directed. See our <a href="/terms" className="text-blue-400 hover:text-cyan-300 transition-colors underline">Terms of Service</a> and <a href="/privacy" className="text-blue-400 hover:text-cyan-300 transition-colors underline">Privacy Policy</a> for full details.
               </p>
             </div>
-            <h1 className="text-4xl sm:text-5xl font-bold mb-2 mt-8 text-center animate-fade-in" style={{ color: 'var(--text-light)', textShadow: 'var(--neon-glow)' }}>$USDFG Whitepaper</h1>
+            <h1 className="text-4xl sm:text-5xl font-bold mb-2 mt-8 text-center animate-fade-in" style={{ color: 'var(--text-light)', textShadow: 'var(--neon-glow)' }}>USDFG Whitepaper</h1>
             <div className="text-xl sm:text-2xl font-extrabold text-cyan-400 drop-shadow-glow animate-fade-in mb-4 text-center mt-1" style={{textShadow:'0 0 8px #22d3ee, 0 0 16px #a78bfa'}}>
               The Token of Gaming
             </div>
@@ -235,7 +235,7 @@ const Whitepaper: React.FC = () => {
             {/* Why This Whitepaper Matters */}
             <section id="intro" className="max-w-2xl mx-auto mb-6 text-center animate-fade-in">
               <p className="text-lg font-semibold text-cyan-400 mb-2">Why This Whitepaper Matters</p>
-              <p className="text-base text-white/90">USDFGAMING is built for elite gamers and crypto users who value skill, fairness, and full control. This platform was designed to reward performance — not purchases. Everything is decentralized, transparent, and self-custodial. $USDFG isn't built for passive gain. It's built for those who compete with purpose.</p>
+              <p className="text-base text-white/90">USDFGAMING is built for elite gamers and crypto users who value skill, fairness, and full control. This platform was designed to reward performance — not purchases. Everything is decentralized, transparent, and self-custodial. USDFG isn't built for passive gain. It's built for those who compete with purpose.</p>
             </section>
 
             {/* Last Updated Notice */}
@@ -257,9 +257,9 @@ const Whitepaper: React.FC = () => {
             <section id="utility" className="whitepaper-section max-w-4xl mx-auto bg-[#111]/90 border border-[#22d3ee] p-6 sm:p-8 rounded-lg shadow-lg mb-10 animate-fade-in">
               <div className="prose prose-invert max-w-none">
                 <h2 className="text-2xl font-bold text-cyan-400 mb-4 flex items-center gap-2"><FaUserShield className="text-purple-400" /> Token Utility & Legal Framing</h2>
-                <p className="text-white mb-2">$USDFG is a utility token designed for skill-based access, challenge entry, and verifiable rewards.</p>
-                <p className="text-white mb-2">It is not a security, investment, or speculative asset. $USDFG offers no staking, no passive yield, and no financial guarantees — all use is non-custodial and performance-based.</p>
-                <p className="text-white mb-2">Users retain full control of their wallets and assets at all times. No part of $USDFG or this platform is structured for financial gain. <a href="/terms" className="text-blue-400 hover:text-cyan-300 transition-colors underline">See our Terms of Service</a> for full legal details.</p>
+                <p className="text-white mb-2">USDFG is a utility token designed for skill-based access, challenge entry, and verifiable rewards.</p>
+                <p className="text-white mb-2">It is not a security, investment, or speculative asset. USDFG offers no staking, no passive yield, and no financial guarantees — all use is non-custodial and performance-based.</p>
+                <p className="text-white mb-2">Users retain full control of their wallets and assets at all times. No part of USDFG or this platform is structured for financial gain. <a href="/terms" className="text-blue-400 hover:text-cyan-300 transition-colors underline">See our Terms of Service</a> for full legal details.</p>
               </div>
             </section>
 
@@ -267,7 +267,7 @@ const Whitepaper: React.FC = () => {
             <section id="tokenomics" className="whitepaper-section max-w-4xl mx-auto bg-[#111]/90 border border-[#22d3ee] p-6 sm:p-8 rounded-lg shadow-lg mb-10 animate-fade-in">
               <div className="prose prose-invert max-w-none">
                 <h2 className="text-2xl font-bold text-cyan-400 mb-4 flex items-center gap-2"><FaLock className="text-purple-400" /> Tokenomics & Distribution</h2>
-                <p className="text-white mb-4"><b>Total Supply:</b> 21,000,000 $USDFG (Fixed, non-inflationary)</p>
+                <p className="text-white mb-4"><b>Total Supply:</b> 21,000,000 USDFG (Fixed, non-inflationary)</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-[#1a1a1a] p-4 rounded-lg border border-cyan-800/30">
                     <h4 className="text-xl font-semibold text-purple-400 mb-2">65% Public Trading</h4>
@@ -348,7 +348,7 @@ const Whitepaper: React.FC = () => {
               <p className="text-base md:text-lg text-white/90 font-bold">
                 <span className="text-purple-300">Legal Note:</span><br />
                 This document is not financial advice and does not offer or solicit any investment.<br />
-                $USDFG is a fixed-supply utility token used only for skill-based access and entertainment. Participation is optional and at your own discretion.
+                USDFG is a fixed-supply utility token used only for skill-based access and entertainment. Participation is optional and at your own discretion.
               </p>
             </section>
           </div>
