@@ -408,12 +408,10 @@ const ArenaHome: React.FC = () => {
                           <div className="text-center">
                             <div className="text-white font-semibold">{challenge.entryFee} USDFG</div>
                             <div className="text-gray-400 text-xs">Entry Fee</div>
-                            <div className="text-gray-500 text-xs">{usdfgToUsd(challenge.entryFee).toFixed(2)} USD</div>
                           </div>
                           <div className="text-center">
                             <div className="text-white font-semibold">{challenge.prizePool} USDFG</div>
                             <div className="text-gray-400 text-xs">Prize Pool</div>
-                            <div className="text-gray-500 text-xs">{usdfgToUsd(challenge.prizePool).toFixed(2)} USD</div>
                           </div>
                           <div className="text-center">
                             <div className="text-white font-semibold">{challenge.players}/{challenge.capacity}</div>
