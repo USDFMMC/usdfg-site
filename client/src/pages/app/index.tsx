@@ -148,34 +148,43 @@ const ArenaHome: React.FC = () => {
     const fetchChallengesFromDevnet = async () => {
       try {
         const devnetChallenges = await fetchActiveChallenges();
-        if (devnetChallenges.length > 0) {
-          // Convert devnet challenges to the format expected by the UI
-          const formattedChallenges = devnetChallenges.map(challenge => ({
-            id: challenge.id,
-            title: `${challenge.game} Challenge`,
-            game: challenge.game,
-            mode: "Head-to-Head",
-            platform: "PS5",
-            username: challenge.creatorAddress.slice(0, 8) + "...",
-            entryFee: challenge.entryFee,
-            prizePool: challenge.entryFee * 1.9, // Approximate after platform fee
-            players: 1,
-            capacity: challenge.maxPlayers,
-            category: "Fighting", // Default category
-            creator: "devnet",
-            rules: "• Standard competitive rules\n• Best of 3 rounds\n• No cheating allowed",
-            createdAt: new Date(challenge.timestamp).toISOString()
-          }));
-          
-          // Merge with existing challenges, avoiding duplicates
-          setChallenges(prev => {
-            const existingIds = new Set(prev.map(c => c.id));
-            const newChallenges = formattedChallenges.filter(c => !existingIds.has(c.id));
-            return [...newChallenges, ...prev];
-          });
-        }
+        
+        // Convert devnet challenges to the format expected by the UI
+        const formattedChallenges = devnetChallenges.map(challenge => ({
+          id: challenge.id,
+          title: `${challenge.game} Challenge`,
+          game: challenge.game,
+          mode: "Head-to-Head",
+          platform: "PS5",
+          username: challenge.creatorAddress.slice(0, 8) + "...",
+          entryFee: challenge.entryFee,
+          prizePool: challenge.entryFee * 1.9, // Approximate after platform fee
+          players: 1,
+          capacity: challenge.maxPlayers,
+          category: "Fighting", // Default category
+          creator: "devnet",
+          rules: "• Standard competitive rules\n• Best of 3 rounds\n• No cheating allowed",
+          createdAt: new Date(challenge.timestamp).toISOString()
+        }));
+        
+        // Get local challenges (user-created ones)
+        const localChallenges = JSON.parse(localStorage.getItem('challenges') || '[]');
+        
+        // Combine devnet challenges with local challenges, prioritizing devnet
+        const allChallenges = [...formattedChallenges, ...localChallenges];
+        
+        // Remove duplicates based on ID
+        const uniqueChallenges = allChallenges.filter((challenge, index, self) => 
+          index === self.findIndex(c => c.id === challenge.id)
+        );
+        
+        console.log(`🔄 Synced ${formattedChallenges.length} devnet challenges + ${localChallenges.length} local challenges`);
+        setChallenges(uniqueChallenges);
       } catch (error) {
         console.error("Failed to fetch challenges from devnet:", error);
+        // Fallback to local challenges only
+        const localChallenges = JSON.parse(localStorage.getItem('challenges') || '[]');
+        setChallenges(localChallenges);
       }
     };
 
@@ -188,7 +197,7 @@ const ArenaHome: React.FC = () => {
     return () => clearInterval(refreshInterval);
   }, []);
 
-  const handleCreateChallenge = (challengeData: any) => {
+  const handleCreateChallenge = async (challengeData: any) => {
     const platformFee = 0.05; // 5% platform fee
     const totalPrize = challengeData.entryFee * 2; // Challenger matches entry fee
     const prizePool = totalPrize - (totalPrize * platformFee); // Minus platform fee
@@ -218,7 +227,25 @@ const ArenaHome: React.FC = () => {
       rules: challengeData.rules || "",
       createdAt: new Date().toISOString()
     };
+    
+    // Add to local challenges immediately
     setChallenges(prev => [newChallenge, ...prev]);
+    
+    // Also try to sync with devnet (this will make it visible across devices)
+    try {
+      const { createChallenge } = await import("@/lib/chain/events");
+      const creatorAddress = localStorage.getItem('wallet_address') || 'unknown';
+      await createChallenge(
+        creatorAddress,
+        challengeData.game,
+        challengeData.entryFee,
+        8, // maxPlayers
+        challengeData.rules || ""
+      );
+      console.log("✅ Challenge synced to devnet for cross-device visibility");
+    } catch (error) {
+      console.log("⚠️ Challenge created locally but not synced to devnet:", error);
+    }
   };
 
   const handleDeleteChallenge = (challengeId: string) => {
