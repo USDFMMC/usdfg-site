@@ -56,15 +56,8 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
     setLoading(true);
     setError(null);
     
-    // Debug logging
-    console.log("Attempting Phantom connection...");
-    console.log("Is mobile:", isMobile);
-    console.log("User agent:", navigator.userAgent);
-    console.log("Phantom installed:", hasPhantomInstalled());
-    
     try {
       const pubkey = await connectPhantom();
-      console.log("Connection successful, pubkey:", pubkey);
       setAddress(pubkey);
       const bal = await getSOLBalance(pubkey);
       setBalance(bal);
@@ -168,7 +161,7 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
     return (
       <div className="flex flex-col space-y-2">
         <div className="text-sm text-gray-400 mb-2">
-          {isMobile ? "On mobile, make sure you have the Phantom app installed and try refreshing the page." : "No wallet detected. Please install a wallet to continue."}
+          No wallet detected. Please install a wallet to continue.
         </div>
         <button 
           onClick={() => window.open('https://phantom.app/download', '_blank')}
@@ -182,14 +175,6 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
         >
           📥 Install Solflare
         </button>
-        {isMobile && (
-          <button 
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-500/30 transition-colors"
-          >
-            🔄 Refresh Page
-          </button>
-        )}
       </div>
     );
   }
@@ -213,15 +198,9 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
         </button>
       )}
       
-      {loading && isMobile && (
-        <div className="text-sm text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded p-2">
-          📱 Mobile detected: Please approve the connection in your Phantom app and return to this page. The connection will complete automatically when you return.
-        </div>
-      )}
-      
-      {loading && !isMobile && (
+      {loading && (
         <div className="text-sm text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded p-2">
-          🔗 Please approve the connection in your Phantom wallet popup.
+          🔗 Please approve the connection in your wallet popup.
         </div>
       )}
       
