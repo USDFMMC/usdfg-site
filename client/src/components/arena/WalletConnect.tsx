@@ -56,15 +56,22 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
     setLoading(true);
     setError(null);
     
+    // Debug logging
+    console.log("Attempting Phantom connection...");
+    console.log("Is mobile:", isMobile);
+    console.log("User agent:", navigator.userAgent);
+    console.log("Phantom installed:", hasPhantomInstalled());
+    
     try {
       const pubkey = await connectPhantom();
+      console.log("Connection successful, pubkey:", pubkey);
       setAddress(pubkey);
       const bal = await getSOLBalance(pubkey);
       setBalance(bal);
       onConnect();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to connect");
       console.error("Phantom connection failed:", err);
+      setError(err instanceof Error ? err.message : "Failed to connect");
     } finally {
       setLoading(false);
     }
@@ -160,6 +167,9 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
   if (!hasAnyWalletInstalled()) {
     return (
       <div className="flex flex-col space-y-2">
+        <div className="text-sm text-gray-400 mb-2">
+          {isMobile ? "On mobile, make sure you have the Phantom app installed and try refreshing the page." : "No wallet detected. Please install a wallet to continue."}
+        </div>
         <button 
           onClick={() => window.open('https://phantom.app/download', '_blank')}
           className="px-4 py-2 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-semibold rounded-lg hover:brightness-110 transition-all"
@@ -172,6 +182,14 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
         >
           📥 Install Solflare
         </button>
+        {isMobile && (
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-500/30 transition-colors"
+          >
+            🔄 Refresh Page
+          </button>
+        )}
       </div>
     );
   }

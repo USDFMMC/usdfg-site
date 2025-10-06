@@ -17,7 +17,19 @@ export const connectPhantom = async () => {
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         
         if (isMobile) {
-          // On mobile, we need to wait for the user to return from the Phantom app
+          console.log("Mobile device detected, using mobile connection flow");
+          // For mobile, try a simpler approach first
+          try {
+            // Try direct connection first
+            await provider.connect();
+            if (provider.publicKey) {
+              return provider.publicKey.toString();
+            }
+          } catch (error) {
+            console.log("Direct connection failed, trying mobile flow:", error);
+          }
+          
+          // If direct connection fails, use the mobile flow
           return new Promise((resolve, reject) => {
             let timeoutId: NodeJS.Timeout;
             let resolved = false;
@@ -93,6 +105,7 @@ export const connectPhantom = async () => {
           });
         } else {
           // Desktop connection
+          console.log("Desktop connection flow");
           await provider.connect();
           return provider.publicKey.toString();
         }
@@ -311,7 +324,10 @@ export const sendSOL = async (senderPublicKey: string, recipientPublicKey: strin
 
 export const hasPhantomInstalled = () => {
   if (typeof window === 'undefined') return false;
-  return "solana" in window && (window as any).solana?.isPhantom;
+  const hasSolana = "solana" in window;
+  const isPhantom = (window as any).solana?.isPhantom;
+  console.log("Phantom detection:", { hasSolana, isPhantom, userAgent: navigator.userAgent });
+  return hasSolana && isPhantom;
 };
 
 export const hasSolflareInstalled = () => {
