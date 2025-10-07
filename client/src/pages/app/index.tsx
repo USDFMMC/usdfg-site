@@ -49,247 +49,188 @@ const ArenaHome: React.FC = () => {
     return usdfgAmount * usdfgPrice;
   }, [usdfgPrice]);
   // Load challenges from localStorage on mount
-  const [challenges, setChallenges] = useState(() => {
-    const savedChallenges = localStorage.getItem('challenges');
-    if (savedChallenges) {
-      try {
-        return JSON.parse(savedChallenges);
-      } catch (error) {
-        console.error('Error parsing saved challenges:', error);
+  // Keep state as a Map for de-dupe & upsert
+  const [challengeMap, setChallengeMap] = useState<Map<string, any>>(new Map());
+  const [lastRefreshAt, setLastRefreshAt] = useState<number>(0);
+  
+  // Helper to upsert challenges
+  const upsertMany = (items: any[]) => {
+    setChallengeMap((prev) => {
+      const next = new Map(prev);
+      for (const it of items) {
+        const key = it.id ?? it.clientId!;
+        next.set(key, { ...(next.get(key) || {}), ...it });
       }
+      return next;
+    });
+  };
+  
+  // Convert map to array for rendering
+  const challenges = Array.from(challengeMap.values())
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  
+  // Initialize with default challenges
+  useEffect(() => {
+    if (challengeMap.size === 0) {
+      const defaultChallenges = [
+        {
+          id: "ch_01",
+          title: "Street Fighter 6 Versus Match",
+          game: "Street Fighter 6",
+          mode: "Versus Match",
+          platform: "PS5",
+          username: "FighterPro_89",
+          entryFee: 50,
+          prizePool: 95,
+          players: 2,
+          capacity: 8,
+          category: "Fighting",
+          creator: "system",
+          rules: "• Best of 3 rounds per match\n• Standard character roster\n• No duplicate characters\n• Tournament legal stages only\n• Rage quit = forfeit\n• Standard round timer (99 seconds)",
+          createdAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+          timestamp: Date.now() - 3600000
+        },
+        {
+          id: "ch_02", 
+          title: "FIFA 24 Head-to-Head",
+          game: "FIFA 24",
+          mode: "Head-to-Head",
+          platform: "Xbox",
+          username: "SoccerKing24",
+          entryFee: 25,
+          prizePool: 47,
+          players: 1,
+          capacity: 2,
+          category: "Sports",
+          creator: "system",
+          rules: "• Match length: 6-minute halves\n• Difficulty: World Class\n• No duplicate teams\n• Draw = penalties\n• Disconnect = forfeit unless agreed to rematch\n• Standard FIFA rules apply",
+          createdAt: new Date(Date.now() - 1800000).toISOString(), // 30 min ago
+          timestamp: Date.now() - 1800000
+        }
+      ];
+      upsertMany(defaultChallenges);
     }
-    // Default challenges if none saved
-    return [
-    {
-      id: "ch_01",
-      title: "Street Fighter 6 Versus Match",
-      game: "Street Fighter 6",
-      mode: "Versus Match",
-      platform: "PS5",
-      username: "FighterPro_89",
-      entryFee: 50,
-      prizePool: 95,
-      players: 2,
-      capacity: 8,
-      category: "Fighting",
-      creator: "system",
-      rules: "• Best of 3 rounds per match\n• Standard character roster\n• No duplicate characters\n• Tournament legal stages only\n• Rage quit = forfeit\n• Standard round timer (99 seconds)",
-      createdAt: new Date(Date.now() - 3600000).toISOString() // 1 hour ago
-    },
-    {
-      id: "ch_02", 
-      title: "FIFA 24 Head-to-Head",
-      game: "FIFA 24",
-      mode: "Head-to-Head",
-      platform: "Xbox",
-      username: "SoccerKing24",
-      entryFee: 25,
-      prizePool: 47,
-      players: 1,
-      capacity: 2,
-      category: "Sports",
-      creator: "system",
-      rules: "• Match length: 6-minute halves\n• Difficulty: World Class\n• No duplicate teams\n• Draw = penalties\n• Disconnect = forfeit unless agreed to rematch\n• Standard FIFA rules apply",
-      createdAt: new Date(Date.now() - 1800000).toISOString() // 30 min ago
-    },
-    {
-      id: "ch_03",
-      title: "Call of Duty Duel",
-      game: "Call of Duty",
-      mode: "Duel",
-      platform: "PC", 
-      username: "GunSlinger_X",
-      entryFee: 75,
-      prizePool: 142,
-      players: 1,
-      capacity: 2,
-      category: "Shooting",
-      creator: "system",
-      rules: "• First to 6 rounds wins\n• Random weapon rotation\n• No killstreaks\n• Standard gunfight maps\n• Connection issues require rematch\n• No camping allowed",
-      createdAt: new Date(Date.now() - 900000).toISOString() // 15 min ago
-    },
-    {
-      id: "ch_04",
-      title: "NBA 2K25 Head-to-Head",
-      game: "NBA 2K25",
-      mode: "Head-to-Head",
-      platform: "PS5",
-      username: "HoopMaster22",
-      entryFee: 60,
-      prizePool: 114,
-      players: 1,
-      capacity: 2,
-      category: "Sports",
-      creator: "system",
-      rules: "• Game length: 4x6 minute quarters\n• Difficulty: All-Star\n• No duplicate teams\n• Standard NBA rules\n• Pause abuse = forfeit\n• Disconnect = forfeit unless agreed to rematch",
-      createdAt: new Date(Date.now() - 2700000).toISOString() // 45 min ago
-    },
-    {
-      id: "ch_05",
-      title: "Valorant Squad Battle",
-      game: "Valorant",
-      mode: "Squad Battle",
-      platform: "PC",
-      username: "TacShooter_Pro",
-      entryFee: 40,
-      prizePool: 76,
-      players: 2,
-      capacity: 10,
-      category: "Shooting",
-      creator: "system",
-      rules: "• 5v5 competitive format\n• Standard map pool\n• Agent restrictions by team agreement\n• Communication allowed\n• Standard economy rules\n• Overtime rules apply",
-      createdAt: new Date(Date.now() - 600000).toISOString() // 10 min ago
-    }
-    ];
-  });
+  }, []);
 
   // Save challenges to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('challenges', JSON.stringify(challenges));
   }, [challenges]);
 
-  // Auto-refresh challenges from devnet every 10 seconds
+  // Auto-refresh challenges from devnet every 10 seconds - MERGE, don't replace
   useEffect(() => {
-    const fetchChallengesFromDevnet = async () => {
-      // Always fetch devnet challenges - they won't override recent local ones
-      
+    let stop = false;
+    const load = async () => {
       try {
         console.log("🔄 Starting devnet challenge fetch...");
-        const devnetChallenges = await fetchActiveChallenges();
+        const devnetItems = await fetchActiveChallenges();
+        if (stop) return;
         
         // Convert devnet challenges to the format expected by the UI
-        const formattedChallenges = devnetChallenges.map(challenge => ({
+        const formattedChallenges = devnetItems.map(challenge => ({
           id: challenge.id,
+          clientId: challenge.clientId,
           title: `${challenge.game} Challenge`,
           game: challenge.game,
           mode: "Head-to-Head",
           platform: "PS5",
-          username: challenge.creatorAddress.slice(0, 8) + "...",
+          username: challenge.creator.slice(0, 8) + "...",
           entryFee: challenge.entryFee,
           prizePool: challenge.entryFee * 1.9, // Approximate after platform fee
           players: 1,
           capacity: challenge.maxPlayers,
           category: "Fighting", // Default category
-          creator: "devnet",
-          rules: "• Standard competitive rules\n• Best of 3 rounds\n• No cheating allowed",
-          createdAt: new Date(challenge.timestamp).toISOString()
+          creator: challenge.creator,
+          rules: challenge.rules,
+          createdAt: new Date(challenge.timestamp).toISOString(),
+          timestamp: challenge.timestamp
         }));
         
-        // SIMPLE MERGE: Always show devnet challenges + recent local challenges
-        const localChallenges = JSON.parse(localStorage.getItem('challenges') || '[]');
-        
-        // Always include devnet challenges
-        let allChallenges = [...formattedChallenges];
-        
-        // Add local challenges that are less than 5 minutes old
-        const now = Date.now();
-        const recentLocalChallenges = localChallenges.filter(challenge => {
-          const challengeTime = new Date(challenge.createdAt).getTime();
-          const ageMinutes = (now - challengeTime) / (1000 * 60);
-          console.log(`🛡️ Local challenge ${challenge.id} age: ${ageMinutes.toFixed(1)} minutes`);
-          return ageMinutes < 5; // Keep local challenges for 5 minutes
-        });
-        
-        allChallenges = [...allChallenges, ...recentLocalChallenges];
-        
-        // Remove duplicates based on ID
-        const uniqueChallenges = allChallenges.filter((challenge, index, self) => 
-          index === self.findIndex(c => c.id === challenge.id)
-        );
-        
-        console.log(`✅ Merged ${formattedChallenges.length} devnet + ${localChallenges.length} local = ${uniqueChallenges.length} total challenges`);
-        setChallenges(uniqueChallenges);
+        upsertMany(formattedChallenges); // MERGE, don't replace
+        setLastRefreshAt(Date.now());
         setLastUpdated(new Date());
         setIsLive(true);
         
-        // Save merged challenges to localStorage
-        localStorage.setItem('challenges', JSON.stringify(uniqueChallenges));
-        localStorage.setItem('devnet_challenges', JSON.stringify(formattedChallenges));
-        
+        console.log(`✅ Merged ${formattedChallenges.length} devnet challenges`);
       } catch (error) {
         console.error("❌ Failed to fetch challenges from devnet:", error);
-        
-        // Only fallback to localStorage if devnet completely fails
-        try {
-          const fallbackChallenges = JSON.parse(localStorage.getItem('devnet_challenges') || '[]');
-          if (fallbackChallenges.length > 0) {
-            console.log("🔄 Using cached devnet challenges as fallback");
-            setChallenges(fallbackChallenges);
-          } else {
-            console.log("⚠️ No cached challenges available");
-            setChallenges([]);
-          }
-        } catch (fallbackError) {
-          console.error("❌ Fallback also failed:", fallbackError);
-          setChallenges([]);
-        }
       }
     };
-
-    // Fetch immediately on mount
-    fetchChallengesFromDevnet();
     
-    // Set up auto-refresh every 15 seconds (give local challenges time to be created)
-    const refreshInterval = setInterval(fetchChallengesFromDevnet, 15000);
-    
-    return () => clearInterval(refreshInterval);
-  }, [lastLocalChallenge]);
+    load();
+    const iv = setInterval(load, 10000);
+    return () => { stop = true; clearInterval(iv); };
+  }, []);
 
   const handleCreateChallenge = async (challengeData: any) => {
-    const platformFee = 0.05; // 5% platform fee
-    const totalPrize = challengeData.entryFee * 2; // Challenger matches entry fee
-    const prizePool = totalPrize - (totalPrize * platformFee); // Minus platform fee
-    
-    // Determine category based on game
-    const getGameCategory = (game: string) => {
-      if (['NBA 2K25', 'FIFA 24', 'Madden NFL 24'].includes(game)) return 'Sports';
-      if (['Street Fighter 6', 'Tekken 8'].includes(game)) return 'Fighting';
-      if (['Call of Duty', 'Valorant'].includes(game)) return 'Shooting';
-      if (['Forza Horizon'].includes(game)) return 'Racing';
-      return 'Other';
-    };
-    
-    const newChallenge = {
-      id: `ch_${Date.now()}`,
-      title: `${challengeData.game} ${challengeData.mode === 'Custom Mode' ? challengeData.customMode : challengeData.mode}`,
-      game: challengeData.game,
-      mode: challengeData.mode === 'Custom Mode' ? challengeData.customMode : challengeData.mode,
-      platform: challengeData.platform,
-      username: challengeData.username,
-      entryFee: challengeData.entryFee,
-      prizePool: Math.round(prizePool), // Round to whole number
-      players: 1,
-      capacity: 8,
-      category: getGameCategory(challengeData.game),
-      creator: getWalletPublicKey() || "unknown", // Track who created the challenge
-      rules: challengeData.rules || "",
-      createdAt: new Date().toISOString()
-    };
-    
-    // Add to local challenges immediately
-    setChallenges(prev => [newChallenge, ...prev]);
-    setLastLocalChallenge(Date.now());
-    
-    // Also save to localStorage immediately
-    const currentChallenges = JSON.parse(localStorage.getItem('challenges') || '[]');
-    const updatedChallenges = [newChallenge, ...currentChallenges];
-    localStorage.setItem('challenges', JSON.stringify(updatedChallenges));
-    console.log("💾 Challenge saved to localStorage:", newChallenge.id);
-    
-    // Also try to sync with devnet (this will make it visible across devices)
     try {
       const { createChallenge } = await import("@/lib/chain/events");
-      const creatorAddress = localStorage.getItem('wallet_address') || 'unknown';
-      await createChallenge(
-        creatorAddress,
-        challengeData.game,
-        challengeData.entryFee,
-        8, // maxPlayers
-        challengeData.rules || ""
-      );
-      console.log("✅ Challenge synced to devnet for cross-device visibility");
+      const { optimistic, txPromise } = await createChallenge({
+        game: challengeData.game,
+        entryFee: challengeData.entryFee,
+        maxPlayers: 8,
+        rules: challengeData.rules || ""
+      });
+      
+      // Show optimistic challenge immediately
+      const platformFee = 0.05; // 5% platform fee
+      const totalPrize = challengeData.entryFee * 2; // Challenger matches entry fee
+      const prizePool = totalPrize - (totalPrize * platformFee); // Minus platform fee
+      
+      // Determine category based on game
+      const getGameCategory = (game: string) => {
+        if (['NBA 2K25', 'FIFA 24', 'Madden NFL 24'].includes(game)) return 'Sports';
+        if (['Street Fighter 6', 'Tekken 8'].includes(game)) return 'Fighting';
+        if (['Call of Duty', 'Valorant'].includes(game)) return 'Shooting';
+        if (['Forza Horizon'].includes(game)) return 'Racing';
+        return 'Other';
+      };
+      
+      const optimisticChallenge = {
+        id: optimistic.clientId,
+        clientId: optimistic.clientId,
+        title: `${challengeData.game} ${challengeData.mode === 'Custom Mode' ? challengeData.customMode : challengeData.mode}`,
+        game: challengeData.game,
+        mode: challengeData.mode === 'Custom Mode' ? challengeData.customMode : challengeData.mode,
+        platform: challengeData.platform,
+        username: challengeData.username,
+        entryFee: challengeData.entryFee,
+        prizePool: Math.round(prizePool),
+        players: 1,
+        capacity: 8,
+        category: getGameCategory(challengeData.game),
+        creator: optimistic.creator,
+        rules: challengeData.rules || "",
+        createdAt: new Date(optimistic.timestamp).toISOString(),
+        timestamp: optimistic.timestamp
+      };
+      
+      upsertMany([optimisticChallenge]); // Show immediately
+      
+      // Handle transaction completion
+      try {
+        const { signature, id } = await txPromise;
+        // Replace optimistic with canonical
+        setChallengeMap((prev) => {
+          const next = new Map(prev);
+          const key = optimistic.clientId!;
+          const existed = next.get(key);
+          next.delete(key);
+          next.set(id, { ...(existed || {}), id, clientId: undefined });
+          return next;
+        });
+        console.log("✅ Challenge synced to devnet:", signature);
+      } catch (e) {
+        // If tx fails, remove optimistic
+        setChallengeMap((prev) => {
+          const next = new Map(prev);
+          next.delete(optimistic.clientId!);
+          return next;
+        });
+        console.error("❌ Challenge creation failed:", e);
+      }
     } catch (error) {
-      console.log("⚠️ Challenge created locally but not synced to devnet:", error);
+      console.error("❌ Failed to create challenge:", error);
     }
   };
 

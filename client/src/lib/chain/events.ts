@@ -25,6 +25,17 @@ export interface ChallengeCreatedEvent {
   transactionHash: string;
 }
 
+export interface ChallengeMeta {
+  id?: string;             // on-chain id when available
+  clientId?: string;       // temp id for optimistic UI
+  creator: string;
+  game: string;
+  entryFee: number;
+  maxPlayers: number;
+  rules: string;
+  timestamp: number;       // ms
+}
+
 /**
  * Fetch all challenge events for a specific player
  * TODO: Replace with actual Solana program query
@@ -74,47 +85,41 @@ export async function fetchPlayerEvents(playerAddress: string): Promise<Challeng
 }
 
 /**
- * Fetch all active challenges from devnet
+ * Fetch all active challenges from devnet - works without wallet
  */
-export async function fetchActiveChallenges(): Promise<ChallengeCreatedEvent[]> {
+export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
   console.log('🔄 Fetching challenges from devnet...');
   
   try {
-    // Check if wallet is connected, but don't require it for fetching
-    const hasWallet = (window as any).solana?.isConnected;
-    if (!hasWallet) {
-      console.warn("⚠️ No wallet connected — using devnet public fetch only.");
-    }
-    
     // For now, simulate fetching from program accounts
     // Later this will query your deployed USDFG program accounts
     console.log("✅ Connected to devnet, ready to fetch challenges from your program");
     
     // Simulate some challenges for testing (replace with real account queries later)
-    const mockChallenges: ChallengeCreatedEvent[] = [
+    const mockChallenges: ChallengeMeta[] = [
       {
         id: 'devnet_challenge_1',
-        creatorAddress: 'mock_creator_1',
+        creator: 'mock_creator_1',
         game: 'Street Fighter 6',
         entryFee: 50,
         maxPlayers: 2,
+        rules: 'Standard competitive rules',
         timestamp: Date.now() - 30 * 60 * 1000, // 30 minutes ago
-        transactionHash: 'devnet_tx_1'
       },
       {
         id: 'devnet_challenge_2',
-        creatorAddress: 'mock_creator_2',
+        creator: 'mock_creator_2',
         game: 'Tekken 8',
         entryFee: 25,
         maxPlayers: 2,
+        rules: 'Best of 3 rounds',
         timestamp: Date.now() - 60 * 60 * 1000, // 1 hour ago
-        transactionHash: 'devnet_tx_2'
       }
     ];
     
     // Log each challenge as requested
     mockChallenges.forEach(challenge => {
-      console.log(`🎮 Challenge Loaded: ${challenge.game} | Entry Fee: ${challenge.entryFee} | Creator: ${challenge.creatorAddress.slice(0, 8)}...`);
+      console.log(`🎮 Challenge Loaded: ${challenge.game} | Entry Fee: ${challenge.entryFee} | Creator: ${challenge.creator.slice(0, 8)}...`);
     });
     
     console.log(`✅ Loaded ${mockChallenges.length} challenges from devnet`);
@@ -169,16 +174,38 @@ export async function submitChallengeResult(
 }
 
 /**
- * Create a new challenge on the blockchain with metadata storage
+ * Create a new challenge with optimistic UI support
  */
-export async function createChallenge(
-  creatorAddress: string,
-  game: string,
-  entryFee: number,
-  maxPlayers: number,
-  rules: string
-): Promise<string> {
-  console.log(`Creating challenge: ${game}, ${entryFee} USDFG`);
+export async function createChallenge(meta: Omit<ChallengeMeta, "id"|"clientId"|"timestamp">) {
+  const provider = (window as any).solana;
+  if (!provider?.publicKey) throw new Error("Wallet not connected");
+
+  // Optimistic object for UI
+  const optimistic: ChallengeMeta = {
+    clientId: `client_${crypto.randomUUID()}`,
+    creator: provider.publicKey.toString(),
+    game: meta.game,
+    entryFee: meta.entryFee,
+    maxPlayers: meta.maxPlayers,
+    rules: meta.rules,
+    timestamp: Date.now(),
+  };
+
+  // Return both optimistic and a promise that resolves with chain id/signature
+  const txPromise = (async () => {
+    const sig = await createChallengeOnChain(optimistic); // your existing devnet tx
+    // derive id from sig (or PDA) in your program later:
+    return { signature: sig, id: sig };
+  })();
+
+  return { optimistic, txPromise };
+}
+
+/**
+ * Create challenge on chain (internal helper)
+ */
+async function createChallengeOnChain(meta: ChallengeMeta): Promise<string> {
+  console.log(`Creating challenge: ${meta.game}, ${meta.entryFee} USDFG`);
   
   try {
     // Get the connected wallet provider
@@ -190,12 +217,12 @@ export async function createChallenge(
     // Create challenge metadata object
     const challengeData = {
       id: `challenge_${Date.now()}`,
-      creatorAddress,
-      game,
-      entryFee,
-      maxPlayers,
-      rules,
-      timestamp: Date.now(),
+      creatorAddress: meta.creator,
+      game: meta.game,
+      entryFee: meta.entryFee,
+      maxPlayers: meta.maxPlayers,
+      rules: meta.rules,
+      timestamp: meta.timestamp,
       status: 'active'
     };
 
@@ -228,7 +255,7 @@ export async function createChallenge(
     await connection.confirmTransaction(signature, "confirmed");
     
     console.log(`✅ Challenge stored on devnet: ${signature}`);
-    console.log(`🎮 Challenge Data: ${game} | Entry Fee: ${entryFee} USDFG | Creator: ${creatorAddress.slice(0, 8)}...`);
+    console.log(`🎮 Challenge Data: ${meta.game} | Entry Fee: ${meta.entryFee} USDFG | Creator: ${meta.creator.slice(0, 8)}...`);
     console.log(`🔗 View on Solana Explorer: https://explorer.solana.com/tx/${signature}?cluster=devnet`);
     
     return signature;

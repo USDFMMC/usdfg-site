@@ -17,25 +17,36 @@ const connection = new Connection(clusterApiUrl("devnet"), {
   }
 });
 
-export const connectPhantom = async () => {
+// Helper to get provider safely
+export async function getProvider(): Promise<any> {
   if (typeof window === 'undefined') {
     throw new Error("Window not available");
   }
-  
-  if ("solana" in window) {
-    const provider = (window as any).solana;
-    if (provider?.isPhantom) {
-      try {
-        await provider.connect();
-        return provider.publicKey.toString();
-      } catch (error) {
-        console.error("Phantom connection error:", error);
-        throw error;
-      }
-    }
+  const provider = (window as any).solana;
+  if (!provider || !provider.isPhantom) throw new Error("Phantom not found");
+  return provider;
+}
+
+// Silent reconnect using trusted session
+export async function silentReconnect(): Promise<string | null> {
+  try {
+    const provider = await getProvider();
+    const res = await provider.connect({ onlyIfTrusted: true }); // ✅ silent
+    return res?.publicKey?.toString() ?? null;
+  } catch {
+    return null; // no toast, stay silent
   }
-  throw new Error("Phantom not found");
-};
+}
+
+// Interactive connect for user-initiated actions
+export async function connectPhantomInteractive(): Promise<string> {
+  const provider = await getProvider();
+  const res = await provider.connect(); // user-initiated
+  return res.publicKey.toString();
+}
+
+// Legacy function for backward compatibility
+export const connectPhantom = connectPhantomInteractive;
 
 export const connectSolflare = async () => {
   if (typeof window === 'undefined') {
@@ -102,17 +113,14 @@ export const getWalletPublicKey = () => {
   return null;
 };
 
-export const isWalletConnected = () => {
-  // Check if wallet is actually connected
-  const pubkey = getWalletPublicKey();
-  if (pubkey) {
-    console.log("✅ Wallet connected:", pubkey.slice(0, 8) + "...");
-    return true;
-  } else {
-    console.log("❌ Wallet not connected");
+export async function isWalletConnected(): Promise<boolean> {
+  try {
+    const provider = await getProvider();
+    return !!provider.publicKey; // no calls that trigger popups
+  } catch {
     return false;
   }
-};
+}
 
 export const saveWalletConnection = (pubkey: string) => {
   localStorage.setItem('wallet_connected', 'true');

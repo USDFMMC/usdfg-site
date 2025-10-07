@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { 
-  connectPhantom, 
+  connectPhantomInteractive, 
   connectSolflare, 
   disconnectWallet, 
   getWalletPublicKey, 
@@ -11,10 +11,8 @@ import {
   hasPhantomInstalled,
   hasSolflareInstalled,
   hasAnyWalletInstalled,
-  wasWalletConnected,
-  getStoredWalletAddress,
-  saveWalletConnection,
-  clearWalletConnection
+  silentReconnect,
+  getProvider
 } from "@/lib/wallet/solana";
 
 interface WalletConnectProps {
@@ -35,81 +33,62 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
   const [sending, setSending] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
-  // Check if wallet is already connected on mount
+  // Silent reconnect on mount - no race conditions
   useEffect(() => {
-    const checkConnection = async () => {
-      // Wait a bit for wallet provider to load (especially important for Firefox)
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // First check if wallet was previously connected
-      if (wasWalletConnected()) {
-        const storedAddress = getStoredWalletAddress();
-        if (storedAddress) {
-          // Check if wallet is still actually connected
-          if (isWalletConnected()) {
-            console.log("🔄 Restoring wallet connection:", storedAddress.slice(0, 8) + "...");
-            setAddress(storedAddress);
-            onConnect();
-            // Fetch real SOL balance with better error handling
-            getSOLBalance(storedAddress)
-              .then(balance => {
-                console.log("💰 Balance loaded:", balance);
-                setBalance(balance);
-              })
-              .catch(err => {
-                console.error("❌ Balance fetch failed:", err);
-                setBalance(0.5); // Set default balance to avoid "Loading..."
-              });
-          } else {
-            // Wallet is no longer connected, clear stored state
-            console.log("❌ Wallet no longer connected, clearing stored state");
-            clearWalletConnection();
-          }
-        }
-      } else if (isWalletConnected()) {
-        // Wallet is connected but not stored (first time)
-        const pubkey = getWalletPublicKey();
-        if (pubkey) {
-          console.log("🔄 First time wallet connection detected:", pubkey.slice(0, 8) + "...");
-          setAddress(pubkey);
-          onConnect();
-          // Fetch real SOL balance with better error handling
-          getSOLBalance(pubkey)
-            .then(balance => {
-              console.log("💰 Balance loaded:", balance);
-              setBalance(balance);
-            })
-            .catch(err => {
-              console.error("❌ Balance fetch failed:", err);
-              setBalance(0.5); // Set default balance to avoid "Loading..."
-            });
-        }
-      } else {
-        console.log("ℹ️ No wallet connection found");
+    let unsub = () => {};
+    (async () => {
+      const pubkey = await silentReconnect(); // ✅ no popup if trusted
+      if (pubkey) {
+        console.log("🔄 Silent wallet reconnect:", pubkey.slice(0, 8) + "...");
+        setAddress(pubkey);
+        onConnect();
+        // Fetch balance in background
+        getSOLBalance(pubkey)
+          .then(balance => {
+            console.log("💰 Balance loaded:", balance);
+            setBalance(balance);
+          })
+          .catch(err => {
+            console.error("❌ Balance fetch failed:", err);
+            setBalance(0.5); // Set default balance
+          });
       }
-    };
-
-    // Detect mobile device
-    const mobileCheck = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    setIsMobile(mobileCheck);
-
-    // Try connection check immediately
-    checkConnection();
-    
-    // Also try again after a longer delay for Firefox compatibility
-    const retryTimeout = setTimeout(checkConnection, 1000);
-    
-    return () => clearTimeout(retryTimeout);
-  }, []); // Removed onConnect dependency to prevent infinite loop
+      
+      // Listen to wallet events
+      try {
+        const provider = await getProvider();
+        const onConnect = (e: any) => {
+          const pubkey = provider.publicKey?.toString();
+          if (pubkey) {
+            console.log("🔗 Wallet connected:", pubkey.slice(0, 8) + "...");
+            setAddress(pubkey);
+            onConnect();
+          }
+        };
+        const onDisconnect = () => {
+          console.log("🔌 Wallet disconnected");
+          setAddress(null);
+          setBalance(null);
+          onDisconnect();
+        };
+        provider.on("connect", onConnect);
+        provider.on("disconnect", onDisconnect);
+        unsub = () => {
+          provider.off("connect", onConnect);
+          provider.off("disconnect", onDisconnect);
+        };
+      } catch {/* phantom not present */}
+    })();
+    return () => unsub();
+  }, []);
 
   const handleConnectPhantom = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const pubkey = await connectPhantom();
+      const pubkey = await connectPhantomInteractive(); // User-initiated connection
       setAddress(pubkey);
-      saveWalletConnection(pubkey); // Save connection to localStorage
       onConnect();
       
       // Fetch balance with better error handling
@@ -160,7 +139,6 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
       setAddress(null);
       setBalance(null);
       setError(null);
-      clearWalletConnection(); // Clear stored connection state
       onDisconnect();
     } catch (err) {
       console.error("Disconnect failed:", err);
