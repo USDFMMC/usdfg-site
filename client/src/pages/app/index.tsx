@@ -1133,7 +1133,7 @@ const CreateChallengeModal: React.FC<{
             </div>
           </div>
         ) : (
-          <div className="mt-4">
+          <form onSubmit={handleSubmit} className="mt-4">
             {/* Validation Errors Display */}
             {attemptedNext && validationErrors.length > 0 && (
               <div className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
@@ -1376,13 +1376,13 @@ Prize pool: {(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5
 
                 <div className="flex justify-between">
                   <TertiaryButton onClick={prevStep}>Back</TertiaryButton>
-                  <PrimaryButton onClick={handleSubmit} className="bg-gradient-to-r from-cyan-400 to-purple-500 hover:from-cyan-300 hover:to-purple-400">
+                  <PrimaryButton type="submit" className="bg-gradient-to-r from-cyan-400 to-purple-500 hover:from-cyan-300 hover:to-purple-400">
                     Create Challenge
                   </PrimaryButton>
                 </div>
               </div>
             )}
-          </div>
+          </form>
         )}
       </div>
     </div>

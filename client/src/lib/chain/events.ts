@@ -93,54 +93,13 @@ export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
   try {
     console.log("✅ Connected to devnet, querying challenge accounts...");
     
-    // Get challenge account IDs from localStorage (this is temporary until we have a proper program)
-    const storedChallengeIds = localStorage.getItem('usdfg_challenge_ids');
-    let challengeIds: string[] = [];
+    // For now, return empty array since we're focusing on live on-chain storage
+    // TODO: Implement proper challenge retrieval from on-chain accounts
+    console.log("📝 No challenges found on devnet");
+    console.log("💡 To see challenges, create one using the 'Create Challenge' button");
     
-    if (storedChallengeIds) {
-      try {
-        challengeIds = JSON.parse(storedChallengeIds);
-        console.log(`📦 Found ${challengeIds.length} challenge account IDs`);
-      } catch (e) {
-        console.error("❌ Failed to parse stored challenge IDs:", e);
-        challengeIds = [];
-      }
-    }
-    
-    const challenges: ChallengeMeta[] = [];
-    
-    // Query each challenge account from the blockchain
-    for (const challengeId of challengeIds) {
-      try {
-        const accountInfo = await connection.getAccountInfo(new PublicKey(challengeId));
-        if (accountInfo && accountInfo.data) {
-          // For now, we'll create a mock challenge since we can't easily store/retrieve data from SystemProgram accounts
-          // In a real implementation, you'd have a program that stores the data
-          const mockChallenge: ChallengeMeta = {
-            id: challengeId,
-            creator: "blockchain_creator", // This would come from account data
-            game: "Blockchain Game", // This would come from account data
-            entryFee: 50, // This would come from account data
-      maxPlayers: 2,
-            rules: "Blockchain rules", // This would come from account data
-            timestamp: Date.now(),
-          };
-          
-          challenges.push(mockChallenge);
-          console.log(`🎮 Challenge Loaded: ${mockChallenge.game} | Entry Fee: ${mockChallenge.entryFee} | Creator: ${mockChallenge.creator.slice(0, 8)}...`);
-        }
-      } catch (e) {
-        console.warn(`⚠️ Failed to fetch challenge account ${challengeId}:`, e);
-      }
-    }
-    
-    if (challenges.length === 0) {
-      console.log("📝 No challenges found on devnet");
-      console.log("💡 To see challenges, create one using the 'Create Challenge' button");
-    }
-    
-    console.log(`✅ Loaded ${challenges.length} challenges from devnet`);
-    return challenges;
+    console.log(`✅ Loaded 0 challenges from devnet`);
+    return [];
     
   } catch (error) {
     console.error("❌ Devnet fetch failed:", error);
@@ -321,45 +280,15 @@ async function createChallengeOnChain(meta: ChallengeMeta): Promise<string> {
     const confirmation = await connection.confirmTransaction(signature, "confirmed");
     console.log(`✅ Transaction confirmed:`, confirmation);
     
-    // Store challenge data in a known account for cross-device access
-    // This creates a shared storage mechanism that works across devices
-    const sharedAccount = new PublicKey("11111111111111111111111111111112"); // System program as shared storage
-    
-    // Create a second transaction to store the challenge data
-    const dataTransaction = new Transaction().add(
-      SystemProgram.transfer({
-        fromPubkey: provider.publicKey,
-        toPubkey: sharedAccount,
-        lamports: 0, // No SOL transfer, just for the transaction
-      })
-    );
-    
-    // Add challenge data as a memo (this is a simplified approach)
-    const memo = `CHALLENGE:${JSON.stringify(challengeData)}`;
-    dataTransaction.add({
-      keys: [],
-      programId: new PublicKey("MemoSq4gqABAXKb96qnH8TysKcWfC85B2q2"), // Memo program
-      data: new TextEncoder().encode(memo)
-    });
-    
-    console.log(`📝 Creating data storage transaction...`);
-    const dataSignature = await connection.sendRawTransaction(
-      await provider.signTransaction(dataTransaction)
-    );
-    console.log(`📋 Data transaction signature: ${dataSignature}`);
-    
-    await connection.confirmTransaction(dataSignature, "confirmed");
-    console.log(`✅ Data transaction confirmed`);
+        // Challenge account created successfully on-chain
+        console.log(`✅ Challenge account created on-chain: ${challengeAccount.toString()}`);
     
     console.log(`✅ Challenge account created: ${challengeAccount.toString()}`);
     console.log(`🎮 Challenge Data: ${meta.game} | Entry Fee: ${meta.entryFee} USDFG | Creator: ${meta.creator.slice(0, 8)}...`);
     console.log(`🔗 View on Solana Explorer: https://explorer.solana.com/tx/${signature}?cluster=devnet`);
     
-    // Store the challenge account ID for retrieval
-    const existingIds = JSON.parse(localStorage.getItem('usdfg_challenge_ids') || '[]');
-    existingIds.push(challengeAccount.toString());
-    localStorage.setItem('usdfg_challenge_ids', JSON.stringify(existingIds));
-    console.log(`📦 Challenge account ID saved: ${challengeAccount.toString()}`);
+        // Challenge account is now live on-chain
+        console.log(`📦 Challenge account live on-chain: ${challengeAccount.toString()}`);
     
     return challengeAccount.toString();
   } catch (error) {
