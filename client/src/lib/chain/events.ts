@@ -34,6 +34,7 @@ export interface ChallengeMeta {
   maxPlayers: number;
   rules: string;
   timestamp: number;       // ms
+  expiresAt: number;      // ms - when challenge expires (2 hours from creation)
 }
 
 /**
@@ -154,6 +155,15 @@ export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
           const metadata = challengeMetadata.find(m => m.id === challengeId);
           
           if (metadata) {
+            // Check if challenge has expired (2 hours)
+            const now = Date.now();
+            const isExpired = metadata.expiresAt && now > metadata.expiresAt;
+            
+            if (isExpired) {
+              console.log(`⏰ Challenge expired: ${challengeId} (expired at ${new Date(metadata.expiresAt).toISOString()})`);
+              continue; // Skip expired challenges
+            }
+            
             const challenge: ChallengeMeta = {
               id: challengeId,
               clientId: challengeId,
@@ -162,11 +172,12 @@ export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
               entryFee: metadata.entryFee || 0,
               maxPlayers: metadata.maxPlayers || 8,
               rules: metadata.rules || "No rules specified",
-              timestamp: metadata.timestamp || Date.now()
+              timestamp: metadata.timestamp || Date.now(),
+              expiresAt: metadata.expiresAt || (Date.now() + (2 * 60 * 60 * 1000)) // Default 2 hours if not set
             };
             
             challenges.push(challenge);
-            console.log(`🎮 Challenge Loaded: ${challenge.game} | Entry Fee: ${challenge.entryFee} | Creator: ${challenge.creator.slice(0, 8)}...`);
+            console.log(`🎮 Challenge Loaded: ${challenge.game} | Entry Fee: ${challenge.entryFee} | Creator: ${challenge.creator.slice(0, 8)}... | Expires: ${new Date(challenge.expiresAt).toLocaleTimeString()}`);
           } else {
             console.warn(`⚠️ No metadata found for challenge ${challengeId}`);
           }
@@ -178,13 +189,31 @@ export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
       }
     }
     
-    if (challenges.length === 0) {
-      console.log("📝 No challenges found on devnet");
-      console.log("💡 To see challenges, create one using the 'Create Challenge' button");
-      console.log("🔧 Note: Cross-device challenge sync requires proper on-chain discovery implementation");
+    // Clean up expired challenges from localStorage
+    if (challengeMetadata.length > 0) {
+      const now = Date.now();
+      const activeMetadata = challengeMetadata.filter(meta => {
+        const isExpired = meta.expiresAt && now > meta.expiresAt;
+        if (isExpired) {
+          console.log(`🧹 Cleaning up expired challenge: ${meta.id}`);
+        }
+        return !isExpired;
+      });
+      
+      // Update localStorage with only active challenges
+      if (activeMetadata.length !== challengeMetadata.length) {
+        localStorage.setItem('usdfg_challenge_metadata', JSON.stringify(activeMetadata));
+        console.log(`🧹 Cleaned up ${challengeMetadata.length - activeMetadata.length} expired challenges`);
+      }
     }
     
-    console.log(`✅ Loaded ${challenges.length} challenges from devnet`);
+    if (challenges.length === 0) {
+      console.log("📝 No active challenges found on devnet");
+      console.log("💡 To see challenges, create one using the 'Create Challenge' button");
+      console.log("⏰ Challenges expire after 2 hours to prevent network bloat");
+    }
+    
+    console.log(`✅ Loaded ${challenges.length} active challenges from devnet`);
     return challenges;
     
   } catch (error) {
@@ -388,7 +417,8 @@ async function createChallengeOnChain(meta: ChallengeMeta): Promise<string> {
           entryFee: meta.entryFee,
           maxPlayers: meta.maxPlayers,
           rules: meta.rules,
-          timestamp: meta.timestamp
+          timestamp: meta.timestamp,
+          expiresAt: meta.timestamp + (2 * 60 * 60 * 1000) // 2 hours from creation
         };
         existingMetadata.push(challengeMetadata);
         localStorage.setItem('usdfg_challenge_metadata', JSON.stringify(existingMetadata));

@@ -194,24 +194,25 @@ const ArenaHome: React.FC = () => {
         return 'Other';
       };
       
-      const optimisticChallenge = {
-        id: optimistic.clientId,
-        clientId: optimistic.clientId,
-        title: `${challengeData.game} ${challengeData.mode === 'Custom Mode' ? challengeData.customMode : challengeData.mode}`,
-        game: challengeData.game,
-        mode: challengeData.mode === 'Custom Mode' ? challengeData.customMode : challengeData.mode,
-        platform: challengeData.platform,
-        username: challengeData.username,
-        entryFee: challengeData.entryFee,
-        prizePool: Math.round(prizePool),
-        players: 1,
-        capacity: 8,
-        category: getGameCategory(challengeData.game),
-        creator: optimistic.creator,
-        rules: challengeData.rules || "",
-        createdAt: new Date(optimistic.timestamp).toISOString(),
-        timestamp: optimistic.timestamp
-      };
+        const optimisticChallenge = {
+          id: optimistic.clientId,
+          clientId: optimistic.clientId,
+          title: `${challengeData.game} ${challengeData.mode === 'Custom Mode' ? challengeData.customMode : challengeData.mode}`,
+          game: challengeData.game,
+          mode: challengeData.mode === 'Custom Mode' ? challengeData.customMode : challengeData.mode,
+          platform: challengeData.platform,
+          username: challengeData.username,
+          entryFee: challengeData.entryFee,
+          prizePool: Math.round(prizePool),
+          players: 1,
+          capacity: 8,
+          category: getGameCategory(challengeData.game),
+          creator: optimistic.creator,
+          rules: challengeData.rules || "",
+          createdAt: new Date(optimistic.timestamp).toISOString(),
+          timestamp: optimistic.timestamp,
+          expiresAt: optimistic.timestamp + (2 * 60 * 60 * 1000) // 2 hours from creation
+        };
       
       console.log("📝 Adding optimistic challenge to UI...");
       upsertMany([optimisticChallenge]); // Show immediately
@@ -541,6 +542,11 @@ const ArenaHome: React.FC = () => {
                               {challenge.createdAt && (
                                 <p className="text-text-dim/60 text-xs neocore-body">
                                   Created {new Date(challenge.createdAt).toLocaleDateString()} at {new Date(challenge.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              )}
+                              {challenge.expiresAt && (
+                                <p className="text-orange-400/80 text-xs neocore-body">
+                                  ⏰ Expires in {Math.max(0, Math.floor((challenge.expiresAt - Date.now()) / (1000 * 60)))} minutes
                                 </p>
                               )}
                               {isOwner && (
