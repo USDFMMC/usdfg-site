@@ -275,6 +275,7 @@ const ArenaHome: React.FC = () => {
     console.log("🗑️ Current challengeMap size before deletion:", challengeMap.size);
     
     if (window.confirm("Are you sure you want to delete this challenge? This action cannot be undone.")) {
+      // Remove from challengeMap
       setChallengeMap(prev => {
         const next = new Map(prev);
         const hadChallenge = next.has(challengeId);
@@ -283,6 +284,25 @@ const ArenaHome: React.FC = () => {
         console.log("🗑️ New challengeMap size:", next.size);
         return next;
       });
+      
+      // Also remove from localStorage to prevent it from being restored
+      try {
+        // Remove from challenge IDs
+        const storedIds = JSON.parse(localStorage.getItem('usdfg_challenge_ids') || '[]');
+        const updatedIds = storedIds.filter((id: string) => id !== challengeId);
+        localStorage.setItem('usdfg_challenge_ids', JSON.stringify(updatedIds));
+        console.log("🗑️ Removed challenge ID from localStorage");
+        
+        // Remove from challenge metadata
+        const storedMetadata = JSON.parse(localStorage.getItem('usdfg_challenge_metadata') || '[]');
+        const updatedMetadata = storedMetadata.filter((meta: any) => meta.id !== challengeId);
+        localStorage.setItem('usdfg_challenge_metadata', JSON.stringify(updatedMetadata));
+        console.log("🗑️ Removed challenge metadata from localStorage");
+        
+        console.log("🗑️ Challenge permanently deleted from storage");
+      } catch (error) {
+        console.error("🗑️ Failed to remove challenge from localStorage:", error);
+      }
     }
   };
 
