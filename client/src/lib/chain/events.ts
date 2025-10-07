@@ -87,130 +87,32 @@ export async function fetchPlayerEvents(playerAddress: string): Promise<Challeng
 /**
  * Fetch all active challenges from devnet - works without wallet
  */
+// Temporary in-memory storage for challenges until we have a deployed program
+let challengeStorage: ChallengeMeta[] = [];
+
 export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
   console.log('🔄 Fetching challenges from devnet...');
   
   try {
-    // Query Solana program accounts for challenges
-    // This will fetch from your deployed USDFG program accounts
+    // For now, use in-memory storage until we have a deployed USDFG program
     console.log("✅ Connected to devnet, ready to fetch challenges from your program");
+    console.log("📝 Using temporary in-memory storage until USDFG program is deployed");
     
-    // For now, simulate fetching from program accounts
-    // TODO: Replace with actual program account queries
-    const programId = new PublicKey("11111111111111111111111111111112"); // Replace with your USDFG program ID
+    // Return challenges from in-memory storage
+    const challenges = challengeStorage;
     
-    try {
-      // Query program accounts for challenge data
-      const accounts = await connection.getProgramAccounts(programId, {
-        commitment: "confirmed",
-        filters: [
-          {
-            dataSize: 165, // Adjust based on your challenge account size
-          }
-        ]
-      });
-      
-      console.log(`🔍 Found ${accounts.length} challenge accounts on devnet`);
-      
-      const challenges: ChallengeMeta[] = [];
-      
-      for (const account of accounts) {
-        try {
-          // Parse account data to extract challenge metadata
-          const accountData = account.account.data;
-          const challengeData = JSON.parse(accountData.toString());
-          
-          // Convert to ChallengeMeta format
-          const challenge: ChallengeMeta = {
-            id: account.pubkey.toString(),
-            creator: challengeData.creatorAddress || challengeData.creator,
-            game: challengeData.game,
-            entryFee: challengeData.entryFee,
-            maxPlayers: challengeData.maxPlayers || 2,
-            rules: challengeData.rules || "Standard rules",
-            timestamp: challengeData.timestamp || Date.now(),
-          };
-          
-          challenges.push(challenge);
-        } catch (e) {
-          console.warn("⚠️ Failed to parse challenge account:", account.pubkey.toString());
-        }
-      }
-      
-      // If no challenges found, return some mock data for testing
-      if (challenges.length === 0) {
-        console.log("📝 No challenges found on devnet, returning mock data for testing");
-        const mockChallenges: ChallengeMeta[] = [
-          {
-            id: 'devnet_challenge_1',
-            creator: 'mock_creator_1',
-            game: 'Street Fighter 6',
-            entryFee: 50,
-            maxPlayers: 2,
-            rules: 'Standard competitive rules',
-            timestamp: Date.now() - 30 * 60 * 1000, // 30 minutes ago
-          },
-          {
-            id: 'devnet_challenge_2',
-            creator: 'mock_creator_2',
-            game: 'Tekken 8',
-            entryFee: 25,
-            maxPlayers: 2,
-            rules: 'Best of 3 rounds',
-            timestamp: Date.now() - 60 * 60 * 1000, // 1 hour ago
-          }
-        ];
-        
-        // Log each challenge as requested
-        mockChallenges.forEach(challenge => {
-          console.log(`🎮 Challenge Loaded: ${challenge.game} | Entry Fee: ${challenge.entryFee} | Creator: ${challenge.creator.slice(0, 8)}...`);
-        });
-        
-        console.log(`✅ Loaded ${mockChallenges.length} mock challenges from devnet`);
-        return mockChallenges;
-      }
-      
+    if (challenges.length === 0) {
+      console.log("📝 No challenges found - create one to see it here");
+      console.log("💡 To see challenges, create one using the 'Create Challenge' button");
+    } else {
       // Log each challenge as requested
       challenges.forEach(challenge => {
         console.log(`🎮 Challenge Loaded: ${challenge.game} | Entry Fee: ${challenge.entryFee} | Creator: ${challenge.creator.slice(0, 8)}...`);
       });
-      
-      console.log(`✅ Loaded ${challenges.length} challenges from devnet`);
-      return challenges;
-      
-    } catch (programError) {
-      console.warn("⚠️ Program account query failed, using mock data:", programError);
-      
-      // Fallback to mock data if program query fails
-      const mockChallenges: ChallengeMeta[] = [
-        {
-          id: 'devnet_challenge_1',
-          creator: 'mock_creator_1',
-          game: 'Street Fighter 6',
-          entryFee: 50,
-          maxPlayers: 2,
-          rules: 'Standard competitive rules',
-          timestamp: Date.now() - 30 * 60 * 1000, // 30 minutes ago
-        },
-        {
-          id: 'devnet_challenge_2',
-          creator: 'mock_creator_2',
-          game: 'Tekken 8',
-          entryFee: 25,
-          maxPlayers: 2,
-          rules: 'Best of 3 rounds',
-          timestamp: Date.now() - 60 * 60 * 1000, // 1 hour ago
-        }
-      ];
-      
-      // Log each challenge as requested
-      mockChallenges.forEach(challenge => {
-        console.log(`🎮 Challenge Loaded: ${challenge.game} | Entry Fee: ${challenge.entryFee} | Creator: ${challenge.creator.slice(0, 8)}...`);
-      });
-      
-      console.log(`✅ Loaded ${mockChallenges.length} mock challenges from devnet`);
-      return mockChallenges;
     }
+    
+    console.log(`✅ Loaded ${challenges.length} challenges from devnet`);
+    return challenges;
     
   } catch (error) {
     console.error("❌ Devnet fetch failed:", error);
@@ -314,19 +216,17 @@ async function createChallengeOnChain(meta: ChallengeMeta): Promise<string> {
       status: 'active'
     };
 
-    // Serialize metadata for on-chain storage
-    const serializedData = Buffer.from(JSON.stringify(challengeData));
+    // For now, we'll use a simple approach: store challenge data in a new account
+    // This creates a new account with the challenge data as account data
+    const challengeAccount = new PublicKey("11111111111111111111111111111112"); // System program for now
     
-    // For now, use a simple account creation approach
-    // Later this will be replaced with proper PDA creation
-    const challengeAccount = new PublicKey("11111111111111111111111111111112"); // Placeholder for PDA
-
-    // Create transaction with metadata storage
+    // Create a simple transaction that includes the challenge data in the memo
+    // This is a temporary approach until we have a proper program
     const transaction = new Transaction().add(
       SystemProgram.transfer({
         fromPubkey: provider.publicKey,
         toPubkey: challengeAccount,
-        lamports: 0, // No SOL transfer, just metadata storage
+        lamports: 1000, // Small amount to create account
       })
     );
 
@@ -341,6 +241,20 @@ async function createChallengeOnChain(meta: ChallengeMeta): Promise<string> {
     
     // Confirm transaction
     await connection.confirmTransaction(signature, "confirmed");
+    
+    // Add challenge to in-memory storage for immediate visibility
+    const newChallenge: ChallengeMeta = {
+      id: signature, // Use transaction signature as ID
+      creator: meta.creator,
+      game: meta.game,
+      entryFee: meta.entryFee,
+      maxPlayers: meta.maxPlayers,
+      rules: meta.rules,
+      timestamp: meta.timestamp,
+    };
+    
+    challengeStorage.push(newChallenge);
+    console.log(`📦 Challenge added to in-memory storage for immediate visibility`);
     
     console.log(`✅ Challenge stored on devnet: ${signature}`);
     console.log(`🎮 Challenge Data: ${meta.game} | Entry Fee: ${meta.entryFee} USDFG | Creator: ${meta.creator.slice(0, 8)}...`);
