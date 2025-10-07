@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { 
   connectPhantomInteractive, 
+  connectPhantomMobile,
   connectSolflare, 
   disconnectWallet, 
   getWalletPublicKey, 
@@ -133,7 +134,8 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
     setError(null);
     
     try {
-      const pubkey = await connectPhantomInteractive(); // User-initiated connection
+      // Try mobile-specific connection first
+      const pubkey = await connectPhantomMobile();
       setAddress(pubkey);
       onConnect();
       

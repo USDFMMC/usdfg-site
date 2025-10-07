@@ -22,9 +22,21 @@ export async function getProvider(): Promise<any> {
   if (typeof window === 'undefined') {
     throw new Error("Window not available");
   }
-  const provider = (window as any).solana;
-  if (!provider || !provider.isPhantom) throw new Error("Phantom not found");
-  return provider;
+  
+  // Wait for Phantom to be available (especially on mobile)
+  let attempts = 0;
+  while (attempts < 10) {
+    const provider = (window as any).solana;
+    if (provider && provider.isPhantom) {
+      return provider;
+    }
+    
+    // Wait a bit for Phantom to load
+    await new Promise(resolve => setTimeout(resolve, 100));
+    attempts++;
+  }
+  
+  throw new Error("Phantom not found - please ensure Phantom is installed and try refreshing the page");
 }
 
 // Silent reconnect using trusted session
@@ -41,8 +53,58 @@ export async function silentReconnect(): Promise<string | null> {
 // Interactive connect for user-initiated actions
 export async function connectPhantomInteractive(): Promise<string> {
   const provider = await getProvider();
-  const res = await provider.connect(); // user-initiated
-  return res.publicKey.toString();
+  
+  try {
+    // Try the standard connection first
+    const res = await provider.connect();
+    return res.publicKey.toString();
+  } catch (error) {
+    console.log("🔄 Standard connect failed, trying mobile-specific approach...");
+    
+    // For mobile browsers, try a different approach
+    if (isMobile()) {
+      try {
+        // Try connecting with mobile-specific options
+        const res = await provider.connect({ 
+          onlyIfTrusted: false,
+          // Add mobile-specific options if available
+        });
+        return res.publicKey.toString();
+      } catch (mobileError) {
+        console.error("❌ Mobile connection failed:", mobileError);
+        throw new Error("Mobile connection failed. Please try using the Phantom browser app instead of external browsers.");
+      }
+    }
+    
+    throw error;
+  }
+}
+
+// Helper to detect mobile devices
+function isMobile(): boolean {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+// Mobile-specific connection helper
+export async function connectPhantomMobile(): Promise<string> {
+  console.log("📱 Attempting mobile Phantom connection...");
+  
+  // Check if we're in Phantom browser
+  if (isPhantomBrowser()) {
+    console.log("✅ Detected Phantom browser, using direct connection");
+    return connectPhantomInteractive();
+  }
+  
+  // For external browsers, provide instructions
+  console.log("⚠️ External browser detected - connection may not work properly");
+  throw new Error("For best mobile experience, please use the Phantom browser app instead of external browsers like Firefox or Safari.");
+}
+
+// Check if we're in Phantom browser
+function isPhantomBrowser(): boolean {
+  return navigator.userAgent.includes('Phantom') || 
+         (window as any).phantom || 
+         navigator.userAgent.includes('PhantomWallet');
 }
 
 // Legacy function for backward compatibility
