@@ -246,7 +246,9 @@ const ArenaHome: React.FC = () => {
           const key = optimistic.clientId!;
           const existed = next.get(key);
           next.delete(key);
-          next.set(id, { ...(existed || {}), id, clientId: undefined });
+          // Keep all the original data but update the ID
+          next.set(id, { ...(existed || {}), id, clientId: id });
+          console.log("🔄 Replaced optimistic challenge with canonical:", id);
           return next;
         });
         console.log("✅ Challenge synced to devnet:", signature);
@@ -269,10 +271,16 @@ const ArenaHome: React.FC = () => {
   };
 
   const handleDeleteChallenge = (challengeId: string) => {
+    console.log("🗑️ Attempting to delete challenge:", challengeId);
+    console.log("🗑️ Current challengeMap size before deletion:", challengeMap.size);
+    
     if (window.confirm("Are you sure you want to delete this challenge? This action cannot be undone.")) {
       setChallengeMap(prev => {
         const next = new Map(prev);
+        const hadChallenge = next.has(challengeId);
         next.delete(challengeId);
+        console.log("🗑️ Challenge existed:", hadChallenge);
+        console.log("🗑️ New challengeMap size:", next.size);
         return next;
       });
     }
