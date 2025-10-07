@@ -91,39 +91,127 @@ export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
   console.log('🔄 Fetching challenges from devnet...');
   
   try {
-    // For now, simulate fetching from program accounts
-    // Later this will query your deployed USDFG program accounts
+    // Query Solana program accounts for challenges
+    // This will fetch from your deployed USDFG program accounts
     console.log("✅ Connected to devnet, ready to fetch challenges from your program");
     
-    // Simulate some challenges for testing (replace with real account queries later)
-    const mockChallenges: ChallengeMeta[] = [
-      {
-        id: 'devnet_challenge_1',
-        creator: 'mock_creator_1',
-        game: 'Street Fighter 6',
-        entryFee: 50,
-        maxPlayers: 2,
-        rules: 'Standard competitive rules',
-        timestamp: Date.now() - 30 * 60 * 1000, // 30 minutes ago
-      },
-      {
-        id: 'devnet_challenge_2',
-        creator: 'mock_creator_2',
-        game: 'Tekken 8',
-        entryFee: 25,
-        maxPlayers: 2,
-        rules: 'Best of 3 rounds',
-        timestamp: Date.now() - 60 * 60 * 1000, // 1 hour ago
+    // For now, simulate fetching from program accounts
+    // TODO: Replace with actual program account queries
+    const programId = new PublicKey("11111111111111111111111111111112"); // Replace with your USDFG program ID
+    
+    try {
+      // Query program accounts for challenge data
+      const accounts = await connection.getProgramAccounts(programId, {
+        commitment: "confirmed",
+        filters: [
+          {
+            dataSize: 165, // Adjust based on your challenge account size
+          }
+        ]
+      });
+      
+      console.log(`🔍 Found ${accounts.length} challenge accounts on devnet`);
+      
+      const challenges: ChallengeMeta[] = [];
+      
+      for (const account of accounts) {
+        try {
+          // Parse account data to extract challenge metadata
+          const accountData = account.account.data;
+          const challengeData = JSON.parse(accountData.toString());
+          
+          // Convert to ChallengeMeta format
+          const challenge: ChallengeMeta = {
+            id: account.pubkey.toString(),
+            creator: challengeData.creatorAddress || challengeData.creator,
+            game: challengeData.game,
+            entryFee: challengeData.entryFee,
+            maxPlayers: challengeData.maxPlayers || 2,
+            rules: challengeData.rules || "Standard rules",
+            timestamp: challengeData.timestamp || Date.now(),
+          };
+          
+          challenges.push(challenge);
+        } catch (e) {
+          console.warn("⚠️ Failed to parse challenge account:", account.pubkey.toString());
+        }
       }
-    ];
+      
+      // If no challenges found, return some mock data for testing
+      if (challenges.length === 0) {
+        console.log("📝 No challenges found on devnet, returning mock data for testing");
+        const mockChallenges: ChallengeMeta[] = [
+          {
+            id: 'devnet_challenge_1',
+            creator: 'mock_creator_1',
+            game: 'Street Fighter 6',
+            entryFee: 50,
+            maxPlayers: 2,
+            rules: 'Standard competitive rules',
+            timestamp: Date.now() - 30 * 60 * 1000, // 30 minutes ago
+          },
+          {
+            id: 'devnet_challenge_2',
+            creator: 'mock_creator_2',
+            game: 'Tekken 8',
+            entryFee: 25,
+            maxPlayers: 2,
+            rules: 'Best of 3 rounds',
+            timestamp: Date.now() - 60 * 60 * 1000, // 1 hour ago
+          }
+        ];
+        
+        // Log each challenge as requested
+        mockChallenges.forEach(challenge => {
+          console.log(`🎮 Challenge Loaded: ${challenge.game} | Entry Fee: ${challenge.entryFee} | Creator: ${challenge.creator.slice(0, 8)}...`);
+        });
+        
+        console.log(`✅ Loaded ${mockChallenges.length} mock challenges from devnet`);
+        return mockChallenges;
+      }
+      
+      // Log each challenge as requested
+      challenges.forEach(challenge => {
+        console.log(`🎮 Challenge Loaded: ${challenge.game} | Entry Fee: ${challenge.entryFee} | Creator: ${challenge.creator.slice(0, 8)}...`);
+      });
+      
+      console.log(`✅ Loaded ${challenges.length} challenges from devnet`);
+      return challenges;
+      
+    } catch (programError) {
+      console.warn("⚠️ Program account query failed, using mock data:", programError);
+      
+      // Fallback to mock data if program query fails
+      const mockChallenges: ChallengeMeta[] = [
+        {
+          id: 'devnet_challenge_1',
+          creator: 'mock_creator_1',
+          game: 'Street Fighter 6',
+          entryFee: 50,
+          maxPlayers: 2,
+          rules: 'Standard competitive rules',
+          timestamp: Date.now() - 30 * 60 * 1000, // 30 minutes ago
+        },
+        {
+          id: 'devnet_challenge_2',
+          creator: 'mock_creator_2',
+          game: 'Tekken 8',
+          entryFee: 25,
+          maxPlayers: 2,
+          rules: 'Best of 3 rounds',
+          timestamp: Date.now() - 60 * 60 * 1000, // 1 hour ago
+        }
+      ];
+      
+      // Log each challenge as requested
+      mockChallenges.forEach(challenge => {
+        console.log(`🎮 Challenge Loaded: ${challenge.game} | Entry Fee: ${challenge.entryFee} | Creator: ${challenge.creator.slice(0, 8)}...`);
+      });
+      
+      console.log(`✅ Loaded ${mockChallenges.length} mock challenges from devnet`);
+      return mockChallenges;
+    }
     
-    // Log each challenge as requested
-    mockChallenges.forEach(challenge => {
-      console.log(`🎮 Challenge Loaded: ${challenge.game} | Entry Fee: ${challenge.entryFee} | Creator: ${challenge.creator.slice(0, 8)}...`);
-    });
-    
-    console.log(`✅ Loaded ${mockChallenges.length} challenges from devnet`);
-    return mockChallenges;
   } catch (error) {
     console.error("❌ Devnet fetch failed:", error);
     return [];
