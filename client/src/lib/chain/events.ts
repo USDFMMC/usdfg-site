@@ -376,27 +376,27 @@ export async function createChallengeOnChain(challengeData: Omit<ChallengeMeta, 
     
     console.log("✅ Wallet connected:", provider.publicKey.toString());
     
-    // Generate a new keypair for this challenge
+    // Generate a unique challenge ID
+    const challengeId = `challenge_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    console.log("🔑 Generated challenge ID:", challengeId);
+    
+    // For now, we'll create a simple transaction that just sends a small amount to a new address
+    // This creates a "challenge account" on-chain without complex signing requirements
     const challengeKeypair = Keypair.generate();
     const challengeAccount = challengeKeypair.publicKey;
     
     console.log("🔑 Generated challenge account:", challengeAccount.toString());
     
-    // Calculate rent exemption for the account
-    const rentExemption = await connection.getMinimumBalanceForRentExemption(0);
-    console.log("💰 Rent exemption required:", rentExemption, "lamports");
-    
-    // Create the challenge account
-    const createAccountInstruction = SystemProgram.createAccount({
+    // Create a simple transfer transaction to the challenge account
+    const transferInstruction = SystemProgram.transfer({
       fromPubkey: provider.publicKey,
-      newAccountPubkey: challengeAccount,
-      lamports: rentExemption,
-      space: 0,
-      programId: SystemProgram.programId,
+      toPubkey: challengeAccount,
+      lamports: 1000, // Small amount to create the account
     });
     
     // Create transaction
-    const transaction = new Transaction().add(createAccountInstruction);
+    const transaction = new Transaction().add(transferInstruction);
     
     // Get recent blockhash
     const { blockhash } = await connection.getLatestBlockhash();
@@ -415,9 +415,9 @@ export async function createChallengeOnChain(challengeData: Omit<ChallengeMeta, 
     console.log("✅ Transaction confirmed:", signature);
     
     // Store challenge metadata in localStorage for now
-    const challengeId = challengeAccount.toString();
+    const finalChallengeId = challengeAccount.toString();
     const challengeMetadata = {
-      id: challengeId,
+      id: finalChallengeId,
       creator: provider.publicKey.toString(),
       game: challengeData.game,
       entryFee: challengeData.entryFee,
@@ -431,17 +431,17 @@ export async function createChallengeOnChain(challengeData: Omit<ChallengeMeta, 
     const existingIds = JSON.parse(localStorage.getItem('usdfg_challenge_ids') || '[]');
     const existingMetadata = JSON.parse(localStorage.getItem('usdfg_challenge_metadata') || '[]');
     
-    existingIds.push(challengeId);
+    existingIds.push(finalChallengeId);
     existingMetadata.push(challengeMetadata);
     
     localStorage.setItem('usdfg_challenge_ids', JSON.stringify(existingIds));
     localStorage.setItem('usdfg_challenge_metadata', JSON.stringify(existingMetadata));
     
     // Update the registry with the new challenge
-    await updateRegistry(challengeId);
+    await updateRegistry(finalChallengeId);
     
-    console.log("✅ Challenge created successfully:", challengeId);
-    return challengeId;
+    console.log("✅ Challenge created successfully:", finalChallengeId);
+    return finalChallengeId;
     
   } catch (error) {
     console.error("❌ Failed to create challenge:", error);
