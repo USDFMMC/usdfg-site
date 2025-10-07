@@ -14,6 +14,7 @@ import {
   silentReconnect,
   getProvider
 } from "@/lib/wallet/solana";
+import { Connection, clusterApiUrl, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 interface WalletConnectProps {
   isConnected: boolean;
@@ -81,6 +82,37 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
     })();
     return () => unsub();
   }, []);
+
+  // Auto-refresh SOL balance every 15 seconds
+  useEffect(() => {
+    if (!address) return;
+    
+    let stop = false;
+    const fetchBalance = async () => {
+      try {
+        const provider = await getProvider();
+        const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+        const balanceLamports = await connection.getBalance(provider.publicKey);
+        const balance = balanceLamports / LAMPORTS_PER_SOL;
+        if (!stop) {
+          setBalance(balance);
+          console.log("🔄 Balance auto-refreshed:", balance.toFixed(4), "SOL");
+        }
+      } catch (e) {
+        console.warn("Balance auto-refresh failed:", e);
+      }
+    };
+    
+    // Initial fetch
+    fetchBalance();
+    // Set up interval
+    const iv = setInterval(fetchBalance, 15000); // every 15s
+    
+    return () => { 
+      stop = true; 
+      clearInterval(iv); 
+    };
+  }, [address]);
 
   const handleConnectPhantom = async () => {
     setLoading(true);
