@@ -94,7 +94,6 @@
   
   body {
     @apply bg-background text-foreground;
-    background: linear-gradient(135deg, var(--background-dark) 0%, #1a142e 100%) !important;
     background-color: #121421 !important;
     /* cursor: none; */ /* Crosshair effect disabled */
   }
@@ -408,20 +407,7 @@
     backdrop-filter: blur(20px);
   }
 
-  .parallax-glow {
-    position: absolute;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle at 50% 50%, var(--glow-cyan) 0%, transparent 70%);
-    opacity: 0.015;
-    animation: parallaxFloat 32s ease-in-out infinite;
-    pointer-events: none;
-  }
-
-  @keyframes parallaxFloat {
-    0%, 100% { transform: translate(-25%, -25%) scale(1); }
-    50% { transform: translate(-28%, -22%) scale(1.05); }
-  }
+  /* Removed heavy parallax glow for performance */
 }
 
 @keyframes float {
