@@ -264,7 +264,7 @@
   }
 
   .shadow-glow {
-    box-shadow: 0 0 30px rgba(255, 102, 255, 0.4), 0 0 80px rgba(102, 204, 255, 0.2);
+    box-shadow: 0 0 10px rgba(255, 102, 255, 0.2);
   }
 
   .tiktok-hover {
@@ -375,20 +375,15 @@
   }
 
   .challenge-card:hover {
-    box-shadow:
-      inset 0 0 10px rgba(255,255,255,0.03),
-      0 0 30px rgba(0,255,255,0.18);
+    box-shadow: 0 0 10px rgba(0,255,255,0.1);
     border-color: rgba(0,255,255,0.2);
-    transform: scale(1.01);
   }
 
   .neocore-panel {
     position: relative;
     background: var(--background-2);
     border: 1px solid var(--border-soft);
-    backdrop-filter: blur(10px);
     border-radius: 16px;
-    box-shadow: inset 0 0 10px rgba(255,255,255,0.03);
   }
 
   .neocore-panel::before {
@@ -404,7 +399,6 @@
 
   .neocore-glass-overlay {
     background: rgba(0,0,0,0.85);
-    backdrop-filter: blur(20px);
   }
 
   /* Removed heavy parallax glow for performance */
@@ -441,20 +435,7 @@
   transform: translateY(0);
 }
 
-@keyframes subtleGlow {
-  0%, 100% {
-    opacity: 1;
-    text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff;
-  }
-  50% {
-    opacity: 0.7;
-    text-shadow: 0 0 20px #00ffff, 0 0 30px #00ffff;
-  }
-}
-
-.animate-glow {
-  animation: subtleGlow 2s infinite ease-in-out;
-}
+/* Removed heavy glow animations for performance */
 
 .fade-in-delayed {
   opacity: 0;

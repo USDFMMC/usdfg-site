@@ -137,7 +137,6 @@ const ChallengeSystem: React.FC = () => {
         {/* Leaderboard + mascot visual (now visible) */}
         <section className="flex justify-center py-12">
           <div ref={visualRef} className="relative opacity-0 translate-y-3 transition-all duration-700" id="challenge-leaderboard-visual">
-            <div className="glow-behind pulse-glow"></div>
             <img
               src={imageSrcWebp}
               onError={(e) => {
@@ -149,7 +148,7 @@ const ChallengeSystem: React.FC = () => {
               }}
               loading="lazy"
               alt="USDFG mascot in front of glowing leaderboard - skill gaming competition"
-              className="w-full max-w-2xl drop-shadow-2xl rounded-lg relative z-10 shadow-glow select-none"
+              className="w-full max-w-2xl rounded-lg relative z-10 select-none"
             />
           </div>
         </section>

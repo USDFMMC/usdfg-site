@@ -31,20 +31,17 @@ const CTASection: React.FC = () => {
           {/* Enter the Challenge Image - Pro-level polish */}
           <section className="flex flex-col items-center py-14 px-4">
             <div className="flex justify-center mb-8 relative w-full" style={{ alignItems: 'center', minHeight: '340px' }}>
-              <div className="absolute inset-0 flex justify-center items-center pointer-events-none z-0">
-                <div className="glow-behind pulse-glow" style={{ width: '80%', height: '80%' }} />
-              </div>
               <div className="relative rounded-xl overflow-hidden flex items-center justify-center" style={{ minHeight: '300px' }}>
                 <img
                   src="/assets/usdfg-enter-the-challenge-arcade.webp"
                   alt="USDFG Mascot Entering the Challenge Arena"
-                  className="w-full max-w-3xl rounded-xl premium-float"
+                  className="w-full max-w-3xl rounded-xl"
                   style={{ display: 'block', margin: '0 auto' }}
                   loading="lazy" decoding="async"
                 />
               </div>
             </div>
-            <p className="text-center text-sm text-neutral-400 mt-2 italic animate-glow">
+            <p className="text-center text-sm text-neutral-400 mt-2 italic">
               Step in. Only the skilled walk out.
             </p>
           </section>

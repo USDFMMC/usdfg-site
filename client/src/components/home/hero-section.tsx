@@ -81,7 +81,6 @@ USDFG
           {/* Right mascot */}
           <div className="lg:w-1/2 flex justify-center lg:justify-end">
             <div ref={mascotRef} className="relative w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96">
-              <div className="mascot-glow-pulse absolute inset-0 z-0 pointer-events-none" />
               <picture>
                 <source srcSet={MASCOT_WEBP} type="image/webp" />
                 <img
@@ -91,7 +90,7 @@ USDFG
                   loading="eager"
                   decoding="async"
                   onError={handleImgError}
-                  className="w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 max-w-full object-contain relative z-10 mascot-float"
+                  className="w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 max-w-full object-contain"
                 />
               </picture>
             </div>
@@ -100,17 +99,7 @@ USDFG
       </div>
 
       <style>{`
-        .conquer-glow { text-shadow: 0 0 16px #ff005c, 0 0 32px #ff005c99, 0 0 2px #fff; }
-        .mascot-glow-pulse {
-          border-radius: 50%;
-          background: radial-gradient(circle, #00e8fc 0%, #00e8fc44 60%, transparent 80%);
-          filter: blur(16px);
-          opacity: 0.4;
-          animation: mascotGlowPulse 2.8s ease-in-out infinite alternate;
-        }
-        @keyframes mascotGlowPulse { 0% { opacity: .3; filter: blur(12px);} 100% { opacity:.5; filter: blur(22px);} }
-        .mascot-float { animation: mascotFloat 4.5s ease-in-out infinite alternate; }
-        @keyframes mascotFloat { 0% { transform: translateY(0);} 100% { transform: translateY(-18px);} }
+        .conquer-glow { text-shadow: 0 0 8px #ff005c; }
       `}</style>
     </section>
   );
