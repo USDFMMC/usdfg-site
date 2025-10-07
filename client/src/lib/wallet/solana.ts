@@ -103,21 +103,27 @@ export const getWalletPublicKey = () => {
 };
 
 export const isWalletConnected = () => {
-  // First check if wallet is actually connected
+  // Check if wallet is actually connected
   const pubkey = getWalletPublicKey();
   if (pubkey) {
-    // Store connection state in localStorage for persistence
-    localStorage.setItem('wallet_connected', 'true');
-    localStorage.setItem('wallet_address', pubkey);
     console.log("✅ Wallet connected:", pubkey.slice(0, 8) + "...");
     return true;
   } else {
-    // Clear stored state if not actually connected
-    localStorage.removeItem('wallet_connected');
-    localStorage.removeItem('wallet_address');
     console.log("❌ Wallet not connected");
     return false;
   }
+};
+
+export const saveWalletConnection = (pubkey: string) => {
+  localStorage.setItem('wallet_connected', 'true');
+  localStorage.setItem('wallet_address', pubkey);
+  console.log("💾 Wallet connection saved to localStorage");
+};
+
+export const clearWalletConnection = () => {
+  localStorage.removeItem('wallet_connected');
+  localStorage.removeItem('wallet_address');
+  console.log("🗑️ Wallet connection cleared from localStorage");
 };
 
 export const formatPublicKey = (publicKey: string, length: number = 8) => {

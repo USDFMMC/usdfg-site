@@ -12,7 +12,9 @@ import {
   hasSolflareInstalled,
   hasAnyWalletInstalled,
   wasWalletConnected,
-  getStoredWalletAddress
+  getStoredWalletAddress,
+  saveWalletConnection,
+  clearWalletConnection
 } from "@/lib/wallet/solana";
 
 interface WalletConnectProps {
@@ -48,21 +50,20 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
             console.log("🔄 Restoring wallet connection:", storedAddress.slice(0, 8) + "...");
             setAddress(storedAddress);
             onConnect();
-          // Fetch real SOL balance with better error handling
-          getSOLBalance(storedAddress)
-            .then(balance => {
-              console.log("💰 Balance loaded:", balance);
-              setBalance(balance);
-            })
-            .catch(err => {
-              console.error("❌ Balance fetch failed:", err);
-              setBalance(0.5); // Set default balance to avoid "Loading..."
-            });
+            // Fetch real SOL balance with better error handling
+            getSOLBalance(storedAddress)
+              .then(balance => {
+                console.log("💰 Balance loaded:", balance);
+                setBalance(balance);
+              })
+              .catch(err => {
+                console.error("❌ Balance fetch failed:", err);
+                setBalance(0.5); // Set default balance to avoid "Loading..."
+              });
           } else {
             // Wallet is no longer connected, clear stored state
             console.log("❌ Wallet no longer connected, clearing stored state");
-            localStorage.removeItem('wallet_connected');
-            localStorage.removeItem('wallet_address');
+            clearWalletConnection();
           }
         }
       } else if (isWalletConnected()) {
@@ -108,6 +109,7 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
     try {
       const pubkey = await connectPhantom();
       setAddress(pubkey);
+      saveWalletConnection(pubkey); // Save connection to localStorage
       onConnect();
       
       // Fetch balance with better error handling
@@ -133,6 +135,7 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
     try {
       const pubkey = await connectSolflare();
       setAddress(pubkey);
+      saveWalletConnection(pubkey); // Save connection to localStorage
       onConnect();
       
       // Fetch balance with better error handling
@@ -157,9 +160,7 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
       setAddress(null);
       setBalance(null);
       setError(null);
-      // Clear stored connection state
-      localStorage.removeItem('wallet_connected');
-      localStorage.removeItem('wallet_address');
+      clearWalletConnection(); // Clear stored connection state
       onDisconnect();
     } catch (err) {
       console.error("Disconnect failed:", err);

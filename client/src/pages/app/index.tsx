@@ -151,12 +151,7 @@ const ArenaHome: React.FC = () => {
   // Auto-refresh challenges from devnet every 10 seconds
   useEffect(() => {
     const fetchChallengesFromDevnet = async () => {
-      // Skip devnet fetch if a local challenge was created recently (within 2 minutes)
-      const timeSinceLastLocal = Date.now() - lastLocalChallenge;
-      if (timeSinceLastLocal < 120000) { // 2 minutes
-        console.log("⏸️ Skipping devnet fetch - local challenge created recently");
-        return;
-      }
+      // Always fetch devnet challenges - they won't override recent local ones
       
       try {
         console.log("🔄 Starting devnet challenge fetch...");
@@ -180,28 +175,24 @@ const ArenaHome: React.FC = () => {
           createdAt: new Date(challenge.timestamp).toISOString()
         }));
         
-        // MERGE DEVNET + LOCAL: Combine devnet challenges with any local challenges
+        // SIMPLE MERGE: Always show devnet challenges + recent local challenges
         const localChallenges = JSON.parse(localStorage.getItem('challenges') || '[]');
         
-        // PROTECT LOCAL CHALLENGES: Don't override local challenges that are less than 2 minutes old
+        // Always include devnet challenges
+        let allChallenges = [...formattedChallenges];
+        
+        // Add local challenges that are less than 5 minutes old
         const now = Date.now();
-        const protectedLocalChallenges = localChallenges.filter(challenge => {
+        const recentLocalChallenges = localChallenges.filter(challenge => {
           const challengeTime = new Date(challenge.createdAt).getTime();
           const ageMinutes = (now - challengeTime) / (1000 * 60);
-          console.log(`🛡️ Challenge ${challenge.id} age: ${ageMinutes.toFixed(1)} minutes`);
-          return ageMinutes < 2; // Protect challenges less than 2 minutes old
+          console.log(`🛡️ Local challenge ${challenge.id} age: ${ageMinutes.toFixed(1)} minutes`);
+          return ageMinutes < 5; // Keep local challenges for 5 minutes
         });
         
-        // Only include older local challenges in the merge
-        const olderLocalChallenges = localChallenges.filter(challenge => {
-          const challengeTime = new Date(challenge.createdAt).getTime();
-          const ageMinutes = (now - challengeTime) / (1000 * 60);
-          return ageMinutes >= 2;
-        });
+        allChallenges = [...allChallenges, ...recentLocalChallenges];
         
-        const allChallenges = [...formattedChallenges, ...olderLocalChallenges, ...protectedLocalChallenges];
-        
-        // Remove duplicates based on ID, but prioritize local challenges
+        // Remove duplicates based on ID
         const uniqueChallenges = allChallenges.filter((challenge, index, self) => 
           index === self.findIndex(c => c.id === challenge.id)
         );
@@ -278,6 +269,12 @@ const ArenaHome: React.FC = () => {
     // Add to local challenges immediately
     setChallenges(prev => [newChallenge, ...prev]);
     setLastLocalChallenge(Date.now());
+    
+    // Also save to localStorage immediately
+    const currentChallenges = JSON.parse(localStorage.getItem('challenges') || '[]');
+    const updatedChallenges = [newChallenge, ...currentChallenges];
+    localStorage.setItem('challenges', JSON.stringify(updatedChallenges));
+    console.log("💾 Challenge saved to localStorage:", newChallenge.id);
     
     // Also try to sync with devnet (this will make it visible across devices)
     try {
