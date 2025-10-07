@@ -1058,7 +1058,7 @@ const CreateChallengeModal: React.FC<{
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative w-[92vw] max-w-xl rounded-2xl border border-white/10 bg-[#11051E] p-5">
+      <div className="relative w-[92vw] max-w-xl max-h-[90vh] rounded-2xl border border-white/10 bg-[#11051E] p-5 overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-lg font-semibold text-white">Create Challenge</h3>
@@ -1234,8 +1234,10 @@ Prize pool: {(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5
                   </div>
                 </Field>
 
-                <div className="flex justify-end">
-                  <PrimaryButton onClick={nextStep}>Next</PrimaryButton>
+                <div className="flex justify-end mt-6 mb-4 sticky bottom-0 bg-[#11051E] pt-4">
+                  <PrimaryButton onClick={nextStep} className="min-h-[44px] px-6 py-3 text-base touch-manipulation">
+                    Next
+                  </PrimaryButton>
                 </div>
               </div>
             )}
@@ -1295,9 +1297,9 @@ Prize pool: {(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5
                   </div>
                 )}
 
-                <div className="flex justify-between">
-                  <TertiaryButton onClick={prevStep}>Back</TertiaryButton>
-                  <PrimaryButton onClick={nextStep}>Review & Create</PrimaryButton>
+                <div className="flex justify-between mt-6 mb-4 sticky bottom-0 bg-[#11051E] pt-4">
+                  <TertiaryButton onClick={prevStep} className="min-h-[44px] px-6 py-3 text-base touch-manipulation">Back</TertiaryButton>
+                  <PrimaryButton onClick={nextStep} className="min-h-[44px] px-6 py-3 text-base touch-manipulation">Review & Create</PrimaryButton>
                 </div>
               </div>
             )}
