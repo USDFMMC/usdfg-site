@@ -93,74 +93,14 @@ export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
   try {
     console.log("✅ Connected to devnet, querying challenge accounts...");
     
-    // Get challenge account IDs from localStorage (temporary tracking)
-    const storedChallengeIds = localStorage.getItem('usdfg_challenge_ids');
-    let challengeIds: string[] = [];
+    // For now, return empty array since we need to implement proper on-chain retrieval
+    // The current approach of using localStorage is device-specific and won't work across devices
+    console.log("📝 No challenges found on devnet");
+    console.log("💡 To see challenges, create one using the 'Create Challenge' button");
+    console.log("🔧 TODO: Implement proper on-chain challenge retrieval from Solana accounts");
     
-    if (storedChallengeIds) {
-      try {
-        challengeIds = JSON.parse(storedChallengeIds);
-        console.log(`📦 Found ${challengeIds.length} challenge account IDs`);
-      } catch (e) {
-        console.error("❌ Failed to parse stored challenge IDs:", e);
-        challengeIds = [];
-      }
-    }
-    
-    const challenges: ChallengeMeta[] = [];
-    
-    // Get stored challenge metadata from localStorage
-    const storedChallenges = localStorage.getItem('usdfg_challenge_metadata');
-    let challengeMetadata: any[] = [];
-    
-    if (storedChallenges) {
-      try {
-        challengeMetadata = JSON.parse(storedChallenges);
-        console.log(`📦 Found ${challengeMetadata.length} challenge metadata entries`);
-      } catch (e) {
-        console.error("❌ Failed to parse stored challenge metadata:", e);
-        challengeMetadata = [];
-      }
-    }
-    
-    // Query each challenge account from the blockchain and match with metadata
-    for (const challengeId of challengeIds) {
-      try {
-        const accountInfo = await connection.getAccountInfo(new PublicKey(challengeId));
-        if (accountInfo && accountInfo.data) {
-          // Find matching metadata for this challenge
-          const metadata = challengeMetadata.find(m => m.id === challengeId);
-          
-          if (metadata) {
-            const challenge: ChallengeMeta = {
-              id: challengeId,
-              clientId: challengeId,
-              creator: metadata.creator || "Unknown",
-              game: metadata.game || "Unknown Game",
-              entryFee: metadata.entryFee || 0,
-              maxPlayers: metadata.maxPlayers || 8,
-              rules: metadata.rules || "No rules specified",
-              timestamp: metadata.timestamp || Date.now()
-            };
-            
-            challenges.push(challenge);
-            console.log(`🎮 Challenge Loaded: ${challenge.game} | Entry Fee: ${challenge.entryFee} | Creator: ${challenge.creator.slice(0, 8)}...`);
-          } else {
-            console.warn(`⚠️ No metadata found for challenge ${challengeId}`);
-          }
-        }
-      } catch (e) {
-        console.warn(`⚠️ Failed to fetch challenge account ${challengeId}:`, e);
-      }
-    }
-    
-    if (challenges.length === 0) {
-      console.log("📝 No challenges found on devnet");
-      console.log("💡 To see challenges, create one using the 'Create Challenge' button");
-    }
-    
-    console.log(`✅ Loaded ${challenges.length} challenges from devnet`);
-    return challenges;
+    console.log(`✅ Loaded 0 challenges from devnet`);
+    return [];
     
   } catch (error) {
     console.error("❌ Devnet fetch failed:", error);
@@ -348,13 +288,13 @@ async function createChallengeOnChain(meta: ChallengeMeta): Promise<string> {
     console.log(`🎮 Challenge Data: ${meta.game} | Entry Fee: ${meta.entryFee} USDFG | Creator: ${meta.creator.slice(0, 8)}...`);
     console.log(`🔗 View on Solana Explorer: https://explorer.solana.com/tx/${signature}?cluster=devnet`);
     
-        // Store the challenge account ID for retrieval
+        // Store the challenge account ID for retrieval (temporary solution)
         const existingIds = JSON.parse(localStorage.getItem('usdfg_challenge_ids') || '[]');
         existingIds.push(challengeAccount.toString());
         localStorage.setItem('usdfg_challenge_ids', JSON.stringify(existingIds));
         console.log(`📦 Challenge account ID saved: ${challengeAccount.toString()}`);
         
-        // Store challenge metadata for retrieval
+        // Store challenge metadata for retrieval (temporary solution)
         const existingMetadata = JSON.parse(localStorage.getItem('usdfg_challenge_metadata') || '[]');
         const challengeMetadata = {
           id: challengeAccount.toString(),
@@ -368,6 +308,10 @@ async function createChallengeOnChain(meta: ChallengeMeta): Promise<string> {
         existingMetadata.push(challengeMetadata);
         localStorage.setItem('usdfg_challenge_metadata', JSON.stringify(existingMetadata));
         console.log(`📦 Challenge metadata saved for: ${challengeAccount.toString()}`);
+        
+        // TODO: Implement proper on-chain challenge discovery
+        // For now, we're using localStorage as a temporary solution
+        // In a real implementation, we'd query all challenge accounts from the blockchain
     
     return challengeAccount.toString();
   } catch (error) {
