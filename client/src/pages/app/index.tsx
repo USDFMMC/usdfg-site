@@ -76,48 +76,10 @@ const ArenaHome: React.FC = () => {
     console.log("🔍 First challenge:", challenges[0]);
   }
   
-  // Initialize with default challenges
-  useEffect(() => {
-    if (challengeMap.size === 0) {
-      const defaultChallenges = [
-        {
-          id: "ch_01",
-          title: "Street Fighter 6 Versus Match",
-          game: "Street Fighter 6",
-          mode: "Versus Match",
-          platform: "PS5",
-          username: "FighterPro_89",
-          entryFee: 50,
-          prizePool: 95,
-          players: 2,
-          capacity: 8,
-          category: "Fighting",
-          creator: "system",
-          rules: "• Best of 3 rounds per match\n• Standard character roster\n• No duplicate characters\n• Tournament legal stages only\n• Rage quit = forfeit\n• Standard round timer (99 seconds)",
-          createdAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-          timestamp: Date.now() - 3600000
-        },
-        {
-          id: "ch_02", 
-          title: "FIFA 24 Head-to-Head",
-          game: "FIFA 24",
-          mode: "Head-to-Head",
-          platform: "Xbox",
-          username: "SoccerKing24",
-          entryFee: 25,
-          prizePool: 47,
-          players: 1,
-          capacity: 2,
-          category: "Sports",
-          creator: "system",
-          rules: "• Match length: 6-minute halves\n• Difficulty: World Class\n• No duplicate teams\n• Draw = penalties\n• Disconnect = forfeit unless agreed to rematch\n• Standard FIFA rules apply",
-          createdAt: new Date(Date.now() - 1800000).toISOString(), // 30 min ago
-          timestamp: Date.now() - 1800000
-        }
-      ];
-      upsertMany(defaultChallenges);
-    }
-  }, []);
+  // No more default challenges - we're using live on-chain data only
+  // useEffect(() => {
+  //   // Default challenges removed - using live on-chain data only
+  // }, []);
 
   // Save challenges to localStorage whenever they change
   useEffect(() => {
