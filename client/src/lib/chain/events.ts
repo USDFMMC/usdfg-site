@@ -159,6 +159,12 @@ export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
             const now = Date.now();
             const isExpired = metadata.expiresAt && now > metadata.expiresAt;
             
+            console.log(`🔍 Checking expiration for challenge ${challengeId}:`, {
+              now: new Date(now).toISOString(),
+              expiresAt: metadata.expiresAt ? new Date(metadata.expiresAt).toISOString() : 'not set',
+              isExpired
+            });
+            
             if (isExpired) {
               console.log(`⏰ Challenge expired: ${challengeId} (expired at ${new Date(metadata.expiresAt).toISOString()})`);
               continue; // Skip expired challenges

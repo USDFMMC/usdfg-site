@@ -69,6 +69,13 @@ const ArenaHome: React.FC = () => {
   const challenges = Array.from(challengeMap.values())
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   
+  // Debug: Log challenges for debugging
+  console.log("🔍 Current challenges for display:", challenges.length);
+  console.log("🔍 Challenge map size:", challengeMap.size);
+  if (challenges.length > 0) {
+    console.log("🔍 First challenge:", challenges[0]);
+  }
+  
   // Initialize with default challenges
   useEffect(() => {
     if (challengeMap.size === 0) {
@@ -215,8 +222,15 @@ const ArenaHome: React.FC = () => {
         };
       
       console.log("📝 Adding optimistic challenge to UI...");
+      console.log("📋 Optimistic challenge data:", optimisticChallenge);
       upsertMany([optimisticChallenge]); // Show immediately
       console.log("✅ Optimistic challenge added to UI");
+      
+      // Debug: Check if challenge was added to map
+      setTimeout(() => {
+        console.log("🔍 Current challengeMap size:", challengeMap.size);
+        console.log("🔍 Current challenges:", Array.from(challengeMap.values()));
+      }, 100);
       
       // Handle transaction completion
       console.log("⏳ Waiting for transaction completion...");
