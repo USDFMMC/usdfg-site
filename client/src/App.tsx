@@ -10,7 +10,7 @@ import PlayerProfile from "@/pages/app/profile/[address]";
 import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
 import Whitepaper from "@/pages/whitepaper";
-import StarBackground from "@/components/effects/star-background";
+// import StarBackground from "@/components/effects/star-background";
 import Crosshair from "@/components/effects/Crosshair";
 import { Helmet } from "react-helmet";
 
@@ -71,7 +71,7 @@ function App() {
       </Helmet>
 
       <div className="min-h-screen flex flex-col relative overflow-hidden">
-        <StarBackground />
+        {/* <StarBackground /> */}
         {/* <Crosshair color="#00ffff" /> */}
         <AppRouter />
         <Toaster />

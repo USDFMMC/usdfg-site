@@ -121,7 +121,7 @@ export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
             creator: "blockchain_creator", // This would come from account data
             game: "Blockchain Game", // This would come from account data
             entryFee: 50, // This would come from account data
-            maxPlayers: 2,
+      maxPlayers: 2,
             rules: "Blockchain rules", // This would come from account data
             timestamp: Date.now(),
           };
@@ -195,8 +195,14 @@ export async function submitChallengeResult(
  * Create a new challenge with optimistic UI support
  */
 export async function createChallenge(meta: Omit<ChallengeMeta, "id"|"clientId"|"timestamp"|"creator">) {
+  console.log("🔍 Checking wallet connection...");
   const provider = (window as any).solana;
-  if (!provider?.publicKey) throw new Error("Wallet not connected");
+  if (!provider?.publicKey) {
+    console.error("❌ Wallet not connected");
+    throw new Error("Wallet not connected");
+  }
+
+  console.log("✅ Wallet connected:", provider.publicKey.toString().slice(0, 8) + "...");
 
   // Optimistic object for UI
   const optimistic: ChallengeMeta = {
@@ -209,11 +215,20 @@ export async function createChallenge(meta: Omit<ChallengeMeta, "id"|"clientId"|
     timestamp: Date.now(),
   };
 
+  console.log("📝 Created optimistic challenge:", optimistic);
+
   // Return both optimistic and a promise that resolves with chain id/signature
   const txPromise = (async () => {
-    const sig = await createChallengeOnChain(optimistic); // your existing devnet tx
-    // derive id from sig (or PDA) in your program later:
-    return { signature: sig, id: sig };
+    console.log("🚀 Starting on-chain transaction...");
+    try {
+      const sig = await createChallengeOnChain(optimistic); // your existing devnet tx
+      console.log("✅ On-chain transaction completed:", sig);
+      // derive id from sig (or PDA) in your program later:
+      return { signature: sig, id: sig };
+    } catch (error) {
+      console.error("❌ On-chain transaction failed:", error);
+      throw error;
+    }
   })();
 
   return { optimistic, txPromise };
@@ -223,7 +238,7 @@ export async function createChallenge(meta: Omit<ChallengeMeta, "id"|"clientId"|
  * Create challenge on chain (internal helper)
  */
 async function createChallengeOnChain(meta: ChallengeMeta): Promise<string> {
-  console.log(`Creating challenge: ${meta.game}, ${meta.entryFee} USDFG`);
+  console.log(`🚀 Creating challenge: ${meta.game}, ${meta.entryFee} USDFG`);
   
   try {
     // Get the connected wallet provider
@@ -231,6 +246,8 @@ async function createChallengeOnChain(meta: ChallengeMeta): Promise<string> {
     if (!provider || !provider.publicKey) {
       throw new Error("Wallet not connected");
     }
+
+    console.log(`👤 Wallet connected: ${provider.publicKey.toString().slice(0, 8)}...`);
 
     // Create a new keypair for this challenge account
     const challengeKeypair = Keypair.generate();
@@ -250,8 +267,8 @@ async function createChallengeOnChain(meta: ChallengeMeta): Promise<string> {
       status: 'active'
     };
 
-    // Serialize challenge data
-    const serializedData = Buffer.from(JSON.stringify(challengeData));
+    // Serialize challenge data (using TextEncoder instead of Buffer)
+    const serializedData = new TextEncoder().encode(JSON.stringify(challengeData));
     const dataSize = serializedData.length;
     
     console.log(`📦 Challenge data size: ${dataSize} bytes`);
@@ -259,6 +276,14 @@ async function createChallengeOnChain(meta: ChallengeMeta): Promise<string> {
     // Calculate rent exemption for the account
     const rentExemption = await connection.getMinimumBalanceForRentExemption(dataSize);
     console.log(`💰 Rent exemption required: ${rentExemption / LAMPORTS_PER_SOL} SOL`);
+
+    // Check wallet balance
+    const walletBalance = await connection.getBalance(provider.publicKey);
+    console.log(`💰 Wallet balance: ${walletBalance / LAMPORTS_PER_SOL} SOL`);
+    
+    if (walletBalance < rentExemption) {
+      throw new Error(`Insufficient balance. Need ${rentExemption / LAMPORTS_PER_SOL} SOL, have ${walletBalance / LAMPORTS_PER_SOL} SOL`);
+    }
 
     // Create transaction to store challenge data on-chain
     const transaction = new Transaction().add(
@@ -272,20 +297,29 @@ async function createChallengeOnChain(meta: ChallengeMeta): Promise<string> {
       })
     );
 
+    console.log(`📝 Transaction created with ${transaction.instructions.length} instructions`);
+
     // Get recent blockhash
     const { blockhash } = await connection.getLatestBlockhash();
     transaction.recentBlockhash = blockhash;
     transaction.feePayer = provider.publicKey;
 
+    console.log(`🔗 Recent blockhash: ${blockhash}`);
+
     // Sign and send transaction
+    console.log(`✍️ Signing transaction...`);
     const signedTransaction = await provider.signTransaction(transaction);
     // Add the challenge keypair signature
     signedTransaction.partialSign(challengeKeypair);
     
+    console.log(`📤 Sending transaction to devnet...`);
     const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+    console.log(`📋 Transaction signature: ${signature}`);
     
     // Confirm transaction
-    await connection.confirmTransaction(signature, "confirmed");
+    console.log(`⏳ Confirming transaction...`);
+    const confirmation = await connection.confirmTransaction(signature, "confirmed");
+    console.log(`✅ Transaction confirmed:`, confirmation);
     
     // Store challenge data in a known account for cross-device access
     // This creates a shared storage mechanism that works across devices
@@ -305,13 +339,17 @@ async function createChallengeOnChain(meta: ChallengeMeta): Promise<string> {
     dataTransaction.add({
       keys: [],
       programId: new PublicKey("MemoSq4gqABAXKb96qnH8TysKcWfC85B2q2"), // Memo program
-      data: Buffer.from(memo, 'utf8')
+      data: new TextEncoder().encode(memo)
     });
     
+    console.log(`📝 Creating data storage transaction...`);
     const dataSignature = await connection.sendRawTransaction(
       await provider.signTransaction(dataTransaction)
     );
+    console.log(`📋 Data transaction signature: ${dataSignature}`);
+    
     await connection.confirmTransaction(dataSignature, "confirmed");
+    console.log(`✅ Data transaction confirmed`);
     
     console.log(`✅ Challenge account created: ${challengeAccount.toString()}`);
     console.log(`🎮 Challenge Data: ${meta.game} | Entry Fee: ${meta.entryFee} USDFG | Creator: ${meta.creator.slice(0, 8)}...`);
@@ -325,7 +363,8 @@ async function createChallengeOnChain(meta: ChallengeMeta): Promise<string> {
     
     return challengeAccount.toString();
   } catch (error) {
-    console.error("Failed to create challenge on devnet:", error);
+    console.error("❌ Failed to create challenge on devnet:", error);
+    console.error("Error details:", error);
     throw error;
   }
 }

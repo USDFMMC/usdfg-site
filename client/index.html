@@ -27,6 +27,26 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700&family=Chakra+Petch:wght@700&display=swap" rel="stylesheet">
+    <script>
+      // Simple Buffer polyfill for Solana web3.js
+      if (typeof globalThis.Buffer === 'undefined') {
+        globalThis.Buffer = {
+          from: (data, encoding) => new Uint8Array(new TextEncoder().encode(data)),
+          isBuffer: () => false,
+          alloc: (size) => new Uint8Array(size),
+          concat: (arrays) => {
+            const totalLength = arrays.reduce((sum, arr) => sum + arr.length, 0);
+            const result = new Uint8Array(totalLength);
+            let offset = 0;
+            for (const arr of arrays) {
+              result.set(arr, offset);
+              offset += arr.length;
+            }
+            return result;
+          }
+        };
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

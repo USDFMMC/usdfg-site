@@ -16,6 +16,9 @@ export default defineConfig({
         ]
       : []),
   ],
+  define: {
+    global: 'globalThis',
+  },
   resolve: {
     alias: {
       "@db": path.resolve(import.meta.dirname, "db"),

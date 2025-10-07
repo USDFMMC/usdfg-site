@@ -163,14 +163,22 @@ const ArenaHome: React.FC = () => {
   }, []);
 
   const handleCreateChallenge = async (challengeData: any) => {
+    console.log("🎮 Starting challenge creation process...");
+    console.log("📋 Challenge data:", challengeData);
+    
     try {
+      console.log("📦 Importing createChallenge function...");
       const { createChallenge } = await import("@/lib/chain/events");
+      
+      console.log("🚀 Calling createChallenge...");
       const { optimistic, txPromise } = await createChallenge({
         game: challengeData.game,
         entryFee: challengeData.entryFee,
         maxPlayers: 8,
         rules: challengeData.rules || ""
       });
+      
+      console.log("✅ Optimistic challenge created:", optimistic);
       
       // Show optimistic challenge immediately
       const platformFee = 0.05; // 5% platform fee
@@ -205,11 +213,18 @@ const ArenaHome: React.FC = () => {
         timestamp: optimistic.timestamp
       };
       
+      console.log("📝 Adding optimistic challenge to UI...");
       upsertMany([optimisticChallenge]); // Show immediately
+      console.log("✅ Optimistic challenge added to UI");
       
       // Handle transaction completion
+      console.log("⏳ Waiting for transaction completion...");
       try {
         const { signature, id } = await txPromise;
+        console.log("✅ Transaction completed successfully!");
+        console.log("📋 Transaction signature:", signature);
+        console.log("🆔 Challenge ID:", id);
+        
         // Replace optimistic with canonical
         setChallengeMap((prev) => {
           const next = new Map(prev);
@@ -220,17 +235,21 @@ const ArenaHome: React.FC = () => {
           return next;
         });
         console.log("✅ Challenge synced to devnet:", signature);
+        console.log("🔗 View on Solana Explorer: https://explorer.solana.com/tx/" + signature + "?cluster=devnet");
       } catch (e) {
-        // If tx fails, remove optimistic
+        console.error("❌ Transaction failed:", e);
+        // If tx fails, remove optimistic challenge
         setChallengeMap((prev) => {
           const next = new Map(prev);
           next.delete(optimistic.clientId!);
           return next;
         });
         console.error("❌ Challenge creation failed:", e);
+        alert("Challenge creation failed: " + (e instanceof Error ? e.message : "Unknown error"));
       }
     } catch (error) {
       console.error("❌ Failed to create challenge:", error);
+      alert("Failed to create challenge: " + (error instanceof Error ? error.message : "Unknown error"));
     }
   };
 
@@ -285,7 +304,10 @@ const ArenaHome: React.FC = () => {
               
               <div className="flex items-center space-x-4">
                 <button 
-                  onClick={() => setShowCreateModal(true)}
+                  onClick={() => {
+                    console.log("🔥 CREATE CHALLENGE BUTTON CLICKED!");
+                    setShowCreateModal(true);
+                  }}
                   className="elite-btn neocore-button"
                 >
                   Create Challenge
@@ -661,14 +683,20 @@ const ArenaHome: React.FC = () => {
 
         {/* Create Challenge Modal */}
         {showCreateModal && (
-          <CreateChallengeModal 
-            onClose={() => setShowCreateModal(false)} 
-            isConnected={isConnected}
-            onConnect={() => setIsConnected(true)}
-            onCreateChallenge={handleCreateChallenge}
-            usdfgPrice={usdfgPrice}
-            usdfgToUsd={usdfgToUsd}
-          />
+          <>
+            {console.log("🔥 MODAL IS RENDERING!")}
+            <CreateChallengeModal 
+              onClose={() => {
+                console.log("🔥 MODAL CLOSING!");
+                setShowCreateModal(false);
+              }} 
+              isConnected={isConnected}
+              onConnect={() => setIsConnected(true)}
+              onCreateChallenge={handleCreateChallenge}
+              usdfgPrice={usdfgPrice}
+              usdfgToUsd={usdfgToUsd}
+            />
+          </>
         )}
 
         {/* Join Challenge Modal */}
@@ -966,6 +994,7 @@ const CreateChallengeModal: React.FC<{
   }, [formData.rules]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
+    console.log("🔥 MODAL: handleSubmit called!");
     e.preventDefault();
     setAttemptedNext(true);
     
@@ -975,11 +1004,13 @@ const CreateChallengeModal: React.FC<{
     const allErrors = [...step1Errors, ...step2Errors];
     
     setValidationErrors(allErrors);
-    
+
     if (allErrors.length > 0) {
+      console.log("❌ MODAL: Validation errors found:", allErrors);
       return; // Don't submit if there are errors
     }
     
+    console.log("✅ MODAL: Validation passed, calling onCreateChallenge with:", formData);
     // Create the challenge
     onCreateChallenge(formData);
     onClose();
