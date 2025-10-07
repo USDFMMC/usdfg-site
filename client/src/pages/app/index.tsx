@@ -236,7 +236,11 @@ const ArenaHome: React.FC = () => {
 
   const handleDeleteChallenge = (challengeId: string) => {
     if (window.confirm("Are you sure you want to delete this challenge? This action cannot be undone.")) {
-      setChallenges(prev => prev.filter(challenge => challenge.id !== challengeId));
+      setChallengeMap(prev => {
+        const next = new Map(prev);
+        next.delete(challengeId);
+        return next;
+      });
     }
   };
 

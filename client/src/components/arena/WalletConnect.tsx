@@ -12,7 +12,8 @@ import {
   hasSolflareInstalled,
   hasAnyWalletInstalled,
   silentReconnect,
-  getProvider
+  getProvider,
+  saveWalletConnection
 } from "@/lib/wallet/solana";
 import { Connection, clusterApiUrl, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
