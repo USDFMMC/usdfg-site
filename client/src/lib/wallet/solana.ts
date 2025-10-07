@@ -148,8 +148,8 @@ export const getSOLBalance = async (publicKey: string): Promise<number> => {
     return balance;
   } catch (err) {
     console.error("❌ Error fetching SOL balance:", err);
-    // Return a default balance instead of 0 to avoid "Loading..." state
-    return 0.5; // Default balance for display
+    // Don't return a default balance - let the UI handle the null state
+    throw err; // Re-throw to let the component handle it
   }
 };
 

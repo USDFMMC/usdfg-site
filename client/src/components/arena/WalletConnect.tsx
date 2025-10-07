@@ -50,7 +50,7 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
           })
           .catch(err => {
             console.error("❌ Balance fetch failed:", err);
-            setBalance(0.5); // Set default balance
+            setBalance(null); // Don't set default, let it show "Loading balance..."
           });
       }
       
@@ -97,7 +97,7 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
         setBalance(bal);
       } catch (balanceErr) {
         console.error("❌ Balance fetch failed:", balanceErr);
-        setBalance(0.5); // Set default balance
+        setBalance(null); // Don't set default, let it show "Loading balance..."
       }
     } catch (err) {
       console.error("Phantom connection failed:", err);
@@ -123,7 +123,7 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
         setBalance(bal);
       } catch (balanceErr) {
         console.error("❌ Balance fetch failed:", balanceErr);
-        setBalance(0.5); // Set default balance
+        setBalance(null); // Don't set default, let it show "Loading balance..."
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to connect");
@@ -178,7 +178,7 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
             {formatPublicKey(address)}
           </div>
           <div className="text-white font-semibold">
-            {balance !== null ? `${balance.toFixed(4)} SOL` : "Connected"}
+            {balance !== null ? `${balance.toFixed(4)} SOL` : "Loading balance..."}
           </div>
         </div>
         <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
