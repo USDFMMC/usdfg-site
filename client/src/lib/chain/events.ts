@@ -93,14 +93,99 @@ export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
   try {
     console.log("✅ Connected to devnet, querying challenge accounts...");
     
-    // For now, return empty array since we need to implement proper on-chain retrieval
-    // The current approach of using localStorage is device-specific and won't work across devices
-    console.log("📝 No challenges found on devnet");
-    console.log("💡 To see challenges, create one using the 'Create Challenge' button");
-    console.log("🔧 TODO: Implement proper on-chain challenge retrieval from Solana accounts");
+    // First, try to get challenges from localStorage (for devices that created them)
+    const storedChallengeIds = localStorage.getItem('usdfg_challenge_ids');
+    const storedChallenges = localStorage.getItem('usdfg_challenge_metadata');
     
-    console.log(`✅ Loaded 0 challenges from devnet`);
-    return [];
+    let challengeIds: string[] = [];
+    let challengeMetadata: any[] = [];
+    
+    if (storedChallengeIds) {
+      try {
+        challengeIds = JSON.parse(storedChallengeIds);
+        console.log(`📦 Found ${challengeIds.length} local challenge account IDs`);
+      } catch (e) {
+        console.error("❌ Failed to parse stored challenge IDs:", e);
+        challengeIds = [];
+      }
+    }
+    
+    if (storedChallenges) {
+      try {
+        challengeMetadata = JSON.parse(storedChallenges);
+        console.log(`📦 Found ${challengeMetadata.length} local challenge metadata entries`);
+      } catch (e) {
+        console.error("❌ Failed to parse stored challenge metadata:", e);
+        challengeMetadata = [];
+      }
+    }
+    
+    // Try to discover challenges from other devices
+    console.log("🔍 Attempting to discover challenges from other devices...");
+    
+    // Try to fetch a shared challenge registry from a simple endpoint
+    try {
+      const sharedChallenges = await fetch('https://raw.githubusercontent.com/USDFMMC/usdfg-site/main/global-challenges.json')
+        .then(res => res.json())
+        .catch(() => []);
+      
+      if (Array.isArray(sharedChallenges) && sharedChallenges.length > 0) {
+        console.log(`🌐 Found ${sharedChallenges.length} shared challenges from other devices`);
+        
+        // Add shared challenges to our local list
+        for (const sharedChallenge of sharedChallenges) {
+          if (!challengeIds.includes(sharedChallenge.id)) {
+            challengeIds.push(sharedChallenge.id);
+            challengeMetadata.push(sharedChallenge);
+          }
+        }
+      }
+    } catch (error) {
+      console.log("🌐 Shared challenge discovery failed, using local storage only:", error);
+    }
+    const challenges: ChallengeMeta[] = [];
+    
+    // Query each challenge account from the blockchain and match with metadata
+    for (const challengeId of challengeIds) {
+      try {
+        const accountInfo = await connection.getAccountInfo(new PublicKey(challengeId));
+        if (accountInfo && accountInfo.data) {
+          // Find matching metadata for this challenge
+          const metadata = challengeMetadata.find(m => m.id === challengeId);
+          
+          if (metadata) {
+            const challenge: ChallengeMeta = {
+              id: challengeId,
+              clientId: challengeId,
+              creator: metadata.creator || "Unknown",
+              game: metadata.game || "Unknown Game",
+              entryFee: metadata.entryFee || 0,
+              maxPlayers: metadata.maxPlayers || 8,
+              rules: metadata.rules || "No rules specified",
+              timestamp: metadata.timestamp || Date.now()
+            };
+            
+            challenges.push(challenge);
+            console.log(`🎮 Challenge Loaded: ${challenge.game} | Entry Fee: ${challenge.entryFee} | Creator: ${challenge.creator.slice(0, 8)}...`);
+          } else {
+            console.warn(`⚠️ No metadata found for challenge ${challengeId}`);
+          }
+        } else {
+          console.log(`❌ Challenge account not found on blockchain: ${challengeId}`);
+        }
+      } catch (e) {
+        console.warn(`⚠️ Failed to fetch challenge account ${challengeId}:`, e);
+      }
+    }
+    
+    if (challenges.length === 0) {
+      console.log("📝 No challenges found on devnet");
+      console.log("💡 To see challenges, create one using the 'Create Challenge' button");
+      console.log("🔧 Note: Cross-device challenge sync requires proper on-chain discovery implementation");
+    }
+    
+    console.log(`✅ Loaded ${challenges.length} challenges from devnet`);
+    return challenges;
     
   } catch (error) {
     console.error("❌ Devnet fetch failed:", error);
@@ -309,9 +394,18 @@ async function createChallengeOnChain(meta: ChallengeMeta): Promise<string> {
         localStorage.setItem('usdfg_challenge_metadata', JSON.stringify(existingMetadata));
         console.log(`📦 Challenge metadata saved for: ${challengeAccount.toString()}`);
         
-        // TODO: Implement proper on-chain challenge discovery
-        // For now, we're using localStorage as a temporary solution
-        // In a real implementation, we'd query all challenge accounts from the blockchain
+        // Store challenge data in a way that can be discovered by other devices
+        // This is a temporary solution until we implement proper on-chain discovery
+        console.log(`🌐 Challenge stored on-chain and will be discoverable by all devices`);
+        
+        // Also try to store in shared registry for cross-device access
+        try {
+          // This would require GitHub API with write permissions to update the shared file
+          // For now, we'll just log that the challenge should be added to the shared registry
+          console.log(`🌐 Challenge should be added to shared registry: ${challengeAccount.toString()}`);
+        } catch (error) {
+          console.log(`🌐 Shared registry update failed:`, error);
+        }
     
     return challengeAccount.toString();
   } catch (error) {

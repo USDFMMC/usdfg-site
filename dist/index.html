@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>USDFGAMING – Skill-Based Crypto Gaming Platform | Game. Earn. Conquer.</title>
+    <meta name="description" content="USDFGAMING is the elite, skill-based crypto gaming platform. Compete in verified challenges, earn $USDFG, and prove your skill. No gambling. No chance. 100% on-chain rewards." />
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="USDFGAMING – Skill-Based Crypto Gaming Platform" />
+    <meta property="og:description" content="Compete in verified challenges, earn $USDFG, and prove your skill. No gambling, 100% on-chain." />
+    <meta property="og:image" content="https://usdfg.pro/assets/usdfg-challenge-simple-144.png?v=24" />
+    <meta property="og:url" content="https://usdfg.pro/" />
+    
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="USDFGAMING – Skill-Based Crypto Gaming Platform" />
+    <meta name="twitter:description" content="Compete in verified challenges, earn $USDFG, and prove your skill. No gambling, 100% on-chain." />
+    <meta name="twitter:image" content="https://usdfg.pro/assets/usdfg-challenge-simple-144.png?v=24" />
+    <link rel="icon" type="image/png" href="/assets/usdfg-logo-transparent.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#0B0F1A" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="USDFG Arena" />
+    <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700&family=Chakra+Petch:wght@700&display=swap" rel="stylesheet">
+    <script>
+      // Simple Buffer polyfill for Solana web3.js
+      if (typeof globalThis.Buffer === 'undefined') {
+        globalThis.Buffer = {
+          from: (data, encoding) => new Uint8Array(new TextEncoder().encode(data)),
+          isBuffer: () => false,
+          alloc: (size) => new Uint8Array(size),
+          concat: (arrays) => {
+            const totalLength = arrays.reduce((sum, arr) => sum + arr.length, 0);
+            const result = new Uint8Array(totalLength);
+            let offset = 0;
+            for (const arr of arrays) {
+              result.set(arr, offset);
+              offset += arr.length;
+            }
+            return result;
+          }
+        };
+      }
+    </script>
+    <script type="module" crossorigin src="/assets/index-a8xlu0kV.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/vendor-DAtjdg_E.js">
+    <link rel="modulepreload" crossorigin href="/assets/ui-fFnAVTM0.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-B2kCBJA2.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      // Register service worker for PWA functionality
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('SW registered: ', registration);
+            })
+            .catch((registrationError) => {
+              console.log('SW registration failed: ', registrationError);
+            });
+        });
+      }
+
+      // Crosshair functionality - runs after DOM loads
+      document.addEventListener('DOMContentLoaded', () => {
+        let horizontal, vertical;
+
+        const initCrosshair = () => {
+          horizontal = document.querySelector('.crosshair-horizontal');
+          vertical = document.querySelector('.crosshair-vertical');
+        };
+
+        const handleMouseMove = (e) => {
+          if (horizontal && vertical) {
+            horizontal.style.opacity = '0.6';
+            vertical.style.opacity = '0.6';
+            horizontal.style.top = e.clientY + 'px';
+            vertical.style.left = e.clientX + 'px';
+          }
+        };
+
+        const handleMouseLeave = () => {
+          if (horizontal && vertical) {
+            horizontal.style.opacity = '0';
+            vertical.style.opacity = '0';
+          }
+        };
+
+        // Initialize when component loads
+        const checkForCrosshair = () => {
+          if (document.querySelector('.crosshair-container')) {
+            initCrosshair();
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseleave', handleMouseLeave);
+          } else {
+            // Check again in 100ms if crosshair isn't ready yet
+            setTimeout(checkForCrosshair, 100);
+          }
+        };
+
+        checkForCrosshair();
+      });
+    </script>
+  </body>
+</html> 
