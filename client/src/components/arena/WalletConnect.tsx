@@ -44,6 +44,7 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
         setAddress(pubkey);
         onConnect();
         // Fetch balance in background
+        console.log("💰 Initial balance fetch for:", pubkey.slice(0, 8) + "...");
         getSOLBalance(pubkey)
           .then(balance => {
             console.log("💰 Balance loaded:", balance);
@@ -85,15 +86,23 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
 
   // Auto-refresh SOL balance every 15 seconds
   useEffect(() => {
-    if (!address) return;
+    if (!address) {
+      console.log("🔄 Auto-refresh: No address, skipping");
+      return;
+    }
     
+    console.log("🔄 Auto-refresh: Starting for address:", address.slice(0, 8) + "...");
     let stop = false;
+    
     const fetchBalance = async () => {
       try {
+        console.log("🔄 Auto-refresh: Fetching balance...");
         const provider = await getProvider();
         const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
         const balanceLamports = await connection.getBalance(provider.publicKey);
         const balance = balanceLamports / LAMPORTS_PER_SOL;
+        console.log("🔄 Auto-refresh: Raw balance:", balanceLamports, "lamports =", balance, "SOL");
+        
         if (!stop) {
           setBalance(balance);
           console.log("🔄 Balance auto-refreshed:", balance.toFixed(4), "SOL");
@@ -104,11 +113,15 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
     };
     
     // Initial fetch
+    console.log("🔄 Auto-refresh: Initial fetch");
     fetchBalance();
+    
     // Set up interval
+    console.log("🔄 Auto-refresh: Setting up 15s interval");
     const iv = setInterval(fetchBalance, 15000); // every 15s
     
     return () => { 
+      console.log("🔄 Auto-refresh: Cleanup");
       stop = true; 
       clearInterval(iv); 
     };
@@ -124,8 +137,10 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
       onConnect();
       
       // Fetch balance with better error handling
+      console.log("💰 Manual connect - fetching balance for:", pubkey.slice(0, 8) + "...");
       try {
         const bal = await getSOLBalance(pubkey);
+        console.log("💰 Manual connect - balance loaded:", bal);
         setBalance(bal);
       } catch (balanceErr) {
         console.error("❌ Balance fetch failed:", balanceErr);
