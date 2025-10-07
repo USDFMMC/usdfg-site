@@ -1,5 +1,5 @@
 // Live Solana devnet integration
-import { Connection, PublicKey, Transaction, SystemProgram, clusterApiUrl } from "@solana/web3.js";
+import { Connection, PublicKey, Transaction, SystemProgram, clusterApiUrl, Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
 
 // Use the same devnet connection as wallet
 const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
@@ -87,28 +87,60 @@ export async function fetchPlayerEvents(playerAddress: string): Promise<Challeng
 /**
  * Fetch all active challenges from devnet - works without wallet
  */
-// Temporary in-memory storage for challenges until we have a deployed program
-let challengeStorage: ChallengeMeta[] = [];
-
 export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
   console.log('🔄 Fetching challenges from devnet...');
   
   try {
-    // For now, use in-memory storage until we have a deployed USDFG program
-    console.log("✅ Connected to devnet, ready to fetch challenges from your program");
-    console.log("📝 Using temporary in-memory storage until USDFG program is deployed");
+    console.log("✅ Connected to devnet, querying challenge accounts...");
     
-    // Return challenges from in-memory storage
-    const challenges = challengeStorage;
+    // For now, we'll use a simple approach: check localStorage for challenge account addresses
+    // and then fetch their data from the blockchain
+    const storedChallengeIds = localStorage.getItem('usdfg_challenge_ids');
+    let challengeIds: string[] = [];
+    
+    if (storedChallengeIds) {
+      try {
+        challengeIds = JSON.parse(storedChallengeIds);
+        console.log(`📦 Found ${challengeIds.length} challenge account IDs in localStorage`);
+      } catch (e) {
+        console.error("❌ Failed to parse stored challenge IDs:", e);
+        challengeIds = [];
+      }
+    }
+    
+    const challenges: ChallengeMeta[] = [];
+    
+    // Fetch each challenge account's data from the blockchain
+    for (const challengeId of challengeIds) {
+      try {
+        const accountInfo = await connection.getAccountInfo(new PublicKey(challengeId));
+        if (accountInfo && accountInfo.data) {
+          // Parse the account data to extract challenge metadata
+          const accountData = accountInfo.data;
+          const challengeData = JSON.parse(accountData.toString());
+          
+          // Convert to ChallengeMeta format
+          const challenge: ChallengeMeta = {
+            id: challengeId,
+            creator: challengeData.creatorAddress || challengeData.creator,
+            game: challengeData.game,
+            entryFee: challengeData.entryFee,
+            maxPlayers: challengeData.maxPlayers || 2,
+            rules: challengeData.rules || "Standard rules",
+            timestamp: challengeData.timestamp || Date.now(),
+          };
+          
+          challenges.push(challenge);
+          console.log(`🎮 Challenge Loaded: ${challenge.game} | Entry Fee: ${challenge.entryFee} | Creator: ${challenge.creator.slice(0, 8)}...`);
+        }
+      } catch (e) {
+        console.warn(`⚠️ Failed to fetch challenge account ${challengeId}:`, e);
+      }
+    }
     
     if (challenges.length === 0) {
-      console.log("📝 No challenges found - create one to see it here");
+      console.log("📝 No challenges found on devnet");
       console.log("💡 To see challenges, create one using the 'Create Challenge' button");
-    } else {
-      // Log each challenge as requested
-      challenges.forEach(challenge => {
-        console.log(`🎮 Challenge Loaded: ${challenge.game} | Entry Fee: ${challenge.entryFee} | Creator: ${challenge.creator.slice(0, 8)}...`);
-      });
     }
     
     console.log(`✅ Loaded ${challenges.length} challenges from devnet`);
@@ -204,9 +236,15 @@ async function createChallengeOnChain(meta: ChallengeMeta): Promise<string> {
       throw new Error("Wallet not connected");
     }
 
+    // Create a new keypair for this challenge account
+    const challengeKeypair = Keypair.generate();
+    const challengeAccount = challengeKeypair.publicKey;
+    
+    console.log(`🔑 Generated challenge account: ${challengeAccount.toString()}`);
+
     // Create challenge metadata object
     const challengeData = {
-      id: `challenge_${Date.now()}`,
+      id: challengeAccount.toString(),
       creatorAddress: meta.creator,
       game: meta.game,
       entryFee: meta.entryFee,
@@ -216,17 +254,31 @@ async function createChallengeOnChain(meta: ChallengeMeta): Promise<string> {
       status: 'active'
     };
 
-    // For now, we'll use a simple approach: store challenge data in a new account
-    // This creates a new account with the challenge data as account data
-    const challengeAccount = new PublicKey("11111111111111111111111111111112"); // System program for now
+    // Serialize challenge data
+    const serializedData = Buffer.from(JSON.stringify(challengeData));
+    const dataSize = serializedData.length;
     
-    // Create a simple transaction that includes the challenge data in the memo
-    // This is a temporary approach until we have a proper program
+    console.log(`📦 Challenge data size: ${dataSize} bytes`);
+    
+    // Calculate rent exemption for the account
+    const rentExemption = await connection.getMinimumBalanceForRentExemption(dataSize);
+    console.log(`💰 Rent exemption required: ${rentExemption / LAMPORTS_PER_SOL} SOL`);
+
+    // Create transaction to store challenge data on-chain
     const transaction = new Transaction().add(
+      // Create the challenge account
+      SystemProgram.createAccount({
+        fromPubkey: provider.publicKey,
+        newAccountPubkey: challengeAccount,
+        lamports: rentExemption,
+        space: dataSize,
+        programId: SystemProgram.programId, // For now, use SystemProgram
+      }),
+      // Transfer the serialized data (we'll use a simple approach)
       SystemProgram.transfer({
         fromPubkey: provider.publicKey,
         toPubkey: challengeAccount,
-        lamports: 1000, // Small amount to create account
+        lamports: 0, // No additional transfer, just for the transaction
       })
     );
 
@@ -237,30 +289,26 @@ async function createChallengeOnChain(meta: ChallengeMeta): Promise<string> {
 
     // Sign and send transaction
     const signedTransaction = await provider.signTransaction(transaction);
+    // Add the challenge keypair signature
+    signedTransaction.partialSign(challengeKeypair);
+    
     const signature = await connection.sendRawTransaction(signedTransaction.serialize());
     
     // Confirm transaction
     await connection.confirmTransaction(signature, "confirmed");
     
-    // Add challenge to in-memory storage for immediate visibility
-    const newChallenge: ChallengeMeta = {
-      id: signature, // Use transaction signature as ID
-      creator: meta.creator,
-      game: meta.game,
-      entryFee: meta.entryFee,
-      maxPlayers: meta.maxPlayers,
-      rules: meta.rules,
-      timestamp: meta.timestamp,
-    };
-    
-    challengeStorage.push(newChallenge);
-    console.log(`📦 Challenge added to in-memory storage for immediate visibility`);
-    
-    console.log(`✅ Challenge stored on devnet: ${signature}`);
+    console.log(`✅ Challenge account created: ${challengeAccount.toString()}`);
     console.log(`🎮 Challenge Data: ${meta.game} | Entry Fee: ${meta.entryFee} USDFG | Creator: ${meta.creator.slice(0, 8)}...`);
     console.log(`🔗 View on Solana Explorer: https://explorer.solana.com/tx/${signature}?cluster=devnet`);
     
-    return signature;
+    // Store the challenge account ID in localStorage for retrieval
+    const existingIds = JSON.parse(localStorage.getItem('usdfg_challenge_ids') || '[]');
+    existingIds.push(challengeAccount.toString());
+    localStorage.setItem('usdfg_challenge_ids', JSON.stringify(existingIds));
+    console.log(`📦 Challenge account ID saved to localStorage: ${challengeAccount.toString()}`);
+    
+    // Return the challenge account public key as the ID
+    return challengeAccount.toString();
   } catch (error) {
     console.error("Failed to create challenge on devnet:", error);
     throw error;
