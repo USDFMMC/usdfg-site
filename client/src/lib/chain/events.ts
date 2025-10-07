@@ -498,3 +498,40 @@ export async function fetchEvents(): Promise<any[]> {
   
   return mockEvents;
 }
+
+/**
+ * Fetch player events for profile page
+ */
+export async function fetchPlayerEvents(playerAddress: string): Promise<any[]> {
+  console.log(`🔍 Fetching events for player: ${playerAddress}`);
+  
+  // Mock player events for now
+  const mockPlayerEvents = [
+    {
+      id: "1",
+      title: "Fighting Game Challenge",
+      date: "2024-01-15",
+      result: "win",
+      amount: 50,
+      game: "Street Fighter 6"
+    },
+    {
+      id: "2",
+      title: "Racing Challenge", 
+      date: "2024-01-14",
+      result: "loss",
+      amount: -25,
+      game: "F1 2023"
+    },
+    {
+      id: "3",
+      title: "Sports Challenge",
+      date: "2024-01-13", 
+      result: "win",
+      amount: 75,
+      game: "Madden 26"
+    }
+  ];
+  
+  return mockPlayerEvents;
+}
