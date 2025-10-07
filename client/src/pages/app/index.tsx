@@ -646,12 +646,16 @@ const ArenaHome: React.FC = () => {
                         {isOwner ? (
                           <div className="flex space-x-2">
                             <button 
-                              onClick={() => handleDeleteChallenge(challenge.id)}
+                              onClick={(e) => {
+                                e.stopPropagation(); // Prevent opening details modal
+                                handleDeleteChallenge(challenge.id);
+                              }}
                               className="flex-1 px-4 py-2 bg-red-600/20 text-red-400 border border-red-600/30 font-semibold rounded-lg hover:bg-red-600/30 transition-all"
                             >
                               🗑️ Delete
                             </button>
                             <button 
+                              onClick={(e) => e.stopPropagation()} // Prevent opening details modal
                               className="flex-1 px-4 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 font-semibold rounded-lg hover:bg-gray-600/30 transition-all"
                               disabled
                             >
