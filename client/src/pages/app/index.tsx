@@ -136,18 +136,18 @@ const ArenaHome: React.FC = () => {
     console.log("📋 Challenge data:", challengeData);
     
     try {
-      console.log("📦 Importing createChallenge function...");
-      const { createChallenge } = await import("@/lib/chain/events");
+      console.log("📦 Importing createChallengeOnChain function...");
+      const { createChallengeOnChain } = await import("@/lib/chain/events");
       
-      console.log("🚀 Calling createChallenge...");
-      const { optimistic, txPromise } = await createChallenge({
+      console.log("🚀 Calling createChallengeOnChain...");
+      const challengeId = await createChallengeOnChain({
         game: challengeData.game,
         entryFee: challengeData.entryFee,
         maxPlayers: 8,
         rules: challengeData.rules || ""
       });
       
-      console.log("✅ Optimistic challenge created:", optimistic);
+      console.log("✅ Challenge created successfully:", challengeId);
       
       // Show optimistic challenge immediately
       const platformFee = 0.05; // 5% platform fee
@@ -164,8 +164,8 @@ const ArenaHome: React.FC = () => {
       };
       
         const optimisticChallenge = {
-          id: optimistic.clientId,
-          clientId: optimistic.clientId,
+          id: challengeId,
+          clientId: challengeId,
           title: `${challengeData.game} ${challengeData.mode === 'Custom Mode' ? challengeData.customMode : challengeData.mode}`,
           game: challengeData.game,
           mode: challengeData.mode === 'Custom Mode' ? challengeData.customMode : challengeData.mode,
