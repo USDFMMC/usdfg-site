@@ -59,25 +59,25 @@ const WalletConnect: React.FC<WalletConnectProps> = ({
       // Listen to wallet events
       try {
         const provider = await getProvider();
-        const onConnect = (e: any) => {
+        const handleWalletConnect = (e: any) => {
           const pubkey = provider.publicKey?.toString();
           if (pubkey) {
             console.log("🔗 Wallet connected:", pubkey.slice(0, 8) + "...");
             setAddress(pubkey);
-            onConnect();
+            onConnect(); // Call the prop function
           }
         };
-        const onDisconnect = () => {
+        const handleWalletDisconnect = () => {
           console.log("🔌 Wallet disconnected");
           setAddress(null);
           setBalance(null);
-          onDisconnect();
+          onDisconnect(); // Call the prop function
         };
-        provider.on("connect", onConnect);
-        provider.on("disconnect", onDisconnect);
+        provider.on("connect", handleWalletConnect);
+        provider.on("disconnect", handleWalletDisconnect);
         unsub = () => {
-          provider.off("connect", onConnect);
-          provider.off("disconnect", onDisconnect);
+          provider.off("connect", handleWalletConnect);
+          provider.off("disconnect", handleWalletDisconnect);
         };
       } catch {/* phantom not present */}
     })();
