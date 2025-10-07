@@ -270,7 +270,13 @@ const ArenaHome: React.FC = () => {
 
   const isChallengeOwner = (challenge: any) => {
     const currentWallet = getWalletPublicKey();
-    return currentWallet && challenge.creator === currentWallet;
+    const isOwner = currentWallet && challenge.creator === currentWallet;
+    console.log("🔍 Ownership check:", {
+      currentWallet: currentWallet ? currentWallet.slice(0, 8) + "..." : "null",
+      challengeCreator: challenge.creator ? challenge.creator.slice(0, 8) + "..." : "null",
+      isOwner
+    });
+    return isOwner;
   };
 
   // Filter challenges based on selected filters

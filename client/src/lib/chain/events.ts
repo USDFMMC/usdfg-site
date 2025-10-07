@@ -96,7 +96,10 @@ export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
     
     // Get challenge account IDs from localStorage (temporary tracking)
     const storedChallengeIds = localStorage.getItem('usdfg_challenge_ids');
+    const storedChallenges = localStorage.getItem('usdfg_challenge_metadata');
+    
     let challengeIds: string[] = [];
+    let challengeMetadata: any[] = [];
     
     if (storedChallengeIds) {
       try {
@@ -108,31 +111,55 @@ export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
       }
     }
     
+    if (storedChallenges) {
+      try {
+        challengeMetadata = JSON.parse(storedChallenges);
+        console.log(`📦 Found ${challengeMetadata.length} challenge metadata entries`);
+      } catch (e) {
+        console.error("❌ Failed to parse stored challenge metadata:", e);
+        challengeMetadata = [];
+      }
+    }
+    
     const challenges: ChallengeMeta[] = [];
     
-    // Query each challenge account from the blockchain
+    // Query each challenge account from the blockchain and match with metadata
     for (const challengeId of challengeIds) {
       try {
         const accountInfo = await connection.getAccountInfo(new PublicKey(challengeId));
         if (accountInfo && accountInfo.data) {
           console.log(`✅ Found challenge account on blockchain: ${challengeId}`);
           
-          // For now, create a basic challenge from the account
-          // In a real implementation, we'd parse the account data to extract metadata
-          const challenge: ChallengeMeta = {
-            id: challengeId,
-            clientId: challengeId,
-            creator: "Unknown", // Would be parsed from account data
-            game: "Unknown Game", // Would be parsed from account data
-            entryFee: 0, // Would be parsed from account data
-            maxPlayers: 8,
-            rules: "No rules specified", // Would be parsed from account data
-            timestamp: Date.now(),
-            expiresAt: Date.now() + (2 * 60 * 60 * 1000) // Default 2 hours
-          };
+          // Find matching metadata for this challenge
+          const metadata = challengeMetadata.find(m => m.id === challengeId);
           
-          challenges.push(challenge);
-          console.log(`🎮 Challenge Loaded: ${challenge.game} | Entry Fee: ${challenge.entryFee} | Creator: ${challenge.creator.slice(0, 8)}...`);
+          if (metadata) {
+            // Check if challenge has expired (2 hours)
+            const now = Date.now();
+            const isExpired = metadata.expiresAt && now > metadata.expiresAt;
+            
+            if (isExpired) {
+              console.log(`⏰ Challenge expired: ${challengeId} (expired at ${new Date(metadata.expiresAt).toISOString()})`);
+              continue; // Skip expired challenges
+            }
+            
+            const challenge: ChallengeMeta = {
+              id: challengeId,
+              clientId: challengeId,
+              creator: metadata.creator || "Unknown",
+              game: metadata.game || "Unknown Game",
+              entryFee: metadata.entryFee || 0,
+              maxPlayers: metadata.maxPlayers || 8,
+              rules: metadata.rules || "No rules specified",
+              timestamp: metadata.timestamp || Date.now(),
+              expiresAt: metadata.expiresAt || (Date.now() + (2 * 60 * 60 * 1000)) // Default 2 hours if not set
+            };
+            
+            challenges.push(challenge);
+            console.log(`🎮 Challenge Loaded: ${challenge.game} | Entry Fee: ${challenge.entryFee} | Creator: ${challenge.creator.slice(0, 8)}... | Expires: ${new Date(challenge.expiresAt).toLocaleTimeString()}`);
+          } else {
+            console.warn(`⚠️ No metadata found for challenge ${challengeId}`);
+          }
         } else {
           console.log(`❌ Challenge account not found on blockchain: ${challengeId}`);
         }
