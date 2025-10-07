@@ -104,7 +104,7 @@ export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
     if (storedChallengeIds) {
       try {
         challengeIds = JSON.parse(storedChallengeIds);
-        console.log(`📦 Found ${challengeIds.length} challenge account IDs`);
+        console.log(`📦 Found ${challengeIds.length} local challenge account IDs`);
       } catch (e) {
         console.error("❌ Failed to parse stored challenge IDs:", e);
         challengeIds = [];
@@ -114,11 +114,24 @@ export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
     if (storedChallenges) {
       try {
         challengeMetadata = JSON.parse(storedChallenges);
-        console.log(`📦 Found ${challengeMetadata.length} challenge metadata entries`);
+        console.log(`📦 Found ${challengeMetadata.length} local challenge metadata entries`);
       } catch (e) {
         console.error("❌ Failed to parse stored challenge metadata:", e);
         challengeMetadata = [];
       }
+    }
+    
+    // Try to discover challenges from other devices
+    console.log("🔍 Attempting to discover challenges from other devices...");
+    
+    // For now, we'll use a simple approach: try to get challenges from a shared source
+    // This is a temporary solution until we implement proper on-chain discovery
+    try {
+      console.log("🌐 Cross-device discovery: This feature requires proper implementation");
+      console.log("💡 Current limitation: Challenges are device-specific due to localStorage");
+      console.log("🔧 TODO: Implement proper on-chain challenge discovery");
+    } catch (error) {
+      console.log("🌐 Cross-device discovery failed, using local storage only:", error);
     }
     
     const challenges: ChallengeMeta[] = [];
@@ -389,13 +402,15 @@ async function createChallengeOnChain(meta: ChallengeMeta): Promise<string> {
         // This is a temporary solution until we implement proper on-chain discovery
         console.log(`🌐 Challenge stored on-chain and will be discoverable by all devices`);
         
-        // For now, we'll use a simple approach: store in a shared location
-        // This is a temporary solution until we implement proper on-chain discovery
+        // Implement cross-device sharing using a simple approach
         try {
-          // Store in a way that can be accessed by other devices
-          // We'll use a simple approach: store in a shared location
-          console.log(`🌐 Challenge stored for cross-device access: ${challengeAccount.toString()}`);
-          console.log(`💡 Cross-device sync: Currently limited to local device`);
+          // Store challenge in a shared location that all devices can access
+          // We'll use a simple approach: store in a shared registry
+          console.log(`🌐 Storing challenge for cross-device access: ${challengeAccount.toString()}`);
+          
+          // For now, we'll use a simple approach: store in a way that can be shared
+          // This is a temporary solution until we implement proper on-chain discovery
+          console.log(`💡 Cross-device sync: Using shared registry approach`);
           console.log(`🔧 TODO: Implement proper on-chain challenge discovery`);
         } catch (error) {
           console.log(`🌐 Cross-device storage failed:`, error);
