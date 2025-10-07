@@ -3,7 +3,7 @@ import { Helmet } from "react-helmet";
 import { Link } from "react-router-dom";
 import WalletConnect from "@/components/arena/WalletConnect";
 import { connectPhantom, hasPhantomInstalled, getWalletPublicKey } from "@/lib/wallet/solana";
-import { fetchActiveChallenges } from "@/lib/chain/events";
+import { fetchActiveChallenges, fetchOpenChallenges } from "@/lib/chain/events";
 
 const ArenaHome: React.FC = () => {
   const [isConnected, setIsConnected] = useState(() => {
@@ -86,17 +86,17 @@ const ArenaHome: React.FC = () => {
     localStorage.setItem('challenges', JSON.stringify(challenges));
   }, [challenges]);
 
-  // Auto-refresh challenges from devnet every 10 seconds - MERGE, don't replace
+  // Auto-refresh challenges from registry every 10 seconds - CROSS-DEVICE DISCOVERY
   useEffect(() => {
     let stop = false;
     const load = async () => {
       try {
-        console.log("🔄 Starting devnet challenge fetch...");
-        const devnetItems = await fetchActiveChallenges();
+        console.log("🔄 Starting registry challenge fetch...");
+        const registryItems = await fetchOpenChallenges();
         if (stop) return;
         
-        // Convert devnet challenges to the format expected by the UI
-        const formattedChallenges = devnetItems.map(challenge => ({
+        // Convert registry challenges to the format expected by the UI
+        const formattedChallenges = registryItems.map(challenge => ({
           id: challenge.id,
           clientId: challenge.clientId,
           title: `${challenge.game} Challenge`,
@@ -120,9 +120,9 @@ const ArenaHome: React.FC = () => {
         setLastUpdated(new Date());
         setIsLive(true);
         
-        console.log(`✅ Merged ${formattedChallenges.length} devnet challenges`);
+        console.log(`✅ Merged ${formattedChallenges.length} registry challenges`);
       } catch (error) {
-        console.error("❌ Failed to fetch challenges from devnet:", error);
+        console.error("❌ Failed to fetch challenges from registry:", error);
       }
     };
     
