@@ -211,11 +211,10 @@ export const joinChallenge = async (challengeId: string, playerId: string) => {
 };
 
 // Real-time active challenge functions
-const challengesCol = collection(db, "challenges");
 
 // Create challenge (status now 'active')
 export async function addChallengeDoc(data: any) {
-  const docRef = await addDoc(challengesCol, {
+  const docRef = await addDoc(collection(db, "challenges"), {
     ...data,
     status: "active",
     createdAt: serverTimestamp(),
@@ -227,7 +226,7 @@ export async function addChallengeDoc(data: any) {
 
 // Listen only to active/pending for a specific creator wallet
 export function listenActiveForCreator(creator: string, cb: (active: any[]) => void) {
-  const q = query(challengesCol, where("creator", "==", creator), where("status", "in", ["active", "pending"]));
+  const q = query(collection(db, "challenges"), where("creator", "==", creator), where("status", "in", ["active", "pending"]));
   return onSnapshot(q, (snap) => {
     const active = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     console.log('🔒 Active challenges for creator:', active.length);
