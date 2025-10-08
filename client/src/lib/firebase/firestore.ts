@@ -81,7 +81,10 @@ export const updateChallenge = async (challengeId: string, updates: Partial<Chal
 export const updateChallengeStatus = async (challengeId: string, status: 'active' | 'pending' | 'completed' | 'cancelled' | 'disputed') => {
   try {
     const challengeRef = doc(db, 'challenges', challengeId);
-    await updateDoc(challengeRef, { status });
+    await updateDoc(challengeRef, { 
+      status,
+      updatedAt: serverTimestamp()
+    });
     console.log('✅ Challenge status updated:', challengeId, 'to', status);
   } catch (error) {
     console.error('❌ Error updating challenge status:', error);
@@ -232,14 +235,6 @@ export function listenActiveForCreator(creator: string, cb: (active: any[]) => v
   });
 }
 
-// Update status with timestamp
-export async function updateChallengeStatus(id: string, status: "active" | "pending" | "completed" | "cancelled" | "disputed") {
-  await updateDoc(doc(db, "challenges", id), {
-    status,
-    updatedAt: serverTimestamp(),
-  });
-  console.log('✅ Challenge status updated:', id, 'to', status);
-}
 
 // Archive (move doc then delete from active)
 export async function archiveChallenge(id: string) {
