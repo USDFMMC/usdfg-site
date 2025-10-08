@@ -5,8 +5,8 @@ import WalletConnect from "@/components/arena/WalletConnect";
 import { connectPhantom, hasPhantomInstalled, getWalletPublicKey } from "@/lib/wallet/solana";
 import { fetchActiveChallenges, fetchOpenChallenges } from "@/lib/chain/events";
 import { useChallenges } from "@/hooks/useChallenges";
-import { useActiveChallenge } from "@/hooks/useActiveChallenge";
-import { ChallengeData, addChallengeDoc, updateChallengeStatus, archiveChallenge } from "@/lib/firebase/firestore";
+import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
+import { ChallengeData } from "@/lib/firebase/firestore";
 import { testFirestoreConnection } from "@/lib/firebase/firestore";
 
 const ArenaHome: React.FC = () => {
@@ -67,10 +67,8 @@ const ArenaHome: React.FC = () => {
   // Use Firestore real-time challenges
   const { challenges: firestoreChallenges, loading: challengesLoading, error: challengesError } = useChallenges();
   
-  // Real-time active challenge tracking
-  const currentWallet = getWalletPublicKey();
-  const { active: activeMine, loading: activeLoading } = useActiveChallenge(currentWallet);
-  const hasActive = (activeMine?.length ?? 0) > 0;
+  // Auto-expire challenges after 2 hours
+  useChallengeExpiry(firestoreChallenges);
   
   // Convert Firestore challenges to the format expected by the UI
   const challenges = firestoreChallenges.map(challenge => ({
@@ -115,10 +113,14 @@ const ArenaHome: React.FC = () => {
         throw new Error("Wallet not connected");
       }
 
-      // 🔒 Real-time check for active challenges
-      if (hasActive) {
+      // 🔍 Check if the user already has an active challenge
+      const existingActive = challenges.find(
+        c => c.creator === currentWallet && (c.status === 'active' || c.status === 'pending')
+      );
+
+      if (existingActive) {
         alert("You already have an active challenge. Complete or delete it before creating a new one.");
-        console.log("🚫 Creation blocked: User has active challenge");
+        console.log("❌ Blocked: User already has active challenge:", existingActive.id);
         return;
       }
 
@@ -152,10 +154,10 @@ const ArenaHome: React.FC = () => {
       };
       
       // Create Firestore challenge data
+      const { addChallenge } = await import("@/lib/firebase/firestore");
       const { Timestamp } = await import("firebase/firestore");
       
       const firestoreChallengeData = {
-        title: `${challengeData.game} ${challengeData.mode}`,
         creator: currentWallet,
         creatorTag: challengeData.username,
         game: challengeData.game,
@@ -164,6 +166,7 @@ const ArenaHome: React.FC = () => {
         entryFee: challengeData.entryFee,
         maxPlayers: 8,
         rules: challengeData.rules || "",
+        status: 'active' as const,
         players: [currentWallet],
         expiresAt: Timestamp.fromDate(new Date(Date.now() + (2 * 60 * 60 * 1000))), // 2 hours from now
         solanaAccountId: challengeId,
@@ -172,7 +175,7 @@ const ArenaHome: React.FC = () => {
       };
       
       console.log("🔥 Adding challenge to Firestore...");
-      const firestoreId = await addChallengeDoc(firestoreChallengeData);
+      const firestoreId = await addChallenge(firestoreChallengeData);
       console.log("✅ Challenge added to Firestore with ID:", firestoreId);
       
       // The real-time listener will automatically update the UI
@@ -202,31 +205,6 @@ const ArenaHome: React.FC = () => {
     }
   };
 
-  // Completion and cancel actions
-  const completeChallenge = async (challengeId: string) => {
-    console.log("✅ Completing challenge:", challengeId);
-    try {
-      await updateChallengeStatus(challengeId, "completed");
-      await archiveChallenge(challengeId);
-      console.log("✅ Challenge completed and archived");
-    } catch (error) {
-      console.error("❌ Failed to complete challenge:", error);
-      alert("Failed to complete challenge: " + (error instanceof Error ? error.message : "Unknown error"));
-    }
-  };
-
-  const cancelChallenge = async (challengeId: string) => {
-    console.log("❌ Cancelling challenge:", challengeId);
-    try {
-      await updateChallengeStatus(challengeId, "cancelled");
-      await archiveChallenge(challengeId);
-      console.log("✅ Challenge cancelled and archived");
-    } catch (error) {
-      console.error("❌ Failed to cancel challenge:", error);
-      alert("Failed to cancel challenge: " + (error instanceof Error ? error.message : "Unknown error"));
-    }
-  };
-
   const isChallengeOwner = (challenge: any) => {
     const currentWallet = getWalletPublicKey();
     const isOwner = currentWallet && challenge.creator === currentWallet;
@@ -250,27 +228,11 @@ const ArenaHome: React.FC = () => {
   const uniqueGames = ['All', ...Array.from(new Set(challenges.map(c => c.game)))];
   const categories = ['All', 'Fighting', 'Sports', 'Shooting', 'Racing'];
 
-  // Real-time active challenge check (already defined above)
-  console.log("🔍 Active challenge status:", { hasActive, activeCount: activeMine?.length || 0 });
-
-  // Auto-expire challenges after 2 hours
-  useEffect(() => {
-    if (!challenges?.length) return;
-    
-    const now = Date.now();
-    challenges.forEach(async (c: any) => {
-      const exp = c.expiresAt?.toMillis ? c.expiresAt.toMillis() : c.expiresAt;
-      if (c.status === "active" && exp && exp < now) {
-        console.log("⏰ Auto-expiring challenge:", c.id);
-        try {
-          await updateChallengeStatus(c.id, "completed");
-          await archiveChallenge(c.id);
-        } catch (error) {
-          console.error("❌ Failed to auto-expire challenge:", error);
-        }
-      }
-    });
-  }, [challenges]);
+  // Check if user has active challenge (for button disable logic)
+  const currentWallet = getWalletPublicKey();
+  const hasActiveChallenge = currentWallet && challenges.some(
+    c => c.creator === currentWallet && (c.status === 'active' || c.status === 'pending')
+  );
 
   return (
     <>
@@ -297,18 +259,18 @@ const ArenaHome: React.FC = () => {
               <div className="flex items-center space-x-4">
                 <button 
                   onClick={() => {
-                    if (hasActive) {
+                    if (hasActiveChallenge) {
                       alert("You already have an active challenge. Complete or delete it before creating a new one.");
                       return;
                     }
                     console.log("🔥 CREATE CHALLENGE BUTTON CLICKED!");
                     setShowCreateModal(true);
                   }}
-                  disabled={hasActive}
-                  className={`elite-btn neocore-button ${hasActive ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  title={hasActive ? "You already have an active challenge" : "Create a new challenge"}
+                  disabled={hasActiveChallenge}
+                  className={`elite-btn neocore-button ${hasActiveChallenge ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  title={hasActiveChallenge ? "You already have an active challenge" : "Create a new challenge"}
                 >
-                  {hasActive ? "Active Challenge" : "Create Challenge"}
+                  {hasActiveChallenge ? "Active Challenge" : "Create Challenge"}
                 </button>
                 <WalletConnect 
                   isConnected={isConnected}
@@ -517,7 +479,7 @@ const ArenaHome: React.FC = () => {
                     return (
                       <div 
                         key={challenge.id} 
-                        className="challenge-card p-4 cursor-pointer hover:bg-background-2/40 transition-colors"
+                        className={`challenge-card p-4 cursor-pointer hover:bg-background-2/40 transition-colors ${challenge.status === "completed" ? "challenge-expired" : ""}`}
                         onClick={() => {
                           setSelectedChallenge(challenge);
                           setShowDetailsModal(true);
@@ -553,9 +515,16 @@ const ArenaHome: React.FC = () => {
                               )}
                             </div>
                           </div>
-                          <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
-                            Active
-                          </span>
+                          {challenge.status === "active" && (
+                            <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
+                              Active
+                            </span>
+                          )}
+                          {challenge.status === "completed" && (
+                            <span className="px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs animate-pulse">
+                              Expired
+                            </span>
+                          )}
                         </div>
                         
                         <div className="grid grid-cols-3 gap-4 mb-4">
