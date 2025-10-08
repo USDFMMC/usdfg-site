@@ -10,7 +10,6 @@ import {
   where,
   getDocs,
   Timestamp,
-  serverTimestamp,
   writeBatch
 } from 'firebase/firestore';
 import { db } from './config';
@@ -28,6 +27,7 @@ export async function testFirestoreConnection() {
 }
 
 // Collection references
+export const challengesCollection = collection(db, 'challenges');
 export const usersCollection = collection(db, 'users');
 
 // Challenge interfaces
@@ -53,7 +53,7 @@ export interface ChallengeData {
 // Challenge operations
 export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'createdAt'>) => {
   try {
-    const docRef = await addDoc(collection(db, "challenges"), {
+    const docRef = await addDoc(challengesCollection, {
       ...challengeData,
       createdAt: Timestamp.now(),
       players: [challengeData.creator], // Creator is first player
@@ -80,10 +80,7 @@ export const updateChallenge = async (challengeId: string, updates: Partial<Chal
 export const updateChallengeStatus = async (challengeId: string, status: 'active' | 'pending' | 'completed' | 'cancelled' | 'disputed') => {
   try {
     const challengeRef = doc(db, 'challenges', challengeId);
-    await updateDoc(challengeRef, { 
-      status,
-      updatedAt: serverTimestamp()
-    });
+    await updateDoc(challengeRef, { status });
     console.log('✅ Challenge status updated:', challengeId, 'to', status);
   } catch (error) {
     console.error('❌ Error updating challenge status:', error);
@@ -104,7 +101,7 @@ export const deleteChallenge = async (challengeId: string) => {
 
 // Real-time listeners
 export const listenToChallenges = (callback: (challenges: ChallengeData[]) => void) => {
-  const q = query(collection(db, "challenges"), orderBy('createdAt', 'desc'));
+  const q = query(challengesCollection, orderBy('createdAt', 'desc'));
   
   return onSnapshot(q, (snapshot) => {
     const challenges = snapshot.docs.map(doc => ({
@@ -121,7 +118,7 @@ export const listenToChallenges = (callback: (challenges: ChallengeData[]) => vo
 
 export const listenToUserChallenges = (userId: string, callback: (challenges: ChallengeData[]) => void) => {
   const q = query(
-    collection(db, "challenges"), 
+    challengesCollection, 
     where('creator', '==', userId),
     orderBy('createdAt', 'desc')
   );
@@ -142,7 +139,7 @@ export const listenToUserChallenges = (userId: string, callback: (challenges: Ch
 // One-time fetch operations
 export const fetchChallenges = async (): Promise<ChallengeData[]> => {
   try {
-    const q = query(collection(db, "challenges"), orderBy('createdAt', 'desc'));
+    const q = query(challengesCollection, orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
     
     const challenges = snapshot.docs.map(doc => ({
@@ -161,7 +158,7 @@ export const fetchChallenges = async (): Promise<ChallengeData[]> => {
 export const fetchChallengeById = async (challengeId: string): Promise<ChallengeData | null> => {
   try {
     const challengeRef = doc(db, 'challenges', challengeId);
-    const snapshot = await getDocs(query(collection(db, "challenges"), where('__name__', '==', challengeId)));
+    const snapshot = await getDocs(query(challengesCollection, where('__name__', '==', challengeId)));
     
     if (snapshot.empty) {
       console.log('❌ Challenge not found:', challengeId);
@@ -210,22 +207,8 @@ export const joinChallenge = async (challengeId: string, playerId: string) => {
 };
 
 // Real-time active challenge functions
-
-// Create challenge (status now 'active')
-export async function addChallengeDoc(data: any) {
-  const docRef = await addDoc(collection(db, "challenges"), {
-    ...data,
-    status: "active",
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  console.log('✅ Challenge document created with ID:', docRef.id);
-  return docRef.id;
-}
-
-// Listen only to active/pending for a specific creator wallet
 export function listenActiveForCreator(creator: string, cb: (active: any[]) => void) {
-  const q = query(collection(db, "challenges"), where("creator", "==", creator), where("status", "in", ["active", "pending"]));
+  const q = query(challengesCollection, where("creator", "==", creator), where("status", "in", ["active", "pending"]));
   return onSnapshot(q, (snap) => {
     const active = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     console.log('🔒 Active challenges for creator:', active.length);
@@ -233,13 +216,22 @@ export function listenActiveForCreator(creator: string, cb: (active: any[]) => v
   });
 }
 
+export async function addChallengeDoc(data: any) {
+  const docRef = await addDoc(challengesCollection, {
+    ...data,
+    status: "active",
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+  });
+  console.log('✅ Challenge document created with ID:', docRef.id);
+  return docRef.id;
+}
 
-// Archive (move doc then delete from active)
 export async function archiveChallenge(id: string) {
   const src = doc(db, "challenges", id);
   const dst = doc(db, "challenges_archive", id);
   const batch = writeBatch(db);
-  batch.set(dst, { refId: id, movedAt: serverTimestamp() });
+  batch.set(dst, { refId: id, movedAt: Timestamp.now() });
   batch.delete(src);
   await batch.commit();
   console.log('🗄️ Challenge archived:', id);
