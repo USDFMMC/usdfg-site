@@ -76,6 +76,17 @@ export const updateChallenge = async (challengeId: string, updates: Partial<Chal
   }
 };
 
+export const updateChallengeStatus = async (challengeId: string, status: 'active' | 'pending' | 'completed' | 'cancelled' | 'disputed') => {
+  try {
+    const challengeRef = doc(db, 'challenges', challengeId);
+    await updateDoc(challengeRef, { status });
+    console.log('✅ Challenge status updated:', challengeId, 'to', status);
+  } catch (error) {
+    console.error('❌ Error updating challenge status:', error);
+    throw error;
+  }
+};
+
 export const deleteChallenge = async (challengeId: string) => {
   try {
     const challengeRef = doc(db, 'challenges', challengeId);

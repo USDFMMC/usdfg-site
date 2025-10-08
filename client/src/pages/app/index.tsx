@@ -109,6 +109,19 @@ const ArenaHome: React.FC = () => {
         throw new Error("Wallet not connected");
       }
 
+      // 🔍 Check if the user already has an active challenge
+      const existingActive = challenges.find(
+        c => c.creator === currentWallet && (c.status === 'active' || c.status === 'pending')
+      );
+
+      if (existingActive) {
+        alert("You already have an active challenge. Complete or delete it before creating a new one.");
+        console.log("❌ Blocked: User already has active challenge:", existingActive.id);
+        return;
+      }
+
+      console.log("✅ No active challenges found, proceeding with creation...");
+
       console.log("📦 Importing createChallengeOnChain function...");
       const { createChallengeOnChain } = await import("@/lib/chain/events");
       
@@ -149,7 +162,7 @@ const ArenaHome: React.FC = () => {
         entryFee: challengeData.entryFee,
         maxPlayers: 8,
         rules: challengeData.rules || "",
-        status: 'pending' as const,
+        status: 'active' as const,
         players: [currentWallet],
         expiresAt: Timestamp.fromDate(new Date(Date.now() + (2 * 60 * 60 * 1000))), // 2 hours from now
         solanaAccountId: challengeId,
@@ -211,6 +224,12 @@ const ArenaHome: React.FC = () => {
   const uniqueGames = ['All', ...Array.from(new Set(challenges.map(c => c.game)))];
   const categories = ['All', 'Fighting', 'Sports', 'Shooting', 'Racing'];
 
+  // Check if user has active challenge (for button disable logic)
+  const currentWallet = getWalletPublicKey();
+  const hasActiveChallenge = currentWallet && challenges.some(
+    c => c.creator === currentWallet && (c.status === 'active' || c.status === 'pending')
+  );
+
   return (
     <>
       <Helmet>
@@ -236,12 +255,18 @@ const ArenaHome: React.FC = () => {
               <div className="flex items-center space-x-4">
                 <button 
                   onClick={() => {
+                    if (hasActiveChallenge) {
+                      alert("You already have an active challenge. Complete or delete it before creating a new one.");
+                      return;
+                    }
                     console.log("🔥 CREATE CHALLENGE BUTTON CLICKED!");
                     setShowCreateModal(true);
                   }}
-                  className="elite-btn neocore-button"
+                  disabled={hasActiveChallenge}
+                  className={`elite-btn neocore-button ${hasActiveChallenge ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  title={hasActiveChallenge ? "You already have an active challenge" : "Create a new challenge"}
                 >
-                  Create Challenge
+                  {hasActiveChallenge ? "Active Challenge" : "Create Challenge"}
                 </button>
                 <WalletConnect 
                   isConnected={isConnected}
