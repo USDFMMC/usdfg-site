@@ -4,6 +4,9 @@ import { Link } from "react-router-dom";
 import WalletConnect from "@/components/arena/WalletConnect";
 import { connectPhantom, hasPhantomInstalled, getWalletPublicKey } from "@/lib/wallet/solana";
 import { fetchActiveChallenges, fetchOpenChallenges } from "@/lib/chain/events";
+import { useChallenges } from "@/hooks/useChallenges";
+import { ChallengeData } from "@/lib/firebase/firestore";
+import { testFirestoreConnection } from "@/lib/firebase/firestore";
 
 const ArenaHome: React.FC = () => {
   const [isConnected, setIsConnected] = useState(() => {
@@ -44,98 +47,68 @@ const ArenaHome: React.FC = () => {
     return () => clearInterval(priceInterval);
   }, [fetchUsdfgPrice]);
 
+  // Test Firestore connection on component mount
+  useEffect(() => {
+    console.log("🔥 Testing Firestore connection...");
+    testFirestoreConnection().then((connected) => {
+      if (connected) {
+        console.log("✅ Firebase Firestore is ready for real-time challenges!");
+      } else {
+        console.error("❌ Firebase connection failed - check your config");
+      }
+    });
+  }, []);
+
   // Helper function to convert USDFG to USD
   const usdfgToUsd = useCallback((usdfgAmount: number) => {
     return usdfgAmount * usdfgPrice;
   }, [usdfgPrice]);
-  // Load challenges from localStorage on mount
-  // Keep state as a Map for de-dupe & upsert
-  const [challengeMap, setChallengeMap] = useState<Map<string, any>>(new Map());
-  const [lastRefreshAt, setLastRefreshAt] = useState<number>(0);
+  // Use Firestore real-time challenges
+  const { challenges: firestoreChallenges, loading: challengesLoading, error: challengesError } = useChallenges();
   
-  // Helper to upsert challenges
-  const upsertMany = (items: any[]) => {
-    setChallengeMap((prev) => {
-      const next = new Map(prev);
-      for (const it of items) {
-        const key = it.id ?? it.clientId!;
-        next.set(key, { ...(next.get(key) || {}), ...it });
-      }
-      return next;
-    });
-  };
-  
-  // Convert map to array for rendering
-  const challenges = Array.from(challengeMap.values())
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  // Convert Firestore challenges to the format expected by the UI
+  const challenges = firestoreChallenges.map(challenge => ({
+    id: challenge.id,
+    clientId: challenge.id,
+    title: `${challenge.game} ${challenge.mode}`,
+    game: challenge.game,
+    mode: challenge.mode,
+    platform: challenge.platform,
+    username: challenge.creatorTag,
+    entryFee: challenge.entryFee,
+    prizePool: challenge.prizePool,
+    players: challenge.players.length,
+    capacity: challenge.maxPlayers,
+    category: challenge.category,
+    creator: challenge.creator,
+    rules: challenge.rules,
+    createdAt: challenge.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+    timestamp: challenge.createdAt?.toDate?.()?.getTime() || Date.now(),
+    expiresAt: challenge.expiresAt?.toDate?.()?.getTime() || (Date.now() + (2 * 60 * 60 * 1000)),
+    status: challenge.status
+  }));
   
   // Debug: Log challenges for debugging
-  console.log("🔍 Current challenges for display:", challenges.length);
-  console.log("🔍 Challenge map size:", challengeMap.size);
+  console.log("🔍 Current Firestore challenges for display:", challenges.length);
+  console.log("🔍 Challenges loading:", challengesLoading);
+  if (challengesError) {
+    console.error("❌ Challenges error:", challengesError);
+  }
   if (challenges.length > 0) {
     console.log("🔍 First challenge:", challenges[0]);
   }
-  
-  // No more default challenges - we're using live on-chain data only
-  // useEffect(() => {
-  //   // Default challenges removed - using live on-chain data only
-  // }, []);
-
-  // Save challenges to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem('challenges', JSON.stringify(challenges));
-  }, [challenges]);
-
-  // Auto-refresh challenges from registry every 10 seconds - CROSS-DEVICE DISCOVERY
-  useEffect(() => {
-    let stop = false;
-    const load = async () => {
-      try {
-        console.log("🔄 Starting registry challenge fetch...");
-        const registryItems = await fetchOpenChallenges();
-        if (stop) return;
-        
-        // Convert registry challenges to the format expected by the UI
-        const formattedChallenges = registryItems.map(challenge => ({
-          id: challenge.id,
-          clientId: challenge.clientId,
-          title: `${challenge.game} Challenge`,
-          game: challenge.game,
-          mode: "Head-to-Head",
-          platform: "PS5",
-          username: challenge.creator.slice(0, 8) + "...",
-          entryFee: challenge.entryFee,
-          prizePool: challenge.entryFee * 1.9, // Approximate after platform fee
-          players: 1,
-          capacity: challenge.maxPlayers,
-          category: "Fighting", // Default category
-          creator: challenge.creator,
-          rules: challenge.rules,
-          createdAt: new Date(challenge.timestamp).toISOString(),
-          timestamp: challenge.timestamp
-        }));
-        
-        upsertMany(formattedChallenges); // MERGE, don't replace
-        setLastRefreshAt(Date.now());
-        setLastUpdated(new Date());
-        setIsLive(true);
-        
-        console.log(`✅ Merged ${formattedChallenges.length} registry challenges`);
-      } catch (error) {
-        console.error("❌ Failed to fetch challenges from registry:", error);
-      }
-    };
-    
-    load();
-    const iv = setInterval(load, 10000);
-    return () => { stop = true; clearInterval(iv); };
-  }, []);
 
   const handleCreateChallenge = async (challengeData: any) => {
     console.log("🎮 Starting challenge creation process...");
     console.log("📋 Challenge data:", challengeData);
     
     try {
+      // Get current wallet address
+      const currentWallet = getWalletPublicKey();
+      if (!currentWallet) {
+        throw new Error("Wallet not connected");
+      }
+
       console.log("📦 Importing createChallengeOnChain function...");
       const { createChallengeOnChain } = await import("@/lib/chain/events");
       
@@ -149,7 +122,7 @@ const ArenaHome: React.FC = () => {
       
       console.log("✅ Challenge created successfully:", challengeId);
       
-      // Show optimistic challenge immediately
+      // Calculate prize pool
       const platformFee = 0.05; // 5% platform fee
       const totalPrize = challengeData.entryFee * 2; // Challenger matches entry fee
       const prizePool = totalPrize - (totalPrize * platformFee); // Minus platform fee
@@ -163,107 +136,54 @@ const ArenaHome: React.FC = () => {
         return 'Other';
       };
       
-        const optimisticChallenge = {
-          id: challengeId,
-          clientId: challengeId,
-          title: `${challengeData.game} ${challengeData.mode === 'Custom Mode' ? challengeData.customMode : challengeData.mode}`,
-          game: challengeData.game,
-          mode: challengeData.mode === 'Custom Mode' ? challengeData.customMode : challengeData.mode,
-          platform: challengeData.platform,
-          username: challengeData.username,
-          entryFee: challengeData.entryFee,
-          prizePool: Math.round(prizePool),
-          players: 1,
-          capacity: 8,
-          category: getGameCategory(challengeData.game),
-          creator: optimistic.creator,
-          rules: challengeData.rules || "",
-          createdAt: new Date(optimistic.timestamp).toISOString(),
-          timestamp: optimistic.timestamp,
-          expiresAt: optimistic.timestamp + (2 * 60 * 60 * 1000) // 2 hours from creation
-        };
+      // Create Firestore challenge data
+      const { addChallenge } = await import("@/lib/firebase/firestore");
+      const { Timestamp } = await import("firebase/firestore");
       
-      console.log("📝 Adding optimistic challenge to UI...");
-      console.log("📋 Optimistic challenge data:", optimisticChallenge);
-      upsertMany([optimisticChallenge]); // Show immediately
-      console.log("✅ Optimistic challenge added to UI");
+      const firestoreChallengeData = {
+        creator: currentWallet,
+        creatorTag: challengeData.username,
+        game: challengeData.game,
+        mode: challengeData.mode === 'Custom Mode' ? challengeData.customMode : challengeData.mode,
+        platform: challengeData.platform,
+        entryFee: challengeData.entryFee,
+        maxPlayers: 8,
+        rules: challengeData.rules || "",
+        status: 'pending' as const,
+        players: [currentWallet],
+        expiresAt: Timestamp.fromDate(new Date(Date.now() + (2 * 60 * 60 * 1000))), // 2 hours from now
+        solanaAccountId: challengeId,
+        category: getGameCategory(challengeData.game),
+        prizePool: Math.round(prizePool)
+      };
       
-      // Debug: Check if challenge was added to map
-      setTimeout(() => {
-        console.log("🔍 Current challengeMap size:", challengeMap.size);
-        console.log("🔍 Current challenges:", Array.from(challengeMap.values()));
-      }, 100);
+      console.log("🔥 Adding challenge to Firestore...");
+      const firestoreId = await addChallenge(firestoreChallengeData);
+      console.log("✅ Challenge added to Firestore with ID:", firestoreId);
       
-      // Handle transaction completion
-      console.log("⏳ Waiting for transaction completion...");
-      try {
-        const { signature, id } = await txPromise;
-        console.log("✅ Transaction completed successfully!");
-        console.log("📋 Transaction signature:", signature);
-        console.log("🆔 Challenge ID:", id);
-        
-        // Replace optimistic with canonical
-        setChallengeMap((prev) => {
-          const next = new Map(prev);
-          const key = optimistic.clientId!;
-          const existed = next.get(key);
-          next.delete(key);
-          // Keep all the original data but update the ID
-          next.set(id, { ...(existed || {}), id, clientId: id });
-          console.log("🔄 Replaced optimistic challenge with canonical:", id);
-          return next;
-        });
-        console.log("✅ Challenge synced to devnet:", signature);
-        console.log("🔗 View on Solana Explorer: https://explorer.solana.com/tx/" + signature + "?cluster=devnet");
-      } catch (e) {
-        console.error("❌ Transaction failed:", e);
-        // If tx fails, remove optimistic challenge
-        setChallengeMap((prev) => {
-          const next = new Map(prev);
-          next.delete(optimistic.clientId!);
-          return next;
-        });
-        console.error("❌ Challenge creation failed:", e);
-        alert("Challenge creation failed: " + (e instanceof Error ? e.message : "Unknown error"));
-      }
+      // The real-time listener will automatically update the UI
+      console.log("📡 Real-time listener will update UI automatically");
+      
     } catch (error) {
       console.error("❌ Failed to create challenge:", error);
       alert("Failed to create challenge: " + (error instanceof Error ? error.message : "Unknown error"));
     }
   };
 
-  const handleDeleteChallenge = (challengeId: string) => {
+  const handleDeleteChallenge = async (challengeId: string) => {
     console.log("🗑️ Attempting to delete challenge:", challengeId);
-    console.log("🗑️ Current challengeMap size before deletion:", challengeMap.size);
     
     if (window.confirm("Are you sure you want to delete this challenge? This action cannot be undone.")) {
-      // Remove from challengeMap
-      setChallengeMap(prev => {
-        const next = new Map(prev);
-        const hadChallenge = next.has(challengeId);
-        next.delete(challengeId);
-        console.log("🗑️ Challenge existed:", hadChallenge);
-        console.log("🗑️ New challengeMap size:", next.size);
-        return next;
-      });
-      
-      // Also remove from localStorage to prevent it from being restored
       try {
-        // Remove from challenge IDs
-        const storedIds = JSON.parse(localStorage.getItem('usdfg_challenge_ids') || '[]');
-        const updatedIds = storedIds.filter((id: string) => id !== challengeId);
-        localStorage.setItem('usdfg_challenge_ids', JSON.stringify(updatedIds));
-        console.log("🗑️ Removed challenge ID from localStorage");
+        const { deleteChallenge } = await import("@/lib/firebase/firestore");
+        await deleteChallenge(challengeId);
+        console.log("✅ Challenge deleted from Firestore");
         
-        // Remove from challenge metadata
-        const storedMetadata = JSON.parse(localStorage.getItem('usdfg_challenge_metadata') || '[]');
-        const updatedMetadata = storedMetadata.filter((meta: any) => meta.id !== challengeId);
-        localStorage.setItem('usdfg_challenge_metadata', JSON.stringify(updatedMetadata));
-        console.log("🗑️ Removed challenge metadata from localStorage");
-        
-        console.log("🗑️ Challenge permanently deleted from storage");
+        // The real-time listener will automatically update the UI
+        console.log("📡 Real-time listener will update UI automatically");
       } catch (error) {
-        console.error("🗑️ Failed to remove challenge from localStorage:", error);
+        console.error("❌ Failed to delete challenge:", error);
+        alert("Failed to delete challenge: " + (error instanceof Error ? error.message : "Unknown error"));
       }
     }
   };
@@ -344,13 +264,13 @@ const ArenaHome: React.FC = () => {
         <div className="container mx-auto px-4 py-2">
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center space-x-2">
-              <div className={`w-2 h-2 rounded-full ${isLive ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
+              <div className={`w-2 h-2 rounded-full ${!challengesLoading && !challengesError ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
               <span className="text-text-dim">
-                {isLive ? 'Live' : 'Offline'} • Last updated {Math.floor((Date.now() - lastUpdated.getTime()) / 1000)}s ago
+                {challengesLoading ? 'Loading...' : challengesError ? 'Error' : 'Firestore Live'} • {challenges.length} active challenges
               </span>
             </div>
             <div className="text-text-dim">
-              {challenges.length} active challenges
+              Real-time sync enabled
             </div>
           </div>
         </div>

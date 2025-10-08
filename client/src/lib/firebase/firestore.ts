@@ -1,0 +1,195 @@
+import { 
+  collection, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  onSnapshot, 
+  query, 
+  orderBy, 
+  where,
+  getDocs,
+  Timestamp 
+} from 'firebase/firestore';
+import { db } from './config';
+
+// Test Firestore connection
+export async function testFirestoreConnection() {
+  try {
+    const querySnapshot = await getDocs(collection(db, "challenges"));
+    console.log("✅ Firestore connected. Challenges found:", querySnapshot.size);
+    return true;
+  } catch (error) {
+    console.error("❌ Firestore connection failed:", error);
+    return false;
+  }
+}
+
+// Collection references
+export const challengesCollection = collection(db, 'challenges');
+export const usersCollection = collection(db, 'users');
+
+// Challenge interfaces
+export interface ChallengeData {
+  id?: string;
+  creator: string;
+  creatorTag: string;
+  game: string;
+  mode: string;
+  platform: string;
+  entryFee: number;
+  maxPlayers: number;
+  rules: string;
+  status: 'pending' | 'active' | 'completed' | 'cancelled';
+  players: string[];
+  createdAt: Timestamp;
+  expiresAt: Timestamp;
+  solanaAccountId?: string;
+  category: string;
+  prizePool: number;
+}
+
+// Challenge operations
+export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'createdAt'>) => {
+  try {
+    const docRef = await addDoc(challengesCollection, {
+      ...challengeData,
+      createdAt: Timestamp.now(),
+      players: [challengeData.creator], // Creator is first player
+    });
+    console.log('✅ Challenge created with ID:', docRef.id);
+    return docRef.id;
+  } catch (error) {
+    console.error('❌ Error creating challenge:', error);
+    throw error;
+  }
+};
+
+export const updateChallenge = async (challengeId: string, updates: Partial<ChallengeData>) => {
+  try {
+    const challengeRef = doc(db, 'challenges', challengeId);
+    await updateDoc(challengeRef, updates);
+    console.log('✅ Challenge updated:', challengeId);
+  } catch (error) {
+    console.error('❌ Error updating challenge:', error);
+    throw error;
+  }
+};
+
+export const deleteChallenge = async (challengeId: string) => {
+  try {
+    const challengeRef = doc(db, 'challenges', challengeId);
+    await deleteDoc(challengeRef);
+    console.log('✅ Challenge deleted:', challengeId);
+  } catch (error) {
+    console.error('❌ Error deleting challenge:', error);
+    throw error;
+  }
+};
+
+// Real-time listeners
+export const listenToChallenges = (callback: (challenges: ChallengeData[]) => void) => {
+  const q = query(challengesCollection, orderBy('createdAt', 'desc'));
+  
+  return onSnapshot(q, (snapshot) => {
+    const challenges = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as ChallengeData[];
+    
+    console.log('🔄 Real-time update: Received', challenges.length, 'challenges');
+    callback(challenges);
+  }, (error) => {
+    console.error('❌ Firestore listener error:', error);
+  });
+};
+
+export const listenToUserChallenges = (userId: string, callback: (challenges: ChallengeData[]) => void) => {
+  const q = query(
+    challengesCollection, 
+    where('creator', '==', userId),
+    orderBy('createdAt', 'desc')
+  );
+  
+  return onSnapshot(q, (snapshot) => {
+    const challenges = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as ChallengeData[];
+    
+    console.log('🔄 User challenges update:', challenges.length, 'challenges');
+    callback(challenges);
+  }, (error) => {
+    console.error('❌ User challenges listener error:', error);
+  });
+};
+
+// One-time fetch operations
+export const fetchChallenges = async (): Promise<ChallengeData[]> => {
+  try {
+    const q = query(challengesCollection, orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+    
+    const challenges = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as ChallengeData[];
+    
+    console.log('📦 Fetched', challenges.length, 'challenges');
+    return challenges;
+  } catch (error) {
+    console.error('❌ Error fetching challenges:', error);
+    return [];
+  }
+};
+
+export const fetchChallengeById = async (challengeId: string): Promise<ChallengeData | null> => {
+  try {
+    const challengeRef = doc(db, 'challenges', challengeId);
+    const snapshot = await getDocs(query(challengesCollection, where('__name__', '==', challengeId)));
+    
+    if (snapshot.empty) {
+      console.log('❌ Challenge not found:', challengeId);
+      return null;
+    }
+    
+    const challenge = {
+      id: snapshot.docs[0].id,
+      ...snapshot.docs[0].data()
+    } as ChallengeData;
+    
+    return challenge;
+  } catch (error) {
+    console.error('❌ Error fetching challenge:', error);
+    return null;
+  }
+};
+
+// Join challenge
+export const joinChallenge = async (challengeId: string, playerId: string) => {
+  try {
+    const challengeRef = doc(db, 'challenges', challengeId);
+    const challenge = await fetchChallengeById(challengeId);
+    
+    if (!challenge) {
+      throw new Error('Challenge not found');
+    }
+    
+    if (challenge.players.includes(playerId)) {
+      throw new Error('Player already in challenge');
+    }
+    
+    if (challenge.players.length >= challenge.maxPlayers) {
+      throw new Error('Challenge is full');
+    }
+    
+    await updateDoc(challengeRef, {
+      players: [...challenge.players, playerId]
+    });
+    
+    console.log('✅ Player joined challenge:', challengeId);
+  } catch (error) {
+    console.error('❌ Error joining challenge:', error);
+    throw error;
+  }
+};
