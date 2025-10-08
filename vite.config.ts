@@ -5,7 +5,10 @@ import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
 export default defineConfig({
   plugins: [
-    react(),
+    react({
+      // Optimize React refresh for better HMR
+      fastRefresh: true,
+    }),
     runtimeErrorOverlay(),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
@@ -18,6 +21,17 @@ export default defineConfig({
   ],
   define: {
     global: 'globalThis',
+  },
+  optimizeDeps: {
+    // Pre-bundle dependencies for faster dev startup
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      'firebase/app',
+      'firebase/firestore',
+      '@solana/web3.js',
+    ],
   },
   resolve: {
     alias: {
@@ -70,6 +84,14 @@ export default defineConfig({
     },
   },
   server: {
+    port: 5173,
+    host: true, // Allow external connections
+    hmr: {
+      port: 5173,
+      host: 'localhost',
+      protocol: 'ws',
+      clientPort: 5173,
+    },
     headers: {
       "Cache-Control": "public, max-age=31536000, immutable",
       "X-Content-Type-Options": "nosniff",
