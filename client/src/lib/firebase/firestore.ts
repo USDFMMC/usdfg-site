@@ -9,7 +9,9 @@ import {
   orderBy, 
   where,
   getDocs,
-  Timestamp 
+  Timestamp,
+  serverTimestamp,
+  writeBatch
 } from 'firebase/firestore';
 import { db } from './config';
 
@@ -204,3 +206,48 @@ export const joinChallenge = async (challengeId: string, playerId: string) => {
     throw error;
   }
 };
+
+// Real-time active challenge functions
+const challengesCol = collection(db, "challenges");
+
+// Create challenge (status now 'active')
+export async function addChallengeDoc(data: any) {
+  const docRef = await addDoc(challengesCol, {
+    ...data,
+    status: "active",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  console.log('✅ Challenge document created with ID:', docRef.id);
+  return docRef.id;
+}
+
+// Listen only to active/pending for a specific creator wallet
+export function listenActiveForCreator(creator: string, cb: (active: any[]) => void) {
+  const q = query(challengesCol, where("creator", "==", creator), where("status", "in", ["active", "pending"]));
+  return onSnapshot(q, (snap) => {
+    const active = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    console.log('🔒 Active challenges for creator:', active.length);
+    cb(active);
+  });
+}
+
+// Update status with timestamp
+export async function updateChallengeStatus(id: string, status: "active" | "pending" | "completed" | "cancelled" | "disputed") {
+  await updateDoc(doc(db, "challenges", id), {
+    status,
+    updatedAt: serverTimestamp(),
+  });
+  console.log('✅ Challenge status updated:', id, 'to', status);
+}
+
+// Archive (move doc then delete from active)
+export async function archiveChallenge(id: string) {
+  const src = doc(db, "challenges", id);
+  const dst = doc(db, "challenges_archive", id);
+  const batch = writeBatch(db);
+  batch.set(dst, { refId: id, movedAt: serverTimestamp() });
+  batch.delete(src);
+  await batch.commit();
+  console.log('🗄️ Challenge archived:', id);
+}
