@@ -71,22 +71,44 @@ const ArenaHome: React.FC = () => {
   useChallengeExpiry(firestoreChallenges);
   
   // Convert Firestore challenges to the format expected by the UI
-  const challenges = firestoreChallenges.map(challenge => ({
-    id: challenge.id,
-    clientId: challenge.id,
-    title: `${challenge.game} ${challenge.mode}`,
-    game: challenge.game,
-    mode: challenge.mode,
-    platform: challenge.platform,
-    username: challenge.creatorTag,
-    entryFee: challenge.entryFee,
-    prizePool: challenge.prizePool,
-    players: challenge.players.length,
-    capacity: challenge.maxPlayers,
-    category: challenge.category,
-    creator: challenge.creator,
-    rules: challenge.rules,
-    createdAt: challenge.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+  const challenges = firestoreChallenges.map(challenge => {
+    // Determine max players based on mode
+    const getMaxPlayers = (mode: string) => {
+      switch (mode.toLowerCase()) {
+        case 'head-to-head':
+        case '1v1':
+          return 2;
+        case 'tournament':
+        case 'bracket':
+          return 8;
+        case 'battle royale':
+          return 16;
+        case 'team vs team':
+          return 4;
+        default:
+          return challenge.maxPlayers || 2; // Fallback to stored value or default
+      }
+    };
+
+    const maxPlayers = getMaxPlayers(challenge.mode);
+    const currentPlayers = challenge.players?.length || 1; // Creator is always 1st player
+
+    return {
+      id: challenge.id,
+      clientId: challenge.id,
+      title: `${challenge.game} ${challenge.mode}`,
+      game: challenge.game,
+      mode: challenge.mode,
+      platform: challenge.platform,
+      username: challenge.creatorTag,
+      entryFee: challenge.entryFee,
+      prizePool: challenge.prizePool,
+      players: currentPlayers,
+      capacity: maxPlayers,
+      category: challenge.category,
+      creator: challenge.creator,
+      rules: challenge.rules,
+      createdAt: challenge.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
     timestamp: challenge.createdAt?.toDate?.()?.getTime() || Date.now(),
     expiresAt: challenge.expiresAt?.toDate?.()?.getTime() || (Date.now() + (2 * 60 * 60 * 1000)),
     status: challenge.status
@@ -129,11 +151,32 @@ const ArenaHome: React.FC = () => {
       console.log("📦 Importing createChallengeOnChain function...");
       const { createChallengeOnChain } = await import("@/lib/chain/events");
       
+      // Determine max players based on mode
+      const getMaxPlayersForMode = (mode: string) => {
+        switch (mode.toLowerCase()) {
+          case 'head-to-head':
+          case '1v1':
+            return 2;
+          case 'tournament':
+          case 'bracket':
+            return 8;
+          case 'battle royale':
+            return 16;
+          case 'team vs team':
+            return 4;
+          default:
+            return 2; // Default to 1v1
+        }
+      };
+
+      const maxPlayers = getMaxPlayersForMode(challengeData.mode);
+      console.log(`🎯 Setting maxPlayers to ${maxPlayers} for mode: ${challengeData.mode}`);
+
       console.log("🚀 Calling createChallengeOnChain...");
       const challengeId = await createChallengeOnChain({
         game: challengeData.game,
         entryFee: challengeData.entryFee,
-        maxPlayers: 8,
+        maxPlayers: maxPlayers,
         rules: challengeData.rules || ""
       });
       
@@ -164,7 +207,7 @@ const ArenaHome: React.FC = () => {
         mode: challengeData.mode === 'Custom Mode' ? challengeData.customMode : challengeData.mode,
         platform: challengeData.platform,
         entryFee: challengeData.entryFee,
-        maxPlayers: 8,
+        maxPlayers: maxPlayers, // Use the dynamic maxPlayers we calculated
         rules: challengeData.rules || "",
         status: 'active' as const,
         players: [currentWallet],
