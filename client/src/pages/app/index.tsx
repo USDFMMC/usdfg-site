@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { Helmet } from "react-helmet";
 import { Link } from "react-router-dom";
-import WalletConnectMWA from "@/components/arena/WalletConnectMWA";
+import WalletConnectSimple from "@/components/arena/WalletConnectSimple";
 import { useWallet } from '@solana/wallet-adapter-react';
 import { getWalletPublicKey } from "@/lib/wallet/solana";
 import { fetchActiveChallenges, fetchOpenChallenges, joinChallengeOnChain } from "@/lib/chain/events";
@@ -333,7 +333,7 @@ const ArenaHome: React.FC = () => {
                 >
                   {hasActiveChallenge ? "Active Challenge" : isCreatingChallenge ? "Creating..." : "Create Challenge"}
                 </button>
-                <WalletConnectMWA 
+                <WalletConnectSimple 
                   isConnected={isConnected}
                   onConnect={() => {
                     localStorage.setItem('wallet_connected', 'true');
