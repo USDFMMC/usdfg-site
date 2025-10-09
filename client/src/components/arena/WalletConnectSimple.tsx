@@ -65,10 +65,15 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   // Check if we're on mobile
   const isMobile = typeof window !== 'undefined' && /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   
+  // Debug mobile detection
+  console.log('📱 Mobile detection:', isMobile);
+  console.log('📱 User agent:', navigator.userAgent);
+  
   // Show connection button
   return (
     <div className="flex flex-col space-y-2">
-      {isMobile ? (
+      {/* Always show mobile options on mobile, with fallback detection */}
+      {(isMobile || (typeof window !== 'undefined' && window.innerWidth < 768)) ? (
         <div className="space-y-3">
           <div className="text-sm text-gray-400 mb-2">
             Connect with Phantom:
@@ -81,9 +86,15 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
                 // Open Phantom app
                 window.open('https://phantom.app/ul/browse/' + encodeURIComponent(window.location.href), '_blank');
               }}
-              className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors flex items-center justify-center space-x-2"
+              className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors flex items-center justify-center space-x-2 border-2 border-purple-400 shadow-lg"
+              style={{ 
+                backgroundColor: '#9333ea', 
+                color: 'white',
+                minHeight: '48px',
+                fontSize: '16px'
+              }}
             >
-              <span>👻</span>
+              <span style={{ fontSize: '20px' }}>👻</span>
               <span>Open in Phantom</span>
             </button>
             
