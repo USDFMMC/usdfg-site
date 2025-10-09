@@ -23,7 +23,11 @@ export default defineConfig({
     global: 'globalThis',
   },
   optimizeDeps: {
-    // Pre-bundle dependencies for faster dev startup
+    esbuildOptions: {
+      define: {
+        global: 'globalThis',
+      },
+    },
     include: [
       'react',
       'react-dom',
@@ -31,6 +35,13 @@ export default defineConfig({
       'firebase/app',
       'firebase/firestore',
       '@solana/web3.js',
+      '@solana/wallet-adapter-base',
+      '@solana/wallet-adapter-react',
+      '@solana/wallet-adapter-react-ui',
+      '@solana/wallet-adapter-phantom',
+      '@solana/wallet-adapter-solflare',
+      '@solana-mobile/wallet-adapter-protocol',
+      '@solana-mobile/wallet-adapter-protocol-web3js',
     ],
   },
   resolve: {
@@ -47,6 +58,9 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: false,
     minify: "terser",
+    commonjsOptions: {
+      transformMixedEsModules: true,
+    },
     terserOptions: {
       compress: {
         drop_debugger: true,
