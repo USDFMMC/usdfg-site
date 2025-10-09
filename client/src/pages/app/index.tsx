@@ -277,7 +277,7 @@ const ArenaHome: React.FC = () => {
   const filteredChallenges = challenges.filter(challenge => {
     const categoryMatch = filterCategory === 'All' || challenge.category === filterCategory;
     const gameMatch = filterGame === 'All' || challenge.game === filterGame;
-    const myChallengesMatch = !showMyChallenges || challenge.creator === getWalletPublicKey();
+    const myChallengesMatch = !showMyChallenges || challenge.creator === (publicKey?.toString() || null);
     return categoryMatch && gameMatch && myChallengesMatch;
   });
 
@@ -286,7 +286,7 @@ const ArenaHome: React.FC = () => {
   const categories = ['All', 'Fighting', 'Sports', 'Shooting', 'Racing'];
 
   // Check if user has active challenge (for button disable logic)
-  const currentWallet = getWalletPublicKey();
+  const currentWallet = publicKey?.toString() || null;
   const hasActiveChallenge = currentWallet && challenges.some(
     c => c.creator === currentWallet && (c.status === 'active' || c.status === 'pending')
   );
