@@ -25,6 +25,7 @@ const ArenaHome: React.FC = () => {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [isLive, setIsLive] = useState<boolean>(true);
   const [lastLocalChallenge, setLastLocalChallenge] = useState<number>(0);
+  const [isCreatingChallenge, setIsCreatingChallenge] = useState<boolean>(false);
   
   // Mock price API - simulates real-time price updates
   const fetchUsdfgPrice = useCallback(async () => {
@@ -126,6 +127,13 @@ const ArenaHome: React.FC = () => {
   }
 
   const handleCreateChallenge = async (challengeData: any) => {
+    // Prevent double-clicks
+    if (isCreatingChallenge) {
+      console.log("⏳ Challenge creation already in progress, ignoring duplicate request");
+      return;
+    }
+    
+    setIsCreatingChallenge(true);
     console.log("🎮 Starting challenge creation process...");
     console.log("📋 Challenge data:", challengeData);
     
@@ -228,6 +236,8 @@ const ArenaHome: React.FC = () => {
     } catch (error) {
       console.error("❌ Failed to create challenge:", error);
       alert("Failed to create challenge: " + (error instanceof Error ? error.message : "Unknown error"));
+    } finally {
+      setIsCreatingChallenge(false);
     }
   };
 
@@ -307,14 +317,18 @@ const ArenaHome: React.FC = () => {
                       alert("You already have an active challenge. Complete or delete it before creating a new one.");
                       return;
                     }
+                    if (isCreatingChallenge) {
+                      console.log("⏳ Challenge creation in progress, please wait...");
+                      return;
+                    }
                     console.log("🔥 CREATE CHALLENGE BUTTON CLICKED!");
                     setShowCreateModal(true);
                   }}
-                  disabled={hasActiveChallenge}
-                  className={`elite-btn neocore-button ${hasActiveChallenge ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  title={hasActiveChallenge ? "You already have an active challenge" : "Create a new challenge"}
+                  disabled={hasActiveChallenge || isCreatingChallenge}
+                  className={`elite-btn neocore-button ${(hasActiveChallenge || isCreatingChallenge) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  title={hasActiveChallenge ? "You already have an active challenge" : isCreatingChallenge ? "Creating challenge..." : "Create a new challenge"}
                 >
-                  {hasActiveChallenge ? "Active Challenge" : "Create Challenge"}
+                  {hasActiveChallenge ? "Active Challenge" : isCreatingChallenge ? "Creating..." : "Create Challenge"}
                 </button>
                 <WalletConnect 
                   isConnected={isConnected}
