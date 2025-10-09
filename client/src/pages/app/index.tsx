@@ -1512,24 +1512,10 @@ const JoinChallengeModal: React.FC<{
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
 
-  const handleConnect = async () => {
-    if (!hasPhantomInstalled()) {
-      window.open('https://phantom.app/download', '_blank');
-      return;
-    }
-
-    setConnecting(true);
-    try {
-      await connectPhantom();
-      onConnect();
-      setState('review'); // Go back to review state after connection
-    } catch (error) {
-      console.error('Connection failed:', error);
-      setError('Failed to connect wallet');
-      setState('error');
-    } finally {
-      setConnecting(false);
-    }
+  const handleConnect = () => {
+    // Close the modal and let the user connect via the main wallet button
+    onClose();
+    console.log('🔗 Please connect your wallet using the main "Connect Wallet" button first');
   };
 
   const handleJoin = async () => {
@@ -1680,21 +1666,10 @@ const ChallengeDetailsModal: React.FC<{
 }> = ({ challenge, onClose, onJoin, isConnected, onConnect }) => {
   const [connecting, setConnecting] = useState(false);
 
-  const handleConnect = async () => {
-    if (!hasPhantomInstalled()) {
-      window.open('https://phantom.app/download', '_blank');
-      return;
-    }
-
-    setConnecting(true);
-    try {
-      await connectPhantom();
-      onConnect();
-    } catch (error) {
-      console.error('Connection failed:', error);
-    } finally {
-      setConnecting(false);
-    }
+  const handleConnect = () => {
+    // Close the modal and let the user connect via the main wallet button
+    onClose();
+    console.log('🔗 Please connect your wallet using the main "Connect Wallet" button first');
   };
 
   return (
