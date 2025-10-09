@@ -1013,6 +1013,24 @@ const CreateChallengeModal: React.FC<{
     setFormData(prev => ({ ...prev, ...updates }));
   }, []);
 
+  // Provide clear explanations for each mode
+  const getModeExplanation = (selectedMode: string): string => {
+    switch (selectedMode) {
+      case "Head-to-Head (Full Game)":
+        return "Game Length: 4 × 6 minute quarters • Difficulty: All-Star • No duplicate teams • Pause abuse = forfeit.";
+      case "Best of 3 Series":
+        return "First to 2 wins advances • Each game 4 × 6 min quarters • Disconnect = forfeit unless rematch agreed.";
+      case "Quick Match (2 Quarters)":
+        return "2 quarters only • No pause abuse • Standard teams only.";
+      case "Park Match (2v2/3v3)":
+        return "2v2 or 3v3 MyPlayer mode • No AI teammates • Win by 2.";
+      case "Custom Challenge":
+        return "Add your own rules clearly and fairly. Unclear or unfair rules may be rejected.";
+      default:
+        return "";
+    }
+  };
+
   // Form validation functions
   const validateStep1 = useCallback(() => {
     const errors: string[] = [];
@@ -1250,6 +1268,16 @@ const CreateChallengeModal: React.FC<{
                       <option key={mode} value={mode}>{mode}</option>
                     ))}
                   </select>
+                  
+                  {/* Mode Explanation */}
+                  {formData.mode && (
+                    <div className="mt-3">
+                      <p className="text-sm text-gray-400 italic leading-relaxed">
+                        {getModeExplanation(formData.mode)}
+                      </p>
+                      <div className="h-[1px] bg-gray-700 my-3"></div>
+                    </div>
+                  )}
                 </Field>
 
                 {formData.mode === 'Custom Mode' && (
