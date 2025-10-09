@@ -291,6 +291,14 @@ const ArenaHome: React.FC = () => {
     c => c.creator === currentWallet && (c.status === 'active' || c.status === 'pending')
   );
 
+  // Add arena-page class to body for mobile CSS
+  useEffect(() => {
+    document.body.classList.add('arena-page');
+    return () => {
+      document.body.classList.remove('arena-page');
+    };
+  }, []);
+
   return (
     <>
       <Helmet>
