@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChallengeData, listenToChallenges, fetchChallenges } from '@/lib/firebase/firestore';
+import { ChallengeData, listenToChallenges, fetchChallenges, listenToUserChallenges } from '@/lib/firebase/firestore';
 
 export const useChallenges = () => {
   const [challenges, setChallenges] = useState<ChallengeData[]>([]);
@@ -55,7 +55,6 @@ export const useUserChallenges = (userId: string) => {
 
     console.log('🔄 Setting up user challenge listener for:', userId);
     
-    const { listenToUserChallenges } = require('@/lib/firebase/firestore');
     
     const unsubscribe = listenToUserChallenges(userId, (challenges) => {
       console.log('📡 User challenges update:', challenges.length, 'challenges');

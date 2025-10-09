@@ -7,7 +7,7 @@ import { clusterApiUrl } from '@solana/web3.js';
 import { createDefaultAuthorizationResultCache, SolanaMobileWalletAdapter } from '@solana-mobile/wallet-adapter-mobile';
 
 // Import wallet adapter styles
-require('@solana/wallet-adapter-react-ui/styles.css');
+import '@solana/wallet-adapter-react-ui/styles.css';
 
 export const MWAProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const network = 'devnet';
