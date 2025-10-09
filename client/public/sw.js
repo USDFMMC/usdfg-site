@@ -1,7 +1,7 @@
 // Simple ServiceWorker for USDFG Arena
 // This replaces any problematic ServiceWorker that was causing require() errors
 
-const CACHE_NAME = 'usdfg-arena-v2';
+const CACHE_NAME = 'usdfg-arena-v3';
 const urlsToCache = [
   '/',
   '/app',
@@ -28,7 +28,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   
-  // Skip ServiceWorker for ALL external API requests, Firestore, and external services
+  // Skip ServiceWorker for ALL external API requests, Firestore, fonts, and external services
   if (
     url.hostname.includes('firestore.googleapis.com') ||
     url.hostname.includes('firebase.googleapis.com') ||
@@ -39,10 +39,15 @@ self.addEventListener('fetch', (event) => {
     url.hostname.includes('api.mainnet-beta.solana.com') ||
     url.hostname.includes('api.testnet.solana.com') ||
     url.hostname.includes('googleapis.com') ||
+    url.hostname.includes('fonts.googleapis.com') ||
+    url.hostname.includes('fonts.gstatic.com') ||
     url.pathname.includes('/api/') ||
     url.pathname.includes('/firestore/') ||
     url.pathname.includes('/Listen/') ||
     url.pathname.includes('/Listen') ||
+    url.pathname.includes('.woff2') ||
+    url.pathname.includes('.woff') ||
+    url.pathname.includes('.ttf') ||
     event.request.method !== 'GET'
   ) {
     // Let these requests pass through without ServiceWorker interference
@@ -71,7 +76,7 @@ self.addEventListener('fetch', (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('✅ ServiceWorker: Activated v2');
+  console.log('✅ ServiceWorker: Activated v3');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
