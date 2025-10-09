@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { Helmet } from "react-helmet";
 import { Link } from "react-router-dom";
-import WalletConnect from "@/components/arena/WalletConnect";
-import { connectPhantom, hasPhantomInstalled, getWalletPublicKey } from "@/lib/wallet/solana";
+import WalletConnectMWA from "@/components/arena/WalletConnectMWA";
+import { useWallet } from '@solana/wallet-adapter-react';
+import { getWalletPublicKey } from "@/lib/wallet/solana";
 import { fetchActiveChallenges, fetchOpenChallenges, joinChallengeOnChain } from "@/lib/chain/events";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
@@ -10,10 +11,9 @@ import { ChallengeData, joinChallenge } from "@/lib/firebase/firestore";
 import { testFirestoreConnection } from "@/lib/firebase/firestore";
 
 const ArenaHome: React.FC = () => {
-  const [isConnected, setIsConnected] = useState(() => {
-    // Check if wallet was previously connected
-    return localStorage.getItem('wallet_connected') === 'true';
-  });
+  const { connected } = useWallet();
+  // Use MWA connection state
+  const isConnected = connected;
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -330,14 +330,12 @@ const ArenaHome: React.FC = () => {
                 >
                   {hasActiveChallenge ? "Active Challenge" : isCreatingChallenge ? "Creating..." : "Create Challenge"}
                 </button>
-                <WalletConnect 
+                <WalletConnectMWA 
                   isConnected={isConnected}
                   onConnect={() => {
-                    setIsConnected(true);
                     localStorage.setItem('wallet_connected', 'true');
                   }}
                   onDisconnect={() => {
-                    setIsConnected(false);
                     localStorage.removeItem('wallet_connected');
                     localStorage.removeItem('wallet_address');
                   }}
