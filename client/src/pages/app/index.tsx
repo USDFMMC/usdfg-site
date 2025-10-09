@@ -841,77 +841,104 @@ const CreateChallengeModal: React.FC<{
   // Platform options
   const platforms = ['PS5', 'Xbox', 'PC', 'Switch', 'Other/Custom'];
 
-  // Game-specific modes
+  // Game-specific modes - Enhanced with competitive options
   const gameModes = {
-    'NBA 2K25': ['Head-to-Head', 'Squad Match', 'Full Team Play', 'Custom Mode'],
-    'FIFA 24': ['Head-to-Head', 'Squad Match', 'Full Team Play', 'Custom Mode'],
-    'Street Fighter 6': ['Versus Match', 'Best-of-Series', 'Elimination Bracket', 'Custom Mode'],
-    'Call of Duty': ['Duel', 'Squad Battle', 'Full Lobby', 'Battle Royale', 'Custom Mode'],
-    'Tekken 8': ['Versus Match', 'Best-of-Series', 'Elimination Bracket', 'Custom Mode'],
-    'Forza Horizon': ['Time Trial', 'Head-to-Head Race', 'Grand Prix', 'Custom Mode'],
-    'Valorant': ['Duel', 'Squad Battle', 'Full Lobby', 'Custom Mode'],
-    'Madden NFL 24': ['Head-to-Head', 'Squad Match', 'Full Team Play', 'Custom Mode'],
-    'Other/Custom': ['Custom Mode']
+    'NBA 2K25': ['Head-to-Head (Full Game)', 'Best of 3 Series', 'Quick Match (2 Quarters)', 'Park Match (2v2/3v3)', 'Custom Challenge'],
+    'FIFA 24': ['Head-to-Head (Full Match)', 'Best of 3 Series', 'Quick Match (2 Halves)', 'Squad Match (2v2)', 'Custom Challenge'],
+    'Street Fighter 6': ['Versus Match', 'Best of 3 Series', 'Elimination Bracket', 'First to 5', 'Custom Challenge'],
+    'Call of Duty': ['Duel (1v1)', 'Squad Battle (2v2)', 'Full Lobby (5v5)', 'Battle Royale', 'Custom Challenge'],
+    'Tekken 8': ['Versus Match', 'Best of 3 Series', 'Elimination Bracket', 'First to 5', 'Custom Challenge'],
+    'Forza Horizon': ['Time Trial', 'Head-to-Head Race', 'Grand Prix Series', 'Drift Challenge', 'Custom Challenge'],
+    'Valorant': ['Duel (1v1)', 'Squad Battle (2v2)', 'Full Lobby (5v5)', 'Tournament Bracket', 'Custom Challenge'],
+    'Madden NFL 24': ['Head-to-Head (Full Game)', 'Best of 3 Series', 'Quick Match (2 Quarters)', 'Squad Match (2v2)', 'Custom Challenge'],
+    'Other/Custom': ['Custom Challenge']
   };
 
   // Comprehensive preset JSON for game + mode combinations
   const challengePresets = {
     'NBA 2K25': {
-      'Head-to-Head': {
-        rules: ['Game length: 4x6 minute quarters', 'Difficulty: All-Star', 'No duplicate teams', 'Standard NBA rules', 'Pause abuse = forfeit', 'Disconnect = forfeit unless agreed to rematch']
+      'Head-to-Head (Full Game)': {
+        rules: ['Game Length: 4x6 minute quarters', 'Difficulty: All-Star', 'No duplicate teams', 'Standard NBA rules', 'Pause abuse = forfeit', 'Disconnect = forfeit unless rematch agreed']
       },
-      'Squad Match': {
-        rules: ['Game length: 4x6 minute quarters', 'Difficulty: All-Star', 'Each player picks different teams', 'Communication allowed', 'Standard timeout rules', 'Both players must agree to restart']
+      'Best of 3 Series': {
+        rules: ['First to 2 wins advances', 'Each game 4x6 minute quarters', 'Difficulty: All-Star', 'Disconnect = forfeit unless rematch agreed', 'Winner keeps team choice', 'Loser can switch teams']
       },
-      'Full Team Play': {
-        rules: ['Game length: 4x6 minute quarters', 'Difficulty: All-Star', 'Full 5v5 teams', 'Team captains handle disputes', 'No rage quitting', 'Standard NBA roster rules']
+      'Quick Match (2 Quarters)': {
+        rules: ['2 quarters only', 'Standard teams only', 'Difficulty: All-Star', 'No pause abuse', 'Disconnect = forfeit unless rematch agreed', 'Quick timeout rules apply']
+      },
+      'Park Match (2v2/3v3)': {
+        rules: ['2v2 or 3v3 MyPlayer mode', 'No AI teammates', 'Win by 2 points', 'Disconnect = forfeit unless rematch agreed', 'Communication allowed', 'Standard park rules']
+      },
+      'Custom Challenge': {
+        rules: ['Add your own clear, fair, and balanced rules.', 'Unclear or unfair custom rules may be rejected.', 'Ensure both players understand the rules before starting.']
       }
     },
     'FIFA 24': {
-      'Head-to-Head': {
-        rules: ['Match length: 6-minute halves', 'Difficulty: World Class', 'No duplicate teams', 'Draw = penalties', 'Disconnect = forfeit unless agreed to rematch', 'Standard FIFA rules apply']
+      'Head-to-Head (Full Match)': {
+        rules: ['Match length: 6-minute halves', 'Difficulty: World Class', 'No duplicate teams', 'Draw = penalties', 'Disconnect = forfeit unless rematch agreed', 'Standard FIFA rules apply']
       },
-      'Squad Match': {
-        rules: ['Match length: 6-minute halves', 'Difficulty: World Class', 'Teams must be different', 'Voice chat allowed', 'Both players must agree to restart', '2v2 or 3v3 format allowed']
+      'Best of 3 Series': {
+        rules: ['First to 2 wins advances', 'Each match 6-minute halves', 'Difficulty: World Class', 'Disconnect = forfeit unless rematch agreed', 'Winner keeps team choice', 'Loser can switch teams']
       },
-      'Full Team Play': {
-        rules: ['Match length: 6-minute halves', 'Difficulty: World Class', 'Full 11v11 teams', 'Team captains handle disputes', 'No duplicate players', 'Standard formation rules']
+      'Quick Match (2 Halves)': {
+        rules: ['2 halves only', 'Standard teams only', 'Difficulty: World Class', 'No pause abuse', 'Disconnect = forfeit unless rematch agreed', 'Quick timeout rules apply']
+      },
+      'Squad Match (2v2)': {
+        rules: ['2v2 or 3v3 format', 'Teams must be different', 'Voice chat allowed', 'Both players must agree to restart', 'Communication required', 'Standard FIFA squad rules']
+      },
+      'Custom Challenge': {
+        rules: ['Add your own clear, fair, and balanced rules.', 'Unclear or unfair custom rules may be rejected.', 'Ensure both players understand the rules before starting.']
       }
     },
     'Street Fighter 6': {
       'Versus Match': {
         rules: ['Best of 3 rounds per match', 'Standard character roster', 'No duplicate characters', 'Tournament legal stages only', 'Rage quit = forfeit', 'Standard round timer (99 seconds)']
       },
-      'Best-of-Series': {
+      'Best of 3 Series': {
         rules: ['Best of 5 matches', 'Winner keeps character', 'Loser can switch', 'Tournament legal stages', 'Standard round timer', 'No pause abuse']
       },
       'Elimination Bracket': {
         rules: ['Single elimination format', 'Best of 3 per match', 'Character lock per match', 'Tournament legal stages', 'Winner advances', 'Loser eliminated']
+      },
+      'First to 5': {
+        rules: ['First to 5 wins', 'Character switching allowed', 'Tournament legal stages', 'Standard round timer', 'No pause abuse', 'Winner takes all']
+      },
+      'Custom Challenge': {
+        rules: ['Add your own clear, fair, and balanced rules.', 'Unclear or unfair custom rules may be rejected.', 'Ensure both players understand the rules before starting.']
       }
     },
     'Call of Duty': {
-      'Duel': {
+      'Duel (1v1)': {
         rules: ['First to 6 rounds wins', 'Random weapon rotation', 'No killstreaks', 'Standard gunfight maps', 'Connection issues require rematch', 'No camping allowed']
       },
-      'Squad Battle': {
+      'Squad Battle (2v2)': {
         rules: ['First to 6 rounds', 'Standard loadouts only', 'Communication allowed', 'No scorestreaks', 'Team must stay together', '2v2 or 3v3 format']
       },
-      'Full Lobby': {
+      'Full Lobby (5v5)': {
         rules: ['Team vs team format', '5v5 or 6v6 matches', 'Standard game modes', 'Communication allowed', 'No cheating/exploits', 'Best of 3 maps']
       },
       'Battle Royale': {
         rules: ['Last player/team standing', 'Solo or squad entry allowed', 'No teaming in solos', 'Standard BR rules', 'No stream sniping', 'Connection issues = rematch if early']
+      },
+      'Custom Challenge': {
+        rules: ['Add your own clear, fair, and balanced rules.', 'Unclear or unfair custom rules may be rejected.', 'Ensure both players understand the rules before starting.']
       }
     },
     'Tekken 8': {
       'Versus Match': {
         rules: ['Best of 3 rounds per match', 'All characters allowed', 'Tournament legal stages', 'No rage quitting', 'Standard round timer', 'No pause abuse']
       },
-      'Best-of-Series': {
+      'Best of 3 Series': {
         rules: ['Best of 5 matches', 'Character switching allowed', 'Tournament legal stages', 'Winner keeps character option', 'Standard combo rules', 'No infinite combos']
       },
       'Elimination Bracket': {
         rules: ['Single elimination tournament', 'Best of 3 per match', 'Character lock per set', 'Tournament stages only', 'Winner advances', 'Standard Tekken rules']
+      },
+      'First to 5': {
+        rules: ['First to 5 wins', 'Character switching allowed', 'Tournament legal stages', 'Standard round timer', 'No pause abuse', 'Winner takes all']
+      },
+      'Custom Challenge': {
+        rules: ['Add your own clear, fair, and balanced rules.', 'Unclear or unfair custom rules may be rejected.', 'Ensure both players understand the rules before starting.']
       }
     },
     'Forza Horizon': {
@@ -921,30 +948,48 @@ const CreateChallengeModal: React.FC<{
       'Head-to-Head Race': {
         rules: ['1v1 or small group races', 'Clean racing required', 'No ramming/griefing', 'Stock or tuned vehicles allowed', 'Best of 3 races', 'Track vote system']
       },
-      'Grand Prix': {
+      'Grand Prix Series': {
         rules: ['Multi-track championship', 'Points system: 25-18-15-12-10-8-6-4-2-1', 'Clean racing enforced', 'Vehicle restrictions by class', 'Weather randomization', '5-7 race series']
+      },
+      'Drift Challenge': {
+        rules: ['Best drift score wins', 'Stock or tuned vehicles allowed', 'No collision detection', 'Track boundaries enforced', '3 attempts maximum', 'Clean racing required']
+      },
+      'Custom Challenge': {
+        rules: ['Add your own clear, fair, and balanced rules.', 'Unclear or unfair custom rules may be rejected.', 'Ensure both players understand the rules before starting.']
       }
     },
     'Valorant': {
-      'Duel': {
+      'Duel (1v1)': {
         rules: ['First to 13 rounds wins', 'Standard competitive rules', 'No coaching mid-game', 'Agent selection standard', 'Connection issues = pause/rematch', 'Anti-cheat required']
       },
-      'Squad Battle': {
-        rules: ['5v5 competitive format', 'Standard map pool', 'Agent restrictions by team agreement', 'Communication allowed', 'Standard economy rules', 'Overtime rules apply']
+      'Squad Battle (2v2)': {
+        rules: ['2v2 competitive format', 'Standard map pool', 'Agent restrictions by team agreement', 'Communication allowed', 'Standard economy rules', 'Overtime rules apply']
       },
-      'Full Lobby': {
+      'Full Lobby (5v5)': {
         rules: ['Full team vs team', 'Tournament format', 'Map bans/picks allowed', 'Professional ruleset', 'Coaching allowed between maps', 'Best of 3 maps']
+      },
+      'Tournament Bracket': {
+        rules: ['Single elimination format', 'Best of 3 maps per match', 'Map bans/picks allowed', 'Professional ruleset', 'Winner advances', 'Loser eliminated']
+      },
+      'Custom Challenge': {
+        rules: ['Add your own clear, fair, and balanced rules.', 'Unclear or unfair custom rules may be rejected.', 'Ensure both players understand the rules before starting.']
       }
     },
     'Madden NFL 24': {
-      'Head-to-Head': {
+      'Head-to-Head (Full Game)': {
         rules: ['4x6 minute quarters', 'All-Pro difficulty', 'No duplicate teams', 'Standard NFL rules', 'No pause abuse', 'Disconnect = forfeit unless technical issue']
       },
-      'Squad Match': {
+      'Best of 3 Series': {
+        rules: ['First to 2 wins advances', 'Each game 4x6 minute quarters', 'All-Pro difficulty', 'Disconnect = forfeit unless technical issue', 'Winner keeps team choice', 'Loser can switch teams']
+      },
+      'Quick Match (2 Quarters)': {
+        rules: ['2 quarters only', 'Standard teams only', 'All-Pro difficulty', 'No pause abuse', 'Disconnect = forfeit unless technical issue', 'Quick timeout rules apply']
+      },
+      'Squad Match (2v2)': {
         rules: ['2v2 or 3v3 format', 'Each player controls specific positions', 'Communication required', 'Team coordination essential', 'Standard game length', 'No AI assistance']
       },
-      'Full Team Play': {
-        rules: ['Full team vs full team', 'Position assignments required', 'Real-time communication', 'Standard NFL rules', 'Coaching decisions by captain', 'Realistic gameplay settings']
+      'Custom Challenge': {
+        rules: ['Add your own clear, fair, and balanced rules.', 'Unclear or unfair custom rules may be rejected.', 'Ensure both players understand the rules before starting.']
       }
     }
   };
