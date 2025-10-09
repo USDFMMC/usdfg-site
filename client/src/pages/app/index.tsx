@@ -3,7 +3,7 @@ import { Helmet } from "react-helmet";
 import { Link } from "react-router-dom";
 import WalletConnectSimple from "@/components/arena/WalletConnectSimple";
 import { useWallet } from '@solana/wallet-adapter-react';
-import { getWalletPublicKey, hasPhantomInstalled, connectPhantom } from "@/lib/wallet/solana";
+import { getWalletPublicKey } from "@/lib/wallet/solana";
 import { fetchActiveChallenges, fetchOpenChallenges, joinChallengeOnChain } from "@/lib/chain/events";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
@@ -1181,23 +1181,11 @@ const CreateChallengeModal: React.FC<{
     setTimeout(() => applyPreset(), 100);
   }, [formData.game, formData.mode, applyPreset]);
 
-  const handleConnect = async () => {
-    if (!hasPhantomInstalled()) {
-      window.open('https://phantom.app/download', '_blank');
-      return;
-    }
-
-    setConnecting(true);
-    try {
-      await connectPhantom();
-      onConnect();
-      // Close modal after successful connection
-      onClose();
-    } catch (error) {
-      console.error('Connection failed:', error);
-    } finally {
-      setConnecting(false);
-    }
+  const handleConnect = () => {
+    // Close the modal and let the user connect via the main wallet button
+    onClose();
+    // The user should connect their wallet using the main "Connect Wallet" button first
+    console.log('🔗 Please connect your wallet using the main "Connect Wallet" button first');
   };
 
   return (
@@ -1242,7 +1230,7 @@ const CreateChallengeModal: React.FC<{
             <p className="text-sm text-gray-300">Connect your wallet to start a challenge.</p>
             <div className="mt-3">
               <PrimaryButton onClick={handleConnect} disabled={connecting}>
-                {connecting ? "Connecting..." : "Connect Phantom"}
+                {connecting ? "Connecting..." : "Connect Wallet First"}
               </PrimaryButton>
             </div>
           </div>
@@ -1665,7 +1653,7 @@ const JoinChallengeModal: React.FC<{
                 disabled={connecting}
                 className="mt-4 bg-gradient-to-r from-cyan-400 to-purple-500 text-black px-4 py-2 rounded-lg font-semibold hover:brightness-110 transition-all disabled:opacity-50"
               >
-                {connecting ? "Connecting..." : "Connect Phantom"}
+                {connecting ? "Connecting..." : "Connect Wallet First"}
               </button>
             ) : (
               <button
