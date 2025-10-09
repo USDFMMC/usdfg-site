@@ -71,7 +71,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       {isMobile ? (
         <div className="space-y-3">
           <div className="text-sm text-gray-400 mb-2">
-            Choose your wallet:
+            Connect with Phantom:
           </div>
           
           {/* Mobile wallet options */}
@@ -87,20 +87,10 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
               <span>Open in Phantom</span>
             </button>
             
-            <button
-              onClick={() => {
-                // Open Solflare app
-                window.open('https://solflare.com/access-wallet', '_blank');
-              }}
-              className="w-full px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg transition-colors flex items-center justify-center space-x-2"
-            >
-              <span>🔥</span>
-              <span>Open in Solflare</span>
-            </button>
           </div>
           
           <div className="text-xs text-gray-500 text-center">
-            Or use the wallet button below for browser wallets
+            Or use the wallet button below if Phantom is installed
           </div>
         </div>
       ) : null}
