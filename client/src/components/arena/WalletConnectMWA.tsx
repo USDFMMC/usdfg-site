@@ -5,6 +5,44 @@ import { WalletMultiButton, WalletDisconnectButton } from '@solana/wallet-adapte
 import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { sendSOL } from "@/lib/wallet/solana";
 
+// Mobile detection utility
+const isMobile = () => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
+
+// Mobile wallet deep link helpers
+const getMobileWalletUrl = (walletName: string) => {
+  const currentUrl = encodeURIComponent(window.location.href);
+  
+  switch (walletName.toLowerCase()) {
+    case 'phantom':
+      // Try multiple Phantom deep link formats
+      return `https://phantom.app/ul/browse/${currentUrl}?ref=usdfg-arena`;
+    case 'solflare':
+      // Try multiple Solflare deep link formats  
+      return `https://solflare.com/ul/browse/${currentUrl}?ref=usdfg-arena`;
+    default:
+      return currentUrl;
+  }
+};
+
+// Enhanced mobile wallet connection with fallback
+const connectMobileWallet = (walletName: string) => {
+  const walletUrl = getMobileWalletUrl(walletName);
+  
+  // Try to open the wallet app
+  const walletWindow = window.open(walletUrl, '_blank');
+  
+  // If the window didn't open (app not installed), show fallback
+  if (!walletWindow || walletWindow.closed) {
+    // Show instructions for manual connection
+    alert(`Please install ${walletName} app and try again, or use the browser wallet option.`);
+    return false;
+  }
+  
+  return true;
+};
+
 interface WalletConnectMWAProps {
   isConnected: boolean;
   onConnect: () => void;
@@ -21,6 +59,31 @@ const WalletConnectMWA: React.FC<WalletConnectMWAProps> = ({
   const [balance, setBalance] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [showMobileOptions, setShowMobileOptions] = useState(false);
+
+  // Detect mobile device on mount
+  useEffect(() => {
+    setIsMobileDevice(isMobile());
+  }, []);
+
+  // Mobile wallet connection handlers
+  const handleMobileWalletConnect = (walletName: string) => {
+    console.log(`📱 Attempting to connect ${walletName} mobile app`);
+    
+    // Try to connect to mobile wallet
+    const success = connectMobileWallet(walletName);
+    
+    if (success) {
+      setError(`Opening ${walletName} app... Please approve the connection and return to this page.`);
+    } else {
+      setError(`${walletName} app not found. Please install it or use browser wallet.`);
+    }
+  };
+
+  const handleMobileBrowserConnect = () => {
+    setShowMobileOptions(true);
+  };
 
   // Auto-refresh SOL balance every 15 seconds
   useEffect(() => {
@@ -150,12 +213,69 @@ const WalletConnectMWA: React.FC<WalletConnectMWAProps> = ({
         </div>
       )}
       
-      <WalletMultiButton className="px-4 py-2 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50" />
-      
-      {connecting && (
-        <div className="text-sm text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded p-2">
-          🔗 Please approve the connection in your wallet popup.
+      {/* Mobile-specific connection options */}
+      {isMobileDevice && !showMobileOptions && (
+        <div className="space-y-2">
+          <button
+            onClick={handleMobileBrowserConnect}
+            className="w-full px-4 py-2 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-semibold rounded-lg hover:brightness-110 transition-all"
+          >
+            📱 Connect Mobile Wallet
+          </button>
+          <p className="text-xs text-gray-400 text-center">
+            Choose your preferred connection method
+          </p>
         </div>
+      )}
+
+      {/* Mobile wallet options */}
+      {isMobileDevice && showMobileOptions && (
+        <div className="space-y-2">
+          <div className="text-sm text-gray-300 mb-2">Choose your wallet:</div>
+          
+          <button
+            onClick={() => handleMobileWalletConnect('phantom')}
+            className="w-full px-4 py-2 bg-purple-600 text-white font-semibold rounded-lg hover:bg-purple-700 transition-all flex items-center justify-center space-x-2"
+          >
+            <span>👻</span>
+            <span>Open Phantom App</span>
+          </button>
+          
+          <button
+            onClick={() => handleMobileWalletConnect('solflare')}
+            className="w-full px-4 py-2 bg-orange-600 text-white font-semibold rounded-lg hover:bg-orange-700 transition-all flex items-center justify-center space-x-2"
+          >
+            <span>🔥</span>
+            <span>Open Solflare App</span>
+          </button>
+          
+          <button
+            onClick={() => setShowMobileOptions(false)}
+            className="w-full px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 transition-all"
+          >
+            Use Browser Wallet Instead
+          </button>
+          
+          <div className="text-xs text-gray-400 text-center mt-2 space-y-1">
+            <div>After connecting in your wallet app:</div>
+            <div>1. Approve the connection</div>
+            <div>2. Return to this page</div>
+            <div>3. Your wallet will be connected automatically</div>
+          </div>
+        </div>
+      )}
+
+      {/* Desktop/browser wallet connection */}
+      {(!isMobileDevice || showMobileOptions) && (
+        <>
+          <WalletMultiButton className="px-4 py-2 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50" />
+          
+          {connecting && (
+            <div className="text-sm text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded p-2">
+              🔗 Please approve the connection in your wallet popup.
+            </div>
+          )}
+        </>
       )}
     </div>
   );
