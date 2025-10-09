@@ -10,6 +10,10 @@ import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { ChallengeData, joinChallenge } from "@/lib/firebase/firestore";
 import { testFirestoreConnection } from "@/lib/firebase/firestore";
 import ChallengeGrid from "@/components/arena/ChallengeGrid";
+import ChromaButton from "@/components/ui/ChromaButton";
+import ChromaModal from "@/components/ui/ChromaModal";
+import CreateChallengeForm from "@/components/arena/CreateChallengeForm";
+import ChromaNavbar from "@/components/layout/ChromaNavbar";
 
 const ArenaHome: React.FC = () => {
   const { connected, signTransaction, publicKey } = useWallet();
@@ -311,53 +315,37 @@ const ArenaHome: React.FC = () => {
       <div className="min-h-screen bg-background-1 relative w-full overflow-x-hidden">
         <div className="parallax-glow"></div>
         {/* Header */}
-        <div className="border-b border-soft bg-background-2/80 backdrop-blur-sm neocore-panel w-full">
-          <div className="container mx-auto px-4 py-4 w-full">
-            <div className="flex items-center justify-between w-full">
-              <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
-                <Link to="/" className="flex items-center space-x-2">
-                  <div className="w-8 h-8 bg-gradient-to-r from-glow-cyan to-glow-electric rounded-lg flex items-center justify-center">
-                    <span className="text-black font-bold">🎮</span>
-                  </div>
-                  <span className="neocore-h2 text-text-primary hidden sm:block">USDFG Arena</span>
-                  <span className="text-text-primary font-bold sm:hidden">Arena</span>
-                </Link>
-              </div>
-              
-              <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
-                <button 
-                  onClick={() => {
-                    if (hasActiveChallenge) {
-                      alert("You already have an active challenge. Complete or delete it before creating a new one.");
-                      return;
-                    }
-                    if (isCreatingChallenge) {
-                      console.log("⏳ Challenge creation in progress, please wait...");
-                      return;
-                    }
-                    console.log("🔥 CREATE CHALLENGE BUTTON CLICKED!");
-                    setShowCreateModal(true);
-                  }}
-                  disabled={hasActiveChallenge || isCreatingChallenge}
-                  className={`elite-btn neocore-button ${(hasActiveChallenge || isCreatingChallenge) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  title={hasActiveChallenge ? "You already have an active challenge" : isCreatingChallenge ? "Creating challenge..." : "Create a new challenge"}
-                >
-                  {hasActiveChallenge ? "Active Challenge" : isCreatingChallenge ? "Creating..." : "Create Challenge"}
-                </button>
-                <WalletConnectSimple 
-                  isConnected={isConnected}
-                  onConnect={() => {
-                    localStorage.setItem('wallet_connected', 'true');
-                  }}
-                  onDisconnect={() => {
-                    localStorage.removeItem('wallet_connected');
-                    localStorage.removeItem('wallet_address');
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
+        <ChromaNavbar>
+          <ChromaButton
+            onClick={() => {
+              if (hasActiveChallenge) {
+                alert("You already have an active challenge. Complete or delete it before creating a new one.");
+                return;
+              }
+              if (isCreatingChallenge) {
+                console.log("⏳ Challenge creation in progress, please wait...");
+                return;
+              }
+              console.log("🔥 CREATE CHALLENGE BUTTON CLICKED!");
+              setShowCreateModal(true);
+            }}
+            variant="cyan"
+            disabled={hasActiveChallenge || isCreatingChallenge}
+            title={hasActiveChallenge ? "You already have an active challenge" : isCreatingChallenge ? "Creating challenge..." : "Create a new challenge"}
+          >
+            {hasActiveChallenge ? "Active Challenge" : isCreatingChallenge ? "Creating..." : "Create Challenge"}
+          </ChromaButton>
+          <WalletConnectSimple 
+            isConnected={isConnected}
+            onConnect={() => {
+              localStorage.setItem('wallet_connected', 'true');
+            }}
+            onDisconnect={() => {
+              localStorage.removeItem('wallet_connected');
+              localStorage.removeItem('wallet_address');
+            }}
+          />
+        </ChromaNavbar>
 
         {/* Live Data Tracker */}
         <div className="container mx-auto px-4 py-2 w-full">
@@ -473,12 +461,14 @@ const ArenaHome: React.FC = () => {
                   </button>
                 </div>
                 
-                <button 
+                <ChromaButton
                   onClick={() => setShowCreateModal(true)}
-                  className="bg-gradient-to-r from-cyan-400 to-purple-500 text-black px-4 py-2 rounded-full font-semibold hover:brightness-110 transition-all"
+                  variant="cyan"
+                  size="md"
+                  className="px-6 py-3"
                 >
                   Create Challenge
-                </button>
+                </ChromaButton>
               </div>
             </div>
           </section>
@@ -784,22 +774,22 @@ const ArenaHome: React.FC = () => {
         </div>
 
         {/* Create Challenge Modal */}
-        {showCreateModal && (
-          <>
-            {console.log("🔥 MODAL IS RENDERING!")}
-            <CreateChallengeModal 
-              onClose={() => {
-                console.log("🔥 MODAL CLOSING!");
-                setShowCreateModal(false);
-              }} 
-              isConnected={isConnected}
-              onConnect={() => setIsConnected(true)}
-              onCreateChallenge={handleCreateChallenge}
-              usdfgPrice={usdfgPrice}
-              usdfgToUsd={usdfgToUsd}
-            />
-          </>
-        )}
+        <ChromaModal
+          isOpen={showCreateModal}
+          onClose={() => {
+            console.log("🔥 MODAL CLOSING!");
+            setShowCreateModal(false);
+          }}
+          title="Create New Challenge"
+        >
+          <CreateChallengeForm
+            isConnected={isConnected}
+            onConnect={() => setIsConnected(true)}
+            onCreateChallenge={handleCreateChallenge}
+            usdfgPrice={usdfgPrice}
+            usdfgToUsd={usdfgToUsd}
+          />
+        </ChromaModal>
 
         {/* Join Challenge Modal */}
         {showJoinModal && selectedChallenge && (

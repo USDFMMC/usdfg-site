@@ -1,244 +1,412 @@
-import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Gamepad2, DollarSign, Clock, Users } from "lucide-react";
+import React, { useState } from 'react';
+import ChromaButton from '@/components/ui/ChromaButton';
 
 interface CreateChallengeFormProps {
-  onSubmit: (data: any) => void;
-  isSubmitting: boolean;
+  isConnected: boolean;
+  onConnect: () => void;
+  onCreateChallenge: (data: any) => void;
+  usdfgPrice: number;
+  usdfgToUsd: (amount: number) => number;
 }
 
 const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
-  onSubmit,
-  isSubmitting
+  isConnected,
+  onConnect,
+  onCreateChallenge,
+  usdfgPrice,
+  usdfgToUsd
 }) => {
   const [formData, setFormData] = useState({
-    game: "",
-    category: "",
-    entryFee: "",
-    maxPlayers: "2",
-    timeLimit: "30",
-    rules: "",
-    customRules: ""
+    game: 'NBA 2K25',
+    platform: 'PS5',
+    username: '',
+    entryFee: 50,
+    mode: 'Head-to-Head',
+    customMode: '',
+    rules: '',
+    customRules: false
   });
 
-  const gameOptions = {
-    Fighting: ["Street Fighter 6", "Tekken 8", "Mortal Kombat 1", "Guilty Gear Strive"],
-    Racing: ["F1 2023", "Mario Kart 8", "Gran Turismo 7", "Forza Horizon 5"],
-    Shooting: ["Call of Duty: MW3", "Fortnite", "Valorant", "Apex Legends"],
-    Sports: ["EA UFC 6", "FIFA 24", "Madden 24", "NBA 2K24"]
+  const [currentStep, setCurrentStep] = useState(1);
+  const totalSteps = 3;
+  const [connecting, setConnecting] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [attemptedNext, setAttemptedNext] = useState(false);
+
+  // Available games for selection
+  const availableGames = [
+    'NBA 2K25',
+    'FIFA 24', 
+    'Street Fighter 6',
+    'Call of Duty',
+    'Tekken 8',
+    'Forza Horizon',
+    'Valorant',
+    'Madden NFL 24',
+    'Other/Custom'
+  ];
+
+  // Platform options
+  const platforms = ['PS5', 'Xbox', 'PC', 'Switch', 'Other/Custom'];
+
+  // Game-specific modes - Enhanced with competitive options
+  const gameModes = {
+    'NBA 2K25': ['Head-to-Head (Full Game)', 'Best of 3 Series', 'Quick Match (2 Quarters)', 'Park Match (2v2/3v3)', 'Custom Challenge'],
+    'FIFA 24': ['Head-to-Head (Full Match)', 'Best of 3 Series', 'Quick Match (2 Halves)', 'Squad Match (2v2)', 'Custom Challenge'],
+    'Street Fighter 6': ['Versus Match', 'Best of 3 Series', 'Elimination Bracket', 'First to 5', 'Custom Challenge'],
+    'Call of Duty': ['Duel (1v1)', 'Squad Battle (2v2)', 'Full Lobby (5v5)', 'Battle Royale', 'Custom Challenge'],
+    'Tekken 8': ['Versus Match', 'Best of 3 Series', 'Elimination Bracket', 'First to 5', 'Custom Challenge'],
+    'Forza Horizon': ['Time Trial', 'Head-to-Head Race', 'Grand Prix Series', 'Drift Challenge', 'Custom Challenge'],
+    'Valorant': ['Duel (1v1)', 'Squad Battle (2v2)', 'Full Lobby (5v5)', 'Tournament Bracket', 'Custom Challenge'],
+    'Madden NFL 24': ['Head-to-Head (Full Game)', 'Best of 3 Series', 'Quick Match (2 Quarters)', 'Squad Match (2v2)', 'Custom Challenge'],
+    'Other/Custom': ['Custom Challenge']
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit(formData);
+  const getModeExplanation = (mode: string) => {
+    const explanations: { [key: string]: string } = {
+      'Head-to-Head (Full Game)': 'Classic 1v1 match with full game duration. Best for competitive players who want the complete experience.',
+      'Best of 3 Series': 'Tournament-style series where first to win 2 games advances. High stakes, high rewards.',
+      'Quick Match (2 Quarters)': 'Fast-paced shortened matches. Perfect for quick sessions and rapid-fire competition.',
+      'Park Match (2v2/3v3)': 'Team-based basketball action. Coordinate with teammates for maximum impact.',
+      'Versus Match': 'Direct 1v1 combat. Pure skill vs skill in the ultimate test.',
+      'Elimination Bracket': 'Single elimination tournament format. One loss and you\'re out.',
+      'First to 5': 'Race to 5 wins. Endurance and consistency are key.',
+      'Duel (1v1)': 'Intense 1v1 combat. No teammates, no excuses.',
+      'Squad Battle (2v2)': 'Team coordination required. Communication is crucial.',
+      'Full Lobby (5v5)': 'Complete team battles. Strategy and teamwork essential.',
+      'Battle Royale': 'Last player standing wins. Survival of the fittest.',
+      'Time Trial': 'Race against the clock. Precision and speed matter.',
+      'Head-to-Head Race': 'Direct racing competition. Pure speed and skill.',
+      'Grand Prix Series': 'Multiple race championship. Consistency across races.',
+      'Drift Challenge': 'Style and technique competition. Show off your skills.',
+      'Tournament Bracket': 'Full tournament structure. Multiple rounds of elimination.',
+      'Custom Challenge': 'Create your own rules and format. Maximum flexibility.'
+    };
+    return explanations[mode] || 'Custom challenge format with your own rules.';
   };
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    if (attemptedNext) {
+      setValidationErrors([]);
+    }
+  };
+
+  const handleAutoRules = () => {
+    const mode = formData.mode;
+    let rules = '';
+    
+    if (mode.includes('Head-to-Head')) {
+      rules = '• Full game duration\n• No substitutions\n• Standard game settings\n• Winner takes all';
+    } else if (mode.includes('Best of 3')) {
+      rules = '• First to win 2 games\n• No breaks between games\n• Standard settings\n• Winner advances';
+    } else if (mode.includes('Quick Match')) {
+      rules = '• Shortened duration\n• Fast-paced action\n• Quick rotations\n• Winner takes all';
+    } else if (mode.includes('Park Match')) {
+      rules = '• Team coordination required\n• Communication essential\n• No solo play\n• Team victory';
+    } else if (mode.includes('Versus Match')) {
+      rules = '• 1v1 combat\n• No assists\n• Pure skill competition\n• Winner takes all';
+    } else if (mode.includes('Elimination Bracket')) {
+      rules = '• Single elimination\n• One loss and out\n• Tournament format\n• Winner advances';
+    } else if (mode.includes('First to 5')) {
+      rules = '• Race to 5 wins\n• No time limit\n• Endurance test\n• Winner takes all';
+    } else if (mode.includes('Duel')) {
+      rules = '• 1v1 combat\n• No teammates\n• Pure skill\n• Winner takes all';
+    } else if (mode.includes('Squad Battle')) {
+      rules = '• Team coordination\n• Communication required\n• Team victory\n• No solo play';
+    } else if (mode.includes('Full Lobby')) {
+      rules = '• Complete team battles\n• Strategy required\n• Teamwork essential\n• Team victory';
+    } else if (mode.includes('Battle Royale')) {
+      rules = '• Last player standing\n• Survival mode\n• No respawns\n• Winner takes all';
+    } else if (mode.includes('Time Trial')) {
+      rules = '• Race against clock\n• Best time wins\n• No collisions\n• Precision required';
+    } else if (mode.includes('Head-to-Head Race')) {
+      rules = '• Direct racing\n• No assists\n• Pure speed\n• Winner takes all';
+    } else if (mode.includes('Grand Prix Series')) {
+      rules = '• Multiple races\n• Points system\n• Consistency required\n• Series winner';
+    } else if (mode.includes('Drift Challenge')) {
+      rules = '• Style and technique\n• Points for style\n• No collisions\n• Best score wins';
+    } else if (mode.includes('Tournament Bracket')) {
+      rules = '• Full tournament\n• Multiple rounds\n• Elimination format\n• Tournament winner';
+    } else {
+      rules = '• Custom rules\n• Flexible format\n• Your own challenge\n• Winner takes all';
+    }
+    
+    handleInputChange('rules', rules);
+  };
+
+  const validateStep = (step: number) => {
+    const errors: string[] = [];
+    
+    if (step === 1) {
+      if (!formData.game) errors.push('Please select a game');
+      if (!formData.platform) errors.push('Please select a platform');
+      if (!formData.username.trim()) errors.push('Username is required');
+    }
+    
+    if (step === 2) {
+      if (!formData.mode) errors.push('Please select a challenge mode');
+      if (formData.entryFee < 10) errors.push('Minimum entry fee is 10 USDFG');
+      if (formData.entryFee > 1000) errors.push('Maximum entry fee is 1000 USDFG');
+    }
+    
+    if (step === 3) {
+      if (!formData.rules.trim()) errors.push('Please provide challenge rules');
+    }
+    
+    setValidationErrors(errors);
+    return errors.length === 0;
+  };
+
+  const handleNext = () => {
+    setAttemptedNext(true);
+    if (validateStep(currentStep)) {
+      setCurrentStep(prev => Math.min(prev + 1, totalSteps));
+    }
+  };
+
+  const handlePrev = () => {
+    setCurrentStep(prev => Math.max(prev - 1, 1));
+  };
+
+  const handleSubmit = () => {
+    if (validateStep(currentStep)) {
+      const challengeData = {
+        ...formData,
+        maxPlayers: formData.mode.includes('2v2') ? 2 : formData.mode.includes('3v3') ? 3 : formData.mode.includes('5v5') ? 5 : 2,
+        prizePool: formData.entryFee * 2, // 2x entry fee as prize pool
+        category: formData.game,
+        creatorTag: formData.username,
+        platform: formData.platform
+      };
+      
+      onCreateChallenge(challengeData);
+    }
+  };
+
+  const handleConnect = () => {
+    setConnecting(true);
+    setTimeout(() => {
+      onConnect();
+      setConnecting(false);
+    }, 1000);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Game Selection */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <Label htmlFor="category" className="text-sm font-medium text-gray-400 mb-2 block">
-            Game Category
-          </Label>
-          <Select value={formData.category} onValueChange={(value) => handleInputChange("category", value)}>
-            <SelectTrigger className="bg-background border-gray-700 text-white">
-              <SelectValue placeholder="Select category" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.keys(gameOptions).map((category) => (
-                <SelectItem key={category} value={category}>
-                  {category}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+    <div className="space-y-6">
+      {/* Progress Bar */}
+      <div className="flex items-center space-x-2">
+        {Array.from({ length: totalSteps }, (_, i) => (
+          <div key={i} className="flex items-center">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+              i + 1 <= currentStep 
+                ? 'bg-gradient-to-r from-cyan-400 to-purple-500 text-black' 
+                : 'bg-gray-700 text-gray-400'
+            }`}>
+              {i + 1}
+            </div>
+            {i < totalSteps - 1 && (
+              <div className={`w-8 h-0.5 ${
+                i + 1 < currentStep ? 'bg-gradient-to-r from-cyan-400 to-purple-500' : 'bg-gray-700'
+              }`} />
+            )}
+          </div>
+        ))}
+      </div>
 
-        <div>
-          <Label htmlFor="game" className="text-sm font-medium text-gray-400 mb-2 block">
-            Specific Game
-          </Label>
-          <Select 
-            value={formData.game} 
-            onValueChange={(value) => handleInputChange("game", value)}
-            disabled={!formData.category}
-          >
-            <SelectTrigger className="bg-background border-gray-700 text-white">
-              <SelectValue placeholder="Select game" />
-            </SelectTrigger>
-            <SelectContent>
-              {formData.category && gameOptions[formData.category as keyof typeof gameOptions]?.map((game) => (
-                <SelectItem key={game} value={game}>
+      {/* Step 1: Game Selection */}
+      {currentStep === 1 && (
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-xl font-semibold text-white mb-4">Choose Your Game</h3>
+            
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              {availableGames.map((game) => (
+                <button
+                  key={game}
+                  onClick={() => handleInputChange('game', game)}
+                  className={`p-3 rounded-lg border-2 transition-all duration-300 ${
+                    formData.game === game
+                      ? 'border-cyan-400 bg-cyan-400/10 text-cyan-400'
+                      : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
+                  }`}
+                >
                   {game}
-                </SelectItem>
+                </button>
               ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+            </div>
+          </div>
 
-      {/* Challenge Details */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div>
-          <Label htmlFor="entryFee" className="text-sm font-medium text-gray-400 mb-2 block">
-            Entry Fee (USDFG)
-          </Label>
-          <Input
-            id="entryFee"
-            type="number"
-            placeholder="10.00"
-            value={formData.entryFee}
-            onChange={(e) => handleInputChange("entryFee", e.target.value)}
-            className="bg-background border-gray-700 text-white"
-            min="0.01"
-            step="0.01"
-            required
-          />
-        </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Platform</label>
+            <select
+              value={formData.platform}
+              onChange={(e) => handleInputChange('platform', e.target.value)}
+              className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+            >
+              {platforms.map(platform => (
+                <option key={platform} value={platform}>{platform}</option>
+              ))}
+            </select>
+          </div>
 
-        <div>
-          <Label htmlFor="maxPlayers" className="text-sm font-medium text-gray-400 mb-2 block">
-            Max Players
-          </Label>
-          <Select value={formData.maxPlayers} onValueChange={(value) => handleInputChange("maxPlayers", value)}>
-            <SelectTrigger className="bg-background border-gray-700 text-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="2">2 Players</SelectItem>
-              <SelectItem value="4">4 Players</SelectItem>
-              <SelectItem value="8">8 Players</SelectItem>
-              <SelectItem value="16">16 Players</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label htmlFor="timeLimit" className="text-sm font-medium text-gray-400 mb-2 block">
-            Time Limit (minutes)
-          </Label>
-          <Select value={formData.timeLimit} onValueChange={(value) => handleInputChange("timeLimit", value)}>
-            <SelectTrigger className="bg-background border-gray-700 text-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="15">15 minutes</SelectItem>
-              <SelectItem value="30">30 minutes</SelectItem>
-              <SelectItem value="60">1 hour</SelectItem>
-              <SelectItem value="120">2 hours</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Rules */}
-      <div>
-        <Label htmlFor="rules" className="text-sm font-medium text-gray-400 mb-2 block">
-          Challenge Rules
-        </Label>
-        <Select value={formData.rules} onValueChange={(value) => handleInputChange("rules", value)}>
-          <SelectTrigger className="bg-background border-gray-700 text-white">
-            <SelectValue placeholder="Select standard rules" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="best-of-3">Best of 3</SelectItem>
-            <SelectItem value="best-of-5">Best of 5</SelectItem>
-            <SelectItem value="first-to-5">First to 5</SelectItem>
-            <SelectItem value="first-to-10">First to 10</SelectItem>
-            <SelectItem value="custom">Custom Rules</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {formData.rules === "custom" && (
-        <div>
-          <Label htmlFor="customRules" className="text-sm font-medium text-gray-400 mb-2 block">
-            Custom Rules
-          </Label>
-          <Textarea
-            id="customRules"
-            rows={4}
-            placeholder="Describe your custom rules clearly..."
-            value={formData.customRules}
-            onChange={(e) => handleInputChange("customRules", e.target.value)}
-            className="bg-background border-gray-700 text-white"
-            required={formData.rules === "custom"}
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Your Username</label>
+            <input
+              type="text"
+              value={formData.username}
+              onChange={(e) => handleInputChange('username', e.target.value)}
+              placeholder="Enter your gaming username"
+              className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+            />
+          </div>
         </div>
       )}
 
-      {/* Challenge Preview */}
-      {formData.game && formData.entryFee && (
-        <Card className="bg-card/30 border-gray-700">
-          <CardHeader>
-            <CardTitle className="text-white text-lg">Challenge Preview</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="flex items-center space-x-2">
-                <Gamepad2 className="w-4 h-4 text-cyan-400" />
-                <div>
-                  <p className="text-sm text-gray-400">Game</p>
-                  <p className="text-white font-semibold">{formData.game}</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <DollarSign className="w-4 h-4 text-green-400" />
-                <div>
-                  <p className="text-sm text-gray-400">Entry Fee</p>
-                  <p className="text-white font-semibold">{formData.entryFee} USDFG</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Users className="w-4 h-4 text-purple-400" />
-                <div>
-                  <p className="text-sm text-gray-400">Players</p>
-                  <p className="text-white font-semibold">{formData.maxPlayers}</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Clock className="w-4 h-4 text-yellow-400" />
-                <div>
-                  <p className="text-sm text-gray-400">Time Limit</p>
-                  <p className="text-white font-semibold">{formData.timeLimit}m</p>
+      {/* Step 2: Challenge Setup */}
+      {currentStep === 2 && (
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-xl font-semibold text-white mb-4">Challenge Configuration</h3>
+            
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-300 mb-2">Challenge Mode</label>
+              <select
+                value={formData.mode}
+                onChange={(e) => handleInputChange('mode', e.target.value)}
+                className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+              >
+                {gameModes[formData.game as keyof typeof gameModes]?.map(mode => (
+                  <option key={mode} value={mode}>{mode}</option>
+                ))}
+              </select>
+              
+              {/* Mode explanation */}
+              <div className="mt-3 p-3 bg-gray-800/50 rounded-lg border border-gray-600">
+                <p className="text-sm text-gray-300 whitespace-pre-line">
+                  {getModeExplanation(formData.mode)}
+                </p>
+                <div className="mt-2 pt-2 border-t border-gray-600">
+                  <ChromaButton
+                    onClick={handleAutoRules}
+                    variant="secondary"
+                    size="sm"
+                    className="text-xs"
+                  >
+                    Auto-Generate Rules
+                  </ChromaButton>
                 </div>
               </div>
             </div>
-            <div className="pt-4 border-t border-gray-700">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-400">Total Prize Pool:</span>
-                <span className="text-2xl font-bold text-cyan-400">
-                  {(parseFloat(formData.entryFee) * parseInt(formData.maxPlayers)).toFixed(2)} USDFG
-                </span>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Entry Fee (USDFG)
+              </label>
+              <div className="flex items-center space-x-3">
+                <input
+                  type="number"
+                  min="10"
+                  max="1000"
+                  value={formData.entryFee}
+                  onChange={(e) => handleInputChange('entryFee', parseInt(e.target.value) || 0)}
+                  className="flex-1 p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                />
+                <div className="text-sm text-gray-400">
+                  ≈ ${usdfgToUsd(formData.entryFee).toFixed(2)} USD
+                </div>
+              </div>
+              <div className="mt-2 text-sm text-gray-400">
+                Prize Pool: {formData.entryFee * 2} USDFG (2x entry fee)
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
-      {/* Submit Button */}
-      <div className="flex justify-end space-x-4">
-        <Button
-          type="submit"
-          disabled={isSubmitting || !formData.game || !formData.entryFee}
-          className="bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-semibold hover:brightness-110"
+      {/* Step 3: Rules */}
+      {currentStep === 3 && (
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-xl font-semibold text-white mb-4">Challenge Rules</h3>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Rules & Conditions
+              </label>
+              <textarea
+                value={formData.rules}
+                onChange={(e) => handleInputChange('rules', e.target.value)}
+                placeholder="Enter detailed rules for your challenge..."
+                rows={6}
+                className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 resize-none"
+              />
+              <div className="mt-2 text-sm text-gray-400">
+                Be specific about game settings, time limits, and winning conditions.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Validation Errors */}
+      {validationErrors.length > 0 && (
+        <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+          <div className="text-red-400 font-medium mb-2">Please fix the following errors:</div>
+          <ul className="text-red-300 text-sm space-y-1">
+            {validationErrors.map((error, index) => (
+              <li key={index}>• {error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      <div className="flex justify-between pt-6 border-t border-gray-700">
+        <ChromaButton
+          onClick={handlePrev}
+          variant="secondary"
+          disabled={currentStep === 1}
         >
-          <Plus className="w-4 h-4 mr-2" />
-          {isSubmitting ? "Creating Challenge..." : "Create Challenge"}
-        </Button>
+          Previous
+        </ChromaButton>
+
+        <div className="flex space-x-3">
+          {currentStep < totalSteps ? (
+            <ChromaButton
+              onClick={handleNext}
+              variant="primary"
+            >
+              Next
+            </ChromaButton>
+          ) : (
+            <ChromaButton
+              onClick={handleSubmit}
+              variant="success"
+              disabled={!isConnected}
+            >
+              Create Challenge
+            </ChromaButton>
+          )}
+        </div>
       </div>
-    </form>
+
+      {/* Connection Status */}
+      {!isConnected && (
+        <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+          <p className="text-yellow-400 text-sm mb-3">
+            Connect your wallet to create challenges and compete for rewards!
+          </p>
+          <ChromaButton
+            onClick={handleConnect}
+            variant="warning"
+            disabled={connecting}
+          >
+            {connecting ? "Connecting..." : "Connect Wallet"}
+          </ChromaButton>
+        </div>
+      )}
+    </div>
   );
 };
 
