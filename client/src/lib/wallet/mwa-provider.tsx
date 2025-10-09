@@ -4,7 +4,7 @@ import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
 import { SolflareWalletAdapter } from '@solana/wallet-adapter-solflare';
 import { clusterApiUrl } from '@solana/web3.js';
-import { createDefaultAuthorizationResultCache, SolanaMobileWalletAdapter } from '@solana-mobile/wallet-adapter-mobile';
+// Removed mobile wallet adapter import - was causing override issues
 
 // Import wallet adapter styles
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -20,30 +20,20 @@ export const MWAProvider: FC<{ children: ReactNode }> = ({ children }) => {
       
       const walletList = [];
       
-      // Always add Solflare (works in all browsers)
-      const solflareWallet = new SolflareWalletAdapter();
-      walletList.push(solflareWallet);
+      // Always add Solflare (works everywhere)
+      walletList.push(new SolflareWalletAdapter());
       
-      // Add Phantom only if detected or in Phantom app
-      if (isInPhantomApp || (typeof window !== 'undefined' && window.solana)) {
-        const phantomWallet = new PhantomWalletAdapter();
-        walletList.push(phantomWallet);
-      }
-      
-      // Add mobile wallet adapter for mobile browsers
-      if (isMobile) {
-        walletList.push(
-          new SolanaMobileWalletAdapter({
-            appIdentity: { name: 'USDFG Arena' },
-            authorizationResultCache: createDefaultAuthorizationResultCache(),
-          })
-        );
+      // Add Phantom only if:
+      // 1. We're in the Phantom app, OR
+      // 2. We're on desktop (not mobile), OR  
+      // 3. Phantom is actually detected
+      if (isInPhantomApp || !isMobile || (typeof window !== 'undefined' && window.solana)) {
+        walletList.push(new PhantomWalletAdapter());
       }
       
       console.log('🔧 MWA Provider: Available wallets:', walletList.map(w => w.name));
       console.log('📱 Mobile detected:', isMobile);
       console.log('👻 In Phantom app:', isInPhantomApp);
-      console.log('🔧 Window.solana exists:', !!window.solana);
       
       return walletList;
     },
