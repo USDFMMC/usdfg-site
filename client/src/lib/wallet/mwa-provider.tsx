@@ -15,26 +15,17 @@ export const MWAProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   const wallets = useMemo(
     () => {
-      const isMobile = typeof window !== 'undefined' && /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      // Create wallet instances with explicit configuration
+      const phantomWallet = new PhantomWalletAdapter();
+      const solflareWallet = new SolflareWalletAdapter();
       
-      const walletList = [
-        // Desktop wallets first
-        new PhantomWalletAdapter(),
-        new SolflareWalletAdapter(),
-      ];
-      
-      // Add mobile wallet adapter last to avoid overriding desktop wallets
-      if (isMobile) {
-        walletList.push(
-          new SolanaMobileWalletAdapter({
-            appIdentity: { name: 'USDFG Arena' },
-            authorizationResultCache: createDefaultAuthorizationResultCache(),
-          })
-        );
-      }
+      const walletList = [phantomWallet, solflareWallet];
       
       console.log('🔧 MWA Provider: Available wallets:', walletList.map(w => w.name));
-      console.log('📱 Mobile detected:', isMobile);
+      console.log('📱 User agent:', navigator.userAgent);
+      console.log('🔧 Phantom ready:', phantomWallet.readyState);
+      console.log('🔧 Solflare ready:', solflareWallet.readyState);
+      
       return walletList;
     },
     []
@@ -43,10 +34,7 @@ export const MWAProvider: FC<{ children: ReactNode }> = ({ children }) => {
   return (
     <ConnectionProvider endpoint={endpoint}>
       <WalletProvider wallets={wallets} autoConnect={false}>
-        <WalletModalProvider 
-          featuredWallets={2}
-          className="wallet-modal"
-        >
+        <WalletModalProvider>
           {children}
         </WalletModalProvider>
       </WalletProvider>
