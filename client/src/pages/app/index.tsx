@@ -3,7 +3,7 @@ import { Helmet } from "react-helmet";
 import { Link } from "react-router-dom";
 import WalletConnectSimple from "@/components/arena/WalletConnectSimple";
 import { useWallet } from '@solana/wallet-adapter-react';
-import { getWalletPublicKey } from "@/lib/wallet/solana";
+// Removed legacy wallet import - using MWA hooks instead
 import { fetchActiveChallenges, fetchOpenChallenges, joinChallengeOnChain } from "@/lib/chain/events";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
@@ -139,7 +139,7 @@ const ArenaHome: React.FC = () => {
     
     try {
       // Get current wallet address
-      const currentWallet = getWalletPublicKey();
+      const currentWallet = publicKey?.toString() || null;
       if (!currentWallet) {
         throw new Error("Wallet not connected");
       }
@@ -263,7 +263,7 @@ const ArenaHome: React.FC = () => {
   };
 
   const isChallengeOwner = (challenge: any) => {
-    const currentWallet = getWalletPublicKey();
+    const currentWallet = publicKey?.toString() || null;
     const isOwner = currentWallet && challenge.creator === currentWallet;
     console.log("🔍 Ownership check:", {
       currentWallet: currentWallet ? currentWallet.slice(0, 8) + "..." : "null",
@@ -1537,7 +1537,7 @@ const JoinChallengeModal: React.FC<{
     setState('processing');
     
     try {
-      const walletAddress = getWalletPublicKey();
+      const walletAddress = publicKey?.toString() || null;
       if (!walletAddress) {
         throw new Error('Wallet not connected');
       }
