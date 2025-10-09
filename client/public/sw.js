@@ -26,6 +26,22 @@ self.addEventListener('install', (event) => {
 
 // Fetch event - serve from cache
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+  
+  // Skip ServiceWorker for API requests, Firestore, and external services
+  if (
+    url.hostname.includes('firestore.googleapis.com') ||
+    url.hostname.includes('firebase.googleapis.com') ||
+    url.hostname.includes('api.devnet.solana.com') ||
+    url.hostname.includes('api.mainnet-beta.solana.com') ||
+    url.hostname.includes('api.testnet.solana.com') ||
+    url.pathname.includes('/api/') ||
+    url.pathname.includes('/firestore/')
+  ) {
+    // Let these requests pass through without ServiceWorker interference
+    return;
+  }
+  
   event.respondWith(
     caches.match(event.request)
       .then((response) => {

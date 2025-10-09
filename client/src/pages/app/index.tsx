@@ -298,22 +298,23 @@ const ArenaHome: React.FC = () => {
         <meta name="description" content="Enter the USDFG Arena - Compete in skill-based challenges, earn USDFG, and prove your gaming prowess." />
       </Helmet>
 
-      <div className="min-h-screen bg-background-1 relative">
+      <div className="min-h-screen bg-background-1 relative w-full overflow-x-hidden">
         <div className="parallax-glow"></div>
         {/* Header */}
-        <div className="border-b border-soft bg-background-2/80 backdrop-blur-sm neocore-panel">
-          <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
+        <div className="border-b border-soft bg-background-2/80 backdrop-blur-sm neocore-panel w-full">
+          <div className="container mx-auto px-4 py-4 w-full">
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
                 <Link to="/" className="flex items-center space-x-2">
                   <div className="w-8 h-8 bg-gradient-to-r from-glow-cyan to-glow-electric rounded-lg flex items-center justify-center">
                     <span className="text-black font-bold">🎮</span>
                   </div>
-                  <span className="neocore-h2 text-text-primary">USDFG Arena</span>
+                  <span className="neocore-h2 text-text-primary hidden sm:block">USDFG Arena</span>
+                  <span className="text-text-primary font-bold sm:hidden">Arena</span>
                 </Link>
               </div>
               
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
                 <button 
                   onClick={() => {
                     if (hasActiveChallenge) {
@@ -349,22 +350,22 @@ const ArenaHome: React.FC = () => {
         </div>
 
         {/* Live Data Tracker */}
-        <div className="container mx-auto px-4 py-2">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center space-x-2">
+        <div className="container mx-auto px-4 py-2 w-full">
+          <div className="flex items-center justify-between text-sm w-full">
+            <div className="flex items-center space-x-2 flex-shrink-0">
               <div className={`w-2 h-2 rounded-full ${!challengesLoading && !challengesError ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
-              <span className="text-text-dim">
-                {challengesLoading ? 'Loading...' : challengesError ? 'Error' : 'Firestore Live'} • {challenges.length} active challenges
+              <span className="text-text-dim text-xs sm:text-sm">
+                {challengesLoading ? 'Loading...' : challengesError ? 'Error' : 'Firestore Live'} • {challenges.length} active
               </span>
             </div>
-            <div className="text-text-dim">
+            <div className="text-text-dim text-xs sm:text-sm hidden sm:block">
               Real-time sync enabled
             </div>
           </div>
         </div>
 
         {/* Main Content */}
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 py-4 sm:py-8 w-full">
           {/* Hero Section */}
           <div className="text-center neocore-section">
             {/* USDFG Price Ticker */}
@@ -375,23 +376,23 @@ const ArenaHome: React.FC = () => {
               <span className="text-xs text-text-dim ml-2 neocore-body">Live</span>
             </div>
             
-            <h1 className="neocore-h1">
+            <h1 className="neocore-h1 text-2xl sm:text-4xl lg:text-5xl">
               Welcome to the <span className="bg-gradient-to-r from-glow-cyan to-glow-electric bg-clip-text text-transparent">Arena</span>
             </h1>
-            <p className="text-xl max-w-2xl mx-auto neocore-body mb-8">
+            <p className="text-base sm:text-xl max-w-2xl mx-auto neocore-body mb-6 sm:mb-8 px-4">
               Compete in skill-based challenges, earn USDFG, and prove your gaming prowess against players worldwide.
             </p>
             
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4">
               <button 
                 onClick={() => setShowCreateModal(true)}
-                className="elite-btn neocore-button px-6 py-3"
+                className="elite-btn neocore-button px-4 sm:px-6 py-2 sm:py-3 w-full sm:w-auto text-sm sm:text-base"
               >
                 Create Challenge
               </button>
               <Link 
                 to="#challenges"
-                className="text-glow-cyan underline underline-offset-4 hover:text-glow-cyan/80 transition-colors neocore-body"
+                className="text-glow-cyan underline underline-offset-4 hover:text-glow-cyan/80 transition-colors neocore-body text-sm sm:text-base"
               >
                 Browse Challenges
               </Link>

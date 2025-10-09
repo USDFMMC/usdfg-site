@@ -2,6 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Mobile viewport fixes */
+html {
+  height: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  height: 100%;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Ensure proper mobile layout */
+#root {
+  min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+/* Mobile responsive fixes */
+@media (max-width: 768px) {
+  body {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+  
+  #root {
+    height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+}
+
 /* Challenge expiry animations */
 @keyframes fadeOut {
   from { opacity: 1; transform: scale(1); }
