@@ -109,10 +109,11 @@ const ArenaHome: React.FC = () => {
       creator: challenge.creator,
       rules: challenge.rules,
       createdAt: challenge.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-    timestamp: challenge.createdAt?.toDate?.()?.getTime() || Date.now(),
-    expiresAt: challenge.expiresAt?.toDate?.()?.getTime() || (Date.now() + (2 * 60 * 60 * 1000)),
-    status: challenge.status
-  }));
+      timestamp: challenge.createdAt?.toDate?.()?.getTime() || Date.now(),
+      expiresAt: challenge.expiresAt?.toDate?.()?.getTime() || (Date.now() + (2 * 60 * 60 * 1000)),
+      status: challenge.status
+    };
+  });
   
   // Debug: Log challenges for debugging
   console.log("🔍 Current Firestore challenges for display:", challenges.length);

@@ -27,8 +27,8 @@ export async function testFirestoreConnection() {
 }
 
 // Collection references
-export const challengesCollection = collection(db, 'challenges');
-export const usersCollection = collection(db, 'users');
+const challengesCollection = collection(db, 'challenges');
+const usersCollection = collection(db, 'users');
 
 // Challenge interfaces
 export interface ChallengeData {
