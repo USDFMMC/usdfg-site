@@ -10,10 +10,10 @@ import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { ChallengeData, joinChallenge } from "@/lib/firebase/firestore";
 import { testFirestoreConnection } from "@/lib/firebase/firestore";
 import ChallengeGrid from "@/components/arena/ChallengeGrid";
-import ChromaButton from "@/components/ui/ChromaButton";
-import ChromaModal from "@/components/ui/ChromaModal";
+import ElegantButton from "@/components/ui/ElegantButton";
+import ElegantModal from "@/components/ui/ElegantModal";
 import CreateChallengeForm from "@/components/arena/CreateChallengeForm";
-import ChromaNavbar from "@/components/layout/ChromaNavbar";
+import ElegantNavbar from "@/components/layout/ElegantNavbar";
 
 const ArenaHome: React.FC = () => {
   const { connected, signTransaction, publicKey } = useWallet();
@@ -315,8 +315,8 @@ const ArenaHome: React.FC = () => {
       <div className="min-h-screen bg-background-1 relative w-full overflow-x-hidden">
         <div className="parallax-glow"></div>
         {/* Header */}
-        <ChromaNavbar>
-          <ChromaButton
+        <ElegantNavbar>
+          <ElegantButton
             onClick={() => {
               if (hasActiveChallenge) {
                 alert("You already have an active challenge. Complete or delete it before creating a new one.");
@@ -334,7 +334,7 @@ const ArenaHome: React.FC = () => {
             title={hasActiveChallenge ? "You already have an active challenge" : isCreatingChallenge ? "Creating challenge..." : "Create a new challenge"}
           >
             {hasActiveChallenge ? "Active Challenge" : isCreatingChallenge ? "Creating..." : "Create Challenge"}
-          </ChromaButton>
+          </ElegantButton>
           <WalletConnectSimple 
             isConnected={isConnected}
             onConnect={() => {
@@ -345,7 +345,7 @@ const ArenaHome: React.FC = () => {
               localStorage.removeItem('wallet_address');
             }}
           />
-        </ChromaNavbar>
+        </ElegantNavbar>
 
         {/* Live Data Tracker */}
         <div className="container mx-auto px-4 py-2 w-full">
@@ -461,14 +461,14 @@ const ArenaHome: React.FC = () => {
                   </button>
                 </div>
                 
-                <ChromaButton
+                <ElegantButton
                   onClick={() => setShowCreateModal(true)}
                   variant="cyan"
                   size="md"
                   className="px-6 py-3"
                 >
                   Create Challenge
-                </ChromaButton>
+                </ElegantButton>
               </div>
             </div>
           </section>
@@ -774,7 +774,7 @@ const ArenaHome: React.FC = () => {
         </div>
 
         {/* Create Challenge Modal */}
-        <ChromaModal
+        <ElegantModal
           isOpen={showCreateModal}
           onClose={() => {
             console.log("🔥 MODAL CLOSING!");
@@ -789,7 +789,7 @@ const ArenaHome: React.FC = () => {
             usdfgPrice={usdfgPrice}
             usdfgToUsd={usdfgToUsd}
           />
-        </ChromaModal>
+        </ElegantModal>
 
         {/* Join Challenge Modal */}
         {showJoinModal && selectedChallenge && (

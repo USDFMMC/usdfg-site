@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import ChromaButton from '@/components/ui/ChromaButton';
+import ElegantButton from '@/components/ui/ElegantButton';
 
 interface CreateChallengeFormProps {
   isConnected: boolean;
@@ -287,14 +287,14 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                   {getModeExplanation(formData.mode)}
                 </p>
                 <div className="mt-2 pt-2 border-t border-gray-600">
-                  <ChromaButton
+                  <ElegantButton
                     onClick={handleAutoRules}
                     variant="secondary"
                     size="sm"
                     className="text-xs"
                   >
                     Auto-Generate Rules
-                  </ChromaButton>
+                  </ElegantButton>
                 </div>
               </div>
             </div>
@@ -363,30 +363,30 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
 
       {/* Action Buttons */}
       <div className="flex justify-between pt-6 border-t border-gray-700">
-        <ChromaButton
+        <ElegantButton
           onClick={handlePrev}
           variant="secondary"
           disabled={currentStep === 1}
         >
           Previous
-        </ChromaButton>
+        </ElegantButton>
 
         <div className="flex space-x-3">
           {currentStep < totalSteps ? (
-            <ChromaButton
+            <ElegantButton
               onClick={handleNext}
               variant="primary"
             >
               Next
-            </ChromaButton>
+            </ElegantButton>
           ) : (
-            <ChromaButton
+            <ElegantButton
               onClick={handleSubmit}
               variant="success"
               disabled={!isConnected}
             >
               Create Challenge
-            </ChromaButton>
+            </ElegantButton>
           )}
         </div>
       </div>
@@ -397,13 +397,13 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
           <p className="text-yellow-400 text-sm mb-3">
             Connect your wallet to create challenges and compete for rewards!
           </p>
-          <ChromaButton
+          <ElegantButton
             onClick={handleConnect}
             variant="warning"
             disabled={connecting}
           >
             {connecting ? "Connecting..." : "Connect Wallet"}
-          </ChromaButton>
+          </ElegantButton>
         </div>
       )}
     </div>
