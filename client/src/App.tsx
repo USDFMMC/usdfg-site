@@ -1,3 +1,4 @@
+import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -34,16 +35,30 @@ function AppRouter() {
 }
 
 function App() {
+  // Safari compatibility check and error handling
+  React.useEffect(() => {
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    if (isSafari) {
+      console.log('🍎 Safari detected - applying compatibility fixes');
+      
+      // Add Safari-specific meta tags
+      const viewport = document.querySelector('meta[name="viewport"]');
+      if (viewport) {
+        viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+      }
+    }
+  }, []);
+
   return (
     <MWAProvider>
       <QueryClientProvider client={queryClient}>
         <Helmet>
-        <title>USDFGAMING – Skill-Based Crypto Gaming | Game. Earn. Conquer.</title>
-        <meta
-          name="description"
-          content="USDFGAMING is the elite, skill-based crypto gaming platform. Compete, verify results, and earn USDFG. No gambling. 100% on-chain."
-        />
-        <link rel="canonical" href="https://usdfg.pro/" />
+          <title>USDFGAMING – Skill-Based Crypto Gaming | Game. Earn. Conquer.</title>
+          <meta
+            name="description"
+            content="USDFGAMING is the elite, skill-based crypto gaming platform. Compete, verify results, and earn USDFG. No gambling. 100% on-chain."
+          />
+          <link rel="canonical" href="https://usdfg.pro/" />
 
         {/* Open Graph */}
         <meta property="og:type" content="website" />

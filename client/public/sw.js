@@ -1,7 +1,10 @@
 // Simple ServiceWorker for USDFG Arena
-// This replaces any problematic ServiceWorker that was causing require() errors
+// Safari-compatible ServiceWorker with fallbacks
 
-const CACHE_NAME = 'usdfg-arena-v3';
+const CACHE_NAME = 'usdfg-arena-v4';
+
+// Safari compatibility check
+const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 const urlsToCache = [
   '/',
   '/app',
@@ -28,31 +31,53 @@ self.addEventListener('install', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   
-  // Skip ServiceWorker for ALL external API requests, Firestore, fonts, and external services
-  if (
-    url.hostname.includes('firestore.googleapis.com') ||
-    url.hostname.includes('firebase.googleapis.com') ||
-    url.hostname.includes('firebaseinstallations.googleapis.com') ||
-    url.hostname.includes('identitytoolkit.googleapis.com') ||
-    url.hostname.includes('securetoken.googleapis.com') ||
-    url.hostname.includes('api.devnet.solana.com') ||
-    url.hostname.includes('api.mainnet-beta.solana.com') ||
-    url.hostname.includes('api.testnet.solana.com') ||
-    url.hostname.includes('googleapis.com') ||
-    url.hostname.includes('fonts.googleapis.com') ||
-    url.hostname.includes('fonts.gstatic.com') ||
-    url.pathname.includes('/api/') ||
-    url.pathname.includes('/firestore/') ||
-    url.pathname.includes('/Listen/') ||
-    url.pathname.includes('/Listen') ||
-    url.pathname.includes('.woff2') ||
-    url.pathname.includes('.woff') ||
-    url.pathname.includes('.ttf') ||
-    event.request.method !== 'GET'
-  ) {
-    // Let these requests pass through without ServiceWorker interference
-    console.log('🚫 ServiceWorker: Bypassing request to', url.hostname);
-    return;
+  // Safari-specific handling - be more permissive
+  if (isSafari) {
+    // In Safari, bypass ServiceWorker for most requests to avoid issues
+    if (
+      url.hostname.includes('firestore.googleapis.com') ||
+      url.hostname.includes('firebase.googleapis.com') ||
+      url.hostname.includes('googleapis.com') ||
+      url.hostname.includes('fonts.googleapis.com') ||
+      url.hostname.includes('fonts.gstatic.com') ||
+      url.pathname.includes('/api/') ||
+      url.pathname.includes('/firestore/') ||
+      url.pathname.includes('/Listen/') ||
+      url.pathname.includes('/Listen') ||
+      url.pathname.includes('.woff2') ||
+      url.pathname.includes('.woff') ||
+      url.pathname.includes('.ttf') ||
+      event.request.method !== 'GET'
+    ) {
+      console.log('🚫 ServiceWorker: Safari bypass for', url.hostname);
+      return;
+    }
+  } else {
+    // Non-Safari browsers - full ServiceWorker functionality
+    if (
+      url.hostname.includes('firestore.googleapis.com') ||
+      url.hostname.includes('firebase.googleapis.com') ||
+      url.hostname.includes('firebaseinstallations.googleapis.com') ||
+      url.hostname.includes('identitytoolkit.googleapis.com') ||
+      url.hostname.includes('securetoken.googleapis.com') ||
+      url.hostname.includes('api.devnet.solana.com') ||
+      url.hostname.includes('api.mainnet-beta.solana.com') ||
+      url.hostname.includes('api.testnet.solana.com') ||
+      url.hostname.includes('googleapis.com') ||
+      url.hostname.includes('fonts.googleapis.com') ||
+      url.hostname.includes('fonts.gstatic.com') ||
+      url.pathname.includes('/api/') ||
+      url.pathname.includes('/firestore/') ||
+      url.pathname.includes('/Listen/') ||
+      url.pathname.includes('/Listen') ||
+      url.pathname.includes('.woff2') ||
+      url.pathname.includes('.woff') ||
+      url.pathname.includes('.ttf') ||
+      event.request.method !== 'GET'
+    ) {
+      console.log('🚫 ServiceWorker: Bypassing request to', url.hostname);
+      return;
+    }
   }
   
   event.respondWith(
@@ -76,7 +101,7 @@ self.addEventListener('fetch', (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('✅ ServiceWorker: Activated v3');
+  console.log('✅ ServiceWorker: Activated v4 (Safari compatible)');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(

@@ -2,16 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Safari compatibility fixes */
+@supports not (backdrop-filter: blur(10px)) {
+  .backdrop-blur-sm {
+    background-color: rgba(0, 0, 0, 0.8);
+  }
+}
+
 /* Mobile viewport fixes */
 html {
   height: 100%;
   overflow-x: hidden;
+  /* Safari viewport fix */
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
   height: 100%;
   overflow-x: hidden;
   position: relative;
+  /* Safari specific fixes */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Ensure proper mobile layout */
@@ -41,6 +54,33 @@ body {
   body {
     overflow-x: hidden;
   }
+}
+
+/* Safari-specific fixes */
+@supports (-webkit-appearance: none) {
+  /* Safari-specific styles */
+  .bg-gradient-to-r {
+    background: linear-gradient(to right, var(--tw-gradient-stops));
+  }
+  
+  .bg-clip-text {
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+}
+
+/* Safari flexbox fixes */
+.flex {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+}
+
+/* Safari grid fixes */
+.grid {
+  display: -webkit-grid;
+  display: grid;
 }
 
 /* Challenge expiry animations */
