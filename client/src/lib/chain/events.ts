@@ -540,3 +540,25 @@ export async function fetchPlayerEvents(playerAddress: string): Promise<any[]> {
   
   return mockPlayerEvents;
 }
+
+/**
+ * Join a challenge on-chain (placeholder for now)
+ */
+export async function joinChallengeOnChain(challengeId: string, entryFee: number, wallet: string): Promise<boolean> {
+  try {
+    console.log(`💸 Joining challenge ${challengeId} with entry fee ${entryFee} USDFG`);
+    console.log(`👤 Wallet: ${wallet}`);
+    
+    // For now, simulate the join transaction
+    // In a real implementation, this would:
+    // 1. Transfer USDFG tokens to the challenge escrow account
+    // 2. Update the challenge account with the new player
+    // 3. Handle the escrow logic
+    
+    console.log("✅ Join transaction simulated successfully");
+    return true;
+  } catch (error) {
+    console.error("❌ Error joining challenge on-chain:", error);
+    throw error;
+  }
+}

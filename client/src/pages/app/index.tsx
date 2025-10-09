@@ -3,10 +3,10 @@ import { Helmet } from "react-helmet";
 import { Link } from "react-router-dom";
 import WalletConnect from "@/components/arena/WalletConnect";
 import { connectPhantom, hasPhantomInstalled, getWalletPublicKey } from "@/lib/wallet/solana";
-import { fetchActiveChallenges, fetchOpenChallenges } from "@/lib/chain/events";
+import { fetchActiveChallenges, fetchOpenChallenges, joinChallengeOnChain } from "@/lib/chain/events";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
-import { ChallengeData } from "@/lib/firebase/firestore";
+import { ChallengeData, joinChallenge } from "@/lib/firebase/firestore";
 import { testFirestoreConnection } from "@/lib/firebase/firestore";
 
 const ArenaHome: React.FC = () => {
@@ -651,16 +651,32 @@ const ArenaHome: React.FC = () => {
                             </button>
                           </div>
                         ) : (
-                          <button 
-                            onClick={() => {
-                              setSelectedChallenge(challenge);
-                              setShowJoinModal(true);
-                            }}
-                            className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50"
-                            disabled={!isConnected}
-                          >
-                            {!isConnected ? "Connect to Join" : "Join Challenge"}
-                          </button>
+                          <div className="w-full">
+                            {challenge.status === "active" && challenge.players < challenge.capacity ? (
+                              <button 
+                                onClick={() => {
+                                  setSelectedChallenge(challenge);
+                                  setShowJoinModal(true);
+                                }}
+                                className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50"
+                                disabled={!isConnected}
+                              >
+                                {!isConnected ? "Connect to Join" : "Join Challenge"}
+                              </button>
+                            ) : challenge.status === "active" && challenge.players >= challenge.capacity ? (
+                              <div className="w-full px-4 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 font-semibold rounded-lg text-center">
+                                🔒 Challenge Full
+                              </div>
+                            ) : challenge.status === "completed" ? (
+                              <div className="w-full px-4 py-2 bg-red-600/20 text-red-400 border border-red-600/30 font-semibold rounded-lg text-center">
+                                ⏰ Expired
+                              </div>
+                            ) : (
+                              <div className="w-full px-4 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 font-semibold rounded-lg text-center">
+                                📋 View Details
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     );
@@ -1523,16 +1539,28 @@ const JoinChallengeModal: React.FC<{
     setState('processing');
     
     try {
-      // TODO: Implement actual join logic with wallet checks
-      // For now, simulate the process
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const walletAddress = getWalletPublicKey();
+      if (!walletAddress) {
+        throw new Error('Wallet not connected');
+      }
+
+      console.log("🚀 Joining challenge:", challenge.id);
+      
+      // Step 1: Join on-chain (Solana transaction)
+      await joinChallengeOnChain(challenge.id, challenge.entryFee, walletAddress);
+      
+      // Step 2: Update Firestore
+      await joinChallenge(challenge.id, walletAddress);
+      
+      console.log("✅ Successfully joined challenge!");
       setState('success');
       
       setTimeout(() => {
         onClose();
       }, 1500);
-    } catch (err) {
-      setError('Failed to join challenge. Please try again.');
+    } catch (err: any) {
+      console.error("❌ Join failed:", err);
+      setError(err.message || 'Failed to join challenge. Please try again.');
       setState('error');
     }
   };

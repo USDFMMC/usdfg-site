@@ -9,8 +9,12 @@ import {
   orderBy, 
   where,
   getDocs,
+  getDoc,
   Timestamp,
-  writeBatch
+  writeBatch,
+  increment,
+  arrayUnion,
+  serverTimestamp
 } from 'firebase/firestore';
 import { db } from './config';
 
@@ -180,29 +184,38 @@ export const fetchChallengeById = async (challengeId: string): Promise<Challenge
   }
 };
 
-// Join challenge
-export const joinChallenge = async (challengeId: string, playerId: string) => {
+// Join challenge with proper Firestore operations
+export const joinChallenge = async (challengeId: string, wallet: string) => {
   try {
-    const challengeRef = doc(db, 'challenges', challengeId);
-    const challenge = await fetchChallengeById(challengeId);
+    const challengeRef = doc(db, "challenges", challengeId);
+    const snap = await getDoc(challengeRef);
     
-    if (!challenge) {
-      throw new Error('Challenge not found');
+    if (!snap.exists()) {
+      throw new Error("Challenge not found");
     }
-    
-    if (challenge.players.includes(playerId)) {
-      throw new Error('Player already in challenge');
+
+    const data = snap.data();
+    if (data.players && data.players.length >= data.maxPlayers) {
+      throw new Error("Challenge already full");
     }
-    
-    if (challenge.players.length >= challenge.maxPlayers) {
-      throw new Error('Challenge is full');
+
+    // Check if player is already in the challenge
+    if (data.players && data.players.includes(wallet)) {
+      throw new Error("You are already in this challenge");
     }
-    
+
+    const newPlayers = data.players ? [...data.players, wallet] : [wallet];
+    const isFull = newPlayers.length >= data.maxPlayers;
+
     await updateDoc(challengeRef, {
-      players: [...challenge.players, playerId]
+      players: newPlayers,
+      status: isFull ? "in-progress" : "active",
+      joinedBy: arrayUnion(wallet),
+      updatedAt: serverTimestamp(),
     });
-    
+
     console.log('✅ Player joined challenge:', challengeId);
+    return true;
   } catch (error) {
     console.error('❌ Error joining challenge:', error);
     throw error;
