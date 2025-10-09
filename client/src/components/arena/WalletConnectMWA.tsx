@@ -3,6 +3,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { WalletMultiButton, WalletDisconnectButton } from '@solana/wallet-adapter-react-ui';
 import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { sendSOL } from "@/lib/wallet/solana";
 
 interface WalletConnectMWAProps {
   isConnected: boolean;
@@ -15,7 +16,7 @@ const WalletConnectMWA: React.FC<WalletConnectMWAProps> = ({
   onConnect,
   onDisconnect
 }) => {
-  const { publicKey, connected, connecting, disconnect } = useWallet();
+  const { publicKey, connected, connecting, disconnect, signTransaction } = useWallet();
   const { connection } = useConnection();
   const [balance, setBalance] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
@@ -96,7 +97,9 @@ const WalletConnectMWA: React.FC<WalletConnectMWAProps> = ({
     try {
       // Send 0.01 SOL to a test address (you can change this)
       const testRecipient = "11111111111111111111111111111112"; // System program address as test
-      const signature = await sendSOL(publicKey.toString(), testRecipient, 0.01);
+      const signature = await sendSOL(publicKey.toString(), testRecipient, 0.01, {
+        signTransaction: signTransaction
+      });
       
       // Refresh balance after transaction
       const newBalance = await connection.getBalance(publicKey);

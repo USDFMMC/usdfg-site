@@ -363,7 +363,10 @@ const transactionCache = new Map<string, Promise<string>>();
 /**
  * Create a new challenge on-chain with deduplication
  */
-export async function createChallengeOnChain(challengeData: Omit<ChallengeMeta, "id"|"clientId"|"timestamp"|"creator">): Promise<string> {
+export async function createChallengeOnChain(
+  challengeData: Omit<ChallengeMeta, "id"|"clientId"|"timestamp"|"creator">,
+  wallet: { signTransaction: (transaction: Transaction) => Promise<Transaction>, publicKey: PublicKey }
+): Promise<string> {
   console.log("🚀 Creating challenge on-chain...");
   
   // Create a unique cache key based on challenge data
@@ -376,7 +379,7 @@ export async function createChallengeOnChain(challengeData: Omit<ChallengeMeta, 
   }
   
   // Create the transaction promise and cache it
-  const transactionPromise = createChallengeTransaction(challengeData);
+  const transactionPromise = createChallengeTransaction(challengeData, wallet);
   transactionCache.set(cacheKey, transactionPromise);
   
   try {
@@ -391,19 +394,16 @@ export async function createChallengeOnChain(challengeData: Omit<ChallengeMeta, 
 /**
  * Internal function to create the actual challenge transaction
  */
-async function createChallengeTransaction(challengeData: Omit<ChallengeMeta, "id"|"clientId"|"timestamp"|"creator">): Promise<string> {
+async function createChallengeTransaction(
+  challengeData: Omit<ChallengeMeta, "id"|"clientId"|"timestamp"|"creator">,
+  wallet: { signTransaction: (transaction: Transaction) => Promise<Transaction>, publicKey: PublicKey }
+): Promise<string> {
   try {
-    // Get wallet provider
-    const provider = (window as any).solana;
-    if (!provider || !provider.isPhantom) {
-      throw new Error("Phantom wallet not found");
-    }
-    
-    if (!provider.publicKey) {
+    if (!wallet.publicKey) {
       throw new Error("Wallet not connected");
     }
     
-    console.log("✅ Wallet connected:", provider.publicKey.toString());
+    console.log("✅ Wallet connected:", wallet.publicKey.toString());
     
     // Generate a new keypair for this challenge
     const challengeKeypair = Keypair.generate();
@@ -417,7 +417,7 @@ async function createChallengeTransaction(challengeData: Omit<ChallengeMeta, "id
     
     // Create the challenge account
     const createAccountInstruction = SystemProgram.createAccount({
-      fromPubkey: provider.publicKey,
+      fromPubkey: wallet.publicKey,
       newAccountPubkey: challengeAccount,
       lamports: rentExemption,
       space: 0,
@@ -430,7 +430,7 @@ async function createChallengeTransaction(challengeData: Omit<ChallengeMeta, "id
     // Get recent blockhash
     const { blockhash } = await connection.getLatestBlockhash();
     transaction.recentBlockhash = blockhash;
-    transaction.feePayer = provider.publicKey;
+    transaction.feePayer = wallet.publicKey;
     
     // Sign and send transaction
     console.log("📝 Signing and sending transaction...");
@@ -439,7 +439,7 @@ async function createChallengeTransaction(challengeData: Omit<ChallengeMeta, "id
     transaction.partialSign(challengeKeypair);
     
     // Then have the wallet sign the transaction
-    const signedTransaction = await provider.signTransaction(transaction);
+    const signedTransaction = await wallet.signTransaction(transaction);
     
     try {
       const signature = await connection.sendRawTransaction(signedTransaction.serialize());
@@ -475,7 +475,7 @@ async function createChallengeTransaction(challengeData: Omit<ChallengeMeta, "id
     const challengeId = challengeAccount.toString();
     const challengeMetadata = {
       id: challengeId,
-      creator: provider.publicKey.toString(),
+      creator: wallet.publicKey.toString(),
       game: challengeData.game,
       entryFee: challengeData.entryFee,
       maxPlayers: challengeData.maxPlayers,
@@ -596,16 +596,30 @@ export async function fetchPlayerEvents(playerAddress: string): Promise<any[]> {
 /**
  * Join a challenge on-chain (placeholder for now)
  */
-export async function joinChallengeOnChain(challengeId: string, entryFee: number, wallet: string): Promise<boolean> {
+export async function joinChallengeOnChain(
+  challengeId: string, 
+  entryFee: number, 
+  walletAddress: string,
+  wallet: { signTransaction: (transaction: Transaction) => Promise<Transaction>, publicKey: PublicKey }
+): Promise<boolean> {
   try {
     console.log(`💸 Joining challenge ${challengeId} with entry fee ${entryFee} USDFG`);
-    console.log(`👤 Wallet: ${wallet}`);
+    console.log(`👤 Wallet: ${walletAddress}`);
     
     // For now, simulate the join transaction
     // In a real implementation, this would:
     // 1. Transfer USDFG tokens to the challenge escrow account
     // 2. Update the challenge account with the new player
     // 3. Handle the escrow logic
+    
+    // Example of how the real implementation would look:
+    // const transaction = new Transaction().add(
+    //   // USDFG token transfer instruction
+    //   // Challenge account update instruction
+    // );
+    // const signedTransaction = await wallet.signTransaction(transaction);
+    // const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+    // await connection.confirmTransaction(signature);
     
     console.log("✅ Join transaction simulated successfully");
     return true;

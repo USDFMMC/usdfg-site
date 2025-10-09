@@ -11,7 +11,7 @@ import { ChallengeData, joinChallenge } from "@/lib/firebase/firestore";
 import { testFirestoreConnection } from "@/lib/firebase/firestore";
 
 const ArenaHome: React.FC = () => {
-  const { connected } = useWallet();
+  const { connected, signTransaction, publicKey } = useWallet();
   // Use MWA connection state
   const isConnected = connected;
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -187,6 +187,9 @@ const ArenaHome: React.FC = () => {
         entryFee: challengeData.entryFee,
         maxPlayers: maxPlayers,
         rules: challengeData.rules || ""
+      }, {
+        signTransaction: signTransaction,
+        publicKey: publicKey!
       });
       
       console.log("✅ Challenge created successfully:", challengeId);
@@ -1559,7 +1562,10 @@ const JoinChallengeModal: React.FC<{
       console.log("🚀 Joining challenge:", challenge.id);
       
       // Step 1: Join on-chain (Solana transaction)
-      await joinChallengeOnChain(challenge.id, challenge.entryFee, walletAddress);
+      await joinChallengeOnChain(challenge.id, challenge.entryFee, walletAddress, {
+        signTransaction: signTransaction,
+        publicKey: publicKey!
+      });
       
       // Step 2: Update Firestore
       await joinChallenge(challenge.id, walletAddress);

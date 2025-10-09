@@ -18,7 +18,9 @@ const connection = new Connection(clusterApiUrl("devnet"), {
 });
 
 // Helper to get provider safely
+// @deprecated Use MWA hooks instead (useWallet, useConnection)
 export async function getProvider(): Promise<any> {
+  console.warn("⚠️ getProvider() is deprecated. Use MWA hooks (useWallet, useConnection) instead.");
   if (typeof window === 'undefined') {
     throw new Error("Window not available");
   }
@@ -40,6 +42,7 @@ export async function getProvider(): Promise<any> {
 }
 
 // Silent reconnect using trusted session
+// @deprecated Use MWA hooks instead (useWallet)
 export async function silentReconnect(): Promise<string | null> {
   try {
     const provider = await getProvider();
@@ -51,6 +54,7 @@ export async function silentReconnect(): Promise<string | null> {
 }
 
 // Interactive connect for user-initiated actions
+// @deprecated Use MWA hooks instead (useWallet)
 export async function connectPhantomInteractive(): Promise<string> {
   const provider = await getProvider();
   
@@ -220,14 +224,13 @@ export const getUSDFGBalance = async (publicKey: string): Promise<number> => {
   return Math.floor(Math.random() * 5000) + 1000;
 };
 
-export const sendSOL = async (senderPublicKey: string, recipientPublicKey: string, amount: number): Promise<string> => {
+export const sendSOL = async (
+  senderPublicKey: string, 
+  recipientPublicKey: string, 
+  amount: number,
+  wallet: { signTransaction: (transaction: Transaction) => Promise<Transaction> }
+): Promise<string> => {
   try {
-    // Get the connected wallet provider
-    const provider = (window as any).solana;
-    if (!provider) {
-      throw new Error("No wallet provider found");
-    }
-
     // Create transaction
     const transaction = new Transaction().add(
       SystemProgram.transfer({
@@ -243,7 +246,7 @@ export const sendSOL = async (senderPublicKey: string, recipientPublicKey: strin
     transaction.feePayer = new PublicKey(senderPublicKey);
 
     // Sign and send transaction
-    const signedTransaction = await provider.signTransaction(transaction);
+    const signedTransaction = await wallet.signTransaction(transaction);
     const signature = await connection.sendRawTransaction(signedTransaction.serialize());
 
     // Confirm transaction
