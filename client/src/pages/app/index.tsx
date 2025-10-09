@@ -9,6 +9,7 @@ import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { ChallengeData, joinChallenge } from "@/lib/firebase/firestore";
 import { testFirestoreConnection } from "@/lib/firebase/firestore";
+import ChallengeGrid from "@/components/arena/ChallengeGrid";
 
 const ArenaHome: React.FC = () => {
   const { connected, signTransaction, publicKey } = useWallet();
@@ -18,6 +19,7 @@ const ArenaHome: React.FC = () => {
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<any>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [filterCategory, setFilterCategory] = useState<string>('All');
   const [filterGame, setFilterGame] = useState<string>('All');
   const [showMyChallenges, setShowMyChallenges] = useState<boolean>(false);
@@ -446,12 +448,38 @@ const ArenaHome: React.FC = () => {
           <section id="challenges" className="mb-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-white">Available Challenges</h2>
-              <button 
-                onClick={() => setShowCreateModal(true)}
-                className="bg-gradient-to-r from-cyan-400 to-purple-500 text-black px-4 py-2 rounded-full font-semibold hover:brightness-110 transition-all"
-              >
-                Create Challenge
-              </button>
+              <div className="flex items-center space-x-4">
+                {/* View Toggle */}
+                <div className="flex bg-gray-800 rounded-lg p-1">
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                      viewMode === 'grid' 
+                        ? 'bg-cyan-500 text-black' 
+                        : 'text-gray-300 hover:text-white'
+                    }`}
+                  >
+                    Grid
+                  </button>
+                  <button
+                    onClick={() => setViewMode('list')}
+                    className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                      viewMode === 'list' 
+                        ? 'bg-cyan-500 text-black' 
+                        : 'text-gray-300 hover:text-white'
+                    }`}
+                  >
+                    List
+                  </button>
+                </div>
+                
+                <button 
+                  onClick={() => setShowCreateModal(true)}
+                  className="bg-gradient-to-r from-cyan-400 to-purple-500 text-black px-4 py-2 rounded-full font-semibold hover:brightness-110 transition-all"
+                >
+                  Create Challenge
+                </button>
+              </div>
             </div>
           </section>
 
@@ -540,6 +568,20 @@ const ArenaHome: React.FC = () => {
                       >
                         Clear filters to see all challenges
                       </button>
+                    </div>
+                  ) : viewMode === 'grid' ? (
+                    <div style={{ height: '600px', position: 'relative' }}>
+                      <ChallengeGrid 
+                        challenges={filteredChallenges}
+                        onChallengeClick={(challenge) => {
+                          setSelectedChallenge(challenge);
+                          setShowDetailsModal(true);
+                        }}
+                        radius={300}
+                        damping={0.45}
+                        fadeOut={0.6}
+                        ease="power3.out"
+                      />
                     </div>
                   ) : (
                     filteredChallenges.map((challenge) => {
