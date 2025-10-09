@@ -15,16 +15,35 @@ export const MWAProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   const wallets = useMemo(
     () => {
-      // Create wallet instances with explicit configuration
-      const phantomWallet = new PhantomWalletAdapter();
-      const solflareWallet = new SolflareWalletAdapter();
+      const isMobile = typeof window !== 'undefined' && /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const isInPhantomApp = typeof window !== 'undefined' && window.solana && window.solana.isPhantom;
       
-      const walletList = [phantomWallet, solflareWallet];
+      const walletList = [];
+      
+      // Always add Solflare (works in all browsers)
+      const solflareWallet = new SolflareWalletAdapter();
+      walletList.push(solflareWallet);
+      
+      // Add Phantom only if detected or in Phantom app
+      if (isInPhantomApp || (typeof window !== 'undefined' && window.solana)) {
+        const phantomWallet = new PhantomWalletAdapter();
+        walletList.push(phantomWallet);
+      }
+      
+      // Add mobile wallet adapter for mobile browsers
+      if (isMobile) {
+        walletList.push(
+          new SolanaMobileWalletAdapter({
+            appIdentity: { name: 'USDFG Arena' },
+            authorizationResultCache: createDefaultAuthorizationResultCache(),
+          })
+        );
+      }
       
       console.log('🔧 MWA Provider: Available wallets:', walletList.map(w => w.name));
-      console.log('📱 User agent:', navigator.userAgent);
-      console.log('🔧 Phantom ready:', phantomWallet.readyState);
-      console.log('🔧 Solflare ready:', solflareWallet.readyState);
+      console.log('📱 Mobile detected:', isMobile);
+      console.log('👻 In Phantom app:', isInPhantomApp);
+      console.log('🔧 Window.solana exists:', !!window.solana);
       
       return walletList;
     },
