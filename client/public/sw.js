@@ -1,7 +1,7 @@
 // Simple ServiceWorker for USDFG Arena
 // This replaces any problematic ServiceWorker that was causing require() errors
 
-const CACHE_NAME = 'usdfg-arena-v1';
+const CACHE_NAME = 'usdfg-arena-v2';
 const urlsToCache = [
   '/',
   '/app',
@@ -28,17 +28,25 @@ self.addEventListener('install', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   
-  // Skip ServiceWorker for API requests, Firestore, and external services
+  // Skip ServiceWorker for ALL external API requests, Firestore, and external services
   if (
     url.hostname.includes('firestore.googleapis.com') ||
     url.hostname.includes('firebase.googleapis.com') ||
+    url.hostname.includes('firebaseinstallations.googleapis.com') ||
+    url.hostname.includes('identitytoolkit.googleapis.com') ||
+    url.hostname.includes('securetoken.googleapis.com') ||
     url.hostname.includes('api.devnet.solana.com') ||
     url.hostname.includes('api.mainnet-beta.solana.com') ||
     url.hostname.includes('api.testnet.solana.com') ||
+    url.hostname.includes('googleapis.com') ||
     url.pathname.includes('/api/') ||
-    url.pathname.includes('/firestore/')
+    url.pathname.includes('/firestore/') ||
+    url.pathname.includes('/Listen/') ||
+    url.pathname.includes('/Listen') ||
+    event.request.method !== 'GET'
   ) {
     // Let these requests pass through without ServiceWorker interference
+    console.log('🚫 ServiceWorker: Bypassing request to', url.hostname);
     return;
   }
   
@@ -63,7 +71,7 @@ self.addEventListener('fetch', (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('✅ ServiceWorker: Activated');
+  console.log('✅ ServiceWorker: Activated v2');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -74,6 +82,9 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
+    }).then(() => {
+      // Force all clients to use the new ServiceWorker
+      return self.clients.claim();
     })
   );
 });
