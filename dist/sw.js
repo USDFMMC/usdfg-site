@@ -30,10 +30,17 @@ self.addEventListener('fetch', (event) => {
     caches.match(event.request)
       .then((response) => {
         // Return cached version or fetch from network
-        return response || fetch(event.request);
+        if (response) {
+          return response;
+        }
+        return fetch(event.request).catch(() => {
+          // Return a fallback response for failed requests
+          return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+        });
       })
       .catch((error) => {
         console.error('❌ ServiceWorker: Fetch failed:', error);
+        return new Response('Error', { status: 500, statusText: 'Internal Server Error' });
       })
   );
 });

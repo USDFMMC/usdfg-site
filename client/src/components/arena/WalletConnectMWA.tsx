@@ -161,16 +161,5 @@ const WalletConnectMWA: React.FC<WalletConnectMWAProps> = ({
   );
 };
 
-// Helper function for sending SOL (keeping the same logic as before)
-const sendSOL = async (senderPublicKey: string, recipientPublicKey: string, amount: number): Promise<string> => {
-  try {
-    // This would need to be updated to use MWA's transaction signing
-    // For now, keeping the same logic as the original implementation
-    throw new Error("Transaction functionality needs to be updated for MWA");
-  } catch (err) {
-    console.error("Error sending SOL:", err);
-    throw err;
-  }
-};
 
 export default WalletConnectMWA;

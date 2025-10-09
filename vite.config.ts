@@ -40,8 +40,7 @@ export default defineConfig({
       '@solana/wallet-adapter-react-ui',
       '@solana/wallet-adapter-phantom',
       '@solana/wallet-adapter-solflare',
-      '@solana-mobile/wallet-adapter-protocol',
-      '@solana-mobile/wallet-adapter-protocol-web3js',
+      '@solana-mobile/wallet-adapter-mobile',
     ],
   },
   resolve: {
