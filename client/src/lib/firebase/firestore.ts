@@ -31,7 +31,6 @@ export async function testFirestoreConnection() {
 }
 
 // Collection references
-const challengesCollection = collection(db, 'challenges');
 const usersCollection = collection(db, 'users');
 
 // Challenge interfaces
@@ -57,7 +56,7 @@ export interface ChallengeData {
 // Challenge operations
 export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'createdAt'>) => {
   try {
-    const docRef = await addDoc(challengesCollection, {
+    const docRef = await addDoc(collection(db, "challenges"), {
       ...challengeData,
       createdAt: Timestamp.now(),
       players: [challengeData.creator], // Creator is first player
@@ -108,7 +107,7 @@ export const deleteChallenge = async (challengeId: string) => {
 
 // Real-time listeners
 export const listenToChallenges = (callback: (challenges: ChallengeData[]) => void) => {
-  const q = query(challengesCollection, orderBy('createdAt', 'desc'));
+  const q = query(collection(db, "challenges"), orderBy('createdAt', 'desc'));
   
   return onSnapshot(q, (snapshot) => {
     const challenges = snapshot.docs.map(doc => ({
@@ -125,7 +124,7 @@ export const listenToChallenges = (callback: (challenges: ChallengeData[]) => vo
 
 export const listenToUserChallenges = (userId: string, callback: (challenges: ChallengeData[]) => void) => {
   const q = query(
-    challengesCollection, 
+    collection(db, "challenges"), 
     where('creator', '==', userId),
     orderBy('createdAt', 'desc')
   );
@@ -146,7 +145,7 @@ export const listenToUserChallenges = (userId: string, callback: (challenges: Ch
 // One-time fetch operations
 export const fetchChallenges = async (): Promise<ChallengeData[]> => {
   try {
-    const q = query(challengesCollection, orderBy('createdAt', 'desc'));
+    const q = query(collection(db, "challenges"), orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
     
     const challenges = snapshot.docs.map(doc => ({
@@ -165,7 +164,7 @@ export const fetchChallenges = async (): Promise<ChallengeData[]> => {
 export const fetchChallengeById = async (challengeId: string): Promise<ChallengeData | null> => {
   try {
     const challengeRef = doc(db, 'challenges', challengeId);
-    const snapshot = await getDocs(query(challengesCollection, where('__name__', '==', challengeId)));
+    const snapshot = await getDocs(query(collection(db, "challenges"), where('__name__', '==', challengeId)));
     
     if (snapshot.empty) {
       console.log('❌ Challenge not found:', challengeId);
@@ -224,7 +223,7 @@ export const joinChallenge = async (challengeId: string, wallet: string) => {
 
 // Real-time active challenge functions
 export function listenActiveForCreator(creator: string, cb: (active: any[]) => void) {
-  const q = query(challengesCollection, where("creator", "==", creator), where("status", "in", ["active", "pending"]));
+  const q = query(collection(db, "challenges"), where("creator", "==", creator), where("status", "in", ["active", "pending"]));
   return onSnapshot(q, (snap) => {
     const active = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     console.log('🔒 Active challenges for creator:', active.length);
@@ -233,7 +232,7 @@ export function listenActiveForCreator(creator: string, cb: (active: any[]) => v
 }
 
 export async function addChallengeDoc(data: any) {
-  const docRef = await addDoc(challengesCollection, {
+  const docRef = await addDoc(collection(db, "challenges"), {
     ...data,
     status: "active",
     createdAt: Timestamp.now(),
