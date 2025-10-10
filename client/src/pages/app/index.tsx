@@ -16,7 +16,7 @@ import CreateChallengeForm from "@/components/arena/CreateChallengeForm";
 import ElegantNavbar from "@/components/layout/ElegantNavbar";
 
 const ArenaHome: React.FC = () => {
-  const { connected, signTransaction, publicKey } = useWallet();
+  const { connected, signTransaction, publicKey, connect } = useWallet();
   // Use MWA connection state
   const isConnected = connected;
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -784,7 +784,7 @@ const ArenaHome: React.FC = () => {
         >
           <CreateChallengeForm
             isConnected={isConnected}
-            onConnect={() => {}}
+            onConnect={() => connect()}
             onCreateChallenge={handleCreateChallenge}
             usdfgPrice={usdfgPrice}
             usdfgToUsd={usdfgToUsd}
@@ -797,7 +797,7 @@ const ArenaHome: React.FC = () => {
             challenge={selectedChallenge}
             onClose={() => setShowJoinModal(false)}
             isConnected={isConnected}
-            onConnect={() => {}}
+            onConnect={() => connect()}
           />
         )}
 
@@ -811,7 +811,7 @@ const ArenaHome: React.FC = () => {
               setShowJoinModal(true);
             }}
             isConnected={isConnected}
-            onConnect={() => {}}
+            onConnect={() => connect()}
           />
         )}
 
