@@ -35,14 +35,14 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
 
   // Game categories and options
   const gameCategories = {
-    Sports: ["EA UFC 6", "FC 26", "Madden 26", "NBA 2K26", "Custom"],
-    Racing: ["F1 2023", "Mario Kart", "Gran Turismo 7", "Custom"],
-    Fighting: ["Mortal Kombat 1", "Street Fighter 6", "Tekken 8", "Custom"],
-    Shooting: ["COD MW3", "Fortnite", "Valorant", "Custom"]
+    Sports: ["EA UFC 6", "FC 26", "Madden 26", "NBA 2K26"],
+    Racing: ["F1 2023", "Mario Kart", "Gran Turismo 7"],
+    Fighting: ["Mortal Kombat 1", "Street Fighter 6", "Tekken 8"],
+    Shooting: ["COD MW3", "Fortnite", "Valorant"]
   };
 
-  // Available games for selection (flattened)
-  const availableGames = Object.values(gameCategories).flat();
+  // Available games for selection (flattened + Custom)
+  const availableGames = [...Object.values(gameCategories).flat(), "Custom"];
 
   // Platform options
   const platforms = ['PS5', 'Xbox', 'PC', 'Switch', 'Other/Custom'];
@@ -94,23 +94,27 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
 
   const getModeExplanation = (mode: string) => {
     const explanations: { [key: string]: string } = {
-      'Head-to-Head (Full Game)': 'Classic 1v1 match with full game duration. Best for competitive players who want the complete experience.',
-      'Best of 3 Series': 'Tournament-style series where first to win 2 games advances. High stakes, high rewards.',
-      'Quick Match (2 Quarters)': 'Fast-paced shortened matches. Perfect for quick sessions and rapid-fire competition.',
-      'Park Match (2v2/3v3)': 'Team-based basketball action. Coordinate with teammates for maximum impact.',
-      'Versus Match': 'Direct 1v1 combat. Pure skill vs skill in the ultimate test.',
-      'Elimination Bracket': 'Single elimination tournament format. One loss and you\'re out.',
-      'First to 5': 'Race to 5 wins. Endurance and consistency are key.',
-      'Duel (1v1)': 'Intense 1v1 combat. No teammates, no excuses.',
-      'Squad Battle (2v2)': 'Team coordination required. Communication is crucial.',
-      'Full Lobby (5v5)': 'Complete team battles. Strategy and teamwork essential.',
-      'Battle Royale': 'Last player standing wins. Survival of the fittest.',
-      'Time Trial': 'Race against the clock. Precision and speed matter.',
-      'Head-to-Head Race': 'Direct racing competition. Pure speed and skill.',
-      'Grand Prix Series': 'Multiple race championship. Consistency across races.',
-      'Drift Challenge': 'Style and technique competition. Show off your skills.',
-      'Tournament Bracket': 'Full tournament structure. Multiple rounds of elimination.',
-      'Custom Challenge': 'Create your own rules and format. Maximum flexibility.'
+      // Sports modes
+      'Full Match': 'Complete game duration with full regulation time. Best for competitive players who want the complete experience.',
+      'Quick Match (No halftime)': 'Fast-paced shortened matches without halftime breaks. Perfect for quick sessions and rapid-fire competition.',
+      '2v2 Challenge': 'Team-based action requiring coordination with teammates. Communication and teamwork are essential for victory.',
+      
+      // Racing modes
+      'Best Lap Time': 'Race against the clock to set the fastest lap time. Precision and speed matter most.',
+      '1v1 Race to Finish': 'Direct head-to-head racing competition. Pure speed and skill determine the winner.',
+      
+      // Fighting modes
+      'Best of 3': 'Tournament-style series where first to win 2 games advances. High stakes, high rewards.',
+      'Mirror Match': 'Both players use the same character. Pure skill vs skill with no character advantages.',
+      '2v2 Team Fight': 'Team coordination required. Communication and strategy are crucial for team victory.',
+      
+      // Shooting modes
+      'Run the Fade': 'Intense 1v1 combat. No teammates, no excuses - just pure skill and reflexes.',
+      '10 and Done': 'First to 10 kills wins. Fast-paced action with clear victory conditions.',
+      'Snipers Only': 'Sniper rifles only. Precision and patience are key to victory.',
+      
+      // Custom
+      'Custom Challenge': 'Create your own rules and format. Maximum flexibility for unique challenges.'
     };
     return explanations[mode] || 'Custom challenge format with your own rules.';
   };
@@ -126,38 +130,28 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     const mode = formData.mode;
     let rules = '';
     
-    if (mode.includes('Head-to-Head')) {
-      rules = '• Full game duration\n• No substitutions\n• Standard game settings\n• Winner takes all';
-    } else if (mode.includes('Best of 3')) {
-      rules = '• First to win 2 games\n• No breaks between games\n• Standard settings\n• Winner advances';
-    } else if (mode.includes('Quick Match')) {
-      rules = '• Shortened duration\n• Fast-paced action\n• Quick rotations\n• Winner takes all';
-    } else if (mode.includes('Park Match')) {
+    if (mode === 'Full Match') {
+      rules = '• Full game duration\n• Standard game settings\n• No substitutions\n• Winner takes all';
+    } else if (mode === 'Quick Match (No halftime)') {
+      rules = '• Shortened duration\n• No halftime breaks\n• Fast-paced action\n• Winner takes all';
+    } else if (mode === '2v2 Challenge') {
       rules = '• Team coordination required\n• Communication essential\n• No solo play\n• Team victory';
-    } else if (mode.includes('Versus Match')) {
-      rules = '• 1v1 combat\n• No assists\n• Pure skill competition\n• Winner takes all';
-    } else if (mode.includes('Elimination Bracket')) {
-      rules = '• Single elimination\n• One loss and out\n• Tournament format\n• Winner advances';
-    } else if (mode.includes('First to 5')) {
-      rules = '• Race to 5 wins\n• No time limit\n• Endurance test\n• Winner takes all';
-    } else if (mode.includes('Duel')) {
-      rules = '• 1v1 combat\n• No teammates\n• Pure skill\n• Winner takes all';
-    } else if (mode.includes('Squad Battle')) {
-      rules = '• Team coordination\n• Communication required\n• Team victory\n• No solo play';
-    } else if (mode.includes('Full Lobby')) {
-      rules = '• Complete team battles\n• Strategy required\n• Teamwork essential\n• Team victory';
-    } else if (mode.includes('Battle Royale')) {
-      rules = '• Last player standing\n• Survival mode\n• No respawns\n• Winner takes all';
-    } else if (mode.includes('Time Trial')) {
+    } else if (mode === 'Best Lap Time') {
       rules = '• Race against clock\n• Best time wins\n• No collisions\n• Precision required';
-    } else if (mode.includes('Head-to-Head Race')) {
-      rules = '• Direct racing\n• No assists\n• Pure speed\n• Winner takes all';
-    } else if (mode.includes('Grand Prix Series')) {
-      rules = '• Multiple races\n• Points system\n• Consistency required\n• Series winner';
-    } else if (mode.includes('Drift Challenge')) {
-      rules = '• Style and technique\n• Points for style\n• No collisions\n• Best score wins';
-    } else if (mode.includes('Tournament Bracket')) {
-      rules = '• Full tournament\n• Multiple rounds\n• Elimination format\n• Tournament winner';
+    } else if (mode === '1v1 Race to Finish') {
+      rules = '• Direct head-to-head racing\n• No assists\n• Pure speed and skill\n• Winner takes all';
+    } else if (mode === 'Best of 3') {
+      rules = '• First to win 2 games\n• No breaks between games\n• Standard settings\n• Winner advances';
+    } else if (mode === 'Mirror Match') {
+      rules = '• Same character for both players\n• Pure skill competition\n• No character advantages\n• Winner takes all';
+    } else if (mode === '2v2 Team Fight') {
+      rules = '• Team coordination required\n• Communication essential\n• Team strategy\n• Team victory';
+    } else if (mode === 'Run the Fade') {
+      rules = '• 1v1 combat\n• No teammates\n• Pure skill and reflexes\n• Winner takes all';
+    } else if (mode === '10 and Done') {
+      rules = '• First to 10 kills wins\n• Fast-paced action\n• Clear victory conditions\n• Winner takes all';
+    } else if (mode === 'Snipers Only') {
+      rules = '• Sniper rifles only\n• Precision and patience\n• No other weapons\n• Winner takes all';
     } else {
       rules = '• Custom rules\n• Flexible format\n• Your own challenge\n• Winner takes all';
     }
