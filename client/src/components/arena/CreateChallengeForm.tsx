@@ -33,33 +33,63 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [attemptedNext, setAttemptedNext] = useState(false);
 
-  // Available games for selection
-  const availableGames = [
-    'NBA 2K25',
-    'FIFA 24', 
-    'Street Fighter 6',
-    'Call of Duty',
-    'Tekken 8',
-    'Forza Horizon',
-    'Valorant',
-    'Madden NFL 24',
-    'Other/Custom'
-  ];
+  // Game categories and options
+  const gameCategories = {
+    Sports: ["EA UFC 6", "FC 26", "Madden 26", "NBA 2K26", "Custom"],
+    Racing: ["F1 2023", "Mario Kart", "Gran Turismo 7", "Custom"],
+    Fighting: ["Mortal Kombat 1", "Street Fighter 6", "Tekken 8", "Custom"],
+    Shooting: ["COD MW3", "Fortnite", "Valorant", "Custom"]
+  };
+
+  // Available games for selection (flattened)
+  const availableGames = Object.values(gameCategories).flat();
 
   // Platform options
   const platforms = ['PS5', 'Xbox', 'PC', 'Switch', 'Other/Custom'];
 
+  // Challenge modes by category
+  const challengeModes = {
+    Sports: [
+      { label: "Full Match" },
+      { label: "Quick Match (No halftime)" },
+      { label: "2v2 Challenge" },
+      { label: "Custom Challenge", tooltip: "Manual review required. Use only when standard modes don't apply." }
+    ],
+    Racing: [
+      { label: "Best Lap Time" },
+      { label: "1v1 Race to Finish" },
+      { label: "Custom Challenge", tooltip: "Manual review required. Use only when standard modes don't apply." }
+    ],
+    Fighting: [
+      { label: "Best of 3" },
+      { label: "Mirror Match" },
+      { label: "2v2 Team Fight" },
+      { label: "Custom Challenge", tooltip: "Manual review required. Use only when standard modes don't apply." }
+    ],
+    Shooting: [
+      { label: "Run the Fade" },
+      { label: "10 and Done" },
+      { label: "Snipers Only" },
+      { label: "Custom Challenge", tooltip: "Manual review required. Use only when standard modes don't apply." }
+    ]
+  };
+
   // Game-specific modes - Enhanced with competitive options
   const gameModes = {
-    'NBA 2K25': ['Head-to-Head (Full Game)', 'Best of 3 Series', 'Quick Match (2 Quarters)', 'Park Match (2v2/3v3)', 'Custom Challenge'],
-    'FIFA 24': ['Head-to-Head (Full Match)', 'Best of 3 Series', 'Quick Match (2 Halves)', 'Squad Match (2v2)', 'Custom Challenge'],
-    'Street Fighter 6': ['Versus Match', 'Best of 3 Series', 'Elimination Bracket', 'First to 5', 'Custom Challenge'],
-    'Call of Duty': ['Duel (1v1)', 'Squad Battle (2v2)', 'Full Lobby (5v5)', 'Battle Royale', 'Custom Challenge'],
-    'Tekken 8': ['Versus Match', 'Best of 3 Series', 'Elimination Bracket', 'First to 5', 'Custom Challenge'],
-    'Forza Horizon': ['Time Trial', 'Head-to-Head Race', 'Grand Prix Series', 'Drift Challenge', 'Custom Challenge'],
-    'Valorant': ['Duel (1v1)', 'Squad Battle (2v2)', 'Full Lobby (5v5)', 'Tournament Bracket', 'Custom Challenge'],
-    'Madden NFL 24': ['Head-to-Head (Full Game)', 'Best of 3 Series', 'Quick Match (2 Quarters)', 'Squad Match (2v2)', 'Custom Challenge'],
-    'Other/Custom': ['Custom Challenge']
+    'EA UFC 6': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
+    'FC 26': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
+    'Madden 26': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
+    'NBA 2K26': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
+    'F1 2023': ['Best Lap Time', '1v1 Race to Finish', 'Custom Challenge'],
+    'Mario Kart': ['Best Lap Time', '1v1 Race to Finish', 'Custom Challenge'],
+    'Gran Turismo 7': ['Best Lap Time', '1v1 Race to Finish', 'Custom Challenge'],
+    'Mortal Kombat 1': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Custom Challenge'],
+    'Street Fighter 6': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Custom Challenge'],
+    'Tekken 8': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Custom Challenge'],
+    'COD MW3': ['Run the Fade', '10 and Done', 'Snipers Only', 'Custom Challenge'],
+    'Fortnite': ['Run the Fade', '10 and Done', 'Snipers Only', 'Custom Challenge'],
+    'Valorant': ['Run the Fade', '10 and Done', 'Snipers Only', 'Custom Challenge'],
+    'Custom': ['Custom Challenge']
   };
 
   const getModeExplanation = (mode: string) => {
