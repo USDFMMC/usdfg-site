@@ -784,7 +784,7 @@ const ArenaHome: React.FC = () => {
         >
           <CreateChallengeForm
             isConnected={isConnected}
-            onConnect={() => setIsConnected(true)}
+            onConnect={() => {}}
             onCreateChallenge={handleCreateChallenge}
             usdfgPrice={usdfgPrice}
             usdfgToUsd={usdfgToUsd}
@@ -797,7 +797,7 @@ const ArenaHome: React.FC = () => {
             challenge={selectedChallenge}
             onClose={() => setShowJoinModal(false)}
             isConnected={isConnected}
-            onConnect={() => setIsConnected(true)}
+            onConnect={() => {}}
           />
         )}
 
@@ -811,7 +811,7 @@ const ArenaHome: React.FC = () => {
               setShowJoinModal(true);
             }}
             isConnected={isConnected}
-            onConnect={() => setIsConnected(true)}
+            onConnect={() => {}}
           />
         )}
 
