@@ -272,11 +272,12 @@ const ArenaHome: React.FC = () => {
   };
 
   const isChallengeOwner = (challenge: any) => {
-    const currentWallet = publicKey?.toString() || null;
-    const isOwner = currentWallet && challenge.creator === currentWallet;
+    const currentWallet = publicKey?.toString()?.toLowerCase() || null;
+    const challengeCreator = challenge.creator?.toLowerCase() || null;
+    const isOwner = currentWallet && challengeCreator && currentWallet === challengeCreator;
     console.log("🔍 Ownership check:", {
       currentWallet: currentWallet ? currentWallet.slice(0, 8) + "..." : "null",
-      challengeCreator: challenge.creator ? challenge.creator.slice(0, 8) + "..." : "null",
+      challengeCreator: challengeCreator ? challengeCreator.slice(0, 8) + "..." : "null",
       isOwner
     });
     return isOwner;
