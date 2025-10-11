@@ -176,9 +176,28 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
             <footer className="relative z-10 p-3 text-white font-sans">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-lg font-semibold m-0">{challenge.game}</h3>
-                <span className="text-sm bg-white/20 px-2 py-1 rounded-full">
-                  {challenge.status}
-                </span>
+                <div className="flex gap-1">
+                  {challenge.status === "active" && (
+                    <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
+                      Active
+                    </span>
+                  )}
+                  {challenge.status === "in-progress" && (
+                    <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded text-xs">
+                      In Progress
+                    </span>
+                  )}
+                  {challenge.status === "completed" && (
+                    <span className="px-2 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-xs">
+                      Completed
+                    </span>
+                  )}
+                  {challenge.players >= challenge.capacity && challenge.status === "active" && (
+                    <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded text-xs">
+                      Full
+                    </span>
+                  )}
+                </div>
               </div>
               
               <div className="grid grid-cols-2 gap-2 text-sm">
@@ -188,7 +207,7 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
                 </div>
                 <div>
                   <span className="opacity-80">Players:</span>
-                  <div className="font-semibold">{challenge.players?.length || 0}/{challenge.maxPlayers}</div>
+                  <div className="font-semibold">{challenge.players || 0}/{challenge.capacity || 2}</div>
                 </div>
               </div>
               
