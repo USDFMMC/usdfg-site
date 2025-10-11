@@ -623,6 +623,11 @@ const ArenaHome: React.FC = () => {
                               Active
                             </span>
                           )}
+                          {challenge.status === "in-progress" && (
+                            <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded text-xs">
+                              In Progress
+                            </span>
+                          )}
                           {challenge.status === "completed" && (
                             <span className="px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs animate-pulse">
                               Expired
@@ -640,7 +645,9 @@ const ArenaHome: React.FC = () => {
                             <div className="text-gray-400 text-xs">Prize Pool</div>
                           </div>
                           <div className="text-center">
-                            <div className="text-white font-semibold">{challenge.players}/{challenge.capacity}</div>
+                            <div className="text-white font-semibold">
+                              {challenge.players || 0}/{challenge.capacity || 2}
+                            </div>
                             <div className="text-gray-400 text-xs">Players</div>
                           </div>
                         </div>
