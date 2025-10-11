@@ -143,6 +143,17 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
     >
       {challenges.map((challenge, i) => {
         const colors = getChallengeColors(challenge.game, i);
+        
+        // Debug: Log challenge data
+        console.log('🎮 Grid Challenge Data:', {
+          id: challenge.id,
+          players: challenge.players,
+          capacity: challenge.capacity,
+          maxPlayers: challenge.maxPlayers,
+          playersArray: challenge.players?.length,
+          fullObject: challenge
+        });
+        
         return (
           <article
             key={challenge.id}
