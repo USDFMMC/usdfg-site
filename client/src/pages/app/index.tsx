@@ -571,6 +571,8 @@ const ArenaHome: React.FC = () => {
                           setSelectedChallenge(challenge);
                           setShowDetailsModal(true);
                         }}
+                        onDeleteChallenge={handleDeleteChallenge}
+                        isChallengeOwner={isChallengeOwner}
                         radius={300}
                         damping={0.45}
                         fadeOut={0.6}

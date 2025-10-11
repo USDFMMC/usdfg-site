@@ -5,6 +5,8 @@ import { ChallengeData } from '@/hooks/useChallenges';
 export interface ChallengeGridProps {
   challenges: ChallengeData[];
   onChallengeClick?: (challenge: ChallengeData) => void;
+  onDeleteChallenge?: (challengeId: string) => void;
+  isChallengeOwner?: (challenge: ChallengeData) => boolean;
   className?: string;
   radius?: number;
   damping?: number;
@@ -17,6 +19,8 @@ type SetterFn = (v: number | string) => void;
 const ChallengeGrid: React.FC<ChallengeGridProps> = ({
   challenges,
   onChallengeClick,
+  onDeleteChallenge,
+  isChallengeOwner,
   className = '',
   radius = 300,
   damping = 0.45,
@@ -193,8 +197,20 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
                 <div>Platform: {challenge.platform}</div>
               </div>
               
-              <div className="mt-2 text-xs opacity-70">
-                Created by: {challenge.creatorTag || challenge.creator.slice(0, 8)}...
+              <div className="flex items-center justify-between mt-2 text-xs opacity-70">
+                <div>Created by: {challenge.creatorTag || challenge.creator.slice(0, 8)}...</div>
+                {isChallengeOwner && isChallengeOwner(challenge) && onDeleteChallenge && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteChallenge(challenge.id);
+                    }}
+                    className="ml-2 px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs hover:bg-red-500/30 transition-colors z-50"
+                    title="Delete Challenge"
+                  >
+                    🗑️ Delete
+                  </button>
+                )}
               </div>
             </footer>
           </article>
