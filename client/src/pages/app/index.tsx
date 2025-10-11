@@ -99,6 +99,9 @@ const ArenaHome: React.FC = () => {
 
     const maxPlayers = getMaxPlayers(challenge.mode);
     const currentPlayers = challenge.players?.length || 1; // Creator is always 1st player
+    
+    // Debug logging for player count
+    console.log(`🎮 Challenge ${challenge.id}: ${currentPlayers}/${maxPlayers} players`, challenge.players);
 
     return {
       id: challenge.id,
