@@ -245,6 +245,10 @@ const ArenaHome: React.FC = () => {
       // The real-time listener will automatically update the UI
       console.log("📡 Real-time listener will update UI automatically");
       
+      // Close the modal after successful creation
+      setShowCreateModal(false);
+      console.log("✅ Modal closed automatically after challenge creation");
+      
     } catch (error) {
       console.error("❌ Failed to create challenge:", error);
       alert("Failed to create challenge: " + (error instanceof Error ? error.message : "Unknown error"));
