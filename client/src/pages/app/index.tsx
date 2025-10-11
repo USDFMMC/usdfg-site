@@ -1549,6 +1549,7 @@ const JoinChallengeModal: React.FC<{
   isConnected: boolean;
   onConnect: () => void;
 }> = ({ challenge, onClose, isConnected, onConnect }) => {
+  const { publicKey, signTransaction } = useWallet();
   const [state, setState] = useState<'review' | 'processing' | 'success' | 'error'>('review');
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
@@ -1560,7 +1561,7 @@ const JoinChallengeModal: React.FC<{
   };
 
   const handleJoin = async () => {
-    if (!isConnected) {
+    if (!isConnected || !publicKey || !signTransaction) {
       setError('Please connect your wallet first');
       setState('error');
       return;
@@ -1569,7 +1570,7 @@ const JoinChallengeModal: React.FC<{
     setState('processing');
     
     try {
-      const walletAddress = publicKey?.toString() || null;
+      const walletAddress = publicKey.toString();
       if (!walletAddress) {
         throw new Error('Wallet not connected');
       }
@@ -1579,7 +1580,7 @@ const JoinChallengeModal: React.FC<{
       // Step 1: Join on-chain (Solana transaction)
       await joinChallengeOnChain(challenge.id, challenge.entryFee, walletAddress, {
         signTransaction: signTransaction,
-        publicKey: publicKey!
+        publicKey: publicKey
       });
       
       // Step 2: Update Firestore
