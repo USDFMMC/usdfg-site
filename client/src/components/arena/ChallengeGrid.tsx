@@ -199,18 +199,23 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
               
               <div className="flex items-center justify-between mt-2 text-xs opacity-70">
                 <div>Created by: {challenge.creatorTag || challenge.creator.slice(0, 8)}...</div>
-                {isChallengeOwner && isChallengeOwner(challenge) && onDeleteChallenge && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteChallenge(challenge.id);
-                    }}
-                    className="ml-2 px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs hover:bg-red-500/30 transition-colors z-50"
-                    title="Delete Challenge"
-                  >
-                    🗑️ Delete
-                  </button>
-                )}
+                {(() => {
+                  const isOwner = isChallengeOwner ? isChallengeOwner(challenge) : false;
+                  console.log('🔍 Grid - Challenge:', challenge.id, 'isOwner:', isOwner, 'hasDeleteFn:', !!onDeleteChallenge);
+                  return isOwner && onDeleteChallenge ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log('🗑️ Grid Delete clicked for:', challenge.id);
+                        onDeleteChallenge(challenge.id);
+                      }}
+                      className="ml-2 px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs hover:bg-red-500/30 transition-colors z-50"
+                      title="Delete Challenge"
+                    >
+                      🗑️ Delete
+                    </button>
+                  ) : null;
+                })()}
               </div>
             </footer>
           </article>
