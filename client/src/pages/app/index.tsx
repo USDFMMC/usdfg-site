@@ -153,13 +153,19 @@ const ArenaHome: React.FC = () => {
         throw new Error("Wallet not connected");
       }
 
-      // 🔍 Check if the user already has an active challenge
-      const existingActive = challenges.find(
-        c => c.creator === currentWallet && (c.status === 'active' || c.status === 'pending')
-      );
+      // 🔍 Check if the user already has an active challenge (as creator OR participant)
+      const existingActive = challenges.find(c => {
+        const isCreator = c.creator === currentWallet;
+        const isParticipant = firestoreChallenges.some(fc => 
+          fc.id === c.id && 
+          fc.players?.includes(currentWallet)
+        );
+        const isActive = c.status === 'active' || c.status === 'pending' || c.status === 'in-progress';
+        return (isCreator || isParticipant) && isActive;
+      });
 
       if (existingActive) {
-        alert("You already have an active challenge. Complete or delete it before creating a new one.");
+        alert("You already have an active challenge (created or joined). Complete it before creating a new one.");
         console.log("❌ Blocked: User already has active challenge:", existingActive.id);
         return;
       }
@@ -301,9 +307,21 @@ const ArenaHome: React.FC = () => {
 
   // Check if user has active challenge (for button disable logic)
   const currentWallet = publicKey?.toString() || null;
-  const hasActiveChallenge = currentWallet && challenges.some(
-    c => c.creator === currentWallet && (c.status === 'active' || c.status === 'pending')
-  );
+  const hasActiveChallenge = currentWallet && challenges.some(c => {
+    // Check if user created this challenge
+    const isCreator = c.creator === currentWallet;
+    
+    // Check if user is a participant in this challenge
+    const isParticipant = firestoreChallenges.some(fc => 
+      fc.id === c.id && 
+      fc.players?.includes(currentWallet)
+    );
+    
+    // User has active challenge if they created OR joined one that's active/pending/in-progress
+    const isActive = c.status === 'active' || c.status === 'pending' || c.status === 'in-progress';
+    
+    return (isCreator || isParticipant) && isActive;
+  });
 
   // Add arena-page class to body for mobile CSS
   useEffect(() => {
@@ -327,7 +345,7 @@ const ArenaHome: React.FC = () => {
           <ElegantButton
             onClick={() => {
               if (hasActiveChallenge) {
-                alert("You already have an active challenge. Complete or delete it before creating a new one.");
+                alert("You already have an active challenge (created or joined). Complete it before creating a new one.");
                 return;
               }
               if (isCreatingChallenge) {
@@ -339,9 +357,9 @@ const ArenaHome: React.FC = () => {
             }}
             variant="cyan"
             disabled={hasActiveChallenge || isCreatingChallenge}
-            title={hasActiveChallenge ? "You already have an active challenge" : isCreatingChallenge ? "Creating challenge..." : "Create a new challenge"}
+            title={hasActiveChallenge ? "You have an active challenge (created or joined)" : isCreatingChallenge ? "Creating challenge..." : "Create a new challenge"}
           >
-            {hasActiveChallenge ? "Active Challenge" : isCreatingChallenge ? "Creating..." : "Create Challenge"}
+            {hasActiveChallenge ? "In Challenge" : isCreatingChallenge ? "Creating..." : "Create Challenge"}
           </ElegantButton>
           <WalletConnectSimple 
             isConnected={isConnected}
