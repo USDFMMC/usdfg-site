@@ -99,62 +99,69 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   // Check if Phantom is already injected (in-app browser)
   const isPhantomInjected = typeof window !== 'undefined' && (window as any).phantom?.solana?.isPhantom;
   
+  // Custom click handler for mobile - redirect to Phantom app
+  const handleMobileConnect = () => {
+    if (isMobile && !isPhantomInjected) {
+      // Redirect to Phantom app with deep link
+      window.location.href = 'https://phantom.app/ul/browse/' + encodeURIComponent(window.location.href);
+    }
+  };
+  
   // Show connection button
   return (
     <div className="flex flex-col space-y-2">
       {/* Compact mode for mobile navbar */}
       {compact ? (
-        // Custom styled button with proper text
-        <div className="wallet-adapter-button-trigger-wrapper">
-          <WalletMultiButton 
-            className="!px-2.5 !py-1.5 !bg-cyan-500/20 !text-cyan-400 !border !border-cyan-500/30 !rounded-md !text-xs !font-medium hover:!bg-cyan-500/30 !transition-colors !min-w-0"
+        // Custom button for mobile, standard for desktop
+        isMobile && !isPhantomInjected ? (
+          <button
+            onClick={handleMobileConnect}
+            className="px-2.5 py-1.5 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-md text-xs font-medium hover:bg-cyan-500/30 transition-colors"
           >
             Connect Wallet
-          </WalletMultiButton>
-        </div>
+          </button>
+        ) : (
+          <div className="wallet-adapter-button-trigger-wrapper">
+            <WalletMultiButton 
+              className="!px-2.5 !py-1.5 !bg-cyan-500/20 !text-cyan-400 !border !border-cyan-500/30 !rounded-md !text-xs !font-medium hover:!bg-cyan-500/30 !transition-colors !min-w-0"
+            >
+              Connect Wallet
+            </WalletMultiButton>
+          </div>
+        )
       ) : (
         <>
-          {/* Only show "Open in Phantom" if on mobile AND Phantom is NOT injected */}
-          {(isMobile || (typeof window !== 'undefined' && window.innerWidth < 768)) && !isPhantomInjected ? (
-            <div className="space-y-3">
-              <div className="text-sm text-gray-400 mb-2">
-                Connect with Phantom:
-              </div>
+          {/* Mobile: Direct "Connect Wallet" button that opens Phantom */}
+          {isMobile && !isPhantomInjected ? (
+            <button
+              onClick={handleMobileConnect}
+              className="w-full px-4 py-3 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-bold rounded-lg hover:brightness-110 transition-all flex items-center justify-center space-x-2 border-2 border-purple-400 shadow-lg"
+              style={{ 
+                minHeight: '48px',
+                fontSize: '16px'
+              }}
+            >
+              <span style={{ fontSize: '20px' }}>👻</span>
+              <span>Connect Wallet</span>
+            </button>
+          ) : (
+            <>
+              <WalletMultiButton className="px-4 py-2 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50">
+                Connect Wallet
+              </WalletMultiButton>
               
-              {/* Mobile wallet options */}
-              <div className="space-y-2">
-                <button
-                  onClick={() => {
-                    // Open Phantom app
-                    window.open('https://phantom.app/ul/browse/' + encodeURIComponent(window.location.href), '_blank');
-                  }}
-                  className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors flex items-center justify-center space-x-2 border-2 border-purple-400 shadow-lg"
-                  style={{ 
-                    backgroundColor: '#9333ea', 
-                    color: 'white',
-                    minHeight: '48px',
-                    fontSize: '16px'
-                  }}
-                >
-                  <span style={{ fontSize: '20px' }}>👻</span>
-                  <span>Open in Phantom</span>
-                </button>
-                
-              </div>
-              
-              <div className="text-xs text-gray-500 text-center">
-                Or use the wallet button below if Phantom is installed
-              </div>
-            </div>
-          ) : null}
+              {connecting && (
+                <div className="text-sm text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded p-2">
+                  🔗 Please approve the connection in your wallet popup.
+                </div>
+              )}
+            </>
+          )}
           
-          <WalletMultiButton className="px-4 py-2 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50">
-            Connect Wallet
-          </WalletMultiButton>
-          
-          {connecting && (
-            <div className="text-sm text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded p-2">
-              🔗 Please approve the connection in your wallet popup.
+          {/* Help text for mobile */}
+          {isMobile && !isPhantomInjected && (
+            <div className="text-xs text-gray-400 text-center mt-2">
+              Opens in Phantom app • Install Phantom if you haven't already
             </div>
           )}
         </>
