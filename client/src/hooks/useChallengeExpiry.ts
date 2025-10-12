@@ -57,8 +57,8 @@ export function useChallengeExpiry(challenges: any[]) {
     // Check immediately
     checkExpired();
 
-    // Then check every 5 seconds (TESTING - normally 30 seconds)
-    const interval = setInterval(checkExpired, 5000);
+    // Then check every 30 seconds
+    const interval = setInterval(checkExpired, 30000);
 
     return () => {
       clearInterval(interval);
