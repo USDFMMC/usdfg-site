@@ -30,8 +30,8 @@ export function useChallengeExpiry(challenges: any[]) {
           processedChallenges.current.add(challenge.id);
 
           try {
-            // Mark as completed (expired)
-            await updateChallengeStatus(challenge.id, "completed");
+            // Mark as expired (NOT completed - we use "expired" for time-outs)
+            await updateChallengeStatus(challenge.id, "expired");
             console.log("✅ Challenge marked as expired:", challenge.id);
 
             // Schedule archival after 5 seconds
@@ -55,9 +55,10 @@ export function useChallengeExpiry(challenges: any[]) {
           }
         }
         
-        // Handle challenges that are already marked as completed but not archived
+        // Handle challenges that are already marked as expired but not archived
         // This catches any that failed to archive on previous attempts
-        if (challenge.status === "completed" && !archiveTimers.current.has(challenge.id) && !processedChallenges.current.has(challenge.id + '_archive')) {
+        // NOTE: We only auto-archive "expired" status, NOT "completed" (completed = players finished the match)
+        if (challenge.status === "expired" && !archiveTimers.current.has(challenge.id) && !processedChallenges.current.has(challenge.id + '_archive')) {
           console.log("🗑️ Found expired challenge that needs archiving:", challenge.id);
           processedChallenges.current.add(challenge.id + '_archive');
 

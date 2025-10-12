@@ -629,7 +629,7 @@ const ArenaHome: React.FC = () => {
                     return (
                       <div 
                         key={challenge.id} 
-                        className={`challenge-card p-4 cursor-pointer hover:bg-background-2/40 transition-colors ${challenge.status === "completed" ? "challenge-expired" : ""}`}
+                        className={`challenge-card p-4 cursor-pointer hover:bg-background-2/40 transition-colors ${challenge.status === "expired" ? "challenge-expired" : ""}`}
                         onClick={() => {
                           setSelectedChallenge(challenge);
                           setShowDetailsModal(true);
@@ -675,9 +675,14 @@ const ArenaHome: React.FC = () => {
                               In Progress
                             </span>
                           )}
-                          {challenge.status === "completed" && (
+                          {challenge.status === "expired" && (
                             <span className="px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs animate-pulse">
                               Expired
+                            </span>
+                          )}
+                          {challenge.status === "completed" && (
+                            <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
+                              Completed
                             </span>
                           )}
                         </div>
@@ -780,9 +785,13 @@ const ArenaHome: React.FC = () => {
                               <div className="w-full px-4 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 font-semibold rounded-lg text-center">
                                 🔒 Challenge Full
                               </div>
-                            ) : challenge.status === "completed" ? (
+                            ) : challenge.status === "expired" ? (
                               <div className="w-full px-4 py-2 bg-red-600/20 text-red-400 border border-red-600/30 font-semibold rounded-lg text-center">
                                 ⏰ Expired
+                              </div>
+                            ) : challenge.status === "completed" ? (
+                              <div className="w-full px-4 py-2 bg-green-600/20 text-green-400 border border-green-600/30 font-semibold rounded-lg text-center">
+                                ✅ Completed
                               </div>
                             ) : (
                               <div className="w-full px-4 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 font-semibold rounded-lg text-center">

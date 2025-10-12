@@ -80,7 +80,7 @@ export const updateChallenge = async (challengeId: string, updates: Partial<Chal
   }
 };
 
-export const updateChallengeStatus = async (challengeId: string, status: 'active' | 'pending' | 'completed' | 'cancelled' | 'disputed') => {
+export const updateChallengeStatus = async (challengeId: string, status: 'active' | 'pending' | 'completed' | 'cancelled' | 'disputed' | 'expired') => {
   try {
     const challengeRef = doc(db, 'challenges', challengeId);
     await updateDoc(challengeRef, { 
