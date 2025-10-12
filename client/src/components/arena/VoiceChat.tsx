@@ -61,44 +61,67 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
       // Handle ICE candidates
       pc.onicecandidate = async (event) => {
         if (event.candidate) {
-          await setDoc(doc(db, "voice_signals", `${challengeId}_${currentWallet}`), {
-            candidate: event.candidate.toJSON(),
-            from: currentWallet,
+          await setDoc(doc(db, "voice_signals", challengeId), {
+            [`candidates_${currentWallet}`]: event.candidate.toJSON(),
             timestamp: Date.now()
           }, { merge: true });
         }
       };
 
-      // Listen for remote signals
-      const signalRef = doc(db, "voice_signals", `${challengeId}_peer`);
+      // Listen for remote signals from the shared document
+      const signalRef = doc(db, "voice_signals", challengeId);
       const unsubscribe = onSnapshot(signalRef, async (snapshot) => {
         const data = snapshot.data();
         if (!data) return;
 
-        if (data.offer && !pc.currentRemoteDescription) {
-          await pc.setRemoteDescription(data.offer);
+        // Check for offer from other player
+        if (data.offer && data.offerFrom !== currentWallet && !pc.currentRemoteDescription) {
+          console.log("📞 Received offer, creating answer...");
+          await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
-          await setDoc(doc(db, "voice_signals", `${challengeId}_${currentWallet}`), {
+          await setDoc(signalRef, {
             answer,
-            from: currentWallet,
+            answerFrom: currentWallet,
             timestamp: Date.now()
           }, { merge: true });
-        } else if (data.answer && !pc.currentRemoteDescription) {
-          await pc.setRemoteDescription(data.answer);
-        } else if (data.candidate) {
-          await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+        } 
+        // Check for answer from other player
+        else if (data.answer && data.answerFrom !== currentWallet && !pc.currentRemoteDescription) {
+          console.log("✅ Received answer, setting remote description...");
+          await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
         }
+
+        // Handle ICE candidates from other players
+        Object.keys(data).forEach(async (key) => {
+          if (key.startsWith('candidates_') && !key.endsWith(currentWallet)) {
+            try {
+              await pc.addIceCandidate(new RTCIceCandidate(data[key]));
+            } catch (err) {
+              console.error("Failed to add ICE candidate:", err);
+            }
+          }
+        });
       });
 
-      // Create and send offer
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      await setDoc(doc(db, "voice_signals", `${challengeId}_${currentWallet}`), {
-        offer,
-        from: currentWallet,
-        timestamp: Date.now()
-      }, { merge: true });
+      // Small delay to let listener attach
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Check if we should create offer (first person in the room)
+      const { getDoc } = await import("firebase/firestore");
+      const signalSnap = await getDoc(signalRef);
+      const signalData = signalSnap.data();
+      
+      if (!signalData?.offer) {
+        console.log("📞 Creating offer...");
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        await setDoc(signalRef, {
+          offer,
+          offerFrom: currentWallet,
+          timestamp: Date.now()
+        }, { merge: true });
+      }
 
     } catch (error) {
       console.error("❌ Voice chat init failed:", error);
@@ -122,9 +145,9 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
     // Close peer connection
     peerConnection.current?.close();
     
-    // Clean up Firestore signals
+    // Clean up Firestore signals (delete the entire room signal doc)
     try {
-      await deleteDoc(doc(db, "voice_signals", `${challengeId}_${currentWallet}`));
+      await deleteDoc(doc(db, "voice_signals", challengeId));
     } catch (error) {
       console.error("Failed to clean up voice signals:", error);
     }

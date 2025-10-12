@@ -51,15 +51,18 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet }) 
 
     setSending(true);
     try {
+      console.log("📤 Sending message:", { challengeId, text: input.trim(), sender: currentWallet });
       await addDoc(collection(db, "challenge_chats"), {
         challengeId,
         text: input.trim(),
         sender: currentWallet,
         timestamp: serverTimestamp(),
       });
+      console.log("✅ Message sent successfully");
       setInput("");
     } catch (error) {
       console.error("❌ Failed to send message:", error);
+      alert("Failed to send message. Check console for details.");
     } finally {
       setSending(false);
     }
