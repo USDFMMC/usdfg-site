@@ -17,9 +17,25 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   onDisconnect,
   compact = false
 }) => {
-  const { publicKey, connected, connecting, disconnect } = useWallet();
+  const { publicKey, connected, connecting, disconnect, select, wallets } = useWallet();
   const { connection } = useConnection();
   const [balance, setBalance] = useState<number | null>(null);
+
+  // Auto-connect Phantom if in mobile browser
+  useEffect(() => {
+    const isPhantomInjected = typeof window !== 'undefined' && (window as any).phantom?.solana?.isPhantom;
+    
+    if (isPhantomInjected && !connected && !connecting) {
+      console.log('👻 Phantom detected in mobile browser - auto-connecting...');
+      
+      // Find Phantom wallet
+      const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
+      
+      if (phantomWallet) {
+        select(phantomWallet.adapter.name);
+      }
+    }
+  }, [wallets, connected, connecting, select]);
 
   // Handle connection state changes
   useEffect(() => {
@@ -80,25 +96,20 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   // Check if we're on mobile
   const isMobile = typeof window !== 'undefined' && /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   
+  // Check if Phantom is already injected (in-app browser)
+  const isPhantomInjected = typeof window !== 'undefined' && (window as any).phantom?.solana?.isPhantom;
+  
   // Show connection button
   return (
     <div className="flex flex-col space-y-2">
       {/* Compact mode for mobile navbar */}
       {compact ? (
-        <button
-          onClick={() => {
-            if (isMobile) {
-              window.open('https://phantom.app/ul/browse/' + encodeURIComponent(window.location.href), '_blank');
-            }
-          }}
-          className="px-2.5 py-1.5 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-md text-xs font-medium hover:bg-cyan-500/30 transition-colors"
-        >
-          Connect Wallet
-        </button>
+        // Just show the standard wallet button in compact mode
+        <WalletMultiButton className="!px-2.5 !py-1.5 !bg-cyan-500/20 !text-cyan-400 !border !border-cyan-500/30 !rounded-md !text-xs !font-medium hover:!bg-cyan-500/30 !transition-colors !min-w-0" />
       ) : (
         <>
-          {/* Always show mobile options on mobile, with fallback detection */}
-          {(isMobile || (typeof window !== 'undefined' && window.innerWidth < 768)) ? (
+          {/* Only show "Open in Phantom" if on mobile AND Phantom is NOT injected */}
+          {(isMobile || (typeof window !== 'undefined' && window.innerWidth < 768)) && !isPhantomInjected ? (
             <div className="space-y-3">
               <div className="text-sm text-gray-400 mb-2">
                 Connect with Phantom:
