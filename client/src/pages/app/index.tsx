@@ -803,7 +803,8 @@ const ArenaHome: React.FC = () => {
                             });
                           }
 
-                          if (isOwner) {
+                          // Owner buttons (but only if NOT in-progress)
+                          if (isOwner && challenge.status !== "in-progress") {
                             return (
                               <div className="flex space-x-2">
                                 <button 

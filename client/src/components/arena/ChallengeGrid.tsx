@@ -275,8 +275,8 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
                   const hasSubmittedResult = normalizedWallet && (challenge as any).rawData?.results?.[normalizedWallet];
                   const inProgress = challenge.status === "in-progress";
 
-                  // Owner buttons
-                  if (isOwner) {
+                  // Owner buttons (but only if NOT in-progress)
+                  if (isOwner && !inProgress) {
                     return (
                       <>
                         <button
