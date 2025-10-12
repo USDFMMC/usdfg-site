@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { X, Trophy, Loader2 } from "lucide-react";
+import React, { useState, useRef } from "react";
+import { X, Trophy, Loader2, Camera, Upload, Image as ImageIcon } from "lucide-react";
 
 interface SubmitResultModalProps {
   isOpen: boolean;
@@ -20,8 +20,31 @@ export const SubmitResultModal: React.FC<SubmitResultModalProps> = ({
 }) => {
   const [selectedResult, setSelectedResult] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [proofImage, setProofImage] = useState<string | null>(null);
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
+
+  const handleImageCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setProofFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProofImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setProofImage(null);
+    setProofFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const handleSubmit = async () => {
     if (selectedResult === null) return;
@@ -128,6 +151,84 @@ export const SubmitResultModal: React.FC<SubmitResultModalProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Proof Upload Section */}
+        {selectedResult === true && (
+          <div className="mb-6">
+            <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-semibold text-purple-300">
+                  📸 Upload Proof (Optional but Recommended)
+                </p>
+              </div>
+
+              {!proofImage ? (
+                <div className="space-y-2">
+                  {/* Hidden file input */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleImageCapture}
+                    className="hidden"
+                  />
+                  
+                  {/* Upload buttons */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Camera button (mobile) */}
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center justify-center gap-2 p-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg transition-all"
+                    >
+                      <Camera className="w-5 h-5" />
+                      <span className="text-sm font-medium">Take Photo</span>
+                    </button>
+
+                    {/* Upload button (desktop) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (fileInputRef.current) {
+                          fileInputRef.current.removeAttribute('capture');
+                          fileInputRef.current.click();
+                        }
+                      }}
+                      className="flex items-center justify-center gap-2 p-3 bg-purple-700 hover:bg-purple-800 text-white rounded-lg transition-all"
+                    >
+                      <Upload className="w-5 h-5" />
+                      <span className="text-sm font-medium">Upload</span>
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-gray-400 text-center mt-2">
+                    Screenshot of victory screen, final score, or match result
+                  </p>
+                </div>
+              ) : (
+                <div className="relative">
+                  <img
+                    src={proofImage}
+                    alt="Proof"
+                    className="w-full h-48 object-cover rounded-lg"
+                  />
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    className="absolute top-2 right-2 p-2 bg-red-600 hover:bg-red-700 rounded-full text-white transition-all"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  <div className="absolute bottom-2 left-2 px-2 py-1 bg-green-600 rounded text-xs text-white flex items-center gap-1">
+                    <ImageIcon className="w-3 h-3" />
+                    Proof uploaded
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Info Box */}
         <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 mb-6">
