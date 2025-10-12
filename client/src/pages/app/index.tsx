@@ -124,7 +124,8 @@ const ArenaHome: React.FC = () => {
       createdAt: challenge.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
       timestamp: challenge.createdAt?.toDate?.()?.getTime() || Date.now(),
       expiresAt: challenge.expiresAt?.toDate?.()?.getTime() || (Date.now() + (2 * 60 * 60 * 1000)),
-      status: challenge.status
+      status: challenge.status,
+      rawData: challenge // Keep original Firestore data for player checks and results
     };
   });
   
@@ -782,6 +783,19 @@ const ArenaHome: React.FC = () => {
                           const currentWallet = publicKey?.toString()?.toLowerCase();
                           const isParticipant = currentWallet && challenge.rawData?.players?.some((p: string) => p.toLowerCase() === currentWallet);
                           const hasSubmittedResult = currentWallet && challenge.rawData?.results?.[currentWallet];
+
+                          // Debug logging for submit result button
+                          if (challenge.status === "in-progress") {
+                            console.log("🔍 In-Progress Challenge Debug:", {
+                              challengeId: challenge.id,
+                              status: challenge.status,
+                              currentWallet,
+                              players: challenge.rawData?.players,
+                              isParticipant,
+                              hasSubmittedResult,
+                              results: challenge.rawData?.results
+                            });
+                          }
 
                           if (isOwner) {
                             return (
