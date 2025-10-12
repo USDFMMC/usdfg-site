@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Challenges - anyone can read, only authenticated users can create/update
+    match /challenges/{challengeId} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null;
+    }
+    
+    // Challenge Chats - temporary chat during result submission
+    match /challenge_chats/{chatId} {
+      allow read, write: if true;
+      // TODO: Add more restrictive rules based on challenge participants
+    }
+    
+    // Voice Signals - WebRTC signaling for voice chat
+    match /voice_signals/{signalId} {
+      allow read, write: if true;
+      // TODO: Add more restrictive rules based on challenge participants
+    }
+    
+    // User profiles (if you use them)
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
+
