@@ -85,7 +85,6 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
   };
 
   const handleChallengeClick = (challenge: ChallengeData) => {
-    console.log('🎮 Grid challenge clicked:', challenge.id);
     onChallengeClick?.(challenge);
   };
 
@@ -264,7 +263,6 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        console.log('🗑️ Grid Delete clicked for:', challenge.id);
                         onDeleteChallenge?.(challenge.id);
                       }}
                       className="flex-1 px-3 py-2 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-sm font-semibold hover:bg-red-500/30 transition-colors"
@@ -285,7 +283,6 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      console.log('🎮 Join challenge clicked:', challenge.id);
                       onJoinChallenge?.(challenge);
                     }}
                     className="w-full px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all"
