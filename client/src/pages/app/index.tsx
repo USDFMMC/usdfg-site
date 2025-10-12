@@ -717,7 +717,12 @@ const ArenaHome: React.FC = () => {
                           )}
                           {challenge.status === "completed" && (
                             <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
-                              Completed
+                              ✅ Completed
+                            </span>
+                          )}
+                          {challenge.status === "disputed" && (
+                            <span className="px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs animate-pulse">
+                              🔴 Disputed
                             </span>
                           )}
                         </div>
@@ -781,6 +786,40 @@ const ArenaHome: React.FC = () => {
                                 )}
                               </div>
                             </details>
+                          </div>
+                        )}
+
+                        {/* Winner Display for Completed/Disputed Challenges */}
+                        {(challenge.status === "completed" || challenge.status === "disputed") && challenge.rawData?.winner && (
+                          <div className="mb-4 p-4 rounded-lg border-2 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-yellow-500/30">
+                            <div className="text-center">
+                              {challenge.rawData.winner === "tie" ? (
+                                <>
+                                  <div className="text-3xl mb-2">🤝</div>
+                                  <div className="text-xl font-bold text-yellow-400">TIE - Refund</div>
+                                  <p className="text-sm text-gray-400 mt-1">Both players will be refunded</p>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="text-3xl mb-2">🏆</div>
+                                  <div className="text-xl font-bold text-yellow-400">Winner</div>
+                                  <p className="text-xs text-gray-400 mt-1 font-mono break-all">{challenge.rawData.winner}</p>
+                                  {challenge.rawData.winner.toLowerCase() === publicKey?.toString().toLowerCase() && (
+                                    <p className="text-green-400 font-semibold mt-2">🎉 You Won!</p>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {challenge.status === "disputed" && (
+                          <div className="mb-4 p-4 rounded-lg border-2 bg-gradient-to-r from-red-500/10 to-pink-500/10 border-red-500/30">
+                            <div className="text-center">
+                              <div className="text-3xl mb-2">⚠️</div>
+                              <div className="text-xl font-bold text-red-400">Dispute</div>
+                              <p className="text-sm text-gray-400 mt-1">Both players claimed they won. Admin review required.</p>
+                            </div>
                           </div>
                         )}
                         
