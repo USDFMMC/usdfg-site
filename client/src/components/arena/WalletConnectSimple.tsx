@@ -99,7 +99,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           }}
           className="px-2.5 py-1.5 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-md text-xs font-medium hover:bg-cyan-500/30 transition-colors"
         >
-          Connect
+          Connect Wallet
         </button>
       ) : (
         <>
