@@ -14,7 +14,7 @@ import ElegantButton from "@/components/ui/ElegantButton";
 import ElegantModal from "@/components/ui/ElegantModal";
 import CreateChallengeForm from "@/components/arena/CreateChallengeForm";
 import ElegantNavbar from "@/components/layout/ElegantNavbar";
-import { SubmitResultModal } from "@/components/arena/SubmitResultModal";
+import { SubmitResultRoom } from "@/components/arena/SubmitResultRoom";
 
 const ArenaHome: React.FC = () => {
   const { connected, signTransaction, publicKey, connect } = useWallet();
@@ -276,15 +276,19 @@ const ArenaHome: React.FC = () => {
   };
 
   // Handle result submission
-  const handleSubmitResult = async (didWin: boolean) => {
+  const handleSubmitResult = async (didWin: boolean, proofFile?: File | null) => {
     if (!selectedChallenge || !publicKey) {
       console.error("❌ No challenge selected or wallet not connected");
       return;
     }
 
     try {
-      console.log("📝 Submitting result:", { challengeId: selectedChallenge.id, didWin });
+      console.log("📝 Submitting result:", { challengeId: selectedChallenge.id, didWin, hasProof: !!proofFile });
+      
+      // TODO: Upload proof image to Firebase Storage if provided
+      // For now, we'll just submit the result without the proof URL
       await submitChallengeResult(selectedChallenge.id, publicKey.toBase58(), didWin);
+      
       console.log("✅ Result submitted successfully");
       setShowSubmitResultModal(false);
       setSelectedChallenge(null);
@@ -996,8 +1000,8 @@ const ArenaHome: React.FC = () => {
           />
         )}
 
-        {/* Submit Result Modal */}
-        <SubmitResultModal
+        {/* Submit Result Room */}
+        <SubmitResultRoom
           isOpen={showSubmitResultModal}
           onClose={() => {
             setShowSubmitResultModal(false);
@@ -1005,6 +1009,7 @@ const ArenaHome: React.FC = () => {
           }}
           challengeId={selectedChallenge?.id || ""}
           challengeTitle={selectedChallenge?.title || ""}
+          currentWallet={publicKey?.toString() || ""}
           onSubmit={handleSubmitResult}
         />
 
