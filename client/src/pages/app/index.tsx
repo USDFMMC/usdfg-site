@@ -1633,9 +1633,16 @@ const JoinChallengeModal: React.FC<{
   const [connecting, setConnecting] = useState(false);
 
   const handleConnect = () => {
-    // Close the modal and let the user connect via the main wallet button
-    onClose();
-    console.log('🔗 Please connect your wallet using the main "Connect Wallet" button first');
+    // Check if mobile
+    const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+      // Open in Phantom app on mobile
+      window.open('https://phantom.app/ul/browse/' + encodeURIComponent(window.location.href), '_blank');
+    } else {
+      // Desktop: close modal and let user connect via main button
+      onClose();
+    }
   };
 
   const handleJoin = async () => {
