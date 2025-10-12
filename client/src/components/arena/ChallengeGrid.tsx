@@ -231,20 +231,35 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
                 <div>Created by: {challenge.creatorTag || challenge.creator.slice(0, 8)}...</div>
                 {(() => {
                   const isOwner = isChallengeOwner ? isChallengeOwner(challenge) : false;
-                  console.log('🔍 Grid - Challenge:', challenge.id, 'isOwner:', isOwner, 'hasDeleteFn:', !!onDeleteChallenge);
-                  return isOwner && onDeleteChallenge ? (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        console.log('🗑️ Grid Delete clicked for:', challenge.id);
-                        onDeleteChallenge(challenge.id);
-                      }}
-                      className="ml-2 px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs hover:bg-red-500/30 transition-colors z-50"
-                      title="Delete Challenge"
-                    >
-                      🗑️ Delete
-                    </button>
-                  ) : null;
+                  const hasDeleteFn = !!onDeleteChallenge;
+                  const shouldShowButton = isOwner && hasDeleteFn;
+                  
+                  console.log('🔍 Grid Delete Button Check:', {
+                    challengeId: challenge.id,
+                    isOwner,
+                    hasDeleteFn,
+                    shouldShowButton,
+                    isChallengeOwnerExists: !!isChallengeOwner,
+                    onDeleteChallengeExists: !!onDeleteChallenge
+                  });
+                  
+                  if (shouldShowButton) {
+                    return (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          console.log('🗑️ Grid Delete clicked for:', challenge.id);
+                          onDeleteChallenge(challenge.id);
+                        }}
+                        className="ml-2 px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs hover:bg-red-500/30 transition-colors z-50"
+                        title="Delete Challenge"
+                      >
+                        🗑️ Delete
+                      </button>
+                    );
+                  }
+                  
+                  return null;
                 })()}
               </div>
             </footer>
