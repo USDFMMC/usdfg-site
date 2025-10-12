@@ -238,7 +238,7 @@ const ArenaHome: React.FC = () => {
         rules: challengeData.rules || "",
         status: 'active' as const,
         players: [currentWallet],
-        expiresAt: Timestamp.fromDate(new Date(Date.now() + (2 * 60 * 60 * 1000))), // 2 hours from now
+        expiresAt: Timestamp.fromDate(new Date(Date.now() + (10 * 1000))), // 10 seconds from now (TESTING)
         solanaAccountId: challengeId,
         category: getGameCategory(challengeData.game),
         prizePool: Math.round(prizePool)
