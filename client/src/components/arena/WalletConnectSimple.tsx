@@ -97,10 +97,9 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
               window.open('https://phantom.app/ul/browse/' + encodeURIComponent(window.location.href), '_blank');
             }
           }}
-          className="px-2 py-1.5 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-md text-xs font-medium hover:bg-cyan-500/30 transition-colors flex items-center gap-1"
+          className="px-2.5 py-1.5 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-md text-xs font-medium hover:bg-cyan-500/30 transition-colors"
         >
-          <span>🔌</span>
-          <span>Connect</span>
+          Connect
         </button>
       ) : (
         <>
