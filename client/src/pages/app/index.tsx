@@ -284,10 +284,20 @@ const ArenaHome: React.FC = () => {
   const isChallengeOwner = (challenge: any) => {
     const currentWallet = publicKey?.toString()?.toLowerCase() || null;
     const challengeCreator = challenge.creator?.toLowerCase() || null;
-    const isOwner = currentWallet && challengeCreator && currentWallet === challengeCreator;
+    
+    // Must have both wallet addresses to compare
+    if (!currentWallet || !challengeCreator) {
+      console.log("🔍 Ownership check: Missing wallet data", {
+        hasCurrentWallet: !!currentWallet,
+        hasChallengeCreator: !!challengeCreator
+      });
+      return false;
+    }
+    
+    const isOwner = currentWallet === challengeCreator;
     console.log("🔍 Ownership check:", {
-      currentWallet: currentWallet ? currentWallet.slice(0, 8) + "..." : "null",
-      challengeCreator: challengeCreator ? challengeCreator.slice(0, 8) + "..." : "null",
+      currentWallet: currentWallet.slice(0, 8) + "...",
+      challengeCreator: challengeCreator.slice(0, 8) + "...",
       isOwner
     });
     return isOwner;
