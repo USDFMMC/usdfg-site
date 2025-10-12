@@ -187,8 +187,8 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
                     </span>
                   )}
                   {challenge.status === "completed" && (
-                    <span className="px-2 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-xs whitespace-nowrap">
-                      Completed
+                    <span className="px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs whitespace-nowrap animate-pulse">
+                      Expired
                     </span>
                   )}
                   {isFull && challenge.status === "active" && (
