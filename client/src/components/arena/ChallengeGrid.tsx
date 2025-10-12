@@ -6,7 +6,9 @@ export interface ChallengeGridProps {
   challenges: ChallengeData[];
   onChallengeClick?: (challenge: ChallengeData) => void;
   onDeleteChallenge?: (challengeId: string) => void;
+  onJoinChallenge?: (challenge: ChallengeData) => void;
   isChallengeOwner?: (challenge: ChallengeData) => boolean;
+  isConnected?: boolean;
   className?: string;
   radius?: number;
   damping?: number;
@@ -20,7 +22,9 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
   challenges,
   onChallengeClick,
   onDeleteChallenge,
+  onJoinChallenge,
   isChallengeOwner,
+  isConnected = false,
   className = '',
   radius = 300,
   damping = 0.45,
@@ -53,79 +57,66 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
       onUpdate: () => {
         setX.current?.(pos.current.x);
         setY.current?.(pos.current.y);
-      },
-      overwrite: true
+      }
     });
   };
 
   const handleMove = (e: React.PointerEvent) => {
-    const r = rootRef.current!.getBoundingClientRect();
-    moveTo(e.clientX - r.left, e.clientY - r.top);
-    gsap.to(fadeRef.current, { opacity: 0, duration: 0.25, overwrite: true });
+    const el = rootRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    moveTo(e.clientX - rect.left, e.clientY - rect.top);
   };
 
   const handleLeave = () => {
-    gsap.to(fadeRef.current, {
-      opacity: 1,
-      duration: fadeOut,
-      overwrite: true
-    });
+    const el = rootRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    moveTo(rect.width / 2, rect.height / 2);
+  };
+
+  const handleCardMove = (e: React.MouseEvent) => {
+    const card = e.currentTarget as HTMLElement;
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    card.style.setProperty('--mouse-x', `${x}px`);
+    card.style.setProperty('--mouse-y', `${y}px`);
   };
 
   const handleChallengeClick = (challenge: ChallengeData) => {
-    if (onChallengeClick) {
-      onChallengeClick(challenge);
-    }
+    console.log('🎮 Grid challenge clicked:', challenge.id);
+    onChallengeClick?.(challenge);
   };
 
-  const handleCardMove: React.MouseEventHandler<HTMLElement> = e => {
-    const c = e.currentTarget as HTMLElement;
-    const rect = c.getBoundingClientRect();
-    c.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
-    c.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
-  };
-
-  // Get challenge colors based on game type
-  const getChallengeColors = (game: string, index: number) => {
-    const colors = [
-      { border: '#3B82F6', gradient: 'linear-gradient(145deg, #3B82F6, #000)' },
-      { border: '#10B981', gradient: 'linear-gradient(180deg, #10B981, #000)' },
-      { border: '#F59E0B', gradient: 'linear-gradient(165deg, #F59E0B, #000)' },
-      { border: '#EF4444', gradient: 'linear-gradient(195deg, #EF4444, #000)' },
-      { border: '#8B5CF6', gradient: 'linear-gradient(225deg, #8B5CF6, #000)' },
-      { border: '#06B6D4', gradient: 'linear-gradient(135deg, #06B6D4, #000)' }
-    ];
-    return colors[index % colors.length];
-  };
-
-  // Get game emoji
   const getGameEmoji = (game: string) => {
-    const emojis: { [key: string]: string } = {
-      'NBA 2K': '🏀',
-      'FIFA': '⚽',
-      'Call of Duty': '🔫',
-      'Rocket League': '🚗',
-      'Street Fighter': '👊',
-      'Tekken': '🥊',
-      'Mortal Kombat': '⚔️',
-      'Fortnite': '🏗️',
-      'Apex Legends': '🎯',
-      'Valorant': '🎮'
-    };
-    return emojis[game] || '🎮';
+    if (game.includes('UFC') || game.includes('Fighting')) return '🥊';
+    if (game.includes('NBA') || game.includes('FIFA') || game.includes('FC') || game.includes('Madden')) return '🏀';
+    if (game.includes('COD') || game.includes('Fortnite') || game.includes('Valorant')) return '🎯';
+    if (game.includes('Racing') || game.includes('F1') || game.includes('Forza') || game.includes('Mario Kart')) return '🏎️';
+    return '🎮';
   };
 
-  if (challenges.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-96 text-gray-400">
-        <div className="text-center">
-          <div className="text-6xl mb-4">🎮</div>
-          <h3 className="text-xl font-semibold mb-2">No Active Challenges</h3>
-          <p className="text-sm">Be the first to create a challenge!</p>
-        </div>
-      </div>
-    );
-  }
+  const getChallengeColors = (game: string, index: number) => {
+    const colorSchemes = [
+      { gradient: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(139, 92, 246, 0.1) 100%)', border: 'rgba(168, 85, 247, 0.3)' },
+      { gradient: 'linear-gradient(135deg, rgba(236, 72, 153, 0.2) 0%, rgba(219, 39, 119, 0.1) 100%)', border: 'rgba(236, 72, 153, 0.3)' },
+      { gradient: 'linear-gradient(135deg, rgba(34, 211, 238, 0.2) 0%, rgba(6, 182, 212, 0.1) 100%)', border: 'rgba(34, 211, 238, 0.3)' },
+      { gradient: 'linear-gradient(135deg, rgba(251, 146, 60, 0.2) 0%, rgba(249, 115, 22, 0.1) 100%)', border: 'rgba(251, 146, 60, 0.3)' },
+    ];
+    return colorSchemes[index % colorSchemes.length];
+  };
+
+  const getTimeRemaining = (expiresAt: number) => {
+    const minutes = Math.max(0, Math.floor((expiresAt - Date.now()) / (1000 * 60)));
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    
+    if (hours > 0) {
+      return `${hours}h ${mins}m`;
+    }
+    return `${mins}m`;
+  };
 
   return (
     <div
@@ -143,23 +134,16 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
     >
       {challenges.map((challenge, i) => {
         const colors = getChallengeColors(challenge.game, i);
-        
-        // Debug: Log challenge data
-        console.log('🎮 Grid Challenge Data:', {
-          id: challenge.id,
-          players: challenge.players,
-          capacity: challenge.capacity,
-          maxPlayers: challenge.maxPlayers,
-          playersArray: challenge.players?.length,
-          fullObject: challenge
-        });
+        const isOwner = isChallengeOwner ? isChallengeOwner(challenge) : false;
+        const isFull = challenge.players >= challenge.capacity;
+        const canJoin = challenge.status === "active" && !isFull && !isOwner && isConnected;
         
         return (
           <article
             key={challenge.id}
             onMouseMove={handleCardMove}
             onClick={() => handleChallengeClick(challenge)}
-            className="group relative flex flex-col w-[300px] rounded-[20px] overflow-hidden border-2 border-transparent transition-colors duration-300 cursor-pointer hover:border-white/20"
+            className="group relative flex flex-col w-[320px] rounded-[20px] overflow-hidden border-2 border-transparent transition-colors duration-300 cursor-pointer hover:border-white/20"
             style={
               {
                 '--card-border': colors.border,
@@ -184,83 +168,157 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
             </div>
             
             {/* Challenge Info */}
-            <footer className="relative z-10 p-3 text-white font-sans">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-semibold m-0">{challenge.game}</h3>
-                <div className="flex gap-1">
-                  {challenge.status === "active" && (
-                    <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
+            <footer className="relative z-10 p-4 text-white font-sans space-y-3">
+              {/* Header with Title and Status */}
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold m-0 mb-1">{challenge.game}</h3>
+                  <p className="text-sm opacity-70">{challenge.category} • {challenge.mode}</p>
+                </div>
+                <div className="flex flex-col gap-1 items-end">
+                  {challenge.status === "active" && !isFull && (
+                    <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs whitespace-nowrap">
                       Active
                     </span>
                   )}
                   {challenge.status === "in-progress" && (
-                    <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded text-xs">
+                    <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded text-xs whitespace-nowrap">
                       In Progress
                     </span>
                   )}
                   {challenge.status === "completed" && (
-                    <span className="px-2 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-xs">
+                    <span className="px-2 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-xs whitespace-nowrap">
                       Completed
                     </span>
                   )}
-                  {challenge.players >= challenge.capacity && challenge.status === "active" && (
-                    <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded text-xs">
+                  {isFull && challenge.status === "active" && (
+                    <span className="px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs whitespace-nowrap">
                       Full
+                    </span>
+                  )}
+                  {isOwner && (
+                    <span className="px-2 py-1 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded text-xs whitespace-nowrap">
+                      Yours
                     </span>
                   )}
                 </div>
               </div>
-              
-              <div className="grid grid-cols-2 gap-2 text-sm">
+
+              {/* Platform and Creator */}
+              {challenge.platform && challenge.username && (
+                <div className="text-xs opacity-60 flex items-center gap-2">
+                  <span>🖥️ {challenge.platform}</span>
+                  <span>•</span>
+                  <span>👤 {challenge.username}</span>
+                </div>
+              )}
+
+              {/* Timestamps */}
+              <div className="space-y-1">
+                {challenge.createdAt && (
+                  <div className="text-xs opacity-60">
+                    Created {new Date(challenge.createdAt).toLocaleDateString()} at {new Date(challenge.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                )}
+                {challenge.expiresAt && challenge.expiresAt > Date.now() && (
+                  <div className="text-xs text-orange-400">
+                    ⏰ Expires in {getTimeRemaining(challenge.expiresAt)}
+                  </div>
+                )}
+                {challenge.expiresAt && challenge.expiresAt <= Date.now() && (
+                  <div className="text-xs text-red-400 animate-pulse">
+                    ⏰ Expired
+                  </div>
+                )}
+              </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-3 gap-2 text-sm text-center bg-black/20 rounded-lg p-2">
                 <div>
-                  <span className="opacity-80">Entry Fee:</span>
-                  <div className="font-semibold">{challenge.entryFee} USDFG</div>
+                  <div className="font-bold">{challenge.entryFee} USDFG</div>
+                  <div className="text-xs opacity-70">Entry</div>
                 </div>
                 <div>
-                  <span className="opacity-80">Players:</span>
-                  <div className="font-semibold">{challenge.players || 0}/{challenge.capacity || 2}</div>
+                  <div className="font-bold">{challenge.prizePool} USDFG</div>
+                  <div className="text-xs opacity-70">Prize</div>
+                </div>
+                <div>
+                  <div className="font-bold">{challenge.players || 0}/{challenge.capacity || 2}</div>
+                  <div className="text-xs opacity-70">Players</div>
                 </div>
               </div>
-              
-              <div className="mt-2 text-xs opacity-85">
-                <div>Mode: {challenge.mode}</div>
-                <div>Platform: {challenge.platform}</div>
-              </div>
-              
-              <div className="flex items-center justify-between mt-2 text-xs opacity-70">
-                <div>Created by: {challenge.creatorTag || challenge.creator.slice(0, 8)}...</div>
-                {(() => {
-                  const isOwner = isChallengeOwner ? isChallengeOwner(challenge) : false;
-                  const hasDeleteFn = !!onDeleteChallenge;
-                  const shouldShowButton = isOwner && hasDeleteFn;
-                  
-                  console.log('🔍 Grid Delete Button Check:', {
-                    challengeId: challenge.id,
-                    isOwner,
-                    hasDeleteFn,
-                    shouldShowButton,
-                    isChallengeOwnerExists: !!isChallengeOwner,
-                    onDeleteChallengeExists: !!onDeleteChallenge
-                  });
-                  
-                  if (shouldShowButton) {
-                    return (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          console.log('🗑️ Grid Delete clicked for:', challenge.id);
-                          onDeleteChallenge(challenge.id);
-                        }}
-                        className="ml-2 px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs hover:bg-red-500/30 transition-colors z-50"
-                        title="Delete Challenge"
-                      >
-                        🗑️ Delete
-                      </button>
-                    );
-                  }
-                  
-                  return null;
-                })()}
+
+              {/* Rules Preview */}
+              {challenge.rules && (
+                <details className="group/details">
+                  <summary className="cursor-pointer text-xs text-cyan-400 hover:text-cyan-300 flex items-center">
+                    <span className="mr-1">📋</span>
+                    Rules
+                    <span className="ml-auto group-open/details:rotate-180 transition-transform">▼</span>
+                  </summary>
+                  <div className="mt-2 text-xs opacity-80 whitespace-pre-line bg-black/20 p-2 rounded">
+                    {challenge.rules}
+                  </div>
+                </details>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-2">
+                {isOwner ? (
+                  <>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log('🗑️ Grid Delete clicked for:', challenge.id);
+                        onDeleteChallenge?.(challenge.id);
+                      }}
+                      className="flex-1 px-3 py-2 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-sm font-semibold hover:bg-red-500/30 transition-colors"
+                      title="Delete Challenge"
+                    >
+                      🗑️ Delete
+                    </button>
+                    <button
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex-1 px-3 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 rounded-lg text-sm font-semibold opacity-50 cursor-not-allowed"
+                      disabled
+                      title="Coming Soon"
+                    >
+                      ✏️ Edit
+                    </button>
+                  </>
+                ) : canJoin ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      console.log('🎮 Join challenge clicked:', challenge.id);
+                      onJoinChallenge?.(challenge);
+                    }}
+                    className="w-full px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all"
+                  >
+                    ⚡ Join Challenge
+                  </button>
+                ) : isFull ? (
+                  <button
+                    className="w-full px-3 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 rounded-lg text-sm font-semibold cursor-not-allowed"
+                    disabled
+                  >
+                    🔒 Challenge Full
+                  </button>
+                ) : !isConnected ? (
+                  <button
+                    className="w-full px-3 py-2 bg-yellow-600/20 text-yellow-400 border border-yellow-600/30 rounded-lg text-sm font-semibold cursor-not-allowed"
+                    disabled
+                  >
+                    🔌 Connect Wallet to Join
+                  </button>
+                ) : (
+                  <button
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full px-3 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 rounded-lg text-sm font-semibold"
+                  >
+                    ℹ️ View Details
+                  </button>
+                )}
               </div>
             </footer>
           </article>
@@ -290,8 +348,7 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
           maskImage:
             'radial-gradient(circle var(--r) at var(--x) var(--y),white 0%,white 15%,rgba(255,255,255,0.90)30%,rgba(255,255,255,0.78)45%,rgba(255,255,255,0.65)60%,rgba(255,255,255,0.50)75%,rgba(255,255,255,0.32)88%,transparent 100%)',
           WebkitMaskImage:
-            'radial-gradient(circle var(--r) at var(--x) var(--y),white 0%,white 15%,rgba(255,255,255,0.90)30%,rgba(255,255,255,0.78)45%,rgba(255,255,255,0.65)60%,rgba(255,255,255,0.50)75%,rgba(255,255,255,0.32)88%,transparent 100%)',
-          opacity: 1
+            'radial-gradient(circle var(--r) at var(--x) var(--y),white 0%,white 15%,rgba(255,255,255,0.90)30%,rgba(255,255,255,0.78)45%,rgba(255,255,255,0.65)60%,rgba(255,255,255,0.50)75%,rgba(255,255,255,0.32)88%,transparent 100%)'
         }}
       />
     </div>
