@@ -644,8 +644,14 @@ const ArenaHome: React.FC = () => {
                           setSelectedChallenge(challenge);
                           setShowJoinModal(true);
                         }}
+                        onSubmitResult={(challenge) => {
+                          setSelectedChallenge(challenge);
+                          setShowSubmitResultModal(true);
+                        }}
                         isChallengeOwner={isChallengeOwner}
                         isConnected={isConnected}
+                        currentWallet={publicKey?.toString()}
+                        onConnect={() => connect()}
                         radius={300}
                         damping={0.45}
                         fadeOut={0.6}

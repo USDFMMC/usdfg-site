@@ -7,8 +7,11 @@ export interface ChallengeGridProps {
   onChallengeClick?: (challenge: ChallengeData) => void;
   onDeleteChallenge?: (challengeId: string) => void;
   onJoinChallenge?: (challenge: ChallengeData) => void;
+  onSubmitResult?: (challenge: ChallengeData) => void;
   isChallengeOwner?: (challenge: ChallengeData) => boolean;
   isConnected?: boolean;
+  currentWallet?: string;
+  onConnect?: () => void;
   className?: string;
   radius?: number;
   damping?: number;
@@ -23,8 +26,11 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
   onChallengeClick,
   onDeleteChallenge,
   onJoinChallenge,
+  onSubmitResult,
   isChallengeOwner,
   isConnected = false,
+  currentWallet,
+  onConnect,
   className = '',
   radius = 300,
   damping = 0.45,
@@ -263,59 +269,139 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
 
               {/* Action Buttons */}
               <div className="flex gap-2">
-                {isOwner ? (
-                  <>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteChallenge?.(challenge.id);
-                      }}
-                      className="flex-1 px-3 py-2 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-sm font-semibold hover:bg-red-500/30 transition-colors"
-                      title="Delete Challenge"
-                    >
-                      🗑️ Delete
-                    </button>
+                {(() => {
+                  const normalizedWallet = currentWallet?.toLowerCase();
+                  const isParticipant = normalizedWallet && (challenge as any).rawData?.players?.some((p: string) => p.toLowerCase() === normalizedWallet);
+                  const hasSubmittedResult = normalizedWallet && (challenge as any).rawData?.results?.[normalizedWallet];
+                  const inProgress = challenge.status === "in-progress";
+
+                  // Owner buttons
+                  if (isOwner) {
+                    return (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteChallenge?.(challenge.id);
+                          }}
+                          className="flex-1 px-3 py-2 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-sm font-semibold hover:bg-red-500/30 transition-colors"
+                          title="Delete Challenge"
+                        >
+                          🗑️ Delete
+                        </button>
+                        <button
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex-1 px-3 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 rounded-lg text-sm font-semibold opacity-50 cursor-not-allowed"
+                          disabled
+                          title="Coming Soon"
+                        >
+                          ✏️ Edit
+                        </button>
+                      </>
+                    );
+                  }
+
+                  // In-progress challenge logic
+                  if (inProgress) {
+                    // Not connected
+                    if (!currentWallet || !isConnected) {
+                      return (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onConnect?.();
+                          }}
+                          className="w-full px-3 py-2 bg-gradient-to-r from-cyan-600 to-blue-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all text-sm"
+                        >
+                          🔌 Connect to Submit
+                        </button>
+                      );
+                    }
+
+                    // Connected and is participant
+                    if (isParticipant) {
+                      // Already submitted
+                      if (hasSubmittedResult) {
+                        return (
+                          <button
+                            className="w-full px-3 py-2 bg-blue-600/20 text-blue-400 border border-blue-600/30 rounded-lg text-sm font-semibold cursor-default"
+                            disabled
+                          >
+                            ✅ Result Submitted
+                          </button>
+                        );
+                      }
+                      // Can submit
+                      return (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSubmitResult?.(challenge);
+                          }}
+                          className="w-full px-3 py-2 bg-gradient-to-r from-yellow-600 to-orange-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all animate-pulse text-sm"
+                        >
+                          🏆 Submit Result
+                        </button>
+                      );
+                    }
+
+                    // Spectator
+                    return (
+                      <button
+                        className="w-full px-3 py-2 bg-purple-600/20 text-purple-400 border border-purple-600/30 rounded-lg text-sm font-semibold cursor-default"
+                        disabled
+                      >
+                        ⚔️ Match In Progress
+                      </button>
+                    );
+                  }
+
+                  // Active challenge logic
+                  if (canJoin) {
+                    return (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onJoinChallenge?.(challenge);
+                        }}
+                        className="w-full px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all"
+                      >
+                        ⚡ Join Challenge
+                      </button>
+                    );
+                  }
+
+                  if (isFull) {
+                    return (
+                      <button
+                        className="w-full px-3 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 rounded-lg text-sm font-semibold cursor-not-allowed"
+                        disabled
+                      >
+                        🔒 Challenge Full
+                      </button>
+                    );
+                  }
+
+                  if (!isConnected) {
+                    return (
+                      <button
+                        className="w-full px-3 py-2 bg-yellow-600/20 text-yellow-400 border border-yellow-600/30 rounded-lg text-sm font-semibold cursor-not-allowed"
+                        disabled
+                      >
+                        🔌 Connect Wallet to Join
+                      </button>
+                    );
+                  }
+
+                  return (
                     <button
                       onClick={(e) => e.stopPropagation()}
-                      className="flex-1 px-3 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 rounded-lg text-sm font-semibold opacity-50 cursor-not-allowed"
-                      disabled
-                      title="Coming Soon"
+                      className="w-full px-3 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 rounded-lg text-sm font-semibold"
                     >
-                      ✏️ Edit
+                      ℹ️ View Details
                     </button>
-                  </>
-                ) : canJoin ? (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onJoinChallenge?.(challenge);
-                    }}
-                    className="w-full px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all"
-                  >
-                    ⚡ Join Challenge
-                  </button>
-                ) : isFull ? (
-                  <button
-                    className="w-full px-3 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 rounded-lg text-sm font-semibold cursor-not-allowed"
-                    disabled
-                  >
-                    🔒 Challenge Full
-                  </button>
-                ) : !isConnected ? (
-                  <button
-                    className="w-full px-3 py-2 bg-yellow-600/20 text-yellow-400 border border-yellow-600/30 rounded-lg text-sm font-semibold cursor-not-allowed"
-                    disabled
-                  >
-                    🔌 Connect Wallet to Join
-                  </button>
-                ) : (
-                  <button
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-full px-3 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 rounded-lg text-sm font-semibold"
-                  >
-                    ℹ️ View Details
-                  </button>
-                )}
+                  );
+                })()}
               </div>
             </footer>
           </article>
