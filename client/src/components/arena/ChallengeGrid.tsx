@@ -198,14 +198,19 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
               )}
               {challenge.status === "completed" && (
                 <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs whitespace-nowrap">
-                  Completed
+                  ✅ Completed
                 </span>
               )}
-                  {isFull && challenge.status === "active" && (
-                    <span className="px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs whitespace-nowrap">
-                      Full
-                    </span>
-                  )}
+              {challenge.status === "disputed" && (
+                <span className="px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs whitespace-nowrap animate-pulse">
+                  🔴 Disputed
+                </span>
+              )}
+              {isFull && challenge.status === "active" && (
+                <span className="px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs whitespace-nowrap">
+                  Full
+                </span>
+              )}
                   {isOwner && (
                     <span className="px-2 py-1 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded text-xs whitespace-nowrap">
                       Yours
@@ -236,7 +241,7 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
                   </div>
                 )}
               </div>
-
+              
               {/* Stats Grid */}
               <div className="grid grid-cols-3 gap-2 text-sm text-center bg-black/20 rounded-lg p-2">
                 <div>
@@ -252,7 +257,7 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
                   <div className="text-xs opacity-70">Players</div>
                 </div>
               </div>
-
+              
               {/* Rules Preview */}
               {challenge.rules && (
                 <details className="group/details">
@@ -265,6 +270,42 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
                     {challenge.rules}
                   </div>
                 </details>
+              )}
+
+              {/* Winner Display for Completed/Disputed Challenges */}
+              {(challenge.status === "completed" || challenge.status === "disputed") && (challenge as any).rawData?.winner && (
+                <div className="p-3 rounded-lg border-2 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-yellow-500/30">
+                  <div className="text-center">
+                    {(challenge as any).rawData.winner === "tie" ? (
+                      <>
+                        <div className="text-2xl mb-1">🤝</div>
+                        <div className="text-sm font-bold text-yellow-400">TIE - Refund</div>
+                        <p className="text-xs text-gray-400 mt-1">Both refunded</p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-2xl mb-1">🏆</div>
+                        <div className="text-sm font-bold text-yellow-400">Winner</div>
+                        <p className="text-[10px] text-gray-400 mt-1 font-mono break-all leading-tight">
+                          {(challenge as any).rawData.winner.slice(0, 8)}...
+                        </p>
+                        {(challenge as any).rawData.winner.toLowerCase() === currentWallet?.toLowerCase() && (
+                          <p className="text-green-400 font-semibold text-xs mt-1">🎉 You Won!</p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {challenge.status === "disputed" && (
+                <div className="p-3 rounded-lg border-2 bg-gradient-to-r from-red-500/10 to-pink-500/10 border-red-500/30">
+                  <div className="text-center">
+                    <div className="text-2xl mb-1">⚠️</div>
+                    <div className="text-sm font-bold text-red-400">Dispute</div>
+                    <p className="text-xs text-gray-400 mt-1">Admin review needed</p>
+                  </div>
+              </div>
               )}
 
               {/* Action Buttons */}
