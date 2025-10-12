@@ -821,25 +821,50 @@ const ArenaHome: React.FC = () => {
                           }
 
                           // Show "Submit Result" button for participants in "in-progress" challenges
-                          if (isParticipant && challenge.status === "in-progress") {
-                            if (hasSubmittedResult) {
+                          if (challenge.status === "in-progress") {
+                            // If wallet not connected, show connect prompt
+                            if (!currentWallet || !isConnected) {
                               return (
-                                <div className="w-full px-4 py-2 bg-blue-600/20 text-blue-400 border border-blue-600/30 font-semibold rounded-lg text-center">
-                                  ✅ Result Submitted
-                                </div>
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    connect();
+                                  }}
+                                  className="w-full px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all"
+                                >
+                                  🔌 Connect to Submit Result
+                                </button>
                               );
                             }
+
+                            // If wallet connected and is participant
+                            if (isParticipant) {
+                              if (hasSubmittedResult) {
+                                return (
+                                  <div className="w-full px-4 py-2 bg-blue-600/20 text-blue-400 border border-blue-600/30 font-semibold rounded-lg text-center">
+                                    ✅ Result Submitted
+                                  </div>
+                                );
+                              }
+                              return (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedChallenge(challenge);
+                                    setShowSubmitResultModal(true);
+                                  }}
+                                  className="w-full px-4 py-2 bg-gradient-to-r from-yellow-600 to-orange-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all animate-pulse"
+                                >
+                                  🏆 Submit Result
+                                </button>
+                              );
+                            }
+
+                            // If wallet connected but not a participant, just show status
                             return (
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedChallenge(challenge);
-                                  setShowSubmitResultModal(true);
-                                }}
-                                className="w-full px-4 py-2 bg-gradient-to-r from-yellow-600 to-orange-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all animate-pulse"
-                              >
-                                🏆 Submit Result
-                              </button>
+                              <div className="w-full px-4 py-2 bg-purple-600/20 text-purple-400 border border-purple-600/30 font-semibold rounded-lg text-center">
+                                ⚔️ Match In Progress
+                              </div>
                             );
                           }
 
