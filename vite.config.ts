@@ -99,11 +99,11 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true, // Allow external connections
+    strictPort: false, // Allow Vite to use a different port if 5173 is busy
     hmr: {
-      port: 5173,
       host: 'localhost',
       protocol: 'ws',
-      clientPort: 5173,
+      // Don't specify port - let Vite use the same port as the dev server
     },
     headers: {
       "Cache-Control": "public, max-age=31536000, immutable",

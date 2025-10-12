@@ -352,35 +352,53 @@ const ArenaHome: React.FC = () => {
         <div className="parallax-glow"></div>
         {/* Header */}
         <ElegantNavbar>
-          <ElegantButton
-            onClick={() => {
-              if (hasActiveChallenge) {
-                alert("You already have an active challenge (created or joined). Complete it before creating a new one.");
-                return;
-              }
-              if (isCreatingChallenge) {
-                console.log("⏳ Challenge creation in progress, please wait...");
-                return;
-              }
-              console.log("🔥 CREATE CHALLENGE BUTTON CLICKED!");
-              setShowCreateModal(true);
-            }}
-            variant="cyan"
-            disabled={hasActiveChallenge || isCreatingChallenge}
-            title={hasActiveChallenge ? "You have an active challenge (created or joined)" : isCreatingChallenge ? "Creating challenge..." : "Create a new challenge"}
-          >
-            {hasActiveChallenge ? "In Challenge" : isCreatingChallenge ? "Creating..." : "Create Challenge"}
-          </ElegantButton>
-          <WalletConnectSimple 
-            isConnected={isConnected}
-            onConnect={() => {
-              localStorage.setItem('wallet_connected', 'true');
-            }}
-            onDisconnect={() => {
-              localStorage.removeItem('wallet_connected');
-              localStorage.removeItem('wallet_address');
-            }}
-          />
+          {/* Desktop Only Buttons */}
+          <div className="hidden md:flex items-center gap-3">
+            <ElegantButton
+              onClick={() => {
+                if (hasActiveChallenge) {
+                  alert("You already have an active challenge (created or joined). Complete it before creating a new one.");
+                  return;
+                }
+                if (isCreatingChallenge) {
+                  console.log("⏳ Challenge creation in progress, please wait...");
+                  return;
+                }
+                console.log("🔥 CREATE CHALLENGE BUTTON CLICKED!");
+                setShowCreateModal(true);
+              }}
+              variant="cyan"
+              disabled={hasActiveChallenge || isCreatingChallenge}
+              title={hasActiveChallenge ? "You have an active challenge (created or joined)" : isCreatingChallenge ? "Creating challenge..." : "Create a new challenge"}
+            >
+              {hasActiveChallenge ? "In Challenge" : isCreatingChallenge ? "Creating..." : "Create Challenge"}
+            </ElegantButton>
+            <WalletConnectSimple 
+              isConnected={isConnected}
+              onConnect={() => {
+                localStorage.setItem('wallet_connected', 'true');
+              }}
+              onDisconnect={() => {
+                localStorage.removeItem('wallet_connected');
+                localStorage.removeItem('wallet_address');
+              }}
+            />
+          </div>
+
+          {/* Mobile Only - Wallet Button */}
+          <div className="flex md:hidden items-center">
+            <WalletConnectSimple 
+              isConnected={isConnected}
+              onConnect={() => {
+                localStorage.setItem('wallet_connected', 'true');
+              }}
+              onDisconnect={() => {
+                localStorage.removeItem('wallet_connected');
+                localStorage.removeItem('wallet_address');
+              }}
+              compact={true}
+            />
+          </div>
         </ElegantNavbar>
 
         {/* Live Data Tracker */}
@@ -865,12 +883,24 @@ const ArenaHome: React.FC = () => {
           />
         )}
 
-        {/* Mobile FAB */}
+        {/* Mobile FAB - Create Challenge */}
         <button
-          onClick={() => setShowCreateModal(true)}
-          className="fixed bottom-6 right-6 sm:hidden bg-gradient-to-r from-cyan-400 to-purple-500 text-black p-4 rounded-full shadow-lg hover:brightness-110 transition-all z-40"
+          onClick={() => {
+            if (hasActiveChallenge) {
+              alert("You already have an active challenge (created or joined). Complete it before creating a new one.");
+              return;
+            }
+            setShowCreateModal(true);
+          }}
+          disabled={hasActiveChallenge || isCreatingChallenge}
+          className={`fixed bottom-20 right-6 md:hidden ${
+            hasActiveChallenge || isCreatingChallenge 
+              ? 'bg-gray-600/50 cursor-not-allowed' 
+              : 'bg-gradient-to-r from-cyan-400 to-purple-500 hover:brightness-110'
+          } text-white p-4 rounded-full shadow-[0_0_20px_rgba(34,211,238,0.5)] transition-all z-40 flex items-center justify-center`}
+          title={hasActiveChallenge ? "You have an active challenge" : "Create Challenge"}
         >
-          <span className="text-xl">+</span>
+          <span className="text-2xl font-bold">+</span>
         </button>
       </div>
     </>
