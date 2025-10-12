@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -15,6 +15,8 @@ import Whitepaper from "@/pages/whitepaper";
 // import StarBackground from "@/components/effects/star-background";
 import Crosshair from "@/components/effects/Crosshair";
 import { Helmet } from "react-helmet";
+import { startVersionMonitoring } from "@/lib/version";
+import UpdateBanner from "@/components/ui/UpdateBanner";
 
 function AppRouter() {
   return (
@@ -35,8 +37,10 @@ function AppRouter() {
 }
 
 function App() {
+  const [showUpdateBanner, setShowUpdateBanner] = useState(false);
+
   // Safari compatibility check and error handling
-  React.useEffect(() => {
+  useEffect(() => {
     const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
     if (isSafari) {
       console.log('🍎 Safari detected - applying compatibility fixes');
@@ -47,6 +51,17 @@ function App() {
         viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
       }
     }
+  }, []);
+
+  // Version monitoring - check for updates
+  useEffect(() => {
+    console.log('🔄 Initializing version monitoring...');
+    const cleanup = startVersionMonitoring(() => {
+      console.log('🆕 New version available - showing update banner');
+      setShowUpdateBanner(true);
+    });
+    
+    return cleanup;
   }, []);
 
   return (
@@ -88,6 +103,11 @@ function App() {
       </Helmet>
 
       <div className="min-h-screen flex flex-col relative overflow-hidden">
+        {/* Update Banner - shows when new version is available */}
+        {showUpdateBanner && (
+          <UpdateBanner onDismiss={() => setShowUpdateBanner(false)} />
+        )}
+        
         {/* <StarBackground /> */}
         {/* <Crosshair color="#00ffff" /> */}
         <AppRouter />
