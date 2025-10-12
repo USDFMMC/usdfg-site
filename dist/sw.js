@@ -1,7 +1,8 @@
 // Simple ServiceWorker for USDFG Arena
 // Safari-compatible ServiceWorker with fallbacks
 
-const CACHE_NAME = 'usdfg-arena-v4';
+const CACHE_VERSION = Date.now(); // Dynamic version based on deployment time
+const CACHE_NAME = `usdfg-arena-v${CACHE_VERSION}`;
 
 // Safari compatibility check
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
@@ -101,7 +102,7 @@ self.addEventListener('fetch', (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('✅ ServiceWorker: Activated v4 (Safari compatible)');
+  console.log(`✅ ServiceWorker: Activated ${CACHE_NAME} (Safari compatible)`);
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -113,10 +114,22 @@ self.addEventListener('activate', (event) => {
         })
       );
     }).then(() => {
-      // Force all clients to use the new ServiceWorker
+      // Force all clients to use the new ServiceWorker immediately
+      console.log('🔄 ServiceWorker: Taking control of all pages');
       return self.clients.claim();
     })
   );
+  
+  // Skip waiting - activate immediately
+  self.skipWaiting();
+});
+
+// Listen for messages from the client
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    console.log('📨 ServiceWorker: Received SKIP_WAITING message');
+    self.skipWaiting();
+  }
 });
 
 console.log('🚀 ServiceWorker: Loaded successfully');

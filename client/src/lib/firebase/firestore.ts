@@ -44,13 +44,22 @@ export interface ChallengeData {
   entryFee: number;
   maxPlayers: number;
   rules: string;
-  status: 'pending' | 'active' | 'completed' | 'cancelled';
+  status: 'pending' | 'active' | 'completed' | 'cancelled' | 'disputed' | 'in-progress';
   players: string[];
   createdAt: Timestamp;
   expiresAt: Timestamp;
   solanaAccountId?: string;
   category: string;
   prizePool: number;
+  // Result submission fields
+  results?: {
+    [wallet: string]: {
+      didWin: boolean;
+      submittedAt: Timestamp;
+    }
+  };
+  resultDeadline?: Timestamp; // 2 hours after match starts
+  winner?: string;
 }
 
 // Challenge operations
@@ -206,12 +215,21 @@ export const joinChallenge = async (challengeId: string, wallet: string) => {
     const newPlayers = data.players ? [...data.players, wallet] : [wallet];
     const isFull = newPlayers.length >= data.maxPlayers;
 
-    await updateDoc(challengeRef, {
+    // If challenge is now full, start result submission phase (2-hour timer)
+    const updates: any = {
       players: newPlayers,
       status: isFull ? "in-progress" : "active",
       joinedBy: arrayUnion(wallet),
       updatedAt: serverTimestamp(),
-    });
+    };
+
+    if (isFull) {
+      // Set deadline to 2 hours from now for result submission
+      updates.resultDeadline = Timestamp.fromDate(new Date(Date.now() + 2 * 60 * 60 * 1000));
+      console.log('⏰ Challenge is full! Result submission phase started (2-hour deadline)');
+    }
+
+    await updateDoc(challengeRef, updates);
 
     console.log('✅ Player joined challenge:', challengeId);
     return true;
@@ -251,3 +269,214 @@ export async function archiveChallenge(id: string) {
   await batch.commit();
   console.log('🗄️ Challenge archived:', id);
 }
+
+// ============================================
+// RESULT SUBMISSION SYSTEM
+// ============================================
+
+/**
+ * Submit a player's result for a challenge
+ * @param challengeId - The challenge ID
+ * @param wallet - The player's wallet address
+ * @param didWin - Whether the player won (true) or lost (false)
+ */
+export const submitChallengeResult = async (
+  challengeId: string,
+  wallet: string,
+  didWin: boolean
+): Promise<void> => {
+  try {
+    const challengeRef = doc(db, "challenges", challengeId);
+    const snap = await getDoc(challengeRef);
+    
+    if (!snap.exists()) {
+      throw new Error("Challenge not found");
+    }
+
+    const data = snap.data() as ChallengeData;
+    
+    // Verify player is part of this challenge
+    if (!data.players || !data.players.includes(wallet)) {
+      throw new Error("You are not part of this challenge");
+    }
+
+    // Check if player already submitted
+    if (data.results && data.results[wallet]) {
+      throw new Error("You have already submitted your result");
+    }
+
+    // Add result
+    const results = data.results || {};
+    results[wallet] = {
+      didWin,
+      submittedAt: Timestamp.now(),
+    };
+
+    await updateDoc(challengeRef, {
+      results,
+      updatedAt: Timestamp.now(),
+    });
+
+    console.log('✅ Result submitted:', { challengeId, wallet, didWin });
+
+    // Check if both players have submitted
+    if (Object.keys(results).length === data.maxPlayers) {
+      await determineWinner(challengeId, data);
+    }
+  } catch (error) {
+    console.error('❌ Error submitting result:', error);
+    throw error;
+  }
+};
+
+/**
+ * Determine winner based on submitted results
+ * Logic:
+ * - One YES, One NO → YES player wins
+ * - Both YES → Dispute
+ * - Both NO → Tie/Refund
+ */
+async function determineWinner(challengeId: string, data: ChallengeData): Promise<void> {
+  try {
+    const results = data.results || {};
+    const players = Object.keys(results);
+    
+    if (players.length !== 2) {
+      console.log('⏳ Waiting for both players to submit results');
+      return;
+    }
+
+    const player1 = players[0];
+    const player2 = players[1];
+    const player1Won = results[player1].didWin;
+    const player2Won = results[player2].didWin;
+
+    const challengeRef = doc(db, "challenges", challengeId);
+
+    // Case 1: Both claim they won → Dispute
+    if (player1Won && player2Won) {
+      await updateDoc(challengeRef, {
+        status: 'disputed',
+        winner: null,
+        updatedAt: Timestamp.now(),
+      });
+      console.log('🔴 DISPUTE: Both players claim they won');
+      return;
+    }
+
+    // Case 2: Both claim they lost → Tie/Refund
+    if (!player1Won && !player2Won) {
+      await updateDoc(challengeRef, {
+        status: 'completed',
+        winner: 'tie',
+        updatedAt: Timestamp.now(),
+      });
+      console.log('🤝 TIE: Both players claim they lost - Refund initiated');
+      return;
+    }
+
+    // Case 3: Clear winner (one YES, one NO)
+    const winner = player1Won ? player1 : player2;
+    await updateDoc(challengeRef, {
+      status: 'completed',
+      winner,
+      updatedAt: Timestamp.now(),
+    });
+    console.log('🏆 WINNER DETERMINED:', winner);
+    
+    // TODO: Trigger smart contract to release prize pool to winner
+    
+  } catch (error) {
+    console.error('❌ Error determining winner:', error);
+    throw error;
+  }
+}
+
+/**
+ * Start result submission phase when challenge goes in-progress
+ * Sets a 2-hour deadline for result submission
+ */
+export const startResultSubmissionPhase = async (challengeId: string): Promise<void> => {
+  try {
+    const challengeRef = doc(db, "challenges", challengeId);
+    
+    // Set deadline to 2 hours from now
+    const deadline = Timestamp.fromDate(new Date(Date.now() + 2 * 60 * 60 * 1000));
+    
+    await updateDoc(challengeRef, {
+      resultDeadline: deadline,
+      status: 'in-progress',
+      updatedAt: Timestamp.now(),
+    });
+    
+    console.log('⏰ Result submission phase started. Deadline:', deadline.toDate());
+  } catch (error) {
+    console.error('❌ Error starting result submission phase:', error);
+    throw error;
+  }
+};
+
+/**
+ * Check if result submission deadline has passed
+ * If only one player submitted, they win by default
+ * If no one submitted, challenge goes to dispute
+ */
+export const checkResultDeadline = async (challengeId: string): Promise<void> => {
+  try {
+    const challengeRef = doc(db, "challenges", challengeId);
+    const snap = await getDoc(challengeRef);
+    
+    if (!snap.exists()) return;
+    
+    const data = snap.data() as ChallengeData;
+    
+    if (!data.resultDeadline || data.status !== 'in-progress') return;
+    
+    const now = Timestamp.now();
+    const deadlinePassed = now.toMillis() > data.resultDeadline.toMillis();
+    
+    if (!deadlinePassed) return;
+    
+    const results = data.results || {};
+    const submittedCount = Object.keys(results).length;
+    
+    // Case 1: No one submitted → Dispute/Refund
+    if (submittedCount === 0) {
+      await updateDoc(challengeRef, {
+        status: 'disputed',
+        winner: null,
+        updatedAt: Timestamp.now(),
+      });
+      console.log('⚠️ DEADLINE PASSED: No results submitted - Dispute');
+      return;
+    }
+    
+    // Case 2: Only one player submitted → They win by default
+    if (submittedCount === 1) {
+      const submittedWallet = Object.keys(results)[0];
+      const didTheyClaimWin = results[submittedWallet].didWin;
+      
+      // Only award win if they claimed they won
+      if (didTheyClaimWin) {
+        await updateDoc(challengeRef, {
+          status: 'completed',
+          winner: submittedWallet,
+          updatedAt: Timestamp.now(),
+        });
+        console.log('🏆 DEADLINE PASSED: Winner by default (opponent no-show):', submittedWallet);
+      } else {
+        // They claimed they lost and opponent didn't submit → Refund
+        await updateDoc(challengeRef, {
+          status: 'completed',
+          winner: 'tie',
+          updatedAt: Timestamp.now(),
+        });
+        console.log('🤝 DEADLINE PASSED: Refund (player claimed loss, opponent no-show)');
+      }
+    }
+    
+  } catch (error) {
+    console.error('❌ Error checking result deadline:', error);
+    throw error;
+  }
+};

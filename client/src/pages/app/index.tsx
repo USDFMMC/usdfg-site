@@ -7,13 +7,15 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { fetchActiveChallenges, fetchOpenChallenges, joinChallengeOnChain } from "@/lib/chain/events";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
-import { ChallengeData, joinChallenge } from "@/lib/firebase/firestore";
+import { useResultDeadlines } from "@/hooks/useResultDeadlines";
+import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase } from "@/lib/firebase/firestore";
 import { testFirestoreConnection } from "@/lib/firebase/firestore";
 import ChallengeGrid from "@/components/arena/ChallengeGrid";
 import ElegantButton from "@/components/ui/ElegantButton";
 import ElegantModal from "@/components/ui/ElegantModal";
 import CreateChallengeForm from "@/components/arena/CreateChallengeForm";
 import ElegantNavbar from "@/components/layout/ElegantNavbar";
+import { SubmitResultModal } from "@/components/arena/SubmitResultModal";
 
 const ArenaHome: React.FC = () => {
   const { connected, signTransaction, publicKey, connect } = useWallet();
@@ -22,6 +24,7 @@ const ArenaHome: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showSubmitResultModal, setShowSubmitResultModal] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [filterCategory, setFilterCategory] = useState<string>('All');
@@ -76,6 +79,9 @@ const ArenaHome: React.FC = () => {
   
   // Auto-expire challenges after 2 hours
   useChallengeExpiry(firestoreChallenges);
+  
+  // Monitor result submission deadlines
+  useResultDeadlines(firestoreChallenges);
   
   // Convert Firestore challenges to the format expected by the UI
   const challenges = firestoreChallenges.map(challenge => {
@@ -267,6 +273,28 @@ const ArenaHome: React.FC = () => {
         console.error("❌ Failed to delete challenge:", error);
         alert("Failed to delete challenge: " + (error instanceof Error ? error.message : "Unknown error"));
       }
+    }
+  };
+
+  // Handle result submission
+  const handleSubmitResult = async (didWin: boolean) => {
+    if (!selectedChallenge || !publicKey) {
+      console.error("❌ No challenge selected or wallet not connected");
+      return;
+    }
+
+    try {
+      console.log("📝 Submitting result:", { challengeId: selectedChallenge.id, didWin });
+      await submitChallengeResult(selectedChallenge.id, publicKey.toBase58(), didWin);
+      console.log("✅ Result submitted successfully");
+      setShowSubmitResultModal(false);
+      setSelectedChallenge(null);
+      
+      // Show success message
+      alert(didWin ? "🏆 You submitted that you WON! Waiting for opponent..." : "😔 You submitted that you LOST. Waiting for opponent...");
+    } catch (error) {
+      console.error("❌ Failed to submit result:", error);
+      throw error; // Let modal handle the error
     }
   };
 
@@ -749,28 +777,61 @@ const ArenaHome: React.FC = () => {
                           </div>
                         )}
                         
-                        {isOwner ? (
-                          <div className="flex space-x-2">
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation(); // Prevent opening details modal
-                                handleDeleteChallenge(challenge.id);
-                              }}
-                              className="flex-1 px-4 py-2 bg-red-600/20 text-red-400 border border-red-600/30 font-semibold rounded-lg hover:bg-red-600/30 transition-all"
-                            >
-                              🗑️ Delete
-                            </button>
-                            <button 
-                              onClick={(e) => e.stopPropagation()} // Prevent opening details modal
-                              className="flex-1 px-4 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 font-semibold rounded-lg hover:bg-gray-600/30 transition-all"
-                              disabled
-                            >
-                              ✏️ Edit (Coming Soon)
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="w-full">
-                            {challenge.status === "active" && challenge.players < challenge.capacity ? (
+                        {/* Check if user is a participant (creator or joined player) */}
+                        {(() => {
+                          const currentWallet = publicKey?.toString()?.toLowerCase();
+                          const isParticipant = currentWallet && challenge.rawData?.players?.some((p: string) => p.toLowerCase() === currentWallet);
+                          const hasSubmittedResult = currentWallet && challenge.rawData?.results?.[currentWallet];
+
+                          if (isOwner) {
+                            return (
+                              <div className="flex space-x-2">
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteChallenge(challenge.id);
+                                  }}
+                                  className="flex-1 px-4 py-2 bg-red-600/20 text-red-400 border border-red-600/30 font-semibold rounded-lg hover:bg-red-600/30 transition-all"
+                                >
+                                  🗑️ Delete
+                                </button>
+                                <button 
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="flex-1 px-4 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 font-semibold rounded-lg hover:bg-gray-600/30 transition-all"
+                                  disabled
+                                >
+                                  ✏️ Edit (Coming Soon)
+                                </button>
+                              </div>
+                            );
+                          }
+
+                          // Show "Submit Result" button for participants in "in-progress" challenges
+                          if (isParticipant && challenge.status === "in-progress") {
+                            if (hasSubmittedResult) {
+                              return (
+                                <div className="w-full px-4 py-2 bg-blue-600/20 text-blue-400 border border-blue-600/30 font-semibold rounded-lg text-center">
+                                  ✅ Result Submitted
+                                </div>
+                              );
+                            }
+                            return (
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedChallenge(challenge);
+                                  setShowSubmitResultModal(true);
+                                }}
+                                className="w-full px-4 py-2 bg-gradient-to-r from-yellow-600 to-orange-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all animate-pulse"
+                              >
+                                🏆 Submit Result
+                              </button>
+                            );
+                          }
+
+                          // Show "Join" button for non-participants
+                          if (challenge.status === "active" && challenge.players < challenge.capacity) {
+                            return (
                               <button 
                                 onClick={() => {
                                   setSelectedChallenge(challenge);
@@ -781,25 +842,47 @@ const ArenaHome: React.FC = () => {
                               >
                                 {!isConnected ? "Connect to Join" : "Join Challenge"}
                               </button>
-                            ) : challenge.status === "active" && challenge.players >= challenge.capacity ? (
+                            );
+                          }
+
+                          if (challenge.status === "active" && challenge.players >= challenge.capacity) {
+                            return (
                               <div className="w-full px-4 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 font-semibold rounded-lg text-center">
                                 🔒 Challenge Full
                               </div>
-                            ) : challenge.status === "expired" ? (
+                            );
+                          }
+
+                          if (challenge.status === "expired") {
+                            return (
                               <div className="w-full px-4 py-2 bg-red-600/20 text-red-400 border border-red-600/30 font-semibold rounded-lg text-center">
                                 ⏰ Expired
                               </div>
-                            ) : challenge.status === "completed" ? (
+                            );
+                          }
+
+                          if (challenge.status === "completed") {
+                            return (
                               <div className="w-full px-4 py-2 bg-green-600/20 text-green-400 border border-green-600/30 font-semibold rounded-lg text-center">
                                 ✅ Completed
                               </div>
-                            ) : (
-                              <div className="w-full px-4 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 font-semibold rounded-lg text-center">
-                                📋 View Details
+                            );
+                          }
+
+                          if (challenge.status === "disputed") {
+                            return (
+                              <div className="w-full px-4 py-2 bg-red-600/20 text-red-400 border border-red-600/30 font-semibold rounded-lg text-center">
+                                🔴 Disputed
                               </div>
-                            )}
-                          </div>
-                        )}
+                            );
+                          }
+
+                          return (
+                            <div className="w-full px-4 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 font-semibold rounded-lg text-center">
+                              📋 View Details
+                            </div>
+                          );
+                        })()}
                       </div>
                     );
                   }))}
@@ -880,6 +963,18 @@ const ArenaHome: React.FC = () => {
             onConnect={() => connect()}
           />
         )}
+
+        {/* Submit Result Modal */}
+        <SubmitResultModal
+          isOpen={showSubmitResultModal}
+          onClose={() => {
+            setShowSubmitResultModal(false);
+            setSelectedChallenge(null);
+          }}
+          challengeId={selectedChallenge?.id || ""}
+          challengeTitle={selectedChallenge?.title || ""}
+          onSubmit={handleSubmitResult}
+        />
 
         {/* Mobile FAB - Create Challenge */}
         <button
