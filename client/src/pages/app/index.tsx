@@ -99,9 +99,6 @@ const ArenaHome: React.FC = () => {
 
     const maxPlayers = getMaxPlayers(challenge.mode);
     const currentPlayers = challenge.players?.length || 1; // Creator is always 1st player
-    
-    // Debug logging for player count
-    console.log(`🎮 Challenge ${challenge.id}: ${currentPlayers}/${maxPlayers} players`, challenge.players);
 
     return {
       id: challenge.id,
@@ -125,26 +122,18 @@ const ArenaHome: React.FC = () => {
     };
   });
   
-  // Debug: Log challenges for debugging
-  console.log("🔍 Current Firestore challenges for display:", challenges.length);
-  console.log("🔍 Challenges loading:", challengesLoading);
+  // Log errors only
   if (challengesError) {
     console.error("❌ Challenges error:", challengesError);
-  }
-  if (challenges.length > 0) {
-    console.log("🔍 First challenge:", challenges[0]);
   }
 
   const handleCreateChallenge = async (challengeData: any) => {
     // Prevent double-clicks
     if (isCreatingChallenge) {
-      console.log("⏳ Challenge creation already in progress, ignoring duplicate request");
       return;
     }
     
     setIsCreatingChallenge(true);
-    console.log("🎮 Starting challenge creation process...");
-    console.log("📋 Challenge data:", challengeData);
     
     try {
       // Get current wallet address
