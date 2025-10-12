@@ -102,8 +102,33 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   // Custom click handler for mobile - redirect to Phantom app
   const handleMobileConnect = () => {
     if (isMobile && !isPhantomInjected) {
-      // Redirect to Phantom app with deep link
-      window.location.href = 'https://phantom.app/ul/browse/' + encodeURIComponent(window.location.href);
+      const currentUrl = window.location.href;
+      const encodedUrl = encodeURIComponent(currentUrl);
+      
+      // Try Phantom's universal link (v1/browse works better than just /browse)
+      const phantomUrl = `https://phantom.app/ul/v1/browse/${encodedUrl}?ref=${encodedUrl}`;
+      
+      // Set a timeout to detect if the app didn't open
+      let appOpened = false;
+      const startTime = Date.now();
+      
+      // Try to open the app
+      window.location.href = phantomUrl;
+      
+      // Set a flag when user returns (app didn't open)
+      const checkTimer = setTimeout(() => {
+        const elapsed = Date.now() - startTime;
+        // If more than 2 seconds passed, user is probably still here (app didn't open)
+        if (elapsed < 2000) {
+          appOpened = true;
+        }
+      }, 1500);
+      
+      // Clean up
+      window.addEventListener('blur', () => {
+        clearTimeout(checkTimer);
+        appOpened = true;
+      });
     }
   };
   
