@@ -13,15 +13,7 @@ export const MWAProvider: FC<{ children: ReactNode }> = ({ children }) => {
   // Auto-detect Standard Wallets (like Phantom)
   // Empty array allows the wallet adapter to automatically detect and use
   // wallets that follow the Standard Wallet protocol
-  const wallets = useMemo(
-    () => {
-      console.log('🔧 MWA Provider: Auto-detecting Standard Wallets');
-      console.log('📱 User agent:', navigator.userAgent);
-      
-      return [];
-    },
-    []
-  );
+  const wallets = useMemo(() => [], []);
 
   return (
     <ConnectionProvider endpoint={endpoint}>

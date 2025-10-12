@@ -7,11 +7,8 @@ export const useChallenges = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log('🔄 Setting up real-time challenge listener...');
-    
     // Set up real-time listener
     const unsubscribe = listenToChallenges((newChallenges) => {
-      console.log('📡 Real-time update received:', newChallenges.length, 'challenges');
       setChallenges(newChallenges);
       setLoading(false);
       setError(null);
@@ -32,10 +29,7 @@ export const useChallenges = () => {
 
     fetchInitialChallenges();
 
-    return () => {
-      console.log('🧹 Cleaning up challenge listener...');
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, []);
 
   return { challenges, loading, error };
@@ -52,21 +46,14 @@ export const useUserChallenges = (userId: string) => {
       setLoading(false);
       return;
     }
-
-    console.log('🔄 Setting up user challenge listener for:', userId);
-    
     
     const unsubscribe = listenToUserChallenges(userId, (challenges) => {
-      console.log('📡 User challenges update:', challenges.length, 'challenges');
       setUserChallenges(challenges);
       setLoading(false);
       setError(null);
     });
 
-    return () => {
-      console.log('🧹 Cleaning up user challenge listener...');
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, [userId]);
 
   return { userChallenges, loading, error };

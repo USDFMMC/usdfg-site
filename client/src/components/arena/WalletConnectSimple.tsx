@@ -24,7 +24,6 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   // Handle connection state changes
   useEffect(() => {
     if (connected && publicKey) {
-      console.log("🔗 Wallet connected:", publicKey.toString().slice(0, 8) + "...");
       onConnect();
       
       // Fetch balance
@@ -38,7 +37,6 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           setBalance(null);
         });
     } else if (!connected) {
-      console.log("🔌 Wallet disconnected");
       setBalance(null);
       onDisconnect();
     }
@@ -81,10 +79,6 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
 
   // Check if we're on mobile
   const isMobile = typeof window !== 'undefined' && /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  
-  // Debug mobile detection
-  console.log('📱 Mobile detection:', isMobile);
-  console.log('📱 User agent:', navigator.userAgent);
   
   // Show connection button
   return (
