@@ -99,99 +99,126 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   // Check if Phantom is already injected (in-app browser)
   const isPhantomInjected = typeof window !== 'undefined' && (window as any).phantom?.solana?.isPhantom;
   
-  // Custom click handler for mobile - redirect to Phantom app
+  // State to show instructions modal on mobile
+  const [showMobileInstructions, setShowMobileInstructions] = useState(false);
+  
+  // Custom click handler for mobile - show instructions or redirect
   const handleMobileConnect = () => {
     if (isMobile && !isPhantomInjected) {
-      const currentUrl = window.location.href;
-      const encodedUrl = encodeURIComponent(currentUrl);
-      
-      // Try Phantom's universal link (v1/browse works better than just /browse)
-      const phantomUrl = `https://phantom.app/ul/v1/browse/${encodedUrl}?ref=${encodedUrl}`;
-      
-      // Set a timeout to detect if the app didn't open
-      let appOpened = false;
-      const startTime = Date.now();
-      
-      // Try to open the app
-      window.location.href = phantomUrl;
-      
-      // Set a flag when user returns (app didn't open)
-      const checkTimer = setTimeout(() => {
-        const elapsed = Date.now() - startTime;
-        // If more than 2 seconds passed, user is probably still here (app didn't open)
-        if (elapsed < 2000) {
-          appOpened = true;
-        }
-      }, 1500);
-      
-      // Clean up
-      window.addEventListener('blur', () => {
-        clearTimeout(checkTimer);
-        appOpened = true;
-      });
+      // Show instructions modal
+      setShowMobileInstructions(true);
     }
+  };
+  
+  // Copy URL to clipboard
+  const copyUrlToClipboard = () => {
+    navigator.clipboard.writeText(window.location.href);
+    alert('✅ URL copied! Now open Phantom app and paste it in the browser.');
   };
   
   // Show connection button
   return (
-    <div className="flex flex-col space-y-2">
-      {/* Compact mode for mobile navbar */}
-      {compact ? (
-        // Custom button for mobile, standard for desktop
-        isMobile && !isPhantomInjected ? (
-          <button
-            onClick={handleMobileConnect}
-            className="px-2.5 py-1.5 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-md text-xs font-medium hover:bg-cyan-500/30 transition-colors"
-          >
-            Connect Wallet
-          </button>
-        ) : (
-          <div className="wallet-adapter-button-trigger-wrapper">
-            <WalletMultiButton 
-              className="!px-2.5 !py-1.5 !bg-cyan-500/20 !text-cyan-400 !border !border-cyan-500/30 !rounded-md !text-xs !font-medium hover:!bg-cyan-500/30 !transition-colors !min-w-0"
-            >
-              Connect Wallet
-            </WalletMultiButton>
-          </div>
-        )
-      ) : (
-        <>
-          {/* Mobile: Direct "Connect Wallet" button that opens Phantom */}
-          {isMobile && !isPhantomInjected ? (
+    <>
+      <div className="flex flex-col space-y-2">
+        {/* Compact mode for mobile navbar */}
+        {compact ? (
+          // Custom button for mobile, standard for desktop
+          isMobile && !isPhantomInjected ? (
             <button
               onClick={handleMobileConnect}
-              className="w-full px-4 py-3 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-bold rounded-lg hover:brightness-110 transition-all flex items-center justify-center space-x-2 border-2 border-purple-400 shadow-lg"
-              style={{ 
-                minHeight: '48px',
-                fontSize: '16px'
-              }}
+              className="px-2.5 py-1.5 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-md text-xs font-medium hover:bg-cyan-500/30 transition-colors"
             >
-              <span style={{ fontSize: '20px' }}>👻</span>
-              <span>Connect Wallet</span>
+              Connect Wallet
             </button>
           ) : (
-            <>
-              <WalletMultiButton className="px-4 py-2 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50">
+            <div className="wallet-adapter-button-trigger-wrapper">
+              <WalletMultiButton 
+                className="!px-2.5 !py-1.5 !bg-cyan-500/20 !text-cyan-400 !border !border-cyan-500/30 !rounded-md !text-xs !font-medium hover:!bg-cyan-500/30 !transition-colors !min-w-0"
+              >
                 Connect Wallet
               </WalletMultiButton>
-              
-              {connecting && (
-                <div className="text-sm text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded p-2">
-                  🔗 Please approve the connection in your wallet popup.
-                </div>
-              )}
-            </>
-          )}
-          
-          {/* Help text for mobile */}
-          {isMobile && !isPhantomInjected && (
-            <div className="text-xs text-gray-400 text-center mt-2">
-              Opens in Phantom app • Install Phantom if you haven't already
             </div>
-          )}
-        </>
+          )
+        ) : (
+          <>
+            {/* Mobile: Direct "Connect Wallet" button that opens Phantom */}
+            {isMobile && !isPhantomInjected ? (
+              <button
+                onClick={handleMobileConnect}
+                className="w-full px-4 py-3 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-bold rounded-lg hover:brightness-110 transition-all flex items-center justify-center space-x-2 border-2 border-purple-400 shadow-lg"
+                style={{ 
+                  minHeight: '48px',
+                  fontSize: '16px'
+                }}
+              >
+                <span style={{ fontSize: '20px' }}>👻</span>
+                <span>Connect Wallet</span>
+              </button>
+            ) : (
+              <>
+                <WalletMultiButton className="px-4 py-2 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50">
+                  Connect Wallet
+                </WalletMultiButton>
+                
+                {connecting && (
+                  <div className="text-sm text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded p-2">
+                    🔗 Please approve the connection in your wallet popup.
+                  </div>
+                )}
+              </>
+            )}
+            
+            {/* Help text for mobile */}
+            {isMobile && !isPhantomInjected && (
+              <div className="text-xs text-gray-400 text-center mt-2">
+                Tap to see connection options
+              </div>
+            )}
+          </>
+        )}
+      </div>
+      
+      {/* Mobile Instructions Modal */}
+      {showMobileInstructions && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowMobileInstructions(false)}>
+          <div className="bg-gradient-to-br from-gray-900 to-black border-2 border-purple-500/30 rounded-2xl p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-white">👻 Connect with Phantom</h3>
+              <button 
+                onClick={() => setShowMobileInstructions(false)}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-4">
+                <p className="text-white font-semibold mb-2">Quick Steps:</p>
+                <ol className="text-sm text-gray-300 space-y-2 list-decimal list-inside">
+                  <li>Copy this site's URL (button below)</li>
+                  <li>Open the Phantom app</li>
+                  <li>Tap the "Explore" tab (🧭)</li>
+                  <li>Paste the URL and go</li>
+                  <li>You'll be auto-connected!</li>
+                </ol>
+              </div>
+              
+              <button
+                onClick={copyUrlToClipboard}
+                className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold rounded-lg transition-all"
+              >
+                📋 Copy URL
+              </button>
+              
+              <p className="text-xs text-gray-400 text-center">
+                Don't have Phantom? <a href="https://phantom.app/download" target="_blank" rel="noopener noreferrer" className="text-purple-400 underline">Download here</a>
+              </p>
+            </div>
+          </div>
+        </div>
       )}
-    </div>
+    </>
   );
 };
 
