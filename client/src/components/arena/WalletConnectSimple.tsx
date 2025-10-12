@@ -104,8 +104,14 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     <div className="flex flex-col space-y-2">
       {/* Compact mode for mobile navbar */}
       {compact ? (
-        // Just show the standard wallet button in compact mode
-        <WalletMultiButton className="!px-2.5 !py-1.5 !bg-cyan-500/20 !text-cyan-400 !border !border-cyan-500/30 !rounded-md !text-xs !font-medium hover:!bg-cyan-500/30 !transition-colors !min-w-0" />
+        // Custom styled button with proper text
+        <div className="wallet-adapter-button-trigger-wrapper">
+          <WalletMultiButton 
+            className="!px-2.5 !py-1.5 !bg-cyan-500/20 !text-cyan-400 !border !border-cyan-500/30 !rounded-md !text-xs !font-medium hover:!bg-cyan-500/30 !transition-colors !min-w-0"
+          >
+            Connect Wallet
+          </WalletMultiButton>
+        </div>
       ) : (
         <>
           {/* Only show "Open in Phantom" if on mobile AND Phantom is NOT injected */}
@@ -142,7 +148,9 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
             </div>
           ) : null}
           
-          <WalletMultiButton className="px-4 py-2 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50" />
+          <WalletMultiButton className="px-4 py-2 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50">
+            Connect Wallet
+          </WalletMultiButton>
           
           {connecting && (
             <div className="text-sm text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded p-2">
