@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { updateChallengeStatus, archiveChallenge } from "../lib/firebase/firestore";
 
 /**
@@ -6,29 +6,62 @@ import { updateChallengeStatus, archiveChallenge } from "../lib/firebase/firesto
  * Displays an "Expired" tag for 5 seconds before archiving.
  */
 export function useChallengeExpiry(challenges: any[]) {
+  const processedChallenges = useRef(new Set<string>());
+
   useEffect(() => {
     if (!challenges?.length) return;
 
-    const now = Date.now();
+    const checkExpired = async () => {
+      const now = Date.now();
 
-    challenges.forEach(async (c) => {
-      if (!c.expiresAt) return;
+      for (const challenge of challenges) {
+        if (!challenge.expiresAt) continue;
+        
+        // Skip if already processed
+        if (processedChallenges.current.has(challenge.id)) continue;
 
-      const expMs = c.expiresAt.toMillis ? c.expiresAt.toMillis() : c.expiresAt;
-      const isExpired = expMs < now && (c.status === "active" || c.status === "pending");
+        const expMs = challenge.expiresAt.toMillis ? challenge.expiresAt.toMillis() : challenge.expiresAt;
+        const isExpired = expMs < now && (challenge.status === "active" || challenge.status === "pending");
 
-      if (isExpired) {
-        console.log("⏰ Auto-expiring challenge:", c.id);
+        if (isExpired) {
+          console.log("⏰ Auto-expiring challenge:", challenge.id);
+          
+          // Mark as processed to avoid duplicate processing
+          processedChallenges.current.add(challenge.id);
 
-        // Step 1: mark as completed
-        await updateChallengeStatus(c.id, "completed");
+          try {
+            // Step 1: mark as completed
+            await updateChallengeStatus(challenge.id, "completed");
+            console.log("✅ Challenge marked as completed:", challenge.id);
 
-        // Step 2: wait 5s so UI shows "Expired" before deleting
-        setTimeout(async () => {
-          await archiveChallenge(c.id);
-          console.log("🏁 Challenge archived:", c.id);
-        }, 5000);
+            // Step 2: wait 5s so UI shows "Expired" before deleting
+            setTimeout(async () => {
+              try {
+                await archiveChallenge(challenge.id);
+                console.log("🏁 Challenge archived:", challenge.id);
+                // Remove from processed set after archiving
+                processedChallenges.current.delete(challenge.id);
+              } catch (error) {
+                console.error("❌ Failed to archive challenge:", error);
+                processedChallenges.current.delete(challenge.id);
+              }
+            }, 5000);
+          } catch (error) {
+            console.error("❌ Failed to expire challenge:", error);
+            processedChallenges.current.delete(challenge.id);
+          }
+        }
       }
-    });
+    };
+
+    // Check immediately
+    checkExpired();
+
+    // Then check every 30 seconds
+    const interval = setInterval(checkExpired, 30000);
+
+    return () => {
+      clearInterval(interval);
+    };
   }, [challenges]);
 }
