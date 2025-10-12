@@ -664,7 +664,7 @@ const ArenaHome: React.FC = () => {
                                   Created {new Date(challenge.createdAt).toLocaleDateString()} at {new Date(challenge.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </p>
                               )}
-                              {challenge.expiresAt && (
+                              {challenge.expiresAt && challenge.expiresAt > Date.now() && (
                                 <p className="text-orange-400/80 text-xs neocore-body">
                                   ⏰ Expires in {Math.max(0, Math.floor((challenge.expiresAt - Date.now()) / (1000 * 60)))} minutes
                                 </p>

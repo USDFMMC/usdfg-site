@@ -225,11 +225,6 @@ const ChallengeGrid: React.FC<ChallengeGridProps> = ({
                     ⏰ Expires in {getTimeRemaining(challenge.expiresAt)}
                   </div>
                 )}
-                {challenge.expiresAt && challenge.expiresAt <= Date.now() && (
-                  <div className="text-xs text-red-400 animate-pulse">
-                    ⏰ Expired
-                  </div>
-                )}
               </div>
 
               {/* Stats Grid */}
