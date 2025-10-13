@@ -2,10 +2,13 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Challenges - anyone can read, only authenticated users can create/update
+    // Challenges - anyone can read, participants can update
     match /challenges/{challengeId} {
       allow read: if true;
-      allow create, update, delete: if request.auth != null;
+      allow create: if request.auth != null;
+      allow delete: if request.auth != null;
+      // Allow updates from participants (for results, cancel requests, etc.)
+      allow update: if true;
     }
     
     // Challenge Chats - temporary chat during result submission

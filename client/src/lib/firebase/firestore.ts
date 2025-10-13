@@ -527,12 +527,29 @@ export const requestCancelChallenge = async (
         winner: 'cancelled',
         updatedAt: Timestamp.now(),
       });
+      
+      // Send system message to chat
+      await addDoc(collection(db, 'challenge_chats'), {
+        challengeId,
+        text: '🤝 Both players agreed to cancel. Challenge cancelled, funds will be refunded.',
+        sender: 'SYSTEM',
+        timestamp: serverTimestamp(),
+      });
     } else {
       // Just one player requested so far
       console.log('⏳ Cancel requested, waiting for other player to agree');
       await updateDoc(challengeRef, {
         cancelRequests: newCancelRequests,
         updatedAt: Timestamp.now(),
+      });
+      
+      // Send system message to chat notifying opponent
+      const shortWallet = walletAddress.slice(0, 8) + '...' + walletAddress.slice(-4);
+      await addDoc(collection(db, 'challenge_chats'), {
+        challengeId,
+        text: `🚫 ${shortWallet} requested to cancel the challenge. Click "Agree to Cancel" button if you agree.`,
+        sender: 'SYSTEM',
+        timestamp: serverTimestamp(),
       });
     }
   } catch (error) {

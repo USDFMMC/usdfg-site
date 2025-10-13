@@ -111,6 +111,20 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet }) 
         ) : (
           messages.map((msg) => {
             const isMe = msg.sender === currentWallet;
+            const isSystem = msg.sender === 'SYSTEM';
+            
+            // System messages (centered, different style)
+            if (isSystem) {
+              return (
+                <div key={msg.id} className="flex justify-center my-2">
+                  <div className="max-w-[90%] px-4 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-xs text-yellow-300 text-center">
+                    {msg.text}
+                  </div>
+                </div>
+              );
+            }
+            
+            // Regular messages
             return (
               <div
                 key={msg.id}
