@@ -538,7 +538,7 @@ export const requestCancelChallenge = async (
           challengeId,
           text: `🚫 ${shortWallet} requested to cancel the challenge. Click "Agree to Cancel" button if you agree.`,
           sender: 'SYSTEM',
-          timestamp: serverTimestamp(),
+          timestamp: Timestamp.now(), // Use Timestamp.now() instead of serverTimestamp() for immediate visibility
         });
         console.log('✅ System message sent to chat:', chatDoc.id);
       } else {
@@ -566,7 +566,7 @@ export const requestCancelChallenge = async (
         challengeId,
         text: '🤝 Both players agreed to cancel. Challenge cancelled, entry fees will be returned.',
         sender: 'SYSTEM',
-        timestamp: serverTimestamp(),
+        timestamp: Timestamp.now(),
       });
     } else {
       // Just one player requested so far
@@ -583,7 +583,7 @@ export const requestCancelChallenge = async (
         challengeId,
         text: `🚫 ${shortWallet} requested to cancel the challenge. Click "Agree to Cancel" button if you agree.`,
         sender: 'SYSTEM',
-        timestamp: serverTimestamp(),
+        timestamp: Timestamp.now(), // Use Timestamp.now() instead of serverTimestamp() for immediate visibility
       });
       console.log('✅ System message sent to chat:', chatDoc.id);
     }
