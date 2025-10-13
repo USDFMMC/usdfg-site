@@ -11,9 +11,6 @@ interface SubmitResultRoomProps {
   challengeTitle: string;
   currentWallet: string;
   onSubmit: (didWin: boolean, proofFile?: File | null) => Promise<void>;
-  onCancelRequest?: () => Promise<void>;
-  cancelRequested?: boolean;
-  opponentCancelRequested?: boolean;
   isSubmitting?: boolean;
 }
 
@@ -24,9 +21,6 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = ({
   challengeTitle,
   currentWallet,
   onSubmit,
-  onCancelRequest,
-  cancelRequested = false,
-  opponentCancelRequested = false,
   isSubmitting = false,
 }) => {
   const [selectedResult, setSelectedResult] = useState<boolean | null>(null);
@@ -288,51 +282,8 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = ({
                   </p>
                 </div>
 
-                {/* Cancel Request Notice */}
-                {(cancelRequested || opponentCancelRequested) && (
-                  <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                    <p className="text-yellow-400 text-sm text-center">
-                      {cancelRequested && opponentCancelRequested
-                        ? "🤝 Both players agree - Challenge will be cancelled and refunded"
-                        : cancelRequested
-                        ? "⏳ You requested to cancel. Waiting for opponent to agree..."
-                        : "⚠️ Opponent requested to cancel. Click below to agree."}
-                    </p>
-                  </div>
-                )}
-
                 {/* Action Buttons */}
                 <div className="space-y-3">
-                  {/* Cancel Button (only if onCancelRequest is provided) */}
-                  {onCancelRequest && !cancelRequested && (
-                    <button
-                      onClick={async () => {
-                        console.log('🖱️ Cancel button clicked!');
-                        console.log('🖱️ onCancelRequest exists:', !!onCancelRequest);
-                        console.log('🖱️ cancelRequested:', cancelRequested);
-                        console.log('🖱️ opponentCancelRequested:', opponentCancelRequested);
-                        if (onCancelRequest) {
-                          try {
-                            await onCancelRequest();
-                          } catch (error) {
-                            console.error('❌ Error in onCancelRequest:', error);
-                          }
-                        }
-                      }}
-                      disabled={isLoading || isSubmitting}
-                      className="w-full py-3 bg-red-600/20 border-2 border-red-600/30 text-red-400 font-bold rounded-xl hover:bg-red-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {opponentCancelRequested ? "✅ Agree to Cancel" : "🚫 Request Cancel"}
-                    </button>
-                  )}
-                  
-                  {/* Debug info */}
-                  {process.env.NODE_ENV === 'development' && (
-                    <div className="text-xs text-gray-500">
-                      Debug: onCancelRequest={onCancelRequest ? 'yes' : 'no'}, cancelRequested={cancelRequested ? 'yes' : 'no'}
-                    </div>
-                  )}
-
                   {/* Submit Button */}
                   <button
                     onClick={handleSubmit}

@@ -8,7 +8,7 @@ import { fetchActiveChallenges, fetchOpenChallenges, joinChallengeOnChain } from
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
-import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, requestCancelChallenge } from "@/lib/firebase/firestore";
+import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase } from "@/lib/firebase/firestore";
 import { testFirestoreConnection } from "@/lib/firebase/firestore";
 import ElegantButton from "@/components/ui/ElegantButton";
 import ElegantModal from "@/components/ui/ElegantModal";
@@ -111,24 +111,6 @@ const ArenaHome: React.FC = () => {
       setShowSubmitResultModal(true);
     }
   }, [firestoreChallenges, publicKey, showSubmitResultModal]);
-
-  // Update selectedChallenge in real-time when challenge data changes
-  useEffect(() => {
-    if (!selectedChallenge || !firestoreChallenges) return;
-    
-    // Find the updated challenge data
-    const updatedChallenge = firestoreChallenges.find((c: any) => c.id === selectedChallenge.id);
-    
-    if (updatedChallenge) {
-      console.log("🔄 Updating selectedChallenge with latest data");
-      setSelectedChallenge({
-        id: updatedChallenge.id,
-        title: updatedChallenge.title || updatedChallenge.game || "Challenge",
-        ...updatedChallenge,
-        rawData: updatedChallenge
-      });
-    }
-  }, [firestoreChallenges, selectedChallenge?.id]);
   
   // Convert Firestore challenges to the format expected by the UI
   const challenges = firestoreChallenges.map(challenge => {
@@ -347,31 +329,6 @@ const ArenaHome: React.FC = () => {
     } catch (error) {
       console.error("❌ Failed to submit result:", error);
       throw error; // Let modal handle the error
-    }
-  };
-
-  const handleCancelRequest = async () => {
-    if (!selectedChallenge || !publicKey) {
-      console.error("❌ No challenge selected or wallet not connected");
-      alert("Please connect your wallet first.");
-      return;
-    }
-
-    try {
-      console.log("🚫 Requesting to cancel challenge:", selectedChallenge.id);
-      console.log("🚫 Wallet address:", publicKey.toString());
-      await requestCancelChallenge(selectedChallenge.id, publicKey.toString());
-      console.log("✅ Cancel request submitted successfully!");
-      // Don't show alert - system message will appear in chat
-    } catch (error: any) {
-      console.error("❌ Failed to request cancel:", error);
-      console.error("❌ Error details:", error.code, error.message);
-      
-      if (error.code === 'permission-denied') {
-        alert("⚠️ Permission denied. Please make sure Firestore rules are updated in Firebase Console.");
-      } else {
-        alert("❌ Failed to request cancellation: " + error.message);
-      }
     }
   };
 
@@ -1085,19 +1042,6 @@ const ArenaHome: React.FC = () => {
           challengeTitle={selectedChallenge?.title || ""}
           currentWallet={publicKey?.toString() || ""}
           onSubmit={handleSubmitResult}
-          onCancelRequest={handleCancelRequest}
-          cancelRequested={(() => {
-            const requested = selectedChallenge?.rawData?.cancelRequests?.includes(publicKey?.toString()) || false;
-            console.log("🔍 cancelRequested:", requested, "cancelRequests:", selectedChallenge?.rawData?.cancelRequests);
-            return requested;
-          })()}
-          opponentCancelRequested={(() => {
-            const hasRequests = (selectedChallenge?.rawData?.cancelRequests?.length || 0) > 0;
-            const notMyRequest = !selectedChallenge?.rawData?.cancelRequests?.includes(publicKey?.toString());
-            const result = hasRequests && notMyRequest;
-            console.log("🔍 opponentCancelRequested:", result, "hasRequests:", hasRequests, "notMyRequest:", notMyRequest);
-            return result;
-          })()}
         />
 
         {/* Mobile FAB - Create Challenge */}
