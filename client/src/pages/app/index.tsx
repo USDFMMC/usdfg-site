@@ -335,17 +335,25 @@ const ArenaHome: React.FC = () => {
   const handleCancelRequest = async () => {
     if (!selectedChallenge || !publicKey) {
       console.error("❌ No challenge selected or wallet not connected");
+      alert("Please connect your wallet first.");
       return;
     }
 
     try {
       console.log("🚫 Requesting to cancel challenge:", selectedChallenge.id);
+      console.log("🚫 Wallet address:", publicKey.toString());
       await requestCancelChallenge(selectedChallenge.id, publicKey.toString());
-      console.log("✅ Cancel request submitted");
-      alert("Cancel request sent. If your opponent agrees, the challenge will be cancelled and entry fees returned.");
-    } catch (error) {
+      console.log("✅ Cancel request submitted successfully!");
+      alert("✅ Cancel request sent! Check the chat for updates. If your opponent agrees, the challenge will be cancelled and entry fees returned.");
+    } catch (error: any) {
       console.error("❌ Failed to request cancel:", error);
-      alert("Failed to request cancellation. Please try again.");
+      console.error("❌ Error details:", error.code, error.message);
+      
+      if (error.code === 'permission-denied') {
+        alert("⚠️ Permission denied. Please make sure Firestore rules are updated in Firebase Console.");
+      } else {
+        alert("❌ Failed to request cancellation: " + error.message);
+      }
     }
   };
 
