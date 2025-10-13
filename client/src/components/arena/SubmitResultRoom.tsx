@@ -56,9 +56,9 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = ({
     try {
       await onSubmit(selectedResult, proofFile);
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ Error submitting result:", error);
-      alert("Failed to submit result. Please try again.");
+      alert(error.message || "Failed to submit result. Please try again.");
     } finally {
       setIsLoading(false);
     }
