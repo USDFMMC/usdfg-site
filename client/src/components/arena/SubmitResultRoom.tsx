@@ -11,6 +11,9 @@ interface SubmitResultRoomProps {
   challengeTitle: string;
   currentWallet: string;
   onSubmit: (didWin: boolean, proofFile?: File | null) => Promise<void>;
+  onCancelRequest?: () => Promise<void>;
+  cancelRequested?: boolean;
+  opponentCancelRequested?: boolean;
   isSubmitting?: boolean;
 }
 
@@ -21,6 +24,9 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = ({
   challengeTitle,
   currentWallet,
   onSubmit,
+  onCancelRequest,
+  cancelRequested = false,
+  opponentCancelRequested = false,
   isSubmitting = false,
 }) => {
   const [selectedResult, setSelectedResult] = useState<boolean | null>(null);
@@ -269,29 +275,60 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = ({
                   </p>
                 </div>
 
-                {/* Submit Button */}
-                <button
-                  onClick={handleSubmit}
-                  disabled={selectedResult === null || isLoading || isSubmitting}
-                  className={`
-                    w-full py-4 rounded-xl font-bold text-lg transition-all duration-200
-                    disabled:opacity-50 disabled:cursor-not-allowed
-                    ${
-                      selectedResult !== null
-                        ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg shadow-purple-500/20"
-                        : "bg-gray-700 text-gray-400 cursor-not-allowed"
-                    }
-                  `}
-                >
-                  {isLoading || isSubmitting ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Submitting...
-                    </span>
-                  ) : (
-                    "Submit Result"
+                {/* Cancel Request Notice */}
+                {(cancelRequested || opponentCancelRequested) && (
+                  <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                    <p className="text-yellow-400 text-sm text-center">
+                      {cancelRequested && opponentCancelRequested
+                        ? "🤝 Both players agree - Challenge will be cancelled and refunded"
+                        : cancelRequested
+                        ? "⏳ You requested to cancel. Waiting for opponent to agree..."
+                        : "⚠️ Opponent requested to cancel. Click below to agree."}
+                    </p>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="space-y-3">
+                  {/* Cancel Button (only if onCancelRequest is provided) */}
+                  {onCancelRequest && !cancelRequested && (
+                    <button
+                      onClick={async () => {
+                        if (onCancelRequest) {
+                          await onCancelRequest();
+                        }
+                      }}
+                      disabled={isLoading || isSubmitting}
+                      className="w-full py-3 bg-red-600/20 border-2 border-red-600/30 text-red-400 font-bold rounded-xl hover:bg-red-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {opponentCancelRequested ? "✅ Agree to Cancel" : "🚫 Request Cancel"}
+                    </button>
                   )}
-                </button>
+
+                  {/* Submit Button */}
+                  <button
+                    onClick={handleSubmit}
+                    disabled={selectedResult === null || isLoading || isSubmitting}
+                    className={`
+                      w-full py-4 rounded-xl font-bold text-lg transition-all duration-200
+                      disabled:opacity-50 disabled:cursor-not-allowed
+                      ${
+                        selectedResult !== null
+                          ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg shadow-purple-500/20"
+                          : "bg-gray-700 text-gray-400 cursor-not-allowed"
+                      }
+                    `}
+                  >
+                    {isLoading || isSubmitting ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Submitting...
+                      </span>
+                    ) : (
+                      "Submit Result"
+                    )}
+                  </button>
+                </div>
 
                 {/* Warning */}
                 <p className="text-xs text-gray-500 text-center">

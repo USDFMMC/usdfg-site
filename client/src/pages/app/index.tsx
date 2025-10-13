@@ -8,7 +8,7 @@ import { fetchActiveChallenges, fetchOpenChallenges, joinChallengeOnChain } from
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
-import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase } from "@/lib/firebase/firestore";
+import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, requestCancelChallenge } from "@/lib/firebase/firestore";
 import { testFirestoreConnection } from "@/lib/firebase/firestore";
 import ElegantButton from "@/components/ui/ElegantButton";
 import ElegantModal from "@/components/ui/ElegantModal";
@@ -329,6 +329,23 @@ const ArenaHome: React.FC = () => {
     } catch (error) {
       console.error("❌ Failed to submit result:", error);
       throw error; // Let modal handle the error
+    }
+  };
+
+  const handleCancelRequest = async () => {
+    if (!selectedChallenge || !publicKey) {
+      console.error("❌ No challenge selected or wallet not connected");
+      return;
+    }
+
+    try {
+      console.log("🚫 Requesting to cancel challenge:", selectedChallenge.id);
+      await requestCancelChallenge(selectedChallenge.id, publicKey.toString());
+      console.log("✅ Cancel request submitted");
+      alert("Cancel request sent. If your opponent agrees, the challenge will be cancelled and both players refunded.");
+    } catch (error) {
+      console.error("❌ Failed to request cancel:", error);
+      alert("Failed to request cancellation. Please try again.");
     }
   };
 
@@ -1042,6 +1059,12 @@ const ArenaHome: React.FC = () => {
           challengeTitle={selectedChallenge?.title || ""}
           currentWallet={publicKey?.toString() || ""}
           onSubmit={handleSubmitResult}
+          onCancelRequest={handleCancelRequest}
+          cancelRequested={selectedChallenge?.rawData?.cancelRequests?.includes(publicKey?.toString()) || false}
+          opponentCancelRequested={
+            (selectedChallenge?.rawData?.cancelRequests?.length || 0) > 0 &&
+            !selectedChallenge?.rawData?.cancelRequests?.includes(publicKey?.toString())
+          }
         />
 
         {/* Mobile FAB - Create Challenge */}

@@ -51,6 +51,8 @@ export interface ChallengeData {
   solanaAccountId?: string;
   category: string;
   prizePool: number;
+  // Cancel requests (for mutual cancellation)
+  cancelRequests?: string[]; // Array of wallet addresses that requested cancel
   // Result submission fields
   results?: {
     [wallet: string]: {
@@ -477,6 +479,64 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
     
   } catch (error) {
     console.error('❌ Error checking result deadline:', error);
+    throw error;
+  }
+};
+
+/**
+ * Request to cancel an in-progress challenge
+ * Requires mutual agreement from both players
+ */
+export const requestCancelChallenge = async (
+  challengeId: string,
+  walletAddress: string
+): Promise<void> => {
+  try {
+    const challengeRef = doc(db, 'challenges', challengeId);
+    const challengeSnap = await getDoc(challengeRef);
+    
+    if (!challengeSnap.exists()) {
+      throw new Error('Challenge not found');
+    }
+    
+    const challenge = challengeSnap.data() as ChallengeData;
+    
+    // Check if user is a participant
+    if (!challenge.players.includes(walletAddress)) {
+      throw new Error('Only participants can request cancellation');
+    }
+    
+    // Get current cancel requests
+    const cancelRequests = challenge.cancelRequests || [];
+    
+    // If user already requested, do nothing
+    if (cancelRequests.includes(walletAddress)) {
+      console.log('⚠️ User already requested cancellation');
+      return;
+    }
+    
+    // Add this user's cancel request
+    const newCancelRequests = [...cancelRequests, walletAddress];
+    
+    // If both players agreed (all players requested cancel)
+    if (newCancelRequests.length === challenge.players.length) {
+      console.log('✅ Both players agreed to cancel - Cancelling challenge and refunding');
+      await updateDoc(challengeRef, {
+        status: 'cancelled',
+        cancelRequests: newCancelRequests,
+        winner: 'cancelled',
+        updatedAt: Timestamp.now(),
+      });
+    } else {
+      // Just one player requested so far
+      console.log('⏳ Cancel requested, waiting for other player to agree');
+      await updateDoc(challengeRef, {
+        cancelRequests: newCancelRequests,
+        updatedAt: Timestamp.now(),
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error requesting cancel:', error);
     throw error;
   }
 };
