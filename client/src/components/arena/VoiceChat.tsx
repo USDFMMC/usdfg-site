@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
-import { Mic, MicOff, Phone, PhoneOff } from "lucide-react";
-import { collection, doc, setDoc, onSnapshot, deleteDoc } from "firebase/firestore";
+import { Mic, MicOff } from "lucide-react";
+import { doc, setDoc, onSnapshot, deleteDoc, getDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase/config";
 
 interface VoiceChatProps {
@@ -130,67 +130,66 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
   };
 
   const toggleMute = () => {
-    if (localStream.current) {
-      localStream.current.getAudioTracks().forEach((track) => {
-        track.enabled = !track.enabled;
-      });
-      setMuted(!muted);
-    }
+    if (!localStream.current) return;
+    
+    const newMutedState = !muted;
+    localStream.current.getAudioTracks().forEach((track) => {
+      track.enabled = !newMutedState; // enabled = true means NOT muted
+    });
+    setMuted(newMutedState);
   };
 
   const cleanup = async () => {
-    // Stop all tracks
-    localStream.current?.getTracks().forEach((track) => track.stop());
+    console.log("🧹 Cleaning up voice chat...");
+    
+    // Stop all local tracks
+    if (localStream.current) {
+      localStream.current.getTracks().forEach((track) => {
+        track.stop();
+        console.log("🛑 Stopped track:", track.kind);
+      });
+      localStream.current = null;
+    }
     
     // Close peer connection
-    peerConnection.current?.close();
+    if (peerConnection.current) {
+      peerConnection.current.close();
+      peerConnection.current = null;
+    }
     
-    // Clean up Firestore signals (delete the entire room signal doc)
+    // Clean up Firestore signals
     try {
       await deleteDoc(doc(db, "voice_signals", challengeId));
+      console.log("✅ Cleaned up Firestore signals");
     } catch (error) {
       console.error("Failed to clean up voice signals:", error);
     }
     
     setConnected(false);
     setPeerConnected(false);
+    setMuted(false);
   };
 
   return (
-    <div className="bg-gradient-to-r from-gray-800 to-gray-900 border border-gray-700 rounded-xl p-3">
+    <div className="flex justify-between items-center bg-gray-800 p-2 rounded-lg border border-gray-700">
+      {/* Hidden audio element for remote stream */}
       <audio ref={remoteAudioRef} autoPlay />
       
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-          <span className="text-white text-sm font-medium">
-            {connected ? (peerConnected ? '🎙️ Voice Connected' : '🎙️ Connecting...') : '❌ Voice Disconnected'}
-          </span>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <button
-            onClick={toggleMute}
-            disabled={!connected}
-            className={`p-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-              muted
-                ? 'bg-red-600 hover:bg-red-700 text-white'
-                : 'bg-green-600 hover:bg-green-700 text-white'
-            }`}
-            title={muted ? 'Unmute' : 'Mute'}
-          >
-            {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-          </button>
-        </div>
-      </div>
-      
-      <p className="text-xs text-gray-400 mt-2">
+      <span className="text-white text-sm">
         {connected 
-          ? peerConnected 
-            ? '✅ Connected with opponent' 
-            : '⏳ Waiting for opponent...'
-          : '⚠️ Voice unavailable'}
-      </p>
+          ? (peerConnected ? '🎙️ Voice Connected' : '🔌 Connecting...') 
+          : '❌ Disconnected'}
+      </span>
+      
+      <button
+        onClick={toggleMute}
+        disabled={!connected}
+        className={`px-3 py-1 rounded-lg text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+          muted ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
+        }`}
+      >
+        {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+      </button>
     </div>
   );
 };
