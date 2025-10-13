@@ -342,7 +342,7 @@ const ArenaHome: React.FC = () => {
       console.log("🚫 Requesting to cancel challenge:", selectedChallenge.id);
       await requestCancelChallenge(selectedChallenge.id, publicKey.toString());
       console.log("✅ Cancel request submitted");
-      alert("Cancel request sent. If your opponent agrees, the challenge will be cancelled and both players refunded.");
+      alert("Cancel request sent. If your opponent agrees, the challenge will be cancelled and entry fees returned.");
     } catch (error) {
       console.error("❌ Failed to request cancel:", error);
       alert("Failed to request cancellation. Please try again.");
@@ -795,8 +795,8 @@ const ArenaHome: React.FC = () => {
                               {challenge.rawData.winner === "tie" ? (
                                 <>
                                   <div className="text-3xl mb-2">🤝</div>
-                                  <div className="text-xl font-bold text-yellow-400">TIE - Refund</div>
-                                  <p className="text-sm text-gray-400 mt-1">Both players will be refunded</p>
+                                  <div className="text-xl font-bold text-yellow-400">TIE - Entry Fees Returned</div>
+                                  <p className="text-sm text-gray-400 mt-1">Entry fees will be returned to both players</p>
                                 </>
                               ) : (
                                 <>

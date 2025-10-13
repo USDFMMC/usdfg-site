@@ -531,7 +531,7 @@ export const requestCancelChallenge = async (
       // Send system message to chat
       await addDoc(collection(db, 'challenge_chats'), {
         challengeId,
-        text: '🤝 Both players agreed to cancel. Challenge cancelled, funds will be refunded.',
+        text: '🤝 Both players agreed to cancel. Challenge cancelled, entry fees will be returned.',
         sender: 'SYSTEM',
         timestamp: serverTimestamp(),
       });
