@@ -81,6 +81,37 @@ const ArenaHome: React.FC = () => {
   // Monitor result submission deadlines
   useResultDeadlines(firestoreChallenges);
   
+  // Auto-open Submit Result Room when user's challenge becomes "in-progress"
+  useEffect(() => {
+    if (!publicKey || !firestoreChallenges) return;
+    
+    const myInProgressChallenges = firestoreChallenges.filter((challenge: any) => {
+      if (challenge.status !== 'in-progress') return false;
+      
+      const currentWallet = publicKey.toString().toLowerCase();
+      const players = challenge.players || [];
+      
+      // Check if current user is a participant
+      const isParticipant = players.some((player: string) => 
+        player.toLowerCase() === currentWallet
+      );
+      
+      return isParticipant;
+    });
+    
+    // If there's an in-progress challenge and modal isn't already open
+    if (myInProgressChallenges.length > 0 && !showSubmitResultModal) {
+      const challenge = myInProgressChallenges[0];
+      console.log("🎮 Auto-opening Submit Result Room for in-progress challenge:", challenge.id);
+      setSelectedChallenge({
+        id: challenge.id,
+        title: challenge.title || challenge.game || "Challenge",
+        ...challenge
+      });
+      setShowSubmitResultModal(true);
+    }
+  }, [firestoreChallenges, publicKey, showSubmitResultModal]);
+  
   // Convert Firestore challenges to the format expected by the UI
   const challenges = firestoreChallenges.map(challenge => {
     // Determine max players based on mode
