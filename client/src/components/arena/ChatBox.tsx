@@ -35,13 +35,47 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet }) 
       orderBy("timestamp", "asc")
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const newMessages: Message[] = [];
-      snapshot.forEach((doc) => {
-        newMessages.push({ id: doc.id, ...doc.data() } as Message);
-      });
-      setMessages(newMessages);
-    });
+    const unsubscribe = onSnapshot(
+      q, 
+      (snapshot) => {
+        console.log("📨 Received messages:", snapshot.size);
+        const newMessages: Message[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          console.log("💬 Message:", data);
+          newMessages.push({ id: doc.id, ...data } as Message);
+        });
+        setMessages(newMessages);
+      },
+      (error) => {
+        console.error("❌ Chat listener error:", error);
+        console.error("Error code:", error.code);
+        console.error("Error message:", error.message);
+        
+        // If index is missing, fall back to query without orderBy
+        if (error.code === 'failed-precondition') {
+          console.log("⚠️ Index missing, using query without orderBy...");
+          const simpleQ = query(
+            messagesRef,
+            where("challengeId", "==", challengeId)
+          );
+          
+          const fallbackUnsubscribe = onSnapshot(simpleQ, (snapshot) => {
+            const newMessages: Message[] = [];
+            snapshot.forEach((doc) => {
+              newMessages.push({ id: doc.id, ...doc.data() } as Message);
+            });
+            // Sort manually by timestamp
+            newMessages.sort((a, b) => {
+              const aTime = a.timestamp?.seconds || 0;
+              const bTime = b.timestamp?.seconds || 0;
+              return aTime - bTime;
+            });
+            setMessages(newMessages);
+          });
+        }
+      }
+    );
 
     return () => unsubscribe();
   }, [challengeId]);
