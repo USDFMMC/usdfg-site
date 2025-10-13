@@ -453,13 +453,13 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
       return;
     }
     
-    // Case 2: Only one player submitted → They win by default
+    // Case 2: Only one player submitted → Determine winner based on their claim
     if (submittedCount === 1) {
       const submittedWallet = Object.keys(results)[0];
       const didTheyClaimWin = results[submittedWallet].didWin;
       
-      // Only award win if they claimed they won
       if (didTheyClaimWin) {
+        // They claimed they won → They win by default
         await updateDoc(challengeRef, {
           status: 'completed',
           winner: submittedWallet,
@@ -467,13 +467,14 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
         });
         console.log('🏆 DEADLINE PASSED: Winner by default (opponent no-show):', submittedWallet);
       } else {
-        // They claimed they lost and opponent didn't submit → Refund
+        // They claimed they lost → The OTHER player wins by default
+        const opponentWallet = data.players.find((p: string) => p !== submittedWallet);
         await updateDoc(challengeRef, {
           status: 'completed',
-          winner: 'tie',
+          winner: opponentWallet || 'tie',
           updatedAt: Timestamp.now(),
         });
-        console.log('🤝 DEADLINE PASSED: Refund (player claimed loss, opponent no-show)');
+        console.log('🏆 DEADLINE PASSED: Opponent wins (player admitted defeat, opponent no-show):', opponentWallet);
       }
     }
     
