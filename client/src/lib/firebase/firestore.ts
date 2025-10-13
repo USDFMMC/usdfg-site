@@ -545,12 +545,14 @@ export const requestCancelChallenge = async (
       
       // Send system message to chat notifying opponent
       const shortWallet = walletAddress.slice(0, 8) + '...' + walletAddress.slice(-4);
-      await addDoc(collection(db, 'challenge_chats'), {
+      console.log('📨 Sending system message to chat:', challengeId);
+      const chatDoc = await addDoc(collection(db, 'challenge_chats'), {
         challengeId,
         text: `🚫 ${shortWallet} requested to cancel the challenge. Click "Agree to Cancel" button if you agree.`,
         sender: 'SYSTEM',
         timestamp: serverTimestamp(),
       });
+      console.log('✅ System message sent to chat:', chatDoc.id);
     }
   } catch (error) {
     console.error('❌ Error requesting cancel:', error);
