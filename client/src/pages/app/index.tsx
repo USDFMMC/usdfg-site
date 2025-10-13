@@ -344,7 +344,7 @@ const ArenaHome: React.FC = () => {
       console.log("🚫 Wallet address:", publicKey.toString());
       await requestCancelChallenge(selectedChallenge.id, publicKey.toString());
       console.log("✅ Cancel request submitted successfully!");
-      alert("✅ Cancel request sent! Check the chat for updates. If your opponent agrees, the challenge will be cancelled and entry fees returned.");
+      // Don't show alert - system message will appear in chat
     } catch (error: any) {
       console.error("❌ Failed to request cancel:", error);
       console.error("❌ Error details:", error.code, error.message);

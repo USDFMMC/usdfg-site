@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Trophy, Loader2, Camera, Upload, Image as ImageIcon } from "lucide-react";
 import { ChatBox } from "./ChatBox";
@@ -69,6 +69,19 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = ({
       setIsLoading(false);
     }
   };
+
+  // ESC key to close modal
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen && !isLoading && !isSubmitting) {
+        console.log('⌨️ ESC pressed - closing modal');
+        onClose();
+      }
+    };
+    
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isOpen, isLoading, isSubmitting, onClose]);
 
   return (
     <AnimatePresence>
@@ -294,8 +307,16 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = ({
                   {onCancelRequest && !cancelRequested && (
                     <button
                       onClick={async () => {
+                        console.log('🖱️ Cancel button clicked!');
+                        console.log('🖱️ onCancelRequest exists:', !!onCancelRequest);
+                        console.log('🖱️ cancelRequested:', cancelRequested);
+                        console.log('🖱️ opponentCancelRequested:', opponentCancelRequested);
                         if (onCancelRequest) {
-                          await onCancelRequest();
+                          try {
+                            await onCancelRequest();
+                          } catch (error) {
+                            console.error('❌ Error in onCancelRequest:', error);
+                          }
                         }
                       }}
                       disabled={isLoading || isSubmitting}
@@ -303,6 +324,13 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = ({
                     >
                       {opponentCancelRequested ? "✅ Agree to Cancel" : "🚫 Request Cancel"}
                     </button>
+                  )}
+                  
+                  {/* Debug info */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <div className="text-xs text-gray-500">
+                      Debug: onCancelRequest={onCancelRequest ? 'yes' : 'no'}, cancelRequested={cancelRequested ? 'yes' : 'no'}
+                    </div>
                   )}
 
                   {/* Submit Button */}
