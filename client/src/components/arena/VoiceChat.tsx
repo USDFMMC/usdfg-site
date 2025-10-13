@@ -74,34 +74,43 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
         const data = snapshot.data();
         if (!data) return;
 
-        // Check for offer from other player
-        if (data.offer && data.offerFrom !== currentWallet && !pc.currentRemoteDescription) {
-          console.log("📞 Received offer, creating answer...");
-          await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          await setDoc(signalRef, {
-            answer,
-            answerFrom: currentWallet,
-            timestamp: Date.now()
-          }, { merge: true });
-        } 
-        // Check for answer from other player (only if we created the offer)
-        else if (data.answer && data.answerFrom !== currentWallet && data.offerFrom === currentWallet && !pc.currentRemoteDescription) {
-          console.log("✅ Received answer, setting remote description...");
-          await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-        }
-
-        // Handle ICE candidates from other players
-        Object.keys(data).forEach(async (key) => {
-          if (key.startsWith('candidates_') && !key.endsWith(currentWallet)) {
-            try {
-              await pc.addIceCandidate(new RTCIceCandidate(data[key]));
-            } catch (err) {
-              console.error("Failed to add ICE candidate:", err);
+        try {
+          // Check for offer from other player
+          if (data.offer && data.offerFrom !== currentWallet && !pc.currentRemoteDescription) {
+            console.log("📞 Received offer, creating answer...");
+            await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            await setDoc(signalRef, {
+              answer,
+              answerFrom: currentWallet,
+              timestamp: Date.now()
+            }, { merge: true });
+          } 
+          // Check for answer from other player (only if we created the offer)
+          else if (data.answer && data.answerFrom !== currentWallet && data.offerFrom === currentWallet) {
+            // Only set if we're in the right state (waiting for answer)
+            if (pc.signalingState === 'have-local-offer' && !pc.currentRemoteDescription) {
+              console.log("✅ Received answer, setting remote description...");
+              await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
             }
           }
-        });
+
+          // Handle ICE candidates from other players
+          Object.keys(data).forEach(async (key) => {
+            if (key.startsWith('candidates_') && !key.endsWith(currentWallet)) {
+              try {
+                if (pc.remoteDescription) {
+                  await pc.addIceCandidate(new RTCIceCandidate(data[key]));
+                }
+              } catch (err) {
+                console.error("Failed to add ICE candidate:", err);
+              }
+            }
+          });
+        } catch (error) {
+          console.error("❌ Error handling WebRTC signal:", error);
+        }
       });
 
       // Small delay to let listener attach
