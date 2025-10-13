@@ -514,12 +514,18 @@ export const requestCancelChallenge = async (
       console.log('⚠️ User already requested cancellation - checking chat for notification');
       
       // Check if system message was already sent
+      console.log('🔍 Checking for existing system messages...');
       const chatQuery = query(
         collection(db, 'challenge_chats'),
         where('challengeId', '==', challengeId),
         where('sender', '==', 'SYSTEM')
       );
       const chatSnap = await getDocs(chatQuery);
+      console.log('📊 System messages in DB:', chatSnap.size);
+      chatSnap.docs.forEach(doc => {
+        console.log('  -', doc.data().text);
+      });
+      
       const hasSystemMessage = chatSnap.docs.some(doc => 
         doc.data().text?.includes('requested to cancel')
       );
@@ -528,15 +534,15 @@ export const requestCancelChallenge = async (
         // Send system message if it wasn't sent before
         console.log('📨 Resending system message to chat (was missing)');
         const shortWallet = walletAddress.slice(0, 8) + '...' + walletAddress.slice(-4);
-        await addDoc(collection(db, 'challenge_chats'), {
+        const chatDoc = await addDoc(collection(db, 'challenge_chats'), {
           challengeId,
           text: `🚫 ${shortWallet} requested to cancel the challenge. Click "Agree to Cancel" button if you agree.`,
           sender: 'SYSTEM',
           timestamp: serverTimestamp(),
         });
-        console.log('✅ System message sent to chat');
+        console.log('✅ System message sent to chat:', chatDoc.id);
       } else {
-        console.log('✅ System message already exists in chat');
+        console.log('✅ System message already exists in chat (found "requested to cancel")');
       }
       
       return;

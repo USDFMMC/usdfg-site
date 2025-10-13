@@ -54,6 +54,11 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet }) 
         });
         
         console.log("✅ Messages sorted and ready:", newMessages.length);
+        
+        // Debug: Check for system messages
+        const systemMsgs = newMessages.filter(m => m.sender === 'SYSTEM');
+        console.log("🟡 System messages found:", systemMsgs.length, systemMsgs);
+        
         setMessages(newMessages);
       },
       (error) => {
