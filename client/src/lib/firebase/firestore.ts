@@ -442,14 +442,14 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
     const results = data.results || {};
     const submittedCount = Object.keys(results).length;
     
-    // Case 1: No one submitted → Dispute/Refund
+    // Case 1: No one submitted → FORFEIT (no refund to prevent exploitation)
     if (submittedCount === 0) {
       await updateDoc(challengeRef, {
-        status: 'disputed',
-        winner: null,
+        status: 'completed',
+        winner: 'forfeit', // Special value indicating both players forfeited
         updatedAt: Timestamp.now(),
       });
-      console.log('⚠️ DEADLINE PASSED: No results submitted - Dispute');
+      console.log('⚠️ DEADLINE PASSED: No results submitted - FORFEIT (no refund)');
       return;
     }
     

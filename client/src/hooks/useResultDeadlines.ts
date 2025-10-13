@@ -30,10 +30,9 @@ export function useResultDeadlines(challenges: ChallengeData[]) {
         const deadline = challenge.resultDeadline.toMillis();
         const timeSinceDeadline = now - deadline;
 
-        // Only check if deadline has passed within the last 5 minutes
-        // (to avoid re-checking old challenges)
-        if (timeSinceDeadline > 0 && timeSinceDeadline < 5 * 60 * 1000) {
-          console.log('⏰ Checking result deadline for challenge:', challenge.id);
+        // Check if deadline has passed (no time window restriction)
+        if (timeSinceDeadline > 0) {
+          console.log('⏰ Checking result deadline for challenge:', challenge.id, 'Time since deadline:', Math.floor(timeSinceDeadline / 1000 / 60), 'minutes');
           try {
             await checkResultDeadline(challenge.id);
             checkedChallenges.current.add(challenge.id);
