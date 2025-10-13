@@ -111,6 +111,24 @@ const ArenaHome: React.FC = () => {
       setShowSubmitResultModal(true);
     }
   }, [firestoreChallenges, publicKey, showSubmitResultModal]);
+
+  // Update selectedChallenge in real-time when challenge data changes
+  useEffect(() => {
+    if (!selectedChallenge || !firestoreChallenges) return;
+    
+    // Find the updated challenge data
+    const updatedChallenge = firestoreChallenges.find((c: any) => c.id === selectedChallenge.id);
+    
+    if (updatedChallenge) {
+      console.log("🔄 Updating selectedChallenge with latest data");
+      setSelectedChallenge({
+        id: updatedChallenge.id,
+        title: updatedChallenge.title || updatedChallenge.game || "Challenge",
+        ...updatedChallenge,
+        rawData: updatedChallenge
+      });
+    }
+  }, [firestoreChallenges, selectedChallenge?.id]);
   
   // Convert Firestore challenges to the format expected by the UI
   const challenges = firestoreChallenges.map(challenge => {
@@ -1068,11 +1086,18 @@ const ArenaHome: React.FC = () => {
           currentWallet={publicKey?.toString() || ""}
           onSubmit={handleSubmitResult}
           onCancelRequest={handleCancelRequest}
-          cancelRequested={selectedChallenge?.rawData?.cancelRequests?.includes(publicKey?.toString()) || false}
-          opponentCancelRequested={
-            (selectedChallenge?.rawData?.cancelRequests?.length || 0) > 0 &&
-            !selectedChallenge?.rawData?.cancelRequests?.includes(publicKey?.toString())
-          }
+          cancelRequested={(() => {
+            const requested = selectedChallenge?.rawData?.cancelRequests?.includes(publicKey?.toString()) || false;
+            console.log("🔍 cancelRequested:", requested, "cancelRequests:", selectedChallenge?.rawData?.cancelRequests);
+            return requested;
+          })()}
+          opponentCancelRequested={(() => {
+            const hasRequests = (selectedChallenge?.rawData?.cancelRequests?.length || 0) > 0;
+            const notMyRequest = !selectedChallenge?.rawData?.cancelRequests?.includes(publicKey?.toString());
+            const result = hasRequests && notMyRequest;
+            console.log("🔍 opponentCancelRequested:", result, "hasRequests:", hasRequests, "notMyRequest:", notMyRequest);
+            return result;
+          })()}
         />
 
         {/* Mobile FAB - Create Challenge */}
