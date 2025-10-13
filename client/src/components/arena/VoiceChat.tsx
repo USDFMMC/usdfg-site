@@ -86,8 +86,8 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
             timestamp: Date.now()
           }, { merge: true });
         } 
-        // Check for answer from other player
-        else if (data.answer && data.answerFrom !== currentWallet && !pc.currentRemoteDescription) {
+        // Check for answer from other player (only if we created the offer)
+        else if (data.answer && data.answerFrom !== currentWallet && data.offerFrom === currentWallet && !pc.currentRemoteDescription) {
           console.log("✅ Received answer, setting remote description...");
           await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
         }
