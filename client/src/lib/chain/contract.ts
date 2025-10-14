@@ -111,22 +111,30 @@ export async function createChallenge(
       throw new Error('Smart contract initialization failed. Please contact support.');
     }
 
+    console.log('🔧 Step 1: Getting program...');
     const program = await getProgram(wallet, connection);
+    console.log('✅ Program obtained');
+    
     const creator = wallet.publicKey;
+    console.log('👤 Creator:', creator.toString());
 
     // Generate a unique seed for this challenge
+    console.log('🔧 Step 2: Generating challenge seed...');
     const challengeSeed = Keypair.generate();
     console.log('🔑 Challenge seed:', challengeSeed.publicKey.toString());
 
     // Derive all PDAs
+    console.log('🔧 Step 3: Deriving PDAs...');
     const pdas = await derivePDAs(creator, challengeSeed.publicKey);
     console.log('📍 Challenge PDA:', pdas.challengePDA.toString());
 
     // Get creator's token account
+    console.log('🔧 Step 4: Getting token account...');
     const creatorTokenAccount = await getAssociatedTokenAddress(
       USDFG_MINT,
       creator
     );
+    console.log('💳 Token account:', creatorTokenAccount.toString());
 
     // Convert USDFG to lamports (smallest unit)
     const lamports = usdfgToLamports(entryFeeUsdfg);
