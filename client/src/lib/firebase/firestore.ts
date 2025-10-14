@@ -750,9 +750,11 @@ async function updatePlayerStats(
         categoryStats
       };
       
-      // Update display name if provided (keeps most recent username)
-      if (displayName) {
+      // 🔒 LOCKED: Username can only be set once on first challenge
+      // If player doesn't have a displayName yet, set it now (first time only)
+      if (displayName && !currentStats.displayName) {
         updateData.displayName = displayName;
+        console.log(`🔒 Username locked for ${wallet}: "${displayName}"`);
       }
       
       await updateDoc(playerRef, updateData);
