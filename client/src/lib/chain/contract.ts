@@ -16,20 +16,19 @@ import { initializeSmartContract, isSmartContractInitialized } from './initializ
  * Get the Anchor program instance
  */
 export async function getProgram(wallet: any, connection: Connection) {
-  // Create a wallet adapter that Anchor expects
-  const anchorWallet = {
-    publicKey: wallet.publicKey,
-    signTransaction: wallet.signTransaction,
-    signAllTransactions: wallet.signAllTransactions || (async (txs: any[]) => {
+  // The wallet from useWallet() already has the right structure
+  // Just need to ensure it has signAllTransactions
+  if (!wallet.signAllTransactions) {
+    wallet.signAllTransactions = async (txs: Transaction[]) => {
       const signed = [];
       for (const tx of txs) {
         signed.push(await wallet.signTransaction(tx));
       }
       return signed;
-    }),
-  };
+    };
+  }
   
-  const provider = new AnchorProvider(connection, anchorWallet as any, {
+  const provider = new AnchorProvider(connection, wallet, {
     commitment: 'confirmed',
   });
   
