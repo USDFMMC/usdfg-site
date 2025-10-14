@@ -156,10 +156,20 @@ export async function createChallenge(
         console.log('✅ Smart contract already initialized');
       }
       
-      // Update price oracle to refresh the timestamp (must be < 5 minutes old)
-      console.log('🔄 Refreshing price oracle...');
-      await updatePriceOracle(wallet, connection);
-      console.log('✅ Price oracle refreshed!');
+      // Try to update price oracle (only works if you're the admin)
+      // If you're not the admin, that's OK - we'll just use the existing oracle price
+      try {
+        console.log('🔄 Attempting to refresh price oracle...');
+        await updatePriceOracle(wallet, connection);
+        console.log('✅ Price oracle refreshed!');
+      } catch (oracleError: any) {
+        // Not the admin - that's fine, we'll use the existing oracle
+        if (oracleError.message?.includes('AccountNotSigner') || oracleError.message?.includes('Unauthorized')) {
+          console.log('⚠️ Not admin - skipping oracle update (will use existing price)');
+        } else {
+          console.warn('⚠️ Could not update oracle:', oracleError.message);
+        }
+      }
     } catch (initError) {
       console.error('❌ Error checking/initializing smart contract:', initError);
       throw new Error('Smart contract initialization failed. Please contact support.');
