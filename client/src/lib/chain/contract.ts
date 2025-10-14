@@ -9,7 +9,7 @@ import { BN } from '@coral-xyz/anchor';
 import { Connection, PublicKey, Keypair, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction, TransactionInstruction } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
 import { PROGRAM_ID, USDFG_MINT, SEEDS, usdfgToLamports } from './config';
-import { initializeSmartContract, isSmartContractInitialized } from './initialize';
+import { initializeSmartContract, isSmartContractInitialized, updatePriceOracle } from './initialize';
 import * as borsh from '@coral-xyz/borsh';
 
 /**
@@ -155,6 +155,11 @@ export async function createChallenge(
       } else {
         console.log('✅ Smart contract already initialized');
       }
+      
+      // Update price oracle to refresh the timestamp (must be < 5 minutes old)
+      console.log('🔄 Refreshing price oracle...');
+      await updatePriceOracle(wallet, connection);
+      console.log('✅ Price oracle refreshed!');
     } catch (initError) {
       console.error('❌ Error checking/initializing smart contract:', initError);
       throw new Error('Smart contract initialization failed. Please contact support.');

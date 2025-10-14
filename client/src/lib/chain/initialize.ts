@@ -131,3 +131,68 @@ export async function isSmartContractInitialized(
   }
 }
 
+/**
+ * Update the price oracle timestamp
+ * This needs to be called every 5 minutes to keep the oracle fresh
+ */
+export async function updatePriceOracle(
+  wallet: any,
+  connection: Connection,
+  newPrice?: number // Optional: new price in USD (e.g. 0.15)
+): Promise<void> {
+  try {
+    console.log('🔄 Updating price oracle...');
+    
+    // Create wallet adapter for Anchor
+    const anchorWallet = {
+      publicKey: wallet.publicKey,
+      signTransaction: wallet.signTransaction,
+      signAllTransactions: wallet.signAllTransactions || (async (txs: any[]) => {
+        const signed = [];
+        for (const tx of txs) {
+          signed.push(await wallet.signTransaction(tx));
+        }
+        return signed;
+      }),
+    };
+    
+    const provider = new AnchorProvider(connection, anchorWallet as any, {
+      commitment: 'confirmed',
+    });
+    
+    const program = new Program(IDL as any, PROGRAM_ID, provider);
+    
+    // Derive PDAs
+    const [adminStatePDA] = PublicKey.findProgramAddressSync(
+      [SEEDS.ADMIN],
+      PROGRAM_ID
+    );
+    
+    const [priceOraclePDA] = PublicKey.findProgramAddressSync(
+      [SEEDS.PRICE_ORACLE],
+      PROGRAM_ID
+    );
+    
+    // Convert price to lamports (e.g. 0.15 USD = 150,000,000 lamports)
+    const priceInLamports = newPrice 
+      ? new BN(Math.floor(newPrice * 1_000_000_000))
+      : new BN(150_000_000); // Default: $0.15
+    
+    console.log('💰 Updating price to:', newPrice || 0.15, 'USD');
+    
+    const tx = await program.methods
+      .updatePrice(priceInLamports)
+      .accounts({
+        priceOracle: priceOraclePDA,
+        adminState: adminStatePDA,
+        admin: wallet.publicKey,
+      })
+      .rpc();
+    
+    console.log('✅ Price oracle updated! TX:', tx);
+  } catch (error) {
+    console.error('❌ Error updating price oracle:', error);
+    throw error;
+  }
+}
+
