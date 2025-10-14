@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, memo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Trophy, Loader2, Camera, Upload, Image as ImageIcon } from "lucide-react";
 import { ChatBox } from "./ChatBox";
@@ -14,7 +14,7 @@ interface SubmitResultRoomProps {
   isSubmitting?: boolean;
 }
 
-export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = ({
+export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = memo(({
   isOpen,
   onClose,
   challengeId,
@@ -29,7 +29,7 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = ({
   const [proofFile, setProofFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleImageCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageCapture = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setProofFile(file);
@@ -39,17 +39,17 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = ({
       };
       reader.readAsDataURL(file);
     }
-  };
+  }, []);
 
-  const removeImage = () => {
+  const removeImage = useCallback(() => {
     setProofImage(null);
     setProofFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  };
+  }, []);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (selectedResult === null) return;
     
     setIsLoading(true);
@@ -62,7 +62,7 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedResult, proofFile, onSubmit, onClose]);
 
   // ESC key to close modal
   useEffect(() => {
@@ -96,7 +96,7 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = ({
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 30, stiffness: 300 }}
+            transition={{ type: "tween", duration: 0.3, ease: "easeOut" }}
             className="fixed bottom-0 left-0 right-0 z-50 flex justify-center"
             onClick={(e) => e.stopPropagation()}
           >
@@ -196,7 +196,7 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = ({
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
+                    transition={{ duration: 0.2 }}
                   >
                     <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-4">
                       <div className="flex items-center justify-between mb-3">
@@ -269,11 +269,11 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = ({
                   </motion.div>
                 )}
 
-                {/* Voice Chat */}
-                <VoiceChat challengeId={challengeId} currentWallet={currentWallet} />
+                {/* Voice Chat - Only render when modal is open */}
+                {isOpen && <VoiceChat challengeId={challengeId} currentWallet={currentWallet} />}
 
-                {/* Text Chat */}
-                <ChatBox challengeId={challengeId} currentWallet={currentWallet} />
+                {/* Text Chat - Only render when modal is open */}
+                {isOpen && <ChatBox challengeId={challengeId} currentWallet={currentWallet} />}
 
                 {/* Info Box */}
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
@@ -320,5 +320,5 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = ({
       )}
     </AnimatePresence>
   );
-};
+});
 
