@@ -3,6 +3,8 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { WalletMultiButton, WalletDisconnectButton } from '@solana/wallet-adapter-react-ui';
 import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { getAssociatedTokenAddress } from '@solana/spl-token';
+import { USDFG_MINT } from '@/lib/chain/config';
 
 interface WalletConnectSimpleProps {
   isConnected: boolean;
@@ -20,6 +22,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const { publicKey, connected, connecting, disconnect, select, wallets } = useWallet();
   const { connection } = useConnection();
   const [balance, setBalance] = useState<number | null>(null);
+  const [usdfgBalance, setUsdfgBalance] = useState<number | null>(null);
 
   // Auto-connect Phantom if in mobile browser
   useEffect(() => {
@@ -42,18 +45,33 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     if (connected && publicKey) {
       onConnect();
       
-      // Fetch balance
+      // Fetch SOL balance
       connection.getBalance(publicKey)
         .then(balanceLamports => {
           const balance = balanceLamports / LAMPORTS_PER_SOL;
           setBalance(balance);
         })
         .catch(err => {
-          console.error("❌ Balance fetch failed:", err);
+          console.error("❌ SOL balance fetch failed:", err);
           setBalance(null);
+        });
+      
+      // Fetch USDFG balance
+      getAssociatedTokenAddress(USDFG_MINT, publicKey)
+        .then(tokenAccount => {
+          return connection.getTokenAccountBalance(tokenAccount);
+        })
+        .then(tokenBalance => {
+          const usdfg = tokenBalance.value.uiAmount || 0;
+          setUsdfgBalance(usdfg);
+        })
+        .catch(err => {
+          console.error("❌ USDFG balance fetch failed:", err);
+          setUsdfgBalance(0); // Default to 0 if no token account exists yet
         });
     } else if (!connected) {
       setBalance(null);
+      setUsdfgBalance(null);
       onDisconnect();
     }
   }, [connected, publicKey, onConnect, onDisconnect, connection]);
@@ -81,8 +99,15 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           <div className="text-sm text-gray-400">
             {publicKey.toString().slice(0, 8)}...{publicKey.toString().slice(-8)}
           </div>
-          <div className="text-white font-semibold">
-            {balance !== null ? `${balance.toFixed(4)} SOL` : "Loading..."}
+          <div className="flex items-center gap-3">
+            <div>
+              <div className="text-cyan-400 font-bold text-sm">
+                {usdfgBalance !== null ? `${usdfgBalance.toLocaleString()} USDFG` : "Loading..."}
+              </div>
+              <div className="text-gray-400 text-xs">
+                {balance !== null ? `${balance.toFixed(4)} SOL` : "Loading..."}
+              </div>
+            </div>
           </div>
         </div>
         <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
