@@ -389,9 +389,13 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
       updatedAt: Timestamp.now(),
     });
     console.log('🏆 WINNER DETERMINED:', winner);
+    console.log('📊 Updating player stats...');
+    console.log('   Game:', data.game, 'Category:', data.category, 'Prize:', data.prizePool);
     
     // Update player stats
+    console.log('   Updating winner stats:', winner);
     await updatePlayerStats(winner, 'win', data.prizePool, data.game, data.category);
+    console.log('   Updating loser stats:', loser);
     await updatePlayerStats(loser, 'loss', 0, data.game, data.category);
     
     // TODO: Trigger smart contract to release prize pool to winner
@@ -742,6 +746,7 @@ export async function getPlayerStats(wallet: string): Promise<PlayerStats | null
  */
 export async function getTopPlayers(limitCount: number = 10, sortBy: 'wins' | 'winRate' | 'totalEarned' = 'totalEarned'): Promise<PlayerStats[]> {
   try {
+    console.log(`📊 Fetching top ${limitCount} players (sorted by ${sortBy})...`);
     const statsCollection = collection(db, 'player_stats');
     
     // Simple query without where clause to avoid compound index requirement
@@ -755,13 +760,16 @@ export async function getTopPlayers(limitCount: number = 10, sortBy: 'wins' | 'w
     const players: PlayerStats[] = [];
     
     snapshot.forEach((doc) => {
-      players.push(doc.data() as PlayerStats);
+      const data = doc.data() as PlayerStats;
+      console.log(`   Player: ${data.wallet.slice(0, 8)}... - ${data.totalEarned} USDFG - ${data.winRate}% WR`);
+      players.push(data);
     });
     
-    console.log(`📊 Fetched top ${players.length} players (sorted by ${sortBy})`);
+    console.log(`✅ Fetched ${players.length} players total`);
     return players;
   } catch (error) {
     console.error('❌ Error fetching top players:', error);
+    console.error('   Error details:', error);
     return [];
   }
 }
