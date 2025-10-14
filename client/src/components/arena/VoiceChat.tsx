@@ -12,10 +12,13 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
   const [muted, setMuted] = useState(false);
   const [connected, setConnected] = useState(false);
   const [peerConnected, setPeerConnected] = useState(false);
+  const [status, setStatus] = useState<string>("Initializing...");
   
   const localStream = useRef<MediaStream | null>(null);
   const peerConnection = useRef<RTCPeerConnection | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
+  const reconnectAttempts = useRef(0);
+  const maxReconnectAttempts = 3;
 
   console.log("🎤 VoiceChat component mounted", { challengeId, currentWallet });
 
@@ -34,11 +37,13 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
     console.log("🎤 Starting voice chat initialization...");
     try {
       // Get user's microphone
+      setStatus("Requesting mic permission...");
       console.log("🎤 Requesting microphone permission...");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       console.log("✅ Microphone permission granted!");
       localStream.current = stream;
       setConnected(true);
+      setStatus("Mic ready, waiting for opponent...");
 
       // Create peer connection with optimized STUN and TURN servers
       const configuration: RTCConfiguration = {
@@ -95,13 +100,27 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
         console.log("🔌 Connection state:", pc.connectionState);
         if (pc.connectionState === 'connected') {
           setPeerConnected(true);
+          setStatus("Voice connected!");
+          reconnectAttempts.current = 0; // Reset on success
           console.log("✅ Voice chat connected!");
+        } else if (pc.connectionState === 'connecting') {
+          setStatus("Connecting to opponent...");
         } else if (pc.connectionState === 'disconnected') {
           setPeerConnected(false);
-          console.log("⚠️ Voice chat disconnected");
+          setStatus("Disconnected, reconnecting...");
+          console.log("⚠️ Voice chat disconnected - attempting reconnect");
         } else if (pc.connectionState === 'failed') {
           setPeerConnected(false);
-          console.log("❌ Voice chat connection failed");
+          if (reconnectAttempts.current < maxReconnectAttempts) {
+            reconnectAttempts.current++;
+            setStatus(`Connection failed, retry ${reconnectAttempts.current}/${maxReconnectAttempts}...`);
+            console.log(`❌ Voice chat connection failed - retry attempt ${reconnectAttempts.current}`);
+            // Attempt to restart ICE
+            pc.restartIce();
+          } else {
+            setStatus("Connection failed (check network)");
+            console.error("❌ Voice chat connection failed after max retries");
+          }
         }
       };
 
@@ -172,7 +191,8 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
       const signalData = signalSnap.data();
       
       if (!signalData?.offer) {
-        console.log("📞 Creating offer...");
+        console.log("📞 Creating offer (first person in room)...");
+        setStatus("Creating offer, waiting for opponent...");
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         await setDoc(signalRef, {
@@ -180,11 +200,15 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
           offerFrom: currentWallet,
           timestamp: Date.now()
         }, { merge: true });
+      } else if (signalData.offerFrom !== currentWallet) {
+        console.log("📞 Offer already exists from opponent, will answer when ready");
+        setStatus("Found opponent, connecting...");
       }
 
     } catch (error) {
       console.error("❌ Voice chat init failed:", error);
       setConnected(false);
+      setStatus(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -230,25 +254,39 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
   };
 
   return (
-    <div className="flex justify-between items-center bg-gray-800 p-2 rounded-lg border border-gray-700">
+    <div className="bg-gray-800 p-3 rounded-lg border border-gray-700">
       {/* Hidden audio element for remote stream */}
       <audio ref={remoteAudioRef} autoPlay />
       
-      <span className="text-white text-sm">
-        {connected 
-          ? (peerConnected ? '🎙️ Voice Connected' : '🔌 Connecting...') 
-          : '❌ Disconnected'}
-      </span>
-      
-      <button
-        onClick={toggleMute}
-        disabled={!connected}
-        className={`px-3 py-1 rounded-lg text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-          muted ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
-        }`}
-      >
-        {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-      </button>
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          {/* Status Indicator */}
+          <div className={`w-2 h-2 rounded-full ${
+            peerConnected ? 'bg-green-500 animate-pulse' : 
+            connected ? 'bg-yellow-500' : 
+            'bg-red-500'
+          }`} />
+          
+          {/* Status Text */}
+          <div className="flex flex-col">
+            <span className="text-white text-sm font-medium">
+              {peerConnected ? '🎙️ Voice Connected' : connected ? '🔌 Voice Chat' : '❌ Disconnected'}
+            </span>
+            <span className="text-gray-400 text-xs">{status}</span>
+          </div>
+        </div>
+        
+        {/* Mute Button */}
+        <button
+          onClick={toggleMute}
+          disabled={!connected}
+          className={`px-3 py-2 rounded-lg text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+            muted ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/20' : 'bg-green-600 hover:bg-green-700 shadow-lg shadow-green-500/20'
+          }`}
+        >
+          {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+        </button>
+      </div>
     </div>
   );
 };
