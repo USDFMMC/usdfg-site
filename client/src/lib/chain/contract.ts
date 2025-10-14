@@ -16,19 +16,24 @@ import { initializeSmartContract, isSmartContractInitialized } from './initializ
  * Get the Anchor program instance
  */
 export async function getProgram(wallet: any, connection: Connection) {
-  // The wallet from useWallet() already has the right structure
-  // Just need to ensure it has signAllTransactions
-  if (!wallet.signAllTransactions) {
-    wallet.signAllTransactions = async (txs: Transaction[]) => {
-      const signed = [];
-      for (const tx of txs) {
-        signed.push(await wallet.signTransaction(tx));
-      }
-      return signed;
-    };
-  }
+  // Create a proper AnchorWallet wrapper
+  // The issue is that wallet.publicKey from useWallet() is already a PublicKey object
+  // but Anchor expects it in a specific format
+  const anchorWallet = {
+    publicKey: new PublicKey(wallet.publicKey.toString()), // Re-create PublicKey from string
+    signTransaction: wallet.signTransaction.bind(wallet),
+    signAllTransactions: wallet.signAllTransactions 
+      ? wallet.signAllTransactions.bind(wallet)
+      : async (txs: Transaction[]) => {
+          const signed = [];
+          for (const tx of txs) {
+            signed.push(await wallet.signTransaction(tx));
+          }
+          return signed;
+        },
+  };
   
-  const provider = new AnchorProvider(connection, wallet, {
+  const provider = new AnchorProvider(connection, anchorWallet as any, {
     commitment: 'confirmed',
   });
   
