@@ -1017,8 +1017,8 @@ const ArenaHome: React.FC = () => {
                                 {index + 1}
                               </div>
                               <div>
-                                <h3 className="text-white font-semibold font-mono text-sm">
-                                  {player.wallet.slice(0, 6)}...{player.wallet.slice(-4)}
+                                <h3 className="text-white font-semibold text-sm">
+                                  {player.displayName || `${player.wallet.slice(0, 6)}...${player.wallet.slice(-4)}`}
                                 </h3>
                                 <p className="text-gray-400 text-sm">{player.totalEarned.toFixed(2)} USDFG earned</p>
                               </div>

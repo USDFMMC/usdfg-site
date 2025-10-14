@@ -392,11 +392,16 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     console.log('📊 Updating player stats...');
     console.log('   Game:', data.game, 'Category:', data.category, 'Prize:', data.prizePool);
     
+    // Get display names from challenge data
+    // Winner gets their username, loser might not have submitted a tag yet
+    const winnerDisplayName = winner === data.creator ? data.creatorTag : undefined;
+    const loserDisplayName = loser === data.creator ? data.creatorTag : undefined;
+    
     // Update player stats
-    console.log('   Updating winner stats:', winner);
-    await updatePlayerStats(winner, 'win', data.prizePool, data.game, data.category);
-    console.log('   Updating loser stats:', loser);
-    await updatePlayerStats(loser, 'loss', 0, data.game, data.category);
+    console.log('   Updating winner stats:', winner, 'as', winnerDisplayName || 'Anonymous');
+    await updatePlayerStats(winner, 'win', data.prizePool, data.game, data.category, winnerDisplayName);
+    console.log('   Updating loser stats:', loser, 'as', loserDisplayName || 'Anonymous');
+    await updatePlayerStats(loser, 'loss', 0, data.game, data.category, loserDisplayName);
     
     // TODO: Trigger smart contract to release prize pool to winner
     console.log('💰 Prize pool to be released:', data.prizePool, 'USDFG to', winner);
@@ -613,6 +618,7 @@ export const requestCancelChallenge = async (
 
 export interface PlayerStats {
   wallet: string;
+  displayName?: string; // Player's chosen username (from creatorTag)
   wins: number;
   losses: number;
   winRate: number;
@@ -643,7 +649,8 @@ async function updatePlayerStats(
   result: 'win' | 'loss',
   amountEarned: number,
   game: string,
-  category: string
+  category: string,
+  displayName?: string
 ): Promise<void> {
   try {
     const playerRef = doc(db, 'player_stats', wallet);
@@ -653,6 +660,7 @@ async function updatePlayerStats(
       // Create new player stats
       const newStats: PlayerStats = {
         wallet,
+        displayName: displayName || undefined, // Store display name if provided
         wins: result === 'win' ? 1 : 0,
         losses: result === 'loss' ? 1 : 0,
         winRate: result === 'win' ? 100 : 0,
@@ -676,7 +684,7 @@ async function updatePlayerStats(
       };
       
       await setDoc(playerRef, newStats);
-      console.log('✅ Created new player stats:', wallet);
+      console.log('✅ Created new player stats:', wallet, 'as', displayName || 'Anonymous');
     } else {
       // Update existing player stats
       const currentStats = playerSnap.data() as PlayerStats;
@@ -703,7 +711,7 @@ async function updatePlayerStats(
       categoryStats[category].losses += result === 'loss' ? 1 : 0;
       categoryStats[category].earned += amountEarned;
 
-      await updateDoc(playerRef, {
+      const updateData: any = {
         wins: newWins,
         losses: newLosses,
         winRate: Math.round(newWinRate * 10) / 10, // Round to 1 decimal
@@ -712,7 +720,14 @@ async function updatePlayerStats(
         lastActive: Timestamp.now(),
         gameStats,
         categoryStats
-      });
+      };
+      
+      // Update display name if provided (keeps most recent username)
+      if (displayName) {
+        updateData.displayName = displayName;
+      }
+      
+      await updateDoc(playerRef, updateData);
 
       console.log(`✅ Updated player stats: ${wallet} - ${result} (+${amountEarned} USDFG)`);
     }
