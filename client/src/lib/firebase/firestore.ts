@@ -392,10 +392,12 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     console.log('📊 Updating player stats...');
     console.log('   Game:', data.game, 'Category:', data.category, 'Prize:', data.prizePool);
     
-    // Get display names from challenge data
-    // Winner gets their username, loser might not have submitted a tag yet
-    const winnerDisplayName = winner === data.creator ? data.creatorTag : undefined;
-    const loserDisplayName = loser === data.creator ? data.creatorTag : undefined;
+    // Get display names from challenge data and sanitize
+    const rawWinnerName = winner === data.creator ? data.creatorTag : undefined;
+    const rawLoserName = loser === data.creator ? data.creatorTag : undefined;
+    
+    const winnerDisplayName = sanitizeDisplayName(rawWinnerName);
+    const loserDisplayName = sanitizeDisplayName(rawLoserName);
     
     // Update player stats
     console.log('   Updating winner stats:', winner, 'as', winnerDisplayName || 'Anonymous');
@@ -615,6 +617,32 @@ export const requestCancelChallenge = async (
 // ============================================
 // PLAYER STATS TRACKING
 // ============================================
+
+// Basic profanity filter (simple word list - can be expanded)
+const BLOCKED_WORDS = [
+  'fuck', 'shit', 'ass', 'bitch', 'damn', 'hell', 'crap', 
+  'dick', 'cock', 'pussy', 'nigger', 'nigga', 'fag', 'faggot',
+  'retard', 'retarded', 'nazi', 'hitler'
+];
+
+function sanitizeDisplayName(name: string | undefined): string | undefined {
+  if (!name) return undefined;
+  
+  const lowerName = name.toLowerCase();
+  
+  // Check if name contains blocked words
+  for (const word of BLOCKED_WORDS) {
+    if (lowerName.includes(word)) {
+      console.log('⚠️ Blocked inappropriate username:', name);
+      return undefined; // Return undefined to use wallet address instead
+    }
+  }
+  
+  // Trim whitespace and limit length
+  const sanitized = name.trim().slice(0, 20);
+  
+  return sanitized || undefined;
+}
 
 export interface PlayerStats {
   wallet: string;

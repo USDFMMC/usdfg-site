@@ -35,6 +35,7 @@ const ArenaHome: React.FC = () => {
   const [isCreatingChallenge, setIsCreatingChallenge] = useState<boolean>(false);
   const [topPlayers, setTopPlayers] = useState<PlayerStats[]>([]);
   const [loadingTopPlayers, setLoadingTopPlayers] = useState<boolean>(true);
+  const [copiedWallet, setCopiedWallet] = useState<string | null>(null);
   
   // Mock price API - simulates real-time price updates
   const fetchUsdfgPrice = useCallback(async () => {
@@ -1010,20 +1011,39 @@ const ArenaHome: React.FC = () => {
                       ];
                       
                       return (
-                        <div key={player.wallet} className={`bg-gradient-to-r ${bgColors[index]} rounded-lg p-4 border`}>
+                        <div key={player.wallet} className={`bg-gradient-to-r ${bgColors[index]} rounded-lg p-4 border group`}>
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                              <div className={`w-12 h-12 bg-gradient-to-r ${rankColors[index]} rounded-full flex items-center justify-center text-black font-bold text-lg`}>
+                            <div className="flex items-center space-x-4 flex-1">
+                              <div className={`w-12 h-12 bg-gradient-to-r ${rankColors[index]} rounded-full flex items-center justify-center text-black font-bold text-lg shrink-0`}>
                                 {index + 1}
                               </div>
-                              <div>
-                                <h3 className="text-white font-semibold text-sm">
-                                  {player.displayName || `${player.wallet.slice(0, 6)}...${player.wallet.slice(-4)}`}
-                                </h3>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <h3 
+                                    className="text-white font-semibold text-sm truncate cursor-help"
+                                    title={player.wallet}
+                                  >
+                                    {player.displayName || `${player.wallet.slice(0, 6)}...${player.wallet.slice(-4)}`}
+                                  </h3>
+                                  {player.gamesPlayed >= 5 && (
+                                    <span className="text-cyan-400 text-xs" title="Verified Player (5+ games)">✓</span>
+                                  )}
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(player.wallet);
+                                      setCopiedWallet(player.wallet);
+                                      setTimeout(() => setCopiedWallet(null), 2000);
+                                    }}
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-cyan-400 text-xs"
+                                    title="Copy wallet address"
+                                  >
+                                    {copiedWallet === player.wallet ? '✓' : '📋'}
+                                  </button>
+                                </div>
                                 <p className="text-gray-400 text-sm">{player.totalEarned.toFixed(2)} USDFG earned</p>
                               </div>
                             </div>
-                            <div className="text-right">
+                            <div className="text-right shrink-0">
                               <div className="text-white font-semibold">{player.winRate.toFixed(1)}%</div>
                               <div className="text-gray-400 text-sm">Win Rate</div>
                             </div>
