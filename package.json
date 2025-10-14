@@ -12,6 +12,7 @@
     "db:seed": "tsx db/seed.ts"
   },
   "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
     "@hookform/resolvers": "^3.9.1",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@neondatabase/serverless": "^0.10.4",
@@ -45,6 +46,7 @@
     "@replit/vite-plugin-cartographer": "^0.0.11",
     "@replit/vite-plugin-shadcn-theme-json": "^0.0.4",
     "@solana-mobile/wallet-adapter-mobile": "^2.2.4",
+    "@solana/spl-token": "^0.4.14",
     "@solana/wallet-adapter-phantom": "^0.9.28",
     "@solana/wallet-adapter-react": "^0.15.39",
     "@solana/wallet-adapter-react-ui": "^0.9.39",

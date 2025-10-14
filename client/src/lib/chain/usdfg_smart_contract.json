@@ -1,0 +1,250 @@
+{
+  "version": "0.1.0",
+  "name": "usdfg_smart_contract",
+  "instructions": [
+    {
+      "name": "createChallenge",
+      "accounts": [
+        {
+          "name": "challenge",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "creator",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "creatorTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "escrowTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "escrowWallet",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "challengeSeed",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "priceOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "adminState",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "usdfgAmount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "acceptChallenge",
+      "accounts": [
+        {
+          "name": "challenge",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "challenger",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "challengerTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "escrowTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "adminState",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "escrowWallet",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "resolveChallenge",
+      "accounts": [
+        {
+          "name": "challenge",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "escrowTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "winnerTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "escrowWallet",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "adminState",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "winner",
+          "type": "publicKey"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Challenge",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "creator",
+            "type": "publicKey"
+          },
+          {
+            "name": "challenger",
+            "type": {
+              "option": "publicKey"
+            }
+          },
+          {
+            "name": "entryFee",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": "ChallengeStatus"
+            }
+          },
+          {
+            "name": "disputeTimer",
+            "type": "i64"
+          },
+          {
+            "name": "winner",
+            "type": {
+              "option": "publicKey"
+            }
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "lastUpdated",
+            "type": "i64"
+          },
+          {
+            "name": "processing",
+            "type": "bool"
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "ChallengeStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Open"
+          },
+          {
+            "name": "InProgress"
+          },
+          {
+            "name": "Completed"
+          },
+          {
+            "name": "Cancelled"
+          },
+          {
+            "name": "Disputed"
+          }
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "address": "2KL4BKvUtDmABvuvRopkCEb33myWM1W9BGodAZ82RWDT"
+  }
+}
+

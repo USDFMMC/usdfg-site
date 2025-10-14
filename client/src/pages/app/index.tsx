@@ -219,8 +219,10 @@ const ArenaHome: React.FC = () => {
 
       console.log("✅ No active challenges found, proceeding with creation...");
 
-      console.log("📦 Importing createChallengeOnChain function...");
-      const { createChallengeOnChain } = await import("@/lib/chain/events");
+      // Import real smart contract functions
+      console.log("📦 Importing smart contract functions...");
+      const { createChallenge } = await import("@/lib/chain/contract");
+      const { Connection, clusterApiUrl } = await import("@solana/web3.js");
       
       // Determine max players based on mode
       const getMaxPlayersForMode = (mode: string) => {
@@ -243,18 +245,20 @@ const ArenaHome: React.FC = () => {
       const maxPlayers = getMaxPlayersForMode(challengeData.mode);
       console.log(`🎯 Setting maxPlayers to ${maxPlayers} for mode: ${challengeData.mode}`);
 
-      console.log("🚀 Calling createChallengeOnChain...");
-      const challengeId = await createChallengeOnChain({
-        game: challengeData.game,
-        entryFee: challengeData.entryFee,
-        maxPlayers: maxPlayers,
-        rules: challengeData.rules || ""
-      }, {
-        signTransaction: signTransaction,
-        publicKey: publicKey!
-      });
+      // Create connection to devnet
+      const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
       
-      console.log("✅ Challenge created successfully:", challengeId);
+      console.log("🚀 Creating challenge on smart contract with escrow...");
+      const challengeId = await createChallenge(
+        {
+          signTransaction: signTransaction,
+          publicKey: publicKey!
+        },
+        connection,
+        challengeData.entryFee // Entry fee in USDFG
+      );
+      
+      console.log("✅ Challenge created on smart contract! PDA:", challengeId);
       
       // Calculate prize pool
       const platformFee = 0.05; // 5% platform fee
