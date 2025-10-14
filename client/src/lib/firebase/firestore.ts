@@ -334,9 +334,9 @@ export const submitChallengeResult = async (
 /**
  * Determine winner based on submitted results
  * Logic:
- * - One YES, One NO → YES player wins
- * - Both YES → Dispute
- * - Both NO → Tie/Refund
+ * - One YES, One NO → YES player wins (clear winner)
+ * - Both YES → Dispute (both claim victory)
+ * - Both NO → Dispute (suspicious, likely collusion to get refund)
  */
 async function determineWinner(challengeId: string, data: ChallengeData): Promise<void> {
   try {
@@ -366,14 +366,14 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
       return;
     }
 
-    // Case 2: Both claim they lost → Tie/Refund
+    // Case 2: Both claim they lost → DISPUTE (prevent collusion exploit)
     if (!player1Won && !player2Won) {
       await updateDoc(challengeRef, {
-        status: 'completed',
-        winner: 'tie',
+        status: 'disputed',
+        winner: null,
         updatedAt: Timestamp.now(),
       });
-      console.log('🤝 TIE: Both players claim they lost - Refund initiated');
+      console.log('🔴 DISPUTE: Both players claim they lost - Suspicious, requires review');
       return;
     }
 
