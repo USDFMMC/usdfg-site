@@ -1049,18 +1049,22 @@ const ArenaHome: React.FC = () => {
                             </div>
                             
                             {/* Stats Grid */}
-                            <div className="grid grid-cols-3 gap-2 text-center">
-                              <div className="bg-black/30 rounded px-2 py-1">
-                                <div className="text-green-400 font-bold text-sm">{player.wins}</div>
-                                <div className="text-gray-400 text-xs">Wins</div>
+                            <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                              <div className="bg-black/30 rounded px-1 py-1">
+                                <div className="text-green-400 font-bold">{player.wins}</div>
+                                <div className="text-gray-400">Wins</div>
                               </div>
-                              <div className="bg-black/30 rounded px-2 py-1">
-                                <div className="text-red-400 font-bold text-sm">{player.losses}</div>
-                                <div className="text-gray-400 text-xs">Losses</div>
+                              <div className="bg-black/30 rounded px-1 py-1">
+                                <div className="text-red-400 font-bold">{player.losses}</div>
+                                <div className="text-gray-400">Loss</div>
                               </div>
-                              <div className="bg-black/30 rounded px-2 py-1">
-                                <div className="text-cyan-400 font-bold text-sm">{player.winRate.toFixed(0)}%</div>
-                                <div className="text-gray-400 text-xs">Win Rate</div>
+                              <div className="bg-black/30 rounded px-1 py-1">
+                                <div className="text-white font-bold">{player.gamesPlayed}</div>
+                                <div className="text-gray-400">Total</div>
+                              </div>
+                              <div className="bg-black/30 rounded px-1 py-1">
+                                <div className="text-cyan-400 font-bold">{player.winRate.toFixed(0)}%</div>
+                                <div className="text-gray-400">W/R</div>
                               </div>
                             </div>
                           </div>
