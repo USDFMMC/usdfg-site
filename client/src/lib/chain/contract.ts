@@ -5,8 +5,8 @@
  * for creating challenges, accepting them, and resolving winners with automatic payouts.
  */
 
-import { AnchorProvider, Program, BN } from '@coral-xyz/anchor';
-import { Connection, PublicKey, Keypair, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction } from '@solana/web3.js';
+import { AnchorProvider, Program, BN, Wallet } from '@coral-xyz/anchor';
+import { Connection, PublicKey, Keypair, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction, VersionedTransaction } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
 import { PROGRAM_ID, USDFG_MINT, SEEDS, usdfgToLamports } from './config';
 import IDL from './usdfg_smart_contract.json';
@@ -16,26 +16,43 @@ import { initializeSmartContract, isSmartContractInitialized } from './initializ
  * Get the Anchor program instance
  */
 export async function getProgram(wallet: any, connection: Connection) {
-  // Create a proper AnchorWallet wrapper
-  // The issue is that wallet.publicKey from useWallet() is already a PublicKey object
-  // but Anchor expects it in a specific format
-  const anchorWallet = {
-    publicKey: new PublicKey(wallet.publicKey.toString()), // Re-create PublicKey from string
-    signTransaction: wallet.signTransaction.bind(wallet),
-    signAllTransactions: wallet.signAllTransactions 
-      ? wallet.signAllTransactions.bind(wallet)
-      : async (txs: Transaction[]) => {
-          const signed = [];
-          for (const tx of txs) {
-            signed.push(await wallet.signTransaction(tx));
-          }
-          return signed;
-        },
-  };
+  console.log('🔧 Creating Anchor wallet wrapper...');
   
-  const provider = new AnchorProvider(connection, anchorWallet as any, {
+  // Create a proper Wallet class that implements Anchor's Wallet interface
+  class WalletAdapter implements Wallet {
+    constructor(public payer: Keypair) {}
+    
+    async signTransaction<T extends Transaction | VersionedTransaction>(tx: T): Promise<T> {
+      return wallet.signTransaction(tx);
+    }
+    
+    async signAllTransactions<T extends Transaction | VersionedTransaction>(txs: T[]): Promise<T[]> {
+      if (wallet.signAllTransactions) {
+        return wallet.signAllTransactions(txs);
+      }
+      const signed: T[] = [];
+      for (const tx of txs) {
+        signed.push(await this.signTransaction(tx));
+      }
+      return signed;
+    }
+    
+    get publicKey(): PublicKey {
+      return new PublicKey(wallet.publicKey.toString());
+    }
+  }
+  
+  // Create a dummy keypair (not used for signing, just for the Wallet interface)
+  const dummyKeypair = Keypair.generate();
+  const anchorWallet = new WalletAdapter(dummyKeypair);
+  
+  console.log('✅ Wallet wrapper created, publicKey:', anchorWallet.publicKey.toString());
+  
+  const provider = new AnchorProvider(connection, anchorWallet, {
     commitment: 'confirmed',
   });
+  
+  console.log('✅ Provider created');
   
   return new Program(IDL as any, PROGRAM_ID, provider);
 }
