@@ -193,7 +193,7 @@ export async function createChallenge(
 
     // Create instruction data manually (discriminator + entry_fee)
     // The discriminator for "create_challenge" is the first 8 bytes of sha256("global:create_challenge")
-    const discriminator = Buffer.from([0x8e, 0x3d, 0x7e, 0x3f, 0x3e, 0x8c, 0x7a, 0x6d]); // This needs to match your contract
+    const discriminator = Buffer.from([0xaa, 0xf4, 0x2f, 0x01, 0x01, 0x0f, 0xad, 0xef]);
     const entryFeeBuffer = Buffer.alloc(8);
     entryFeeLamports.toArrayLike(Buffer, 'le', 8).copy(entryFeeBuffer);
     
