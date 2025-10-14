@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import ArenaHome from "./app/index";
+import LetterGlitch from "@/components/effects/LetterGlitch";
 
 export default function ArenaRoute() {
   const [entered, setEntered] = useState(false);
@@ -34,16 +35,26 @@ export default function ArenaRoute() {
 
   if (!entered) {
     return (
-      <div className="min-h-screen bg-background-1 text-text-primary flex flex-col items-center justify-center relative">
-        <div className="parallax-glow"></div>
-        <div className="relative z-10 flex flex-col items-center neocore-panel p-8">
+      <div className="min-h-screen text-text-primary flex flex-col items-center justify-center relative overflow-hidden">
+        {/* LetterGlitch Background */}
+        <div className="absolute inset-0 w-full h-full">
+          <LetterGlitch
+            glitchSpeed={50}
+            centerVignette={true}
+            outerVignette={false}
+            smooth={true}
+          />
+        </div>
+        
+        {/* Password Form */}
+        <div className="relative z-10 flex flex-col items-center neocore-panel p-8 backdrop-blur-md bg-black/40 border border-cyan-500/30">
           <h1 className="neocore-h2 mb-4 text-glow-cyan">Enter Arena Password</h1>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             onKeyPress={handleKeyPress}
-            className="px-3 py-2 rounded-md bg-background-2/60 border border-glow/30 text-text-primary backdrop-blur-sm focus:border-glow-cyan/60 focus:outline-none neocore-body"
+            className="px-3 py-2 rounded-md bg-black/60 border border-cyan-500/50 text-cyan-100 backdrop-blur-sm focus:border-cyan-400 focus:outline-none neocore-body"
             placeholder="Password"
             autoFocus
           />
