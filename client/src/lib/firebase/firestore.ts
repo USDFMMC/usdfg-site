@@ -335,8 +335,8 @@ export const submitChallengeResult = async (
  * Determine winner based on submitted results
  * Logic:
  * - One YES, One NO → YES player wins (clear winner)
- * - Both YES → Dispute (both claim victory)
- * - Both NO → Dispute (suspicious, likely collusion to get refund)
+ * - Both YES → Dispute (both claim victory, requires review)
+ * - Both NO → Both forfeit (suspicious collusion, both lose entry fees as penalty)
  */
 async function determineWinner(challengeId: string, data: ChallengeData): Promise<void> {
   try {
@@ -366,14 +366,14 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
       return;
     }
 
-    // Case 2: Both claim they lost → DISPUTE (prevent collusion exploit)
+    // Case 2: Both claim they lost → FORFEIT (both lose entry fees as penalty)
     if (!player1Won && !player2Won) {
       await updateDoc(challengeRef, {
-        status: 'disputed',
-        winner: null,
+        status: 'completed',
+        winner: 'forfeit', // Special value: both players forfeit, no refund
         updatedAt: Timestamp.now(),
       });
-      console.log('🔴 DISPUTE: Both players claim they lost - Suspicious, requires review');
+      console.log('⚠️ FORFEIT: Both players claim they lost - Suspicious collusion detected, both lose entry fees');
       return;
     }
 
