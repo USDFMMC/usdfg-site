@@ -9,8 +9,6 @@ import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
 import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, PlayerStats } from "@/lib/firebase/firestore";
-import { updatePriceOracle } from "@/lib/chain/initialize";
-import { ADMIN_WALLET } from "@/lib/chain/config";
 import { useConnection } from '@solana/wallet-adapter-react';
 import { testFirestoreConnection } from "@/lib/firebase/firestore";
 import ElegantButton from "@/components/ui/ElegantButton";
@@ -25,7 +23,6 @@ const ArenaHome: React.FC = () => {
   const { connected, signTransaction, publicKey, connect, signAllTransactions } = wallet;
   // Use MWA connection state
   const isConnected = connected;
-  const [isRefreshingOracle, setIsRefreshingOracle] = useState<boolean>(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -59,32 +56,6 @@ const ArenaHome: React.FC = () => {
     }
   }, []);
 
-  // Admin: Refresh Oracle (only for admin wallet)
-  const handleRefreshOracle = async () => {
-    if (!publicKey || !connected) {
-      alert("Please connect your wallet first");
-      return;
-    }
-
-    // Check if current wallet is admin
-    if (publicKey.toString() !== ADMIN_WALLET.toString()) {
-      alert("Only the admin wallet can refresh the oracle");
-      return;
-    }
-
-    setIsRefreshingOracle(true);
-    try {
-      console.log("🔄 Admin refreshing oracle...");
-      await updatePriceOracle(wallet, connection);
-      alert("✅ Oracle refreshed successfully! Players can now create challenges.");
-      console.log("✅ Oracle refreshed!");
-    } catch (error: any) {
-      console.error("❌ Error refreshing oracle:", error);
-      alert(`Failed to refresh oracle: ${error.message}`);
-    } finally {
-      setIsRefreshingOracle(false);
-    }
-  };
 
   // Update price every 30 seconds
   useEffect(() => {
@@ -476,27 +447,6 @@ const ArenaHome: React.FC = () => {
             >
               {hasActiveChallenge ? "In Challenge" : isCreatingChallenge ? "Creating..." : "Create Challenge"}
             </ElegantButton>
-            {/* Admin: Oracle Refresh Button (only visible to admin wallet) */}
-            {connected && publicKey?.toString() === ADMIN_WALLET.toString() && (
-              <button
-                onClick={handleRefreshOracle}
-                disabled={isRefreshingOracle}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                title="Refresh the price oracle (admin only)"
-              >
-                {isRefreshingOracle ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Refreshing...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>🔄</span>
-                    <span>Refresh Oracle</span>
-                  </>
-                )}
-              </button>
-            )}
             
             <WalletConnectSimple 
               isConnected={isConnected}
