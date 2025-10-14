@@ -184,18 +184,19 @@ export async function createChallenge(
     );
     console.log('💳 Token account:', creatorTokenAccount.toString());
 
-    // Convert USDFG to lamports (smallest unit)
-    const lamports = usdfgToLamports(entryFeeUsdfg);
-    console.log('💰 Entry fee in lamports:', lamports);
+    // ⚠️ IMPORTANT: Smart contract expects raw USDFG amount (e.g. 1000), NOT lamports!
+    // The contract has MAX_ENTRY_FEE_USDFG = 1000, so it's checking the raw number
+    // The contract will handle the token transfer internally using the correct decimals
+    console.log('💰 Entry fee (raw USDFG):', entryFeeUsdfg);
     
-    const entryFeeLamports = new BN(lamports);
-    console.log('💰 Created BN:', entryFeeLamports.toString());
+    const entryFeeAmount = new BN(entryFeeUsdfg);
+    console.log('💰 Created BN:', entryFeeAmount.toString());
 
     // Create instruction data manually (discriminator + entry_fee)
     // The discriminator for "create_challenge" is the first 8 bytes of sha256("global:create_challenge")
     const discriminator = Buffer.from([0xaa, 0xf4, 0x2f, 0x01, 0x01, 0x0f, 0xad, 0xef]);
     const entryFeeBuffer = Buffer.alloc(8);
-    entryFeeLamports.toArrayLike(Buffer, 'le', 8).copy(entryFeeBuffer);
+    entryFeeAmount.toArrayLike(Buffer, 'le', 8).copy(entryFeeBuffer);
     
     const instructionData = Buffer.concat([discriminator, entryFeeBuffer]);
     console.log('📦 Instruction data created');
