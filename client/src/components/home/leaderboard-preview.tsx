@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Trophy, Copy, Crown } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { motion, AnimatePresence } from "framer-motion";
+import { getTopPlayers, PlayerStats } from "@/lib/firebase/firestore";
 
 interface Player {
   rank: number;
@@ -43,69 +44,66 @@ function formatUSDFG(amount: number): string {
   return amount.toLocaleString(undefined, { minimumFractionDigits: 6, maximumFractionDigits: 6 });
 }
 
+// Helper function to determine tier based on win rate and games played
+function getTier(winRate: number, gamesPlayed: number): string {
+  if (gamesPlayed < 3) return "Bronze";
+  if (winRate >= 90) return "Ghostly";
+  if (winRate >= 80) return "Platinum";
+  if (winRate >= 70) return "Gold";
+  if (winRate >= 60) return "Silver";
+  return "Bronze";
+}
+
 const LeaderboardPreview: React.FC = () => {
-  const [activeTab, setActiveTab] = useState("most-wins");
+  const [activeTab, setActiveTab] = useState("total-gains");
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [loading, setLoading] = useState(true);
   
   const tabs: Tab[] = [
     { id: "most-wins", label: "Most Wins" },
-    { id: "win-streak", label: "Win Streak" },
     { id: "total-gains", label: "Total Skill Rewards" },
-    { id: "highest-rank", label: "Highest Rank" }
   ];
   
-  const players: Player[] = [
-    {
-      rank: 1,
-      wallet: "0xA1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9F8E",
-      wins: 156,
-      losses: 12,
-      winRate: "92.9%",
-      winStreak: 24,
-      gains: 1250.0,
-      rankTitle: "Ghostly"
-    },
-    {
-      rank: 2,
-      wallet: "0xB2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9F8E1A",
-      wins: 142,
-      losses: 18,
-      winRate: "88.8%",
-      winStreak: 18,
-      gains: 3.2456,
-      rankTitle: "Platinum"
-    },
-    {
-      rank: 3,
-      wallet: "0xC3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9F8E1AB2",
-      wins: 128,
-      losses: 22,
-      winRate: "85.3%",
-      winStreak: 15,
-      gains: 0.000034,
-      rankTitle: "Gold"
-    },
-    {
-      rank: 4,
-      wallet: "0xD4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9F8E1AB2C3",
-      wins: 98,
-      losses: 32,
-      winRate: "75.4%",
-      winStreak: 12,
-      gains: 12.5,
-      rankTitle: "Silver"
-    },
-    {
-      rank: 5,
-      wallet: "0xE5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9F8E1AB2C3D4",
-      wins: 85,
-      losses: 45,
-      winRate: "65.4%",
-      winStreak: 8,
-      gains: 0.015678,
-      rankTitle: "Bronze"
-    }
-  ];
+  // Fetch real player data from Firestore
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      setLoading(true);
+      try {
+        let sortBy: 'wins' | 'winRate' | 'totalEarned' = 'totalEarned';
+        
+        if (activeTab === 'most-wins') {
+          sortBy = 'wins';
+        } else if (activeTab === 'total-gains') {
+          sortBy = 'totalEarned';
+        }
+        
+        const topPlayers = await getTopPlayers(10, sortBy);
+        
+        // Transform Firestore data to Player interface
+        const transformedPlayers: Player[] = topPlayers.map((p: PlayerStats, index: number) => ({
+          rank: index + 1,
+          wallet: p.wallet,
+          wins: p.wins,
+          losses: p.losses,
+          winRate: `${p.winRate.toFixed(1)}%`,
+          winStreak: 0, // TODO: Add streak tracking
+          gains: p.totalEarned,
+          rankTitle: getTier(p.winRate, p.gamesPlayed)
+        }));
+        
+        setPlayers(transformedPlayers);
+      } catch (error) {
+        console.error('Failed to fetch leaderboard:', error);
+        // Keep empty array on error
+        setPlayers([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchLeaderboard();
+  }, [activeTab]);
   
   return (
     <section className="py-20 bg-card">
@@ -188,7 +186,26 @@ const LeaderboardPreview: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {players.map((player, i) => {
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-12">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400"></div>
+                        <p className="text-cyan-300">Loading leaderboard...</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : players.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-12">
+                      <div className="flex flex-col items-center gap-3">
+                        <Trophy className="w-16 h-16 text-cyan-400/50" />
+                        <p className="text-cyan-300 text-lg font-semibold">No players yet!</p>
+                        <p className="text-gray-400">Be the first to complete a challenge and claim the top spot.</p>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : players.map((player, i) => {
                   const masked = `${player.wallet.slice(0, 6)}...${player.wallet.slice(-4)}`;
                   const tierColor = tierColors[player.rankTitle] || "bg-gray-700 text-white border-gray-500";
                   const tierTooltip = tierTooltips[player.rankTitle] || player.rankTitle;
