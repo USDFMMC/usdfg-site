@@ -173,11 +173,12 @@ export async function updatePriceOracle(
     const instructionData = Buffer.concat([discriminator, priceBuffer]);
     
     // Create instruction
+    // Note: admin must be a signer according to the smart contract
     const instruction = {
       keys: [
         { pubkey: priceOraclePDA, isSigner: false, isWritable: true },
         { pubkey: adminStatePDA, isSigner: false, isWritable: false },
-        { pubkey: new PublicKey(wallet.publicKey.toString()), isSigner: true, isWritable: false },
+        { pubkey: new PublicKey(wallet.publicKey.toString()), isSigner: true, isWritable: true }, // Admin must be signer + writable
       ],
       programId: PROGRAM_ID,
       data: instructionData,
