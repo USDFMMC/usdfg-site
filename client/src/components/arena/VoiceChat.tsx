@@ -33,12 +33,30 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
       localStream.current = stream;
       setConnected(true);
 
-      // Create peer connection
+      // Create peer connection with STUN and TURN servers
       const configuration: RTCConfiguration = {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' }
-        ]
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          // Free TURN servers from Open Relay Project
+          { 
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          { 
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          { 
+            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          }
+        ],
+        iceCandidatePoolSize: 10
       };
       
       const pc = new RTCPeerConnection(configuration);
@@ -61,11 +79,27 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
       // Handle ICE candidates
       pc.onicecandidate = async (event) => {
         if (event.candidate) {
+          console.log("🧊 New ICE candidate:", event.candidate.type);
           await setDoc(doc(db, "voice_signals", challengeId), {
             [`candidates_${currentWallet}`]: event.candidate.toJSON(),
             timestamp: Date.now()
           }, { merge: true });
         }
+      };
+
+      // Monitor connection state
+      pc.onconnectionstatechange = () => {
+        console.log("🔌 Connection state:", pc.connectionState);
+        if (pc.connectionState === 'connected') {
+          setPeerConnected(true);
+        } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+          setPeerConnected(false);
+        }
+      };
+
+      // Monitor ICE connection state
+      pc.oniceconnectionstatechange = () => {
+        console.log("🧊 ICE connection state:", pc.iceConnectionState);
       };
 
       // Listen for remote signals from the shared document
