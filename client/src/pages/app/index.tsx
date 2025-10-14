@@ -1134,10 +1134,12 @@ const CreateChallengeModal: React.FC<{
   });
 
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 3;
   const [connecting, setConnecting] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [attemptedNext, setAttemptedNext] = useState(false);
+  
+  // Dynamic total steps based on mode
+  const totalSteps = formData.mode === 'Custom Mode' ? 3 : 2;
 
   // Available games for selection
   const availableGames = [
@@ -1497,10 +1499,15 @@ const CreateChallengeModal: React.FC<{
             ))}
           </div>
           {currentStep === 1 && (
-            <p className="text-xs text-gray-400 mt-2">Step 1 of 3 — Game Setup</p>
+            <p className="text-xs text-gray-400 mt-2">
+              Step 1 of {totalSteps} — {formData.mode === 'Custom Mode' ? 'Game Setup' : 'Game Setup & Configuration'}
+            </p>
           )}
-          {currentStep === 2 && (
+          {currentStep === 2 && formData.mode === 'Custom Mode' && (
             <p className="text-xs text-gray-400 mt-2">Step 2 of 3 — Rules & Customization</p>
+          )}
+          {currentStep === 2 && formData.mode !== 'Custom Mode' && (
+            <p className="text-xs text-gray-400 mt-2">Step 2 of 2 — Review & Confirm</p>
           )}
           {currentStep === 3 && (
             <p className="text-xs text-gray-400 mt-2">Step 3 of 3 — Review & Confirm</p>
@@ -1660,9 +1667,15 @@ Prize pool: {(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5
                 </Field>
 
                 <div className="flex justify-end mt-6 mb-4 sticky bottom-0 bg-[#11051E] pt-4">
-                  <PrimaryButton onClick={nextStep} className="min-h-[44px] px-6 py-3 text-base touch-manipulation">
-                    Next
-                  </PrimaryButton>
+                  {formData.mode === 'Custom Mode' ? (
+                    <PrimaryButton onClick={nextStep} className="min-h-[44px] px-6 py-3 text-base touch-manipulation">
+                      Next: Customize Rules
+                    </PrimaryButton>
+                  ) : (
+                    <PrimaryButton onClick={nextStep} className="min-h-[44px] px-6 py-3 text-base touch-manipulation bg-gradient-to-r from-cyan-400 to-purple-500 hover:from-cyan-300 hover:to-purple-400">
+                      Review & Create Challenge
+                    </PrimaryButton>
+                  )}
                 </div>
               </div>
             )}
@@ -1724,7 +1737,13 @@ Prize pool: {(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5
 
                 <div className="flex justify-between mt-6 mb-4 sticky bottom-0 bg-[#11051E] pt-4">
                   <TertiaryButton onClick={prevStep} className="min-h-[44px] px-6 py-3 text-base touch-manipulation">Back</TertiaryButton>
-                  <PrimaryButton onClick={nextStep} className="min-h-[44px] px-6 py-3 text-base touch-manipulation">Review & Create</PrimaryButton>
+                  {formData.mode === 'Custom Mode' ? (
+                    <PrimaryButton onClick={nextStep} className="min-h-[44px] px-6 py-3 text-base touch-manipulation">Review & Create</PrimaryButton>
+                  ) : (
+                    <PrimaryButton type="submit" className="min-h-[44px] px-6 py-3 text-base touch-manipulation bg-gradient-to-r from-cyan-400 to-purple-500 hover:from-cyan-300 hover:to-purple-400">
+                      Create Challenge
+                    </PrimaryButton>
+                  )}
                 </div>
               </div>
             )}
