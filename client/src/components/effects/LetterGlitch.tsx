@@ -98,6 +98,12 @@ const LetterGlitch = ({
     const dpr = window.devicePixelRatio || 1;
     const rect = parent.getBoundingClientRect();
 
+    // If dimensions are zero, retry after a short delay
+    if (rect.width === 0 || rect.height === 0) {
+      setTimeout(resizeCanvas, 100);
+      return;
+    }
+
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
 
@@ -191,15 +197,21 @@ const LetterGlitch = ({
     if (!canvas) return;
 
     context.current = canvas.getContext('2d');
-    resizeCanvas();
-    animate();
+    
+    // Wait for parent to be fully rendered before initializing
+    const initTimeout = setTimeout(() => {
+      resizeCanvas();
+      animate();
+    }, 50); // Small delay to ensure parent dimensions are ready
 
     let resizeTimeout: NodeJS.Timeout;
 
     const handleResize = () => {
       clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(() => {
-        cancelAnimationFrame(animationRef.current as number);
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+        }
         resizeCanvas();
         animate();
       }, 100);
@@ -208,7 +220,10 @@ const LetterGlitch = ({
     window.addEventListener('resize', handleResize);
 
     return () => {
-      cancelAnimationFrame(animationRef.current!);
+      clearTimeout(initTimeout);
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
       window.removeEventListener('resize', handleResize);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
