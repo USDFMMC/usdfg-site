@@ -10,6 +10,9 @@ import { PublicKey } from '@solana/web3.js';
 // Smart Contract Program ID (deployed on devnet)
 export const PROGRAM_ID = new PublicKey('2KL4BKvUtDmABvuvRopkCEb33myWM1W9BGodAZ82RWDT');
 
+// Admin wallet address (can update oracle)
+export const ADMIN_WALLET = new PublicKey('3SeLoDGsajuQUt2pzSkZV7LmB7gKtckmrD693U69kcUd');
+
 // USDFG Token Mint Address (21M fixed supply, no mint/freeze authority)
 export const USDFG_MINT = new PublicKey('7iGZRCHmVTFt9kRn5bc9C2cvDGVp2ZdDYUQsiRfDuspX');
 
