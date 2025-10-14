@@ -208,7 +208,22 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
     } catch (error) {
       console.error("❌ Voice chat init failed:", error);
       setConnected(false);
-      setStatus(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // Provide user-friendly error messages
+      let errorMessage = "Unknown error";
+      if (error instanceof Error) {
+        if (error.name === 'NotAllowedError' || error.message.includes('Permission denied')) {
+          errorMessage = "Mic permission denied. Please allow mic access.";
+        } else if (error.message.includes('AVAudioSession') || error.message.includes('NotReadableError')) {
+          errorMessage = "Mic in use by another app. Close other apps.";
+        } else if (error.name === 'NotFoundError') {
+          errorMessage = "No microphone found";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      setStatus(`Error: ${errorMessage}`);
     }
   };
 
@@ -254,25 +269,38 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
   };
 
   return (
-    <div className="bg-gray-800 p-3 rounded-lg border border-gray-700">
+    <div className={`p-3 rounded-lg border ${
+      status.includes('Error') || status.includes('use by another') 
+        ? 'bg-red-900/20 border-red-500/30' 
+        : 'bg-gray-800 border-gray-700'
+    }`}>
       {/* Hidden audio element for remote stream */}
       <audio ref={remoteAudioRef} autoPlay />
       
       <div className="flex justify-between items-center">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1">
           {/* Status Indicator */}
-          <div className={`w-2 h-2 rounded-full ${
+          <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
             peerConnected ? 'bg-green-500 animate-pulse' : 
             connected ? 'bg-yellow-500' : 
             'bg-red-500'
           }`} />
           
           {/* Status Text */}
-          <div className="flex flex-col">
+          <div className="flex flex-col flex-1 min-w-0">
             <span className="text-white text-sm font-medium">
-              {peerConnected ? '🎙️ Voice Connected' : connected ? '🔌 Voice Chat' : '❌ Disconnected'}
+              {peerConnected ? '🎙️ Voice Connected' : connected ? '🔌 Voice Chat' : '❌ Voice Unavailable'}
             </span>
-            <span className="text-gray-400 text-xs">{status}</span>
+            <span className={`text-xs truncate ${
+              status.includes('Error') ? 'text-red-400' : 'text-gray-400'
+            }`}>
+              {status}
+            </span>
+            {status.includes('Error') && (
+              <span className="text-xs text-gray-500 mt-1">
+                💬 You can still use text chat below
+              </span>
+            )}
           </div>
         </div>
         
@@ -280,7 +308,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
         <button
           onClick={toggleMute}
           disabled={!connected}
-          className={`px-3 py-2 rounded-lg text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+          className={`px-3 py-2 rounded-lg text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 ${
             muted ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/20' : 'bg-green-600 hover:bg-green-700 shadow-lg shadow-green-500/20'
           }`}
         >
