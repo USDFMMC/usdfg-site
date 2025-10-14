@@ -740,14 +740,15 @@ export async function getPlayerStats(wallet: string): Promise<PlayerStats | null
 /**
  * Get top players for leaderboard
  */
-export async function getTopPlayers(limit: number = 10, sortBy: 'wins' | 'winRate' | 'totalEarned' = 'totalEarned'): Promise<PlayerStats[]> {
+export async function getTopPlayers(limitCount: number = 10, sortBy: 'wins' | 'winRate' | 'totalEarned' = 'totalEarned'): Promise<PlayerStats[]> {
   try {
     const statsCollection = collection(db, 'player_stats');
+    
+    // Simple query without where clause to avoid compound index requirement
     const q = query(
       statsCollection,
       orderBy(sortBy, 'desc'),
-      where('gamesPlayed', '>=', 3), // Minimum 3 games to appear on leaderboard
-      limit(limit)
+      limit(limitCount)
     );
     
     const snapshot = await getDocs(q);
