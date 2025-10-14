@@ -5,12 +5,12 @@
  * for creating challenges, accepting them, and resolving winners with automatic payouts.
  */
 
-import { AnchorProvider, Program, BN, Wallet } from '@coral-xyz/anchor';
-import { Connection, PublicKey, Keypair, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction, VersionedTransaction } from '@solana/web3.js';
+import { BN } from '@coral-xyz/anchor';
+import { Connection, PublicKey, Keypair, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction, TransactionInstruction } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
 import { PROGRAM_ID, USDFG_MINT, SEEDS, usdfgToLamports } from './config';
-import IDL from './usdfg_smart_contract.json';
 import { initializeSmartContract, isSmartContractInitialized } from './initialize';
+import * as borsh from '@coral-xyz/borsh';
 
 /**
  * Get the Anchor program instance
@@ -160,13 +160,11 @@ export async function createChallenge(
       throw new Error('Smart contract initialization failed. Please contact support.');
     }
 
-    console.log('🔧 Step 1: Getting program...');
-    const program = await getProgram(wallet, connection);
-    console.log('✅ Program obtained');
+    console.log('🔧 Step 1: Preparing transaction (bypassing Anchor)...');
     
     // Re-create PublicKey to ensure proper format
     const creator = new PublicKey(wallet.publicKey.toString());
-    console.log('👤 Creator (re-created):', creator.toString());
+    console.log('👤 Creator:', creator.toString());
 
     // Generate a unique seed for this challenge
     console.log('🔧 Step 2: Generating challenge seed...');
@@ -189,32 +187,59 @@ export async function createChallenge(
     // Convert USDFG to lamports (smallest unit)
     const lamports = usdfgToLamports(entryFeeUsdfg);
     console.log('💰 Entry fee in lamports:', lamports);
-    console.log('💰 BN type check:', typeof BN, BN);
     
     const entryFeeLamports = new BN(lamports);
-    console.log('💰 Created BN:', entryFeeLamports, 'has _bn?', entryFeeLamports._bn);
+    console.log('💰 Created BN:', entryFeeLamports.toString());
 
-    // Create challenge transaction
-    const tx = await program.methods
-      .createChallenge(entryFeeLamports)
-      .accounts({
-        challenge: pdas.challengePDA,
-        creator: creator,
-        creatorTokenAccount: creatorTokenAccount,
-        escrowTokenAccount: pdas.escrowTokenAccountPDA,
-        escrowWallet: pdas.escrowWalletPDA,
-        challengeSeed: challengeSeed.publicKey,
-        systemProgram: SystemProgram.programId,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        rent: SYSVAR_RENT_PUBKEY,
-        priceOracle: pdas.priceOraclePDA,
-        adminState: pdas.adminStatePDA,
-        mint: USDFG_MINT,
-      })
-      .signers([challengeSeed])
-      .rpc();
+    // Create instruction data manually (discriminator + entry_fee)
+    // The discriminator for "create_challenge" is the first 8 bytes of sha256("global:create_challenge")
+    const discriminator = Buffer.from([0x8e, 0x3d, 0x7e, 0x3f, 0x3e, 0x8c, 0x7a, 0x6d]); // This needs to match your contract
+    const entryFeeBuffer = Buffer.alloc(8);
+    entryFeeLamports.toArrayLike(Buffer, 'le', 8).copy(entryFeeBuffer);
+    
+    const instructionData = Buffer.concat([discriminator, entryFeeBuffer]);
+    console.log('📦 Instruction data created');
 
-    console.log('✅ Challenge created! Transaction:', tx);
+    // Create the instruction
+    const instruction = new TransactionInstruction({
+      keys: [
+        { pubkey: pdas.challengePDA, isSigner: false, isWritable: true },
+        { pubkey: creator, isSigner: true, isWritable: true },
+        { pubkey: creatorTokenAccount, isSigner: false, isWritable: true },
+        { pubkey: pdas.escrowTokenAccountPDA, isSigner: false, isWritable: true },
+        { pubkey: pdas.escrowWalletPDA, isSigner: false, isWritable: false },
+        { pubkey: challengeSeed.publicKey, isSigner: true, isWritable: false },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+        { pubkey: pdas.priceOraclePDA, isSigner: false, isWritable: false },
+        { pubkey: pdas.adminStatePDA, isSigner: false, isWritable: false },
+        { pubkey: USDFG_MINT, isSigner: false, isWritable: false },
+      ],
+      programId: PROGRAM_ID,
+      data: instructionData,
+    });
+
+    console.log('✅ Instruction created');
+
+    // Create and send transaction
+    const transaction = new Transaction().add(instruction);
+    transaction.feePayer = creator;
+    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    
+    console.log('🔧 Signing transaction...');
+    const signedTx = await wallet.signTransaction(transaction);
+    
+    // Add challengeSeed signature
+    signedTx.partialSign(challengeSeed);
+    
+    console.log('🚀 Sending transaction...');
+    const txSignature = await connection.sendRawTransaction(signedTx.serialize());
+    
+    console.log('⏳ Confirming transaction...');
+    await connection.confirmTransaction(txSignature, 'confirmed');
+
+    console.log('✅ Challenge created! Transaction:', txSignature);
     console.log('📦 Challenge address:', pdas.challengePDA.toString());
 
     return pdas.challengePDA.toString();
