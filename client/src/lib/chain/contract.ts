@@ -129,7 +129,12 @@ export async function createChallenge(
     );
 
     // Convert USDFG to lamports (smallest unit)
-    const entryFeeLamports = new BN(usdfgToLamports(entryFeeUsdfg));
+    const lamports = usdfgToLamports(entryFeeUsdfg);
+    console.log('💰 Entry fee in lamports:', lamports);
+    console.log('💰 BN type check:', typeof BN, BN);
+    
+    const entryFeeLamports = new BN(lamports);
+    console.log('💰 Created BN:', entryFeeLamports, 'has _bn?', entryFeeLamports._bn);
 
     // Create challenge transaction
     const tx = await program.methods
