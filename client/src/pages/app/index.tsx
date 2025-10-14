@@ -249,6 +249,12 @@ const ArenaHome: React.FC = () => {
       // Create connection to devnet
       const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
       
+      // Small delay for mobile Phantom to fully initialize
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        console.log('📱 Mobile detected - adding small delay for Phantom...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
       console.log("🚀 Creating challenge on smart contract with escrow...");
       const challengeId = await createChallenge(
         wallet,

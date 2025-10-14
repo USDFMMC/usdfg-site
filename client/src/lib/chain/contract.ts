@@ -100,6 +100,24 @@ export async function createChallenge(
     console.log('🚀 Creating challenge on smart contract...');
     console.log('   Entry fee:', entryFeeUsdfg, 'USDFG');
     
+    // ✅ GUARD 1: Validate wallet
+    if (!wallet?.publicKey) {
+      throw new Error('❌ Wallet not connected. Please connect your wallet first.');
+    }
+    console.log('✅ Wallet connected:', wallet.publicKey.toString());
+    
+    // ✅ GUARD 2: Validate entry fee
+    if (!entryFeeUsdfg || entryFeeUsdfg <= 0) {
+      throw new Error('❌ Invalid entry fee. Must be greater than 0.');
+    }
+    console.log('✅ Entry fee valid:', entryFeeUsdfg, 'USDFG');
+    
+    // ✅ GUARD 3: Ensure wallet has required methods
+    if (!wallet.signTransaction) {
+      throw new Error('❌ Wallet does not support transaction signing.');
+    }
+    console.log('✅ Wallet has signTransaction method');
+    
     // Check if smart contract is initialized, if not, initialize it
     try {
       const isInitialized = await isSmartContractInitialized(connection);
@@ -119,8 +137,9 @@ export async function createChallenge(
     const program = await getProgram(wallet, connection);
     console.log('✅ Program obtained');
     
-    const creator = wallet.publicKey;
-    console.log('👤 Creator:', creator.toString());
+    // Re-create PublicKey to ensure proper format
+    const creator = new PublicKey(wallet.publicKey.toString());
+    console.log('👤 Creator (re-created):', creator.toString());
 
     // Generate a unique seed for this challenge
     console.log('🔧 Step 2: Generating challenge seed...');
