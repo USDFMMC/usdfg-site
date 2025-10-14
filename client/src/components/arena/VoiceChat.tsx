@@ -13,6 +13,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
   const [connected, setConnected] = useState(false);
   const [peerConnected, setPeerConnected] = useState(false);
   const [status, setStatus] = useState<string>("Initializing...");
+  const [voiceDisabled, setVoiceDisabled] = useState(false);
   
   const localStream = useRef<MediaStream | null>(null);
   const peerConnection = useRef<RTCPeerConnection | null>(null);
@@ -24,6 +25,8 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
 
   // Initialize voice chat
   useEffect(() => {
+    if (voiceDisabled) return;
+    
     console.log("🎤 VoiceChat useEffect triggered - initializing...");
     initVoiceChat();
     
@@ -31,7 +34,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
       console.log("🎤 VoiceChat useEffect cleanup");
       cleanup();
     };
-  }, [challengeId, currentWallet]);
+  }, [challengeId, currentWallet, voiceDisabled]);
 
   const initVoiceChat = async () => {
     console.log("🎤 Starting voice chat initialization...");
@@ -268,6 +271,29 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
     setMuted(false);
   };
 
+  // If voice is disabled, show minimal UI
+  if (voiceDisabled) {
+    return (
+      <div className="p-3 rounded-lg border border-gray-700 bg-gray-800/50">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-gray-500" />
+            <span className="text-gray-400 text-sm">Voice chat disabled (using text only)</span>
+          </div>
+          <button
+            onClick={() => {
+              setVoiceDisabled(false);
+              setStatus("Initializing...");
+            }}
+            className="px-3 py-1 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-xs transition-colors"
+          >
+            Enable Voice
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`p-3 rounded-lg border ${
       status.includes('Error') || status.includes('use by another') 
@@ -297,9 +323,20 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
               {status}
             </span>
             {status.includes('Error') && (
-              <span className="text-xs text-gray-500 mt-1">
-                💬 You can still use text chat below
-              </span>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs text-gray-500">
+                  💬 Text chat works fine
+                </span>
+                <button
+                  onClick={() => {
+                    cleanup();
+                    setVoiceDisabled(true);
+                  }}
+                  className="text-xs text-blue-400 hover:text-blue-300 underline"
+                >
+                  Skip voice
+                </button>
+              </div>
             )}
           </div>
         </div>
