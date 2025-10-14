@@ -1015,9 +1015,10 @@ const ArenaHome: React.FC = () => {
                       
                       return (
                         <div key={player.wallet} className={`bg-gradient-to-r ${bgColors[index]} rounded-lg p-4 border group`}>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4 flex-1">
-                              <div className={`w-12 h-12 bg-gradient-to-r ${rankColors[index]} rounded-full flex items-center justify-center text-black font-bold text-lg shrink-0`}>
+                          <div className="space-y-3">
+                            {/* Player Name & Rank */}
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 bg-gradient-to-r ${rankColors[index]} rounded-full flex items-center justify-center text-black font-bold shrink-0`}>
                                 {index + 1}
                               </div>
                               <div className="flex-1 min-w-0">
@@ -1043,12 +1044,24 @@ const ArenaHome: React.FC = () => {
                                     {copiedWallet === player.wallet ? '✓' : '📋'}
                                   </button>
                                 </div>
-                                <p className="text-gray-400 text-sm">{player.totalEarned.toFixed(2)} USDFG earned</p>
+                                <p className="text-cyan-300 text-sm font-semibold">{player.totalEarned.toFixed(2)} USDFG</p>
                               </div>
                             </div>
-                            <div className="text-right shrink-0">
-                              <div className="text-white font-semibold">{player.winRate.toFixed(1)}%</div>
-                              <div className="text-gray-400 text-sm">Win Rate</div>
+                            
+                            {/* Stats Grid */}
+                            <div className="grid grid-cols-3 gap-2 text-center">
+                              <div className="bg-black/30 rounded px-2 py-1">
+                                <div className="text-green-400 font-bold text-sm">{player.wins}</div>
+                                <div className="text-gray-400 text-xs">Wins</div>
+                              </div>
+                              <div className="bg-black/30 rounded px-2 py-1">
+                                <div className="text-red-400 font-bold text-sm">{player.losses}</div>
+                                <div className="text-gray-400 text-xs">Losses</div>
+                              </div>
+                              <div className="bg-black/30 rounded px-2 py-1">
+                                <div className="text-cyan-400 font-bold text-sm">{player.winRate.toFixed(0)}%</div>
+                                <div className="text-gray-400 text-xs">Win Rate</div>
+                              </div>
                             </div>
                           </div>
                         </div>
