@@ -94,6 +94,14 @@ export async function createChallenge(
   try {
     console.log('🚀 Creating challenge on smart contract...');
     console.log('   Entry fee:', entryFeeUsdfg, 'USDFG');
+    console.log('🔍 Wallet object:', {
+      hasPublicKey: !!wallet.publicKey,
+      publicKeyType: typeof wallet.publicKey,
+      publicKeyValue: wallet.publicKey?.toString(),
+      hasSignTransaction: !!wallet.signTransaction,
+      hasSignAllTransactions: !!wallet.signAllTransactions,
+      walletKeys: Object.keys(wallet)
+    });
 
     const program = await getProgram(wallet, connection);
     const creator = wallet.publicKey;
