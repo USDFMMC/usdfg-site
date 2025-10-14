@@ -8,7 +8,7 @@ import { fetchActiveChallenges, fetchOpenChallenges, joinChallengeOnChain } from
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
-import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase } from "@/lib/firebase/firestore";
+import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, PlayerStats } from "@/lib/firebase/firestore";
 import { testFirestoreConnection } from "@/lib/firebase/firestore";
 import ElegantButton from "@/components/ui/ElegantButton";
 import ElegantModal from "@/components/ui/ElegantModal";
@@ -33,6 +33,8 @@ const ArenaHome: React.FC = () => {
   const [isLive, setIsLive] = useState<boolean>(true);
   const [lastLocalChallenge, setLastLocalChallenge] = useState<number>(0);
   const [isCreatingChallenge, setIsCreatingChallenge] = useState<boolean>(false);
+  const [topPlayers, setTopPlayers] = useState<PlayerStats[]>([]);
+  const [loadingTopPlayers, setLoadingTopPlayers] = useState<boolean>(true);
   
   // Mock price API - simulates real-time price updates
   const fetchUsdfgPrice = useCallback(async () => {
@@ -55,6 +57,22 @@ const ArenaHome: React.FC = () => {
     const priceInterval = setInterval(fetchUsdfgPrice, 30000);
     return () => clearInterval(priceInterval);
   }, [fetchUsdfgPrice]);
+
+  // Fetch top players for sidebar
+  useEffect(() => {
+    const fetchTopPlayersData = async () => {
+      try {
+        const players = await getTopPlayers(5, 'totalEarned');
+        setTopPlayers(players);
+      } catch (error) {
+        console.error('Failed to fetch top players:', error);
+      } finally {
+        setLoadingTopPlayers(false);
+      }
+    };
+    
+    fetchTopPlayersData();
+  }, []);
 
   // Test Firestore connection on component mount
   useEffect(() => {
@@ -965,25 +983,56 @@ const ArenaHome: React.FC = () => {
                 </h2>
               </div>
               <div className="p-6">
-                <div className="space-y-4">
-                  <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-lg p-4 border border-yellow-500/30">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-12 h-12 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-black font-bold text-lg">
-                          1
-                        </div>
-                        <div>
-                          <h3 className="text-white font-semibold">CryptoGamer_Pro</h3>
-                          <p className="text-gray-400 text-sm">2,847 USDFG earned</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-white font-semibold">94.2%</div>
-                        <div className="text-gray-400 text-sm">Win Rate</div>
-                      </div>
-                    </div>
+                {loadingTopPlayers ? (
+                  <div className="flex justify-center items-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
                   </div>
-                </div>
+                ) : topPlayers.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-400 text-sm">No players yet. Be the first!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {topPlayers.map((player, index) => {
+                      const rankColors = [
+                        'from-yellow-400 to-orange-500', // 1st place
+                        'from-gray-300 to-gray-400',     // 2nd place
+                        'from-amber-600 to-yellow-700',  // 3rd place
+                        'from-cyan-400 to-blue-500',     // 4th place
+                        'from-purple-400 to-pink-500'    // 5th place
+                      ];
+                      const bgColors = [
+                        'from-yellow-500/20 to-orange-500/20 border-yellow-500/30',
+                        'from-gray-400/20 to-gray-500/20 border-gray-400/30',
+                        'from-amber-600/20 to-yellow-700/20 border-amber-600/30',
+                        'from-cyan-400/20 to-blue-500/20 border-cyan-400/30',
+                        'from-purple-400/20 to-pink-500/20 border-purple-400/30'
+                      ];
+                      
+                      return (
+                        <div key={player.wallet} className={`bg-gradient-to-r ${bgColors[index]} rounded-lg p-4 border`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-4">
+                              <div className={`w-12 h-12 bg-gradient-to-r ${rankColors[index]} rounded-full flex items-center justify-center text-black font-bold text-lg`}>
+                                {index + 1}
+                              </div>
+                              <div>
+                                <h3 className="text-white font-semibold font-mono text-sm">
+                                  {player.wallet.slice(0, 6)}...{player.wallet.slice(-4)}
+                                </h3>
+                                <p className="text-gray-400 text-sm">{player.totalEarned.toFixed(2)} USDFG earned</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-white font-semibold">{player.winRate.toFixed(1)}%</div>
+                              <div className="text-gray-400 text-sm">Win Rate</div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </div>
