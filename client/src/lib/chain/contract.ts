@@ -97,11 +97,18 @@ export async function createChallenge(
     console.log('   Entry fee:', entryFeeUsdfg, 'USDFG');
     
     // Check if smart contract is initialized, if not, initialize it
-    const isInitialized = await isSmartContractInitialized(connection);
-    if (!isInitialized) {
-      console.log('⚠️ Smart contract not initialized. Initializing now...');
-      await initializeSmartContract(wallet, connection);
-      console.log('✅ Smart contract initialized!');
+    try {
+      const isInitialized = await isSmartContractInitialized(connection);
+      if (!isInitialized) {
+        console.log('⚠️ Smart contract not initialized. Initializing now...');
+        await initializeSmartContract(wallet, connection);
+        console.log('✅ Smart contract initialized!');
+      } else {
+        console.log('✅ Smart contract already initialized');
+      }
+    } catch (initError) {
+      console.error('❌ Error checking/initializing smart contract:', initError);
+      throw new Error('Smart contract initialization failed. Please contact support.');
     }
 
     const program = await getProgram(wallet, connection);
