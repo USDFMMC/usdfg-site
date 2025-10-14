@@ -17,19 +17,26 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
   const peerConnection = useRef<RTCPeerConnection | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
 
+  console.log("🎤 VoiceChat component mounted", { challengeId, currentWallet });
+
   // Initialize voice chat
   useEffect(() => {
+    console.log("🎤 VoiceChat useEffect triggered - initializing...");
     initVoiceChat();
     
     return () => {
+      console.log("🎤 VoiceChat useEffect cleanup");
       cleanup();
     };
   }, [challengeId, currentWallet]);
 
   const initVoiceChat = async () => {
+    console.log("🎤 Starting voice chat initialization...");
     try {
       // Get user's microphone
+      console.log("🎤 Requesting microphone permission...");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log("✅ Microphone permission granted!");
       localStream.current = stream;
       setConnected(true);
 
