@@ -68,14 +68,18 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
         }
       };
 
-      // Handle ICE candidates
+      // Handle ICE candidates - store in array instead of overwriting
+      const iceCandidatesRef = { sent: new Set<string>() };
       pc.onicecandidate = async (event) => {
         if (event.candidate) {
           console.log("🧊 New ICE candidate:", event.candidate.type);
+          const candidateKey = `candidate_${currentWallet}_${Date.now()}`;
           await setDoc(doc(db, "voice_signals", challengeId), {
-            [`candidates_${currentWallet}`]: event.candidate.toJSON(),
+            [candidateKey]: event.candidate.toJSON(),
             timestamp: Date.now()
           }, { merge: true });
+        } else {
+          console.log("🧊 All ICE candidates sent");
         }
       };
 
@@ -84,14 +88,24 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
         console.log("🔌 Connection state:", pc.connectionState);
         if (pc.connectionState === 'connected') {
           setPeerConnected(true);
-        } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+          console.log("✅ Voice chat connected!");
+        } else if (pc.connectionState === 'disconnected') {
           setPeerConnected(false);
+          console.log("⚠️ Voice chat disconnected");
+        } else if (pc.connectionState === 'failed') {
+          setPeerConnected(false);
+          console.log("❌ Voice chat connection failed");
         }
       };
 
       // Monitor ICE connection state
       pc.oniceconnectionstatechange = () => {
         console.log("🧊 ICE connection state:", pc.iceConnectionState);
+        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+          console.log("✅ ICE connection established!");
+        } else if (pc.iceConnectionState === 'failed') {
+          console.error("❌ ICE connection failed - may need better TURN servers");
+        }
       };
 
       // Listen for remote signals from the shared document
@@ -124,13 +138,16 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
 
           // Handle ICE candidates from other players
           Object.keys(data).forEach(async (key) => {
-            if (key.startsWith('candidates_') && !key.endsWith(currentWallet)) {
+            if (key.startsWith('candidate_') && !key.includes(currentWallet)) {
               try {
                 if (pc.remoteDescription) {
+                  console.log("🧊 Adding remote ICE candidate");
                   await pc.addIceCandidate(new RTCIceCandidate(data[key]));
+                } else {
+                  console.log("⏳ Queuing ICE candidate (no remote description yet)");
                 }
               } catch (err) {
-                console.error("Failed to add ICE candidate:", err);
+                console.error("❌ Failed to add ICE candidate:", err);
               }
             }
           });
