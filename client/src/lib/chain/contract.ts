@@ -10,6 +10,7 @@ import { Connection, PublicKey, Keypair, SystemProgram, SYSVAR_RENT_PUBKEY, Tran
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
 import { PROGRAM_ID, USDFG_MINT, SEEDS, usdfgToLamports } from './config';
 import IDL from './usdfg_smart_contract.json';
+import { initializeSmartContract, isSmartContractInitialized } from './initialize';
 
 /**
  * Get the Anchor program instance
@@ -94,14 +95,14 @@ export async function createChallenge(
   try {
     console.log('🚀 Creating challenge on smart contract...');
     console.log('   Entry fee:', entryFeeUsdfg, 'USDFG');
-    console.log('🔍 Wallet object:', {
-      hasPublicKey: !!wallet.publicKey,
-      publicKeyType: typeof wallet.publicKey,
-      publicKeyValue: wallet.publicKey?.toString(),
-      hasSignTransaction: !!wallet.signTransaction,
-      hasSignAllTransactions: !!wallet.signAllTransactions,
-      walletKeys: Object.keys(wallet)
-    });
+    
+    // Check if smart contract is initialized, if not, initialize it
+    const isInitialized = await isSmartContractInitialized(connection);
+    if (!isInitialized) {
+      console.log('⚠️ Smart contract not initialized. Initializing now...');
+      await initializeSmartContract(wallet, connection);
+      console.log('✅ Smart contract initialized!');
+    }
 
     const program = await getProgram(wallet, connection);
     const creator = wallet.publicKey;
