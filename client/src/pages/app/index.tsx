@@ -1043,7 +1043,9 @@ const ArenaHome: React.FC = () => {
                                     {copiedWallet === player.wallet ? '✓' : '📋'}
                                   </button>
                                 </div>
-                                <p className="text-gray-400 text-xs">{player.gamesPlayed} games • {player.winRate.toFixed(0)}% win rate</p>
+                                <p className="text-gray-400 text-xs">
+                                  <span className="text-green-400">{player.wins}W</span> • <span className="text-red-400">{player.losses}L</span> • {player.winRate.toFixed(0)}% win rate
+                                </p>
                               </div>
                             </div>
                             <div className="text-right shrink-0">
