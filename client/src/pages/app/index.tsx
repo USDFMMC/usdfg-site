@@ -364,20 +364,10 @@ const ArenaHome: React.FC = () => {
     
     // Must have both wallet addresses to compare
     if (!currentWallet || !challengeCreator) {
-      console.log("🔍 Ownership check: Missing wallet data", {
-        hasCurrentWallet: !!currentWallet,
-        hasChallengeCreator: !!challengeCreator
-      });
       return false;
     }
     
-    const isOwner = currentWallet === challengeCreator;
-    console.log("🔍 Ownership check:", {
-      currentWallet: currentWallet.slice(0, 8) + "...",
-      challengeCreator: challengeCreator.slice(0, 8) + "...",
-      isOwner
-    });
-    return isOwner;
+    return currentWallet === challengeCreator;
   };
 
   // Filter challenges based on selected filters
