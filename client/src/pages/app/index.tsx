@@ -36,6 +36,7 @@ const ArenaHome: React.FC = () => {
   const [topPlayers, setTopPlayers] = useState<PlayerStats[]>([]);
   const [loadingTopPlayers, setLoadingTopPlayers] = useState<boolean>(true);
   const [copiedWallet, setCopiedWallet] = useState<string | null>(null);
+  const [showAllPlayers, setShowAllPlayers] = useState<boolean>(false);
   
   // Mock price API - simulates real-time price updates
   const fetchUsdfgPrice = useCallback(async () => {
@@ -63,7 +64,9 @@ const ArenaHome: React.FC = () => {
   useEffect(() => {
     const fetchTopPlayersData = async () => {
       try {
-        const players = await getTopPlayers(5, 'totalEarned');
+        // Fetch more players if "Show All" is enabled
+        const limit = showAllPlayers ? 50 : 5;
+        const players = await getTopPlayers(limit, 'totalEarned');
         setTopPlayers(players);
       } catch (error) {
         console.error('Failed to fetch top players:', error);
@@ -73,7 +76,7 @@ const ArenaHome: React.FC = () => {
     };
     
     fetchTopPlayersData();
-  }, []);
+  }, [showAllPlayers]);
 
   // Test Firestore connection on component mount
   useEffect(() => {
@@ -1051,6 +1054,21 @@ const ArenaHome: React.FC = () => {
                         </div>
                       );
                     })}
+                  </div>
+                )}
+                
+                {/* Show More/Less Button */}
+                {!loadingTopPlayers && topPlayers.length > 0 && (
+                  <div className="px-6 pb-6">
+                    <button
+                      onClick={() => {
+                        setShowAllPlayers(!showAllPlayers);
+                        setLoadingTopPlayers(true);
+                      }}
+                      className="w-full py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-cyan-400 text-sm font-semibold transition-colors"
+                    >
+                      {showAllPlayers ? '← Show Less' : `View All Players →`}
+                    </button>
                   </div>
                 )}
               </div>
