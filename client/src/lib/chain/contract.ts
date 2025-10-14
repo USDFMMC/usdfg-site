@@ -15,7 +15,20 @@ import IDL from './usdfg_smart_contract.json';
  * Get the Anchor program instance
  */
 export async function getProgram(wallet: any, connection: Connection) {
-  const provider = new AnchorProvider(connection, wallet, {
+  // Create a wallet adapter that Anchor expects
+  const anchorWallet = {
+    publicKey: wallet.publicKey,
+    signTransaction: wallet.signTransaction,
+    signAllTransactions: wallet.signAllTransactions || (async (txs: any[]) => {
+      const signed = [];
+      for (const tx of txs) {
+        signed.push(await wallet.signTransaction(tx));
+      }
+      return signed;
+    }),
+  };
+  
+  const provider = new AnchorProvider(connection, anchorWallet as any, {
     commitment: 'confirmed',
   });
   

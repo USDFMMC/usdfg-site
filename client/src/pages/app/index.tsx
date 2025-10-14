@@ -17,7 +17,8 @@ import ElegantNavbar from "@/components/layout/ElegantNavbar";
 import { SubmitResultRoom } from "@/components/arena/SubmitResultRoom";
 
 const ArenaHome: React.FC = () => {
-  const { connected, signTransaction, publicKey, connect } = useWallet();
+  const wallet = useWallet();
+  const { connected, signTransaction, publicKey, connect, signAllTransactions } = wallet;
   // Use MWA connection state
   const isConnected = connected;
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -250,10 +251,7 @@ const ArenaHome: React.FC = () => {
       
       console.log("🚀 Creating challenge on smart contract with escrow...");
       const challengeId = await createChallenge(
-        {
-          signTransaction: signTransaction,
-          publicKey: publicKey!
-        },
+        wallet,
         connection,
         challengeData.entryFee // Entry fee in USDFG
       );
@@ -741,6 +739,23 @@ const ArenaHome: React.FC = () => {
                             <div className="text-gray-400 text-xs">Players</div>
                           </div>
                         </div>
+
+                        {/* View on Solana Explorer */}
+                        {challenge.solanaAccountId && (
+                          <div className="mb-4">
+                            <a
+                              href={`https://explorer.solana.com/address/${challenge.solanaAccountId}?cluster=devnet`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center justify-center gap-2 px-3 py-2 bg-purple-600/20 text-purple-400 border border-purple-600/30 rounded-lg hover:bg-purple-600/30 transition-all text-sm"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <span>🔗</span>
+                              <span>View Escrow on Solana Explorer</span>
+                              <span className="text-xs">↗</span>
+                            </a>
+                          </div>
+                        )}
 
                         {/* Challenge Details - Collapsible */}
                         {(challenge.description || challenge.rules || challenge.requirements) && (
