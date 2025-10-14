@@ -10,6 +10,7 @@ import {
   where,
   getDocs,
   getDoc,
+  setDoc,
   Timestamp,
   writeBatch,
   increment,
@@ -379,6 +380,8 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
 
     // Case 3: Clear winner (one YES, one NO)
     const winner = player1Won ? player1 : player2;
+    const loser = player1Won ? player2 : player1;
+    
     await updateDoc(challengeRef, {
       status: 'completed',
       winner,
@@ -386,7 +389,12 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     });
     console.log('🏆 WINNER DETERMINED:', winner);
     
+    // Update player stats
+    await updatePlayerStats(winner, 'win', data.prizePool, data.game, data.category);
+    await updatePlayerStats(loser, 'loss', 0, data.game, data.category);
+    
     // TODO: Trigger smart contract to release prize pool to winner
+    console.log('💰 Prize pool to be released:', data.prizePool, 'USDFG to', winner);
     
   } catch (error) {
     console.error('❌ Error determining winner:', error);
@@ -593,3 +601,165 @@ export const requestCancelChallenge = async (
     throw error;
   }
 };
+
+// ============================================
+// PLAYER STATS TRACKING
+// ============================================
+
+export interface PlayerStats {
+  wallet: string;
+  wins: number;
+  losses: number;
+  winRate: number;
+  totalEarned: number;
+  gamesPlayed: number;
+  lastActive: Timestamp;
+  gameStats: {
+    [game: string]: {
+      wins: number;
+      losses: number;
+      earned: number;
+    }
+  };
+  categoryStats: {
+    [category: string]: {
+      wins: number;
+      losses: number;
+      earned: number;
+    }
+  };
+}
+
+/**
+ * Update player stats after a challenge completes
+ */
+async function updatePlayerStats(
+  wallet: string,
+  result: 'win' | 'loss',
+  amountEarned: number,
+  game: string,
+  category: string
+): Promise<void> {
+  try {
+    const playerRef = doc(db, 'player_stats', wallet);
+    const playerSnap = await getDoc(playerRef);
+
+    if (!playerSnap.exists()) {
+      // Create new player stats
+      const newStats: PlayerStats = {
+        wallet,
+        wins: result === 'win' ? 1 : 0,
+        losses: result === 'loss' ? 1 : 0,
+        winRate: result === 'win' ? 100 : 0,
+        totalEarned: amountEarned,
+        gamesPlayed: 1,
+        lastActive: Timestamp.now(),
+        gameStats: {
+          [game]: {
+            wins: result === 'win' ? 1 : 0,
+            losses: result === 'loss' ? 1 : 0,
+            earned: amountEarned
+          }
+        },
+        categoryStats: {
+          [category]: {
+            wins: result === 'win' ? 1 : 0,
+            losses: result === 'loss' ? 1 : 0,
+            earned: amountEarned
+          }
+        }
+      };
+      
+      await setDoc(playerRef, newStats);
+      console.log('✅ Created new player stats:', wallet);
+    } else {
+      // Update existing player stats
+      const currentStats = playerSnap.data() as PlayerStats;
+      const newWins = currentStats.wins + (result === 'win' ? 1 : 0);
+      const newLosses = currentStats.losses + (result === 'loss' ? 1 : 0);
+      const newGamesPlayed = currentStats.gamesPlayed + 1;
+      const newWinRate = (newWins / newGamesPlayed) * 100;
+
+      // Update game-specific stats
+      const gameStats = currentStats.gameStats || {};
+      if (!gameStats[game]) {
+        gameStats[game] = { wins: 0, losses: 0, earned: 0 };
+      }
+      gameStats[game].wins += result === 'win' ? 1 : 0;
+      gameStats[game].losses += result === 'loss' ? 1 : 0;
+      gameStats[game].earned += amountEarned;
+
+      // Update category-specific stats
+      const categoryStats = currentStats.categoryStats || {};
+      if (!categoryStats[category]) {
+        categoryStats[category] = { wins: 0, losses: 0, earned: 0 };
+      }
+      categoryStats[category].wins += result === 'win' ? 1 : 0;
+      categoryStats[category].losses += result === 'loss' ? 1 : 0;
+      categoryStats[category].earned += amountEarned;
+
+      await updateDoc(playerRef, {
+        wins: newWins,
+        losses: newLosses,
+        winRate: Math.round(newWinRate * 10) / 10, // Round to 1 decimal
+        totalEarned: currentStats.totalEarned + amountEarned,
+        gamesPlayed: newGamesPlayed,
+        lastActive: Timestamp.now(),
+        gameStats,
+        categoryStats
+      });
+
+      console.log(`✅ Updated player stats: ${wallet} - ${result} (+${amountEarned} USDFG)`);
+    }
+  } catch (error) {
+    console.error('❌ Error updating player stats:', error);
+    // Don't throw - stats update failure shouldn't block challenge completion
+  }
+}
+
+/**
+ * Get player stats by wallet address
+ */
+export async function getPlayerStats(wallet: string): Promise<PlayerStats | null> {
+  try {
+    const playerRef = doc(db, 'player_stats', wallet);
+    const playerSnap = await getDoc(playerRef);
+    
+    if (!playerSnap.exists()) {
+      return null;
+    }
+    
+    return playerSnap.data() as PlayerStats;
+  } catch (error) {
+    console.error('❌ Error fetching player stats:', error);
+    return null;
+  }
+}
+
+/**
+ * Get top players for leaderboard
+ */
+export async function getTopPlayers(limit: number = 10, sortBy: 'wins' | 'winRate' | 'totalEarned' = 'totalEarned'): Promise<PlayerStats[]> {
+  try {
+    const statsCollection = collection(db, 'player_stats');
+    const q = query(
+      statsCollection,
+      orderBy(sortBy, 'desc'),
+      where('gamesPlayed', '>=', 3), // Minimum 3 games to appear on leaderboard
+      limit(limit)
+    );
+    
+    const snapshot = await getDocs(q);
+    const players: PlayerStats[] = [];
+    
+    snapshot.forEach((doc) => {
+      players.push(doc.data() as PlayerStats);
+    });
+    
+    console.log(`📊 Fetched top ${players.length} players (sorted by ${sortBy})`);
+    return players;
+  } catch (error) {
+    console.error('❌ Error fetching top players:', error);
+    return [];
+  }
+}

@@ -22,6 +22,12 @@ service cloud.firestore {
       // TODO: Add more restrictive rules based on challenge participants
     }
     
+    // Player Stats - track wins/losses/earnings
+    match /player_stats/{wallet} {
+      allow read: if true; // Anyone can view player stats
+      allow write: if true; // Allow system to update stats (Solana wallet verification on-chain)
+    }
+    
     // User profiles (if you use them)
     match /users/{userId} {
       allow read: if true;
