@@ -134,6 +134,7 @@ export async function isSmartContractInitialized(
 /**
  * Update the price oracle timestamp
  * This needs to be called every 5 minutes to keep the oracle fresh
+ * Using raw transactions to bypass Anchor's _bn issue
  */
 export async function updatePriceOracle(
   wallet: any,
@@ -142,25 +143,6 @@ export async function updatePriceOracle(
 ): Promise<void> {
   try {
     console.log('🔄 Updating price oracle...');
-    
-    // Create wallet adapter for Anchor
-    const anchorWallet = {
-      publicKey: wallet.publicKey,
-      signTransaction: wallet.signTransaction,
-      signAllTransactions: wallet.signAllTransactions || (async (txs: any[]) => {
-        const signed = [];
-        for (const tx of txs) {
-          signed.push(await wallet.signTransaction(tx));
-        }
-        return signed;
-      }),
-    };
-    
-    const provider = new AnchorProvider(connection, anchorWallet as any, {
-      commitment: 'confirmed',
-    });
-    
-    const program = new Program(IDL as any, PROGRAM_ID, provider);
     
     // Derive PDAs
     const [adminStatePDA] = PublicKey.findProgramAddressSync(
@@ -180,16 +162,38 @@ export async function updatePriceOracle(
     
     console.log('💰 Updating price to:', newPrice || 0.15, 'USD');
     
-    const tx = await program.methods
-      .updatePrice(priceInLamports)
-      .accounts({
-        priceOracle: priceOraclePDA,
-        adminState: adminStatePDA,
-        admin: wallet.publicKey,
-      })
-      .rpc();
+    // Calculate discriminator for "update_price" instruction
+    // sha256("global:update_price") first 8 bytes
+    const discriminator = Buffer.from([0x3d, 0x22, 0x75, 0x9b, 0x4b, 0x22, 0x7b, 0xd0]);
     
-    console.log('✅ Price oracle updated! TX:', tx);
+    // Serialize the price argument (u64, little-endian)
+    const priceBuffer = Buffer.alloc(8);
+    priceInLamports.toArrayLike(Buffer, 'le', 8).copy(priceBuffer);
+    
+    const instructionData = Buffer.concat([discriminator, priceBuffer]);
+    
+    // Create instruction
+    const instruction = {
+      keys: [
+        { pubkey: priceOraclePDA, isSigner: false, isWritable: true },
+        { pubkey: adminStatePDA, isSigner: false, isWritable: false },
+        { pubkey: new PublicKey(wallet.publicKey.toString()), isSigner: true, isWritable: false },
+      ],
+      programId: PROGRAM_ID,
+      data: instructionData,
+    };
+    
+    // Create and send transaction
+    const { Transaction: SolanaTransaction, TransactionInstruction } = await import('@solana/web3.js');
+    const tx = new SolanaTransaction().add(new TransactionInstruction(instruction));
+    tx.feePayer = new PublicKey(wallet.publicKey.toString());
+    tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    
+    const signedTx = await wallet.signTransaction(tx);
+    const txSignature = await connection.sendRawTransaction(signedTx.serialize());
+    await connection.confirmTransaction(txSignature, 'confirmed');
+    
+    console.log('✅ Price oracle updated! TX:', txSignature);
   } catch (error) {
     console.error('❌ Error updating price oracle:', error);
     throw error;
