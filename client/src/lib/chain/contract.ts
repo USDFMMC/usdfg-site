@@ -53,8 +53,18 @@ export async function getProgram(wallet: any, connection: Connection) {
   });
   
   console.log('✅ Provider created');
+  console.log('🔧 Creating Program with IDL...');
+  console.log('   Program ID:', PROGRAM_ID.toString());
+  console.log('   IDL version:', (IDL as any).version);
   
-  return new Program(IDL as any, PROGRAM_ID, provider);
+  try {
+    const program = new Program(IDL as any, PROGRAM_ID, provider);
+    console.log('✅ Program created successfully');
+    return program;
+  } catch (error) {
+    console.error('❌ Error creating Program:', error);
+    throw error;
+  }
 }
 
 /**
