@@ -98,7 +98,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    host: true, // Allow external connections
+    host: '127.0.0.1', // Use localhost IP instead of 'true' to avoid network interface issues
     strictPort: false, // Allow Vite to use a different port if 5173 is busy
     hmr: {
       host: 'localhost',

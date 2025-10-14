@@ -52,8 +52,8 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      // Register service worker for PWA functionality
-      if ('serviceWorker' in navigator) {
+      // Register service worker for PWA functionality (only in production)
+      if ('serviceWorker' in navigator && window.location.hostname !== 'localhost') {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
             .then((registration) => {
@@ -63,6 +63,16 @@
               console.log('SW registration failed: ', registrationError);
             });
         });
+      } else if (window.location.hostname === 'localhost') {
+        // Unregister any existing service workers on localhost
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then((registrations) => {
+            for (let registration of registrations) {
+              registration.unregister();
+              console.log('SW unregistered for localhost');
+            }
+          });
+        }
       }
 
       // Crosshair functionality - runs after DOM loads
