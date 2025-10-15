@@ -160,18 +160,16 @@ export async function createChallenge(
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
-      { pubkey: pdas.challengePDA, isSigner: false, isWritable: true },
-      { pubkey: creator, isSigner: true, isWritable: true },
-      { pubkey: creatorTokenAccount, isSigner: false, isWritable: true },
-      { pubkey: pdas.escrowTokenAccountPDA, isSigner: false, isWritable: true },
-      { pubkey: pdas.escrowWalletPDA, isSigner: false, isWritable: false },
-      { pubkey: challengeSeed.publicKey, isSigner: true, isWritable: false },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
-      { pubkey: pdas.priceOraclePDA, isSigner: false, isWritable: false }, // Oracle account (required by IDL)
-      { pubkey: pdas.adminStatePDA, isSigner: false, isWritable: false }, // Admin state (required by IDL)
-      { pubkey: USDFG_MINT, isSigner: false, isWritable: false },
+      { pubkey: pdas.challengePDA, isSigner: false, isWritable: true }, // challenge
+      { pubkey: creator, isSigner: true, isWritable: true }, // creator
+      { pubkey: creatorTokenAccount, isSigner: false, isWritable: true }, // creator_token_account
+      { pubkey: pdas.escrowTokenAccountPDA, isSigner: false, isWritable: true }, // escrow_token_account
+      { pubkey: pdas.escrowWalletPDA, isSigner: false, isWritable: false }, // escrow_wallet
+      { pubkey: challengeSeed.publicKey, isSigner: true, isWritable: false }, // challenge_seed
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
+      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }, // rent
+      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // mint
     ],
     data: instructionData,
   });
