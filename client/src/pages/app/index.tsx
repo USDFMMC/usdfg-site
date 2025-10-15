@@ -1812,6 +1812,9 @@ const CreateChallengeModal: React.FC<{
                       max="10000"
                       placeholder="50"
                       required
+                      autoComplete="off"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                     />
                     <div className="absolute right-3 top-1/2 transform -translate-y-1/2 mt-2">
                       <span className="text-gray-400 text-sm">USDFG</span>
