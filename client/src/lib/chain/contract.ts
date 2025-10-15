@@ -141,8 +141,9 @@ export async function createChallenge(
 
   // Create instruction data for create_challenge
   const instructionData = Buffer.alloc(8 + 8); // discriminator + entry_fee
-  instructionData.writeUInt32LE(0x12345678, 0); // Placeholder discriminator
-  instructionData.writeUInt32LE(0x87654321, 4); // Placeholder discriminator
+  // Correct discriminator for "global:create_challenge"
+  instructionData.writeUInt32LE(0x010fadef, 0); // Lower 32 bits: 0x010fadef
+  instructionData.writeUInt32LE(0xaaf42f01, 4); // Upper 32 bits: 0xaaf42f01
   entryFeeBN.toArrayLike(Buffer, 'le', 8).copy(instructionData, 8);
   console.log('📦 Instruction data created');
 
