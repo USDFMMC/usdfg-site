@@ -156,8 +156,15 @@ export async function createChallenge(
         console.log('✅ Smart contract already initialized');
       }
       
-           // Skip oracle update - let the smart contract handle it
-           console.log('⚠️ Skipping oracle update - using existing price');
+           // Try to update price oracle (you are the admin!)
+           try {
+             console.log('🔄 Attempting to refresh price oracle...');
+             await updatePriceOracle(wallet, connection);
+             console.log('✅ Price oracle refreshed!');
+           } catch (oracleError: any) {
+             console.warn('⚠️ Could not update oracle:', oracleError.message);
+             // Continue anyway - maybe the oracle is still fresh enough
+           }
     } catch (initError) {
       console.error('❌ Error checking/initializing smart contract:', initError);
       throw new Error('Smart contract initialization failed. Please contact support.');
