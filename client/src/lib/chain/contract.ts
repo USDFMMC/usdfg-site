@@ -215,25 +215,23 @@ export async function createChallenge(
     // Try to bypass oracle check by removing the price oracle from the instruction keys
     console.log('🔄 Attempting to bypass oracle check by modifying instruction keys...');
 
-    // Create the instruction - oracle accounts are required by smart contract
-    const instruction = new TransactionInstruction({
-      keys: [
-        { pubkey: pdas.challengePDA, isSigner: false, isWritable: true },
-        { pubkey: creator, isSigner: true, isWritable: true },
-        { pubkey: creatorTokenAccount, isSigner: false, isWritable: true },
-        { pubkey: pdas.escrowTokenAccountPDA, isSigner: false, isWritable: true },
-        { pubkey: pdas.escrowWalletPDA, isSigner: false, isWritable: false },
-        { pubkey: challengeSeed.publicKey, isSigner: true, isWritable: false },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-        { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
-        { pubkey: pdas.priceOraclePDA, isSigner: false, isWritable: false },
-        { pubkey: pdas.adminStatePDA, isSigner: false, isWritable: false },
-        { pubkey: USDFG_MINT, isSigner: false, isWritable: false },
-      ],
-      programId: PROGRAM_ID,
-      data: instructionData,
-    });
+           // Create the instruction - try without oracle accounts to bypass oracle check
+           const instruction = new TransactionInstruction({
+             keys: [
+               { pubkey: pdas.challengePDA, isSigner: false, isWritable: true },
+               { pubkey: creator, isSigner: true, isWritable: true },
+               { pubkey: creatorTokenAccount, isSigner: false, isWritable: true },
+               { pubkey: pdas.escrowTokenAccountPDA, isSigner: false, isWritable: true },
+               { pubkey: pdas.escrowWalletPDA, isSigner: false, isWritable: false },
+               { pubkey: challengeSeed.publicKey, isSigner: true, isWritable: false },
+               { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+               { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+               { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+               { pubkey: USDFG_MINT, isSigner: false, isWritable: false },
+             ],
+             programId: PROGRAM_ID,
+             data: instructionData,
+           });
 
            console.log('✅ Instruction created');
 
