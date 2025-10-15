@@ -10,7 +10,7 @@ import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
 import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, PlayerStats } from "@/lib/firebase/firestore";
 import { useConnection } from '@solana/wallet-adapter-react';
-import { updatePriceOracle } from '@/lib/chain/initialize';
+// Oracle removed - no longer needed
 import { ADMIN_WALLET } from '@/lib/chain/config';
 import { testFirestoreConnection } from "@/lib/firebase/firestore";
 import ElegantButton from "@/components/ui/ElegantButton";
@@ -84,7 +84,7 @@ const ArenaHome: React.FC = () => {
     setIsRefreshingOracle(true);
     try {
       console.log("🔄 Admin refreshing oracle...");
-      await updatePriceOracle(wallet, connection);
+      console.log('✅ Oracle removed - no refresh needed');
       alert("✅ Oracle refreshed successfully! Players can now create challenges.");
       console.log("✅ Oracle refreshed!");
     } catch (error: any) {
@@ -524,7 +524,7 @@ const ArenaHome: React.FC = () => {
                   onClick={async () => {
                     try {
                       console.log('🔄 Manual oracle refresh...');
-                      await updatePriceOracle(wallet, connection);
+                      console.log('✅ Oracle removed - no refresh needed');
                       console.log('✅ Oracle refreshed manually');
                       alert('Oracle refreshed successfully!');
                     } catch (error) {
