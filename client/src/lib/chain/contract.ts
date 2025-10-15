@@ -169,8 +169,6 @@ export async function createChallenge(
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
       { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }, // rent
-      { pubkey: pdas.priceOraclePDA, isSigner: false, isWritable: false }, // price_oracle (required by old contract)
-      { pubkey: pdas.adminStatePDA, isSigner: false, isWritable: false }, // admin_state (required by old contract)
       { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // mint
     ],
     data: instructionData,
