@@ -59,11 +59,18 @@ export async function derivePDAs(creator: PublicKey, challengeSeed: PublicKey) {
     PROGRAM_ID
   );
 
+  // Price Oracle PDA (still needed by the deployed smart contract)
+  const [priceOraclePDA] = PublicKey.findProgramAddressSync(
+    [SEEDS.PRICE_ORACLE],
+    PROGRAM_ID
+  );
+
   return {
     adminStatePDA,
     challengePDA,
     escrowWalletPDA,
     escrowTokenAccountPDA,
+    priceOraclePDA,
   };
 }
 
@@ -162,6 +169,8 @@ export async function createChallenge(
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+      { pubkey: pdas.priceOraclePDA, isSigner: false, isWritable: false }, // Oracle account (required by IDL)
+      { pubkey: pdas.adminStatePDA, isSigner: false, isWritable: false }, // Admin state (required by IDL)
       { pubkey: USDFG_MINT, isSigner: false, isWritable: false },
     ],
     data: instructionData,
