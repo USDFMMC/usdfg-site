@@ -156,11 +156,16 @@ export async function createChallenge(
         console.log('✅ Smart contract already initialized');
       }
       
-          // Skip oracle update entirely - let's try without it
-          console.log('⚠️ Skipping oracle update - trying challenge creation directly');
-          
-          // Try to create challenge without oracle check by using a different approach
-          console.log('🔄 Attempting to create challenge with oracle bypass...');
+           // Try to refresh oracle first, then create challenge
+           console.log('🔄 Attempting to refresh oracle before challenge creation...');
+           try {
+             await updatePriceOracle(wallet, connection);
+             console.log('✅ Oracle refreshed successfully');
+             // Small delay to ensure oracle update is processed
+             await new Promise(resolve => setTimeout(resolve, 2000));
+           } catch (oracleError) {
+             console.log('⚠️ Oracle refresh failed, but continuing with challenge creation:', oracleError);
+           }
     } catch (initError) {
       console.error('❌ Error checking/initializing smart contract:', initError);
       throw new Error('Smart contract initialization failed. Please contact support.');
