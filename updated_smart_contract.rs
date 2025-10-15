@@ -4,7 +4,7 @@ use solana_program::pubkey;
 use solana_program::program::invoke_signed;
 use spl_token;
 
-declare_id!("2KL4BKvUtDmABvuvRopkCEb33myWM1W9BGodAZ82RWDT");
+declare_id!("J6pYAhJ6RSaXHeyg1YtC387arz524m51sie7muEpeC1k");
 
 // Price oracle PDA seeds
 const PRICE_ORACLE_SEED: &[u8] = b"price_oracle";
