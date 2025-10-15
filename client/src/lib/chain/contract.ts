@@ -139,11 +139,11 @@ export async function createChallenge(
   const entryFeeBN = new BN(entryFeeUsdfg);
   console.log('💰 Created BN:', entryFeeBN.toString());
 
-  // Create instruction data for create_challenge
+  // Create instruction data for createChallenge
   const instructionData = Buffer.alloc(8 + 8); // discriminator + entry_fee
-  // Correct discriminator for "global:create_challenge"
-  instructionData.writeUInt32LE(0x010fadef, 0); // Lower 32 bits: 0x010fadef
-  instructionData.writeUInt32LE(0xaaf42f01, 4); // Upper 32 bits: 0xaaf42f01
+  // Correct discriminator for "global:createChallenge"
+  instructionData.writeUInt32LE(0x405504b3, 0); // Lower 32 bits: 0x405504b3
+  instructionData.writeUInt32LE(0xa3d3f3ee, 4); // Upper 32 bits: 0xa3d3f3ee
   entryFeeBN.toArrayLike(Buffer, 'le', 8).copy(instructionData, 8);
   console.log('📦 Instruction data created');
 
