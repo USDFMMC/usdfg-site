@@ -501,24 +501,44 @@ const ArenaHome: React.FC = () => {
             {connected && publicKey?.toString() === ADMIN_WALLET.toString() && (
               <>
                 {console.log('🔍 Admin wallet detected, showing refresh button')}
-              <button
-                onClick={handleRefreshOracle}
-                disabled={isRefreshingOracle}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                title="Refresh the price oracle (admin only)"
-              >
-                {isRefreshingOracle ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span>Refreshing...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>🔄</span>
-                    <span>Refresh Oracle</span>
-                  </>
-                )}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleRefreshOracle}
+                  disabled={isRefreshingOracle}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  title="Refresh the price oracle (admin only)"
+                >
+                  {isRefreshingOracle ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Refreshing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>🔄</span>
+                      <span>Refresh Oracle</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      console.log('🔄 Manual oracle refresh...');
+                      await updatePriceOracle(wallet, connection);
+                      console.log('✅ Oracle refreshed manually');
+                      alert('Oracle refreshed successfully!');
+                    } catch (error) {
+                      console.error('❌ Manual oracle refresh failed:', error);
+                      alert('Oracle refresh failed: ' + error.message);
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors flex items-center gap-2"
+                  title="Manual oracle refresh"
+                >
+                  <span>🔧</span>
+                  <span>Manual</span>
+                </button>
+              </div>
               </>
             )}
           </div>
