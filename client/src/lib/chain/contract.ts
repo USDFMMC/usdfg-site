@@ -178,6 +178,8 @@ export async function createChallenge(
   transaction.feePayer = creator;
 
   console.log('🚀 Sending transaction...');
+  // Add challenge seed as a signer
+  transaction.partialSign(challengeSeed);
   const signedTransaction = await wallet.signTransaction(transaction);
   const signature = await connection.sendRawTransaction(signedTransaction.serialize());
   
