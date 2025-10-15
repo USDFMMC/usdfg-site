@@ -235,27 +235,29 @@ export async function createChallenge(
       data: instructionData,
     });
 
-    console.log('✅ Instruction created');
+           console.log('✅ Instruction created');
 
-    // Create and send transaction
-    const transaction = new Transaction().add(instruction);
-    transaction.feePayer = creator;
-    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-    
-    console.log('🔧 Signing transaction...');
-    const signedTx = await wallet.signTransaction(transaction);
-    
-    // Add challengeSeed signature
-    signedTx.partialSign(challengeSeed);
-    
-    console.log('🚀 Sending transaction...');
-    const txSignature = await connection.sendRawTransaction(signedTx.serialize());
-    
-    console.log('⏳ Confirming transaction...');
-    await connection.confirmTransaction(txSignature, 'confirmed');
+           // Create and send transaction
+           const transaction = new Transaction().add(instruction);
+           transaction.feePayer = creator;
+           transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+           
+           console.log('🔧 Signing transaction...');
+           const signedTx = await wallet.signTransaction(transaction);
+           
+           // Add challengeSeed signature
+           signedTx.partialSign(challengeSeed);
+           
+           console.log('🚀 Sending transaction...');
+           const txSignature = await connection.sendRawTransaction(signedTx.serialize());
+           console.log('📝 Transaction signature:', txSignature);
+           
+           console.log('⏳ Confirming transaction...');
+           const confirmation = await connection.confirmTransaction(txSignature, 'confirmed');
+           console.log('✅ Transaction confirmed:', confirmation);
 
-    console.log('✅ Challenge created! Transaction:', txSignature);
-    console.log('📦 Challenge address:', pdas.challengePDA.toString());
+           console.log('✅ Challenge created! Transaction:', txSignature);
+           console.log('📦 Challenge address:', pdas.challengePDA.toString());
 
     return pdas.challengePDA.toString();
   } catch (error) {
