@@ -59,6 +59,15 @@ const ArenaHome: React.FC = () => {
     }
   }, []);
 
+  // Debug: Log wallet info
+  useEffect(() => {
+    if (connected && publicKey) {
+      console.log('🔍 Current wallet:', publicKey.toString());
+      console.log('🔍 Admin wallet:', ADMIN_WALLET.toString());
+      console.log('🔍 Is admin?', publicKey.toString() === ADMIN_WALLET.toString());
+    }
+  }, [connected, publicKey]);
+
   // Admin: Refresh Oracle (only for admin wallet)
   const handleRefreshOracle = async () => {
     if (!publicKey || !connected) {
@@ -490,6 +499,8 @@ const ArenaHome: React.FC = () => {
             
             {/* Admin: Oracle Refresh Button (only visible to admin wallet) */}
             {connected && publicKey?.toString() === ADMIN_WALLET.toString() && (
+              <>
+                {console.log('🔍 Admin wallet detected, showing refresh button')}
               <button
                 onClick={handleRefreshOracle}
                 disabled={isRefreshingOracle}
@@ -508,6 +519,7 @@ const ArenaHome: React.FC = () => {
                   </>
                 )}
               </button>
+              </>
             )}
           </div>
 
