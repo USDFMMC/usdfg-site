@@ -7,10 +7,12 @@
 
 import { PublicKey } from '@solana/web3.js';
 
-// Smart Contract Program ID (deployed on devnet) - Using existing deployed contract
-export const PROGRAM_ID = new PublicKey('2KL4BKvUtDmABvuvRopkCEb33myWM1W9BGodAZ82RWDT');
+// Smart Contract Program ID (deployed on devnet) - NEW UPDATED CONTRACT
+// Old contract: 2KL4BKvUtDmABvuvRopkCEb33myWM1W9BGodAZ82RWDT
+// New contract: 7FcxBoY7313QbsyN9oqGvpJBLGw9B984W18RgZgHPpaY
+export const PROGRAM_ID = new PublicKey('7FcxBoY7313QbsyN9oqGvpJBLGw9B984W18RgZgHPpaY');
 
-// Admin wallet address (can update oracle)
+// Admin wallet address
 export const ADMIN_WALLET = new PublicKey('3SeLoDGsajuQUt2pzSkZV7LmB7gKtckmrD693U69kcUd');
 
 // USDFG Token Mint Address (21M fixed supply, no mint/freeze authority)
@@ -19,7 +21,6 @@ export const USDFG_MINT = new PublicKey('7iGZRCHmVTFt9kRn5bc9C2cvDGVp2ZdDYUQsiRf
 // PDA Seeds (used to derive program-derived addresses)
 export const SEEDS = {
   ADMIN: Buffer.from('admin'),
-  PRICE_ORACLE: Buffer.from('price_oracle'),
   CHALLENGE: Buffer.from('challenge'),
   ESCROW_WALLET: Buffer.from('escrow_wallet'),
 } as const;

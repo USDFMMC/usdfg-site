@@ -42,7 +42,6 @@ const ArenaHome: React.FC = () => {
   const [loadingTopPlayers, setLoadingTopPlayers] = useState<boolean>(true);
   const [copiedWallet, setCopiedWallet] = useState<string | null>(null);
   const [showAllPlayers, setShowAllPlayers] = useState<boolean>(false);
-  const [isRefreshingOracle, setIsRefreshingOracle] = useState(false);
   
   // Mock price API - simulates real-time price updates
   const fetchUsdfgPrice = useCallback(async () => {
@@ -67,33 +66,6 @@ const ArenaHome: React.FC = () => {
       console.log('🔍 Is admin?', publicKey.toString() === ADMIN_WALLET.toString());
     }
   }, [connected, publicKey]);
-
-  // Admin: Refresh Oracle (only for admin wallet)
-  const handleRefreshOracle = async () => {
-    if (!publicKey || !connected) {
-      alert("Please connect your wallet first");
-      return;
-    }
-
-    // Check if current wallet is admin
-    if (publicKey.toString() !== ADMIN_WALLET.toString()) {
-      alert("Only the admin wallet can refresh the oracle");
-      return;
-    }
-
-    setIsRefreshingOracle(true);
-    try {
-      console.log("🔄 Admin refreshing oracle...");
-      console.log('✅ Oracle removed - no refresh needed');
-      alert("✅ Oracle refreshed successfully! Players can now create challenges.");
-      console.log("✅ Oracle refreshed!");
-    } catch (error: any) {
-      console.error("❌ Error refreshing oracle:", error);
-      alert(`Failed to refresh oracle: ${error.message}`);
-    } finally {
-      setIsRefreshingOracle(false);
-    }
-  };
 
   // Update price every 30 seconds
   useEffect(() => {
@@ -497,50 +469,6 @@ const ArenaHome: React.FC = () => {
               }}
             />
             
-            {/* Admin: Oracle Refresh Button (only visible to admin wallet) */}
-            {connected && publicKey?.toString() === ADMIN_WALLET.toString() && (
-              <>
-                {console.log('🔍 Admin wallet detected, showing refresh button')}
-              <div className="flex gap-2">
-                <button
-                  onClick={handleRefreshOracle}
-                  disabled={isRefreshingOracle}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  title="Refresh the price oracle (admin only)"
-                >
-                  {isRefreshingOracle ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span>Refreshing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>🔄</span>
-                      <span>Refresh Oracle</span>
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      console.log('🔄 Manual oracle refresh...');
-                      console.log('✅ Oracle removed - no refresh needed');
-                      console.log('✅ Oracle refreshed manually');
-                      alert('Oracle refreshed successfully!');
-                    } catch (error) {
-                      console.error('❌ Manual oracle refresh failed:', error);
-                      alert('Oracle refresh failed: ' + error.message);
-                    }
-                  }}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors flex items-center gap-2"
-                  title="Manual oracle refresh"
-                >
-                  <span>🔧</span>
-                  <span>Manual</span>
-                </button>
-              </div>
-              </>
-            )}
           </div>
 
           {/* Mobile Only - Wallet Button */}
