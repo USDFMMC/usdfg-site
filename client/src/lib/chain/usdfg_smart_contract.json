@@ -51,16 +51,6 @@
           "isSigner": false
         },
         {
-          "name": "priceOracle",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "adminState",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "mint",
           "isMut": false,
           "isSigner": false
@@ -244,7 +234,7 @@
     }
   ],
   "metadata": {
-    "address": "7FcxBoY7313QbsyN9oqGvpJBLGw9B984W18RgZgHPpaY"
+    "address": "9NBcMx3x8EotQi63fukhXpYbcBRgyWj6PcEFyEaL9oqo"
   }
 }
 
