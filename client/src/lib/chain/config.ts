@@ -7,8 +7,8 @@
 
 import { PublicKey } from '@solana/web3.js';
 
-// Smart Contract Program ID (deployed on devnet) - UPDATED v2
-export const PROGRAM_ID = new PublicKey('J6pYAhJ6RSaXHeyg1YtC387arz524m51sie7muEpeC1k');
+// Smart Contract Program ID (deployed on devnet) - Using existing deployed contract
+export const PROGRAM_ID = new PublicKey('2KL4BKvUtDmABvuvRopkCEb33myWM1W9BGodAZ82RWDT');
 
 // Admin wallet address (can update oracle)
 export const ADMIN_WALLET = new PublicKey('3SeLoDGsajuQUt2pzSkZV7LmB7gKtckmrD693U69kcUd');

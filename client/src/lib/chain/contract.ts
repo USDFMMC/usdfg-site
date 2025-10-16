@@ -11,7 +11,7 @@ import { BN } from '@coral-xyz/anchor';
 import { Connection, PublicKey, Keypair, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction, TransactionInstruction } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
 import { PROGRAM_ID, USDFG_MINT, SEEDS, usdfgToLamports } from './config';
-import { initializeSmartContract, isSmartContractInitialized } from './initialize';
+import { initializeSmartContract, isSmartContractInitialized, updatePriceOracle } from './initialize';
 import * as borsh from '@coral-xyz/borsh';
 
 /**
@@ -118,7 +118,16 @@ export async function createChallenge(
     console.log('✅ Smart contract already initialized');
   }
 
-  console.log('🚀 Creating challenge with pure USDFG amounts (no oracle needed)');
+  // For the deployed contract, we still need to refresh the oracle
+  console.log('🔄 Attempting to refresh oracle before challenge creation...');
+  try {
+    await updatePriceOracle(wallet, connection);
+    console.log('✅ Oracle refreshed successfully');
+  } catch (error) {
+    console.warn('⚠️ Oracle refresh failed, but continuing with challenge creation:', error);
+  }
+
+  console.log('🚀 Creating challenge with USDFG amounts...');
 
   // Step 1: Prepare transaction (bypassing Anchor)
   console.log('🔧 Step 1: Preparing transaction (bypassing Anchor)...');
@@ -157,24 +166,24 @@ export async function createChallenge(
   // Step 6: Create instruction
   console.log('✅ Creating instruction with oracle-free smart contract...');
   
-  const instruction = new TransactionInstruction({
-    programId: PROGRAM_ID,
-    keys: [
-      { pubkey: pdas.challengePDA, isSigner: false, isWritable: true }, // challenge
-      { pubkey: creator, isSigner: true, isWritable: true }, // creator
-      { pubkey: creatorTokenAccount, isSigner: false, isWritable: true }, // creator_token_account
-      { pubkey: pdas.escrowTokenAccountPDA, isSigner: false, isWritable: true }, // escrow_token_account
-      { pubkey: pdas.escrowWalletPDA, isSigner: false, isWritable: false }, // escrow_wallet
-      { pubkey: challengeSeed.publicKey, isSigner: true, isWritable: false }, // challenge_seed
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
-      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }, // rent
-      { pubkey: pdas.priceOraclePDA, isSigner: false, isWritable: false }, // price_oracle (required by deployed contract)
-      { pubkey: pdas.adminStatePDA, isSigner: false, isWritable: false }, // admin_state (required by deployed contract)
-      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // mint
-    ],
-    data: instructionData,
-  });
+             const instruction = new TransactionInstruction({
+               programId: PROGRAM_ID,
+               keys: [
+                 { pubkey: pdas.challengePDA, isSigner: false, isWritable: true }, // challenge
+                 { pubkey: creator, isSigner: true, isWritable: true }, // creator
+                 { pubkey: creatorTokenAccount, isSigner: false, isWritable: true }, // creator_token_account
+                 { pubkey: pdas.escrowTokenAccountPDA, isSigner: false, isWritable: true }, // escrow_token_account
+                 { pubkey: pdas.escrowWalletPDA, isSigner: false, isWritable: false }, // escrow_wallet
+                 { pubkey: challengeSeed.publicKey, isSigner: true, isWritable: false }, // challenge_seed
+                 { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
+                 { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
+                 { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }, // rent
+                 { pubkey: pdas.priceOraclePDA, isSigner: false, isWritable: false }, // price_oracle (required by deployed contract)
+                 { pubkey: pdas.adminStatePDA, isSigner: false, isWritable: false }, // admin_state (required by deployed contract)
+                 { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // mint
+               ],
+               data: instructionData,
+             });
 
   console.log('✅ Instruction created');
 
