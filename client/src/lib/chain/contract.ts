@@ -139,7 +139,10 @@ export async function createChallenge(
 
   // Step 5: Create instruction data
   console.log('💰 Entry fee (raw USDFG):', entryFeeUsdfg);
-  const entryFeeBN = new BN(entryFeeUsdfg);
+  // Convert USDFG to lamports (smallest units)
+  const entryFeeLamports = Math.floor(entryFeeUsdfg * Math.pow(10, 9)); // 9 decimals
+  const entryFeeBN = new BN(entryFeeLamports);
+  console.log('💰 Entry fee in lamports:', entryFeeLamports);
   console.log('💰 Created BN:', entryFeeBN.toString());
 
   // Create instruction data for create_challenge
