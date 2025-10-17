@@ -345,3 +345,127 @@ export async function cancelChallenge(
   console.log('✅ Challenge canceled successfully!');
   return signature;
 }
+
+/**
+ * Resolve Challenge (Admin Only - Triggers Payout to Winner)
+ * 
+ * SECURITY FEATURES:
+ * ✅ Admin wallet required to sign
+ * ✅ Winner must be a valid participant (creator or challenger)
+ * ✅ Smart contract validates winner address
+ * ✅ Challenge must be in-progress
+ * ✅ Reentrancy protection in smart contract
+ * 
+ * @param adminWallet - Admin wallet (must be ADMIN_WALLET from config)
+ * @param connection - Solana connection
+ * @param challengePDA - Challenge account address
+ * @param winnerAddress - Winner's wallet address
+ * @returns Transaction signature
+ */
+export async function resolveChallenge(
+  adminWallet: any,
+  connection: Connection,
+  challengePDA: string,
+  winnerAddress: string
+): Promise<string> {
+  console.log('🏆 Resolving challenge and triggering payout...');
+  console.log('   Challenge PDA:', challengePDA);
+  console.log('   Winner:', winnerAddress);
+  
+  // Security: Verify admin wallet
+  if (!adminWallet || !adminWallet.publicKey) {
+    throw new Error('❌ Admin wallet not connected');
+  }
+
+  // Security: Verify winner address is valid
+  let winnerPubkey: PublicKey;
+  try {
+    winnerPubkey = new PublicKey(winnerAddress);
+  } catch {
+    throw new Error('❌ Invalid winner address');
+  }
+
+  const admin = new PublicKey(adminWallet.publicKey.toString());
+  const challengeAddress = new PublicKey(challengePDA);
+  
+  console.log('✅ Admin wallet verified:', admin.toString());
+  
+  // Derive necessary PDAs
+  const [adminStatePDA] = PublicKey.findProgramAddressSync(
+    [SEEDS.ADMIN],
+    PROGRAM_ID
+  );
+  
+  const [escrowWalletPDA] = PublicKey.findProgramAddressSync(
+    [SEEDS.ESCROW_WALLET],
+    PROGRAM_ID
+  );
+  
+  const [escrowTokenAccountPDA] = PublicKey.findProgramAddressSync(
+    [SEEDS.ESCROW_WALLET, challengeAddress.toBuffer(), USDFG_MINT.toBuffer()],
+    PROGRAM_ID
+  );
+  
+  // Get winner's token account
+  const winnerTokenAccount = await getAssociatedTokenAddress(
+    USDFG_MINT,
+    winnerPubkey
+  );
+  
+  console.log('📍 Derived accounts:');
+  console.log('   Admin State PDA:', adminStatePDA.toString());
+  console.log('   Escrow Wallet PDA:', escrowWalletPDA.toString());
+  console.log('   Escrow Token Account:', escrowTokenAccountPDA.toString());
+  console.log('   Winner Token Account:', winnerTokenAccount.toString());
+  
+  // Calculate discriminator for resolve_challenge
+  const { sha256 } = await import('@noble/hashes/sha2.js');
+  const hash = sha256(new TextEncoder().encode('global:resolve_challenge'));
+  const discriminator = Buffer.from(hash.slice(0, 8));
+  
+  // Create instruction data: discriminator + winner pubkey (32 bytes)
+  const instructionData = Buffer.alloc(8 + 32);
+  discriminator.copy(instructionData, 0);
+  winnerPubkey.toBuffer().copy(instructionData, 8);
+  
+  console.log('📦 Instruction data created');
+  console.log('   Discriminator:', discriminator.toString('hex'));
+  
+  // Create instruction with all required accounts
+  const instruction = new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      { pubkey: challengeAddress, isSigner: false, isWritable: true }, // challenge
+      { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // escrow_token_account
+      { pubkey: winnerTokenAccount, isSigner: false, isWritable: true }, // winner_token_account
+      { pubkey: escrowWalletPDA, isSigner: false, isWritable: false }, // escrow_wallet
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
+      { pubkey: adminStatePDA, isSigner: false, isWritable: false }, // admin_state
+      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // mint
+    ],
+    data: instructionData,
+  });
+  
+  console.log('✅ Instruction created with', instruction.keys.length, 'accounts');
+  
+  // Create and send transaction
+  const transaction = new Transaction().add(instruction);
+  const { blockhash } = await connection.getLatestBlockhash();
+  transaction.recentBlockhash = blockhash;
+  transaction.feePayer = admin;
+  
+  console.log('🔧 Signing transaction with admin wallet...');
+  const signedTransaction = await adminWallet.signTransaction(transaction);
+  
+  console.log('🚀 Sending transaction...');
+  const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+  
+  console.log('⏳ Confirming transaction...');
+  await connection.confirmTransaction(signature, 'confirmed');
+  
+  console.log('✅ Challenge resolved! Winner paid out!');
+  console.log('🔗 Transaction:', `https://explorer.solana.com/tx/${signature}?cluster=devnet`);
+  console.log('💰 Winner received payout:', winnerAddress);
+  
+  return signature;
+}

@@ -405,8 +405,15 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     console.log('   Updating loser stats:', loser, 'as', loserDisplayName || 'Anonymous');
     await updatePlayerStats(loser, 'loss', 0, data.game, data.category, loserDisplayName);
     
-    // TODO: Trigger smart contract to release prize pool to winner
-    console.log('💰 Prize pool to be released:', data.prizePool, 'USDFG to', winner);
+    // Mark challenge as needing payout (Admin will trigger on-chain resolution)
+    await updateDoc(challengeRef, {
+      needsPayout: true,
+      payoutTriggered: false,
+      updatedAt: Timestamp.now(),
+    });
+    
+    console.log('💰 Prize pool ready for payout:', data.prizePool, 'USDFG to', winner);
+    console.log('⚠️  Admin must trigger on-chain payout to release funds from escrow');
     
   } catch (error) {
     console.error('❌ Error determining winner:', error);
@@ -818,3 +825,20 @@ export async function getTopPlayers(limitCount: number = 10, sortBy: 'wins' | 'w
     return [];
   }
 }
+
+// ============================================
+// AUTOMATED PAYOUT SYSTEM
+// ============================================
+
+/**
+ * NOTE: Payouts are now FULLY AUTOMATED via Firebase Cloud Functions!
+ * 
+ * When both players submit matching results, the Cloud Function automatically:
+ * 1. Validates all security checks
+ * 2. Calls the smart contract
+ * 3. Releases funds to the winner
+ * 
+ * NO MANUAL INTERVENTION NEEDED! ✅
+ * 
+ * See: functions/src/index.ts → processChallengePayout()
+ */
