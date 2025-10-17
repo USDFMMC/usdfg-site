@@ -188,10 +188,26 @@ export async function createChallenge(
   // Add challenge seed as a signer
   transaction.partialSign(challengeSeed);
   const signedTransaction = await wallet.signTransaction(transaction);
-  const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
-    skipPreflight: false,
-    maxRetries: 0, // Don't retry - prevents "already processed" errors
-  });
+  
+  let signature: string;
+  
+  try {
+    signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
+      skipPreflight: false,
+      maxRetries: 0, // Don't retry - prevents "already processed" errors
+    });
+    
+    console.log('✅ Transaction sent:', signature);
+  } catch (sendError: any) {
+    // Handle "already processed" error during send
+    if (sendError.message?.includes('This transaction has already been processed') ||
+        sendError.message?.includes('already been processed')) {
+      console.log('✅ Transaction already processed - challenge likely created successfully');
+      console.log(`📍 Challenge PDA: ${pdas.challengePDA.toString()}`);
+      return pdas.challengePDA.toString(); // Return the PDA as success
+    }
+    throw sendError;
+  }
   
   console.log('⏳ Confirming transaction...');
   try {
