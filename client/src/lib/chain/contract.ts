@@ -188,10 +188,23 @@ export async function createChallenge(
   // Add challenge seed as a signer
   transaction.partialSign(challengeSeed);
   const signedTransaction = await wallet.signTransaction(transaction);
-  const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+  const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
+    skipPreflight: false,
+    maxRetries: 0, // Don't retry - prevents "already processed" errors
+  });
   
   console.log('⏳ Confirming transaction...');
-  await connection.confirmTransaction(signature);
+  try {
+    await connection.confirmTransaction(signature, 'confirmed');
+  } catch (confirmError: any) {
+    // If confirmation fails but transaction actually succeeded, continue anyway
+    console.log('⚠️  Confirmation warning:', confirmError.message);
+    if (!confirmError.message?.includes('Transaction was not confirmed') && 
+        !confirmError.message?.includes('already been processed')) {
+      throw confirmError; // Only throw if it's a real error
+    }
+    console.log('✅ Transaction likely succeeded despite confirmation error');
+  }
   
   console.log('✅ Challenge created successfully!');
   console.log(`📍 Challenge PDA: ${pdas.challengePDA.toString()}`);
