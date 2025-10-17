@@ -18,7 +18,6 @@ import ElegantModal from "@/components/ui/ElegantModal";
 import CreateChallengeForm from "@/components/arena/CreateChallengeForm";
 import ElegantNavbar from "@/components/layout/ElegantNavbar";
 import { SubmitResultRoom } from "@/components/arena/SubmitResultRoom";
-import { FloatingChat } from "@/components/arena/FloatingChat";
 
 const ArenaHome: React.FC = () => {
   const wallet = useWallet();
@@ -43,7 +42,6 @@ const ArenaHome: React.FC = () => {
   const [loadingTopPlayers, setLoadingTopPlayers] = useState<boolean>(true);
   const [copiedWallet, setCopiedWallet] = useState<string | null>(null);
   const [showAllPlayers, setShowAllPlayers] = useState<boolean>(false);
-  const [showFloatingChat, setShowFloatingChat] = useState<boolean>(false);
   
   // Mock price API - simulates real-time price updates
   const fetchUsdfgPrice = useCallback(async () => {
@@ -1184,33 +1182,6 @@ const ArenaHome: React.FC = () => {
         >
           <span className="text-2xl font-bold">+</span>
         </button>
-
-        {/* Mobile Chat Button - Only show if user has active challenge */}
-        {hasActiveChallenge && (
-          <button
-            onClick={() => setShowFloatingChat(!showFloatingChat)}
-            className={`fixed bottom-20 left-6 md:hidden ${
-              showFloatingChat 
-                ? 'bg-purple-600 hover:bg-purple-700' 
-                : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:brightness-110'
-            } text-white p-4 rounded-full shadow-[0_0_20px_rgba(168,85,247,0.5)] transition-all z-40 flex items-center justify-center`}
-            title="Open Chat & Voice"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-          </button>
-        )}
-
-        {/* Floating Chat */}
-        {hasActiveChallenge && (
-          <FloatingChat
-            challengeId={selectedChallenge?.id || ""}
-            currentWallet={publicKey?.toString() || ""}
-            isVisible={showFloatingChat}
-            onClose={() => setShowFloatingChat(false)}
-          />
-        )}
       </div>
     </>
   );

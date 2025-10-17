@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, memo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trophy, Loader2, Camera, Upload, Image as ImageIcon, MessageCircle } from "lucide-react";
-import { FloatingChat } from "./FloatingChat";
+import { X, Trophy, Loader2, Camera, Upload, Image as ImageIcon } from "lucide-react";
+import { ChatBox } from "./ChatBox";
+import { VoiceChat } from "./VoiceChat";
 
 interface SubmitResultRoomProps {
   isOpen: boolean;
@@ -26,7 +27,6 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = memo(({
   const [isLoading, setIsLoading] = useState(false);
   const [proofImage, setProofImage] = useState<string | null>(null);
   const [proofFile, setProofFile] = useState<File | null>(null);
-  const [showFloatingChat, setShowFloatingChat] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImageCapture = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -269,22 +269,11 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = memo(({
                   </motion.div>
                 )}
 
-                {/* Chat Toggle Button */}
-                <div className="flex justify-center">
-                  <button
-                    onClick={() => setShowFloatingChat(!showFloatingChat)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                      showFloatingChat 
-                        ? 'bg-purple-600 hover:bg-purple-700 text-white' 
-                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                    }`}
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                    <span className="text-sm font-medium">
-                      {showFloatingChat ? 'Hide Chat' : 'Open Chat & Mic'}
-                    </span>
-                  </button>
-                </div>
+                {/* Voice Chat - Only render when modal is open */}
+                {isOpen && <VoiceChat challengeId={challengeId} currentWallet={currentWallet} />}
+
+                {/* Text Chat - Only render when modal is open */}
+                {isOpen && <ChatBox challengeId={challengeId} currentWallet={currentWallet} />}
 
                 {/* Info Box */}
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
@@ -327,14 +316,6 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = memo(({
               </div>
             </div>
           </motion.div>
-
-          {/* Floating Chat */}
-          <FloatingChat
-            challengeId={challengeId}
-            currentWallet={currentWallet}
-            isVisible={showFloatingChat}
-            onClose={() => setShowFloatingChat(false)}
-          />
         </>
       )}
     </AnimatePresence>
