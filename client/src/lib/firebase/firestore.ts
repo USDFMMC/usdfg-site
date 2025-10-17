@@ -56,7 +56,14 @@ export interface ChallengeData {
   // UI fields (minimal for display)
   players?: string[];                 // Array of player wallets
   maxPlayers?: number;                // Maximum players allowed
-  // REMOVED: game, rules, platform, mode, category, creatorTag, solanaAccountId, prizePool, cancelRequests
+  // Prize claim fields
+  canClaim?: boolean;                 // Whether winner can claim prize
+  payoutTriggered?: boolean;          // Whether prize has been claimed
+  payoutSignature?: string;            // Transaction signature of prize claim
+  payoutTimestamp?: Timestamp;        // When prize was claimed
+  pda?: string;                       // Challenge PDA for smart contract
+  prizePool?: number;                 // Total prize pool amount
+  // REMOVED: game, rules, platform, mode, category, creatorTag, solanaAccountId, cancelRequests
   // These are not needed for leaderboard and increase storage costs unnecessarily
 }
 

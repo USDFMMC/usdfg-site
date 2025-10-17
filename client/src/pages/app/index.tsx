@@ -319,7 +319,10 @@ const ArenaHome: React.FC = () => {
         // UI fields for display
         players: [currentWallet], // Creator is first player
         maxPlayers: 2, // Default to 2 for Head-to-Head
-        // REMOVED: creatorTag, game, mode, platform, rules, solanaAccountId, category, prizePool
+        // Prize claim fields
+        pda: challengeId, // Store the challenge PDA from smart contract
+        prizePool: challengeData.entryFee * 2 * 0.95, // Total prize pool (2x entry fee minus 5% platform fee)
+        // REMOVED: creatorTag, game, mode, platform, rules, solanaAccountId, category
         // These are not needed for leaderboards and increase storage costs unnecessarily
       };
       
@@ -383,6 +386,33 @@ const ArenaHome: React.FC = () => {
     } catch (error) {
       console.error("❌ Failed to submit result:", error);
       throw error; // Let modal handle the error
+    }
+  };
+
+  // Handle prize claiming
+  const handleClaimPrize = async (challenge: any) => {
+    if (!publicKey || !connection) {
+      console.error("❌ Wallet not connected");
+      alert("Please connect your wallet first");
+      return;
+    }
+
+    try {
+      console.log("🏆 Claiming prize for challenge:", challenge.id);
+      
+      // Import the claimChallengePrize function
+      const { claimChallengePrize } = await import("@/lib/firebase/firestore");
+      
+      // Call the claim function
+      await claimChallengePrize(challenge.id, wallet, connection);
+      
+      console.log("✅ Prize claimed successfully!");
+      alert("🏆 Prize claimed! Check your wallet for the USDFG tokens.");
+      
+      // The real-time listener will update the UI automatically
+    } catch (error) {
+      console.error("❌ Failed to claim prize:", error);
+      alert("Failed to claim prize: " + (error instanceof Error ? error.message : "Unknown error"));
     }
   };
 
@@ -992,11 +1022,41 @@ const ArenaHome: React.FC = () => {
                           }
 
                           if (challenge.status === "completed") {
-                            return (
-                              <div className="w-full px-4 py-2 bg-green-600/20 text-green-400 border border-green-600/30 font-semibold rounded-lg text-center">
-                                ✅ Completed
-                              </div>
-                            );
+                            // Check if current user is the winner and can claim prize
+                            const isWinner = currentWallet && challenge.rawData?.winner?.toLowerCase() === currentWallet;
+                            const canClaim = isWinner && challenge.rawData?.canClaim && !challenge.rawData?.payoutTriggered;
+                            
+                            if (canClaim) {
+                              return (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleClaimPrize(challenge);
+                                  }}
+                                  className="w-full px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all animate-pulse"
+                                >
+                                  🏆 Claim Prize
+                                </button>
+                              );
+                            } else if (isWinner && challenge.rawData?.payoutTriggered) {
+                              return (
+                                <div className="w-full px-4 py-2 bg-green-600/20 text-green-400 border border-green-600/30 font-semibold rounded-lg text-center">
+                                  ✅ Prize Claimed
+                                </div>
+                              );
+                            } else if (isWinner) {
+                              return (
+                                <div className="w-full px-4 py-2 bg-green-600/20 text-green-400 border border-green-600/30 font-semibold rounded-lg text-center">
+                                  🏆 You Won!
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <div className="w-full px-4 py-2 bg-green-600/20 text-green-400 border border-green-600/30 font-semibold rounded-lg text-center">
+                                  ✅ Completed
+                                </div>
+                              );
+                            }
                           }
 
                           if (challenge.status === "disputed") {
