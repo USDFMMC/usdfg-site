@@ -344,7 +344,11 @@ export const submitChallengeResult = async (
 
     // Check if both players have submitted
     if (Object.keys(results).length === data.maxPlayers) {
-      await determineWinner(challengeId, data);
+      console.log('🎯 Both players submitted! Determining winner...');
+      // Re-fetch the updated data to pass to determineWinner
+      const updatedSnap = await getDoc(challengeRef);
+      const updatedData = updatedSnap.data() as ChallengeData;
+      await determineWinner(challengeId, updatedData);
     }
   } catch (error) {
     console.error('❌ Error submitting result:', error);
