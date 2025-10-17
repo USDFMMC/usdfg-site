@@ -140,8 +140,11 @@ pub mod usdfg_smart_contract {
 
         let challenge = &mut ctx.accounts.challenge;
         
-        // Security: Verify challenge is open
-        require!(challenge.status == ChallengeStatus::Open, ChallengeError::NotOpen);
+        // Security: Verify challenge is open OR in progress (allow joining challenges that haven't been fully filled yet)
+        require!(
+            challenge.status == ChallengeStatus::Open || challenge.status == ChallengeStatus::InProgress,
+            ChallengeError::NotOpen
+        );
         
         // Security: Prevent self-challenge
         require!(challenge.creator != ctx.accounts.challenger.key(), ChallengeError::SelfChallenge);

@@ -458,7 +458,7 @@ export const syncChallengeStatus = async (challengeId: string, challengePDA: str
     
     // Parse the challenge data to get on-chain status
     const data = accountInfo.data;
-    const statusByte = data[8 + 32 + 1 + 32 + 8]; // Skip discriminator, creator, challenger option, entry_fee, then status
+    const statusByte = data[8 + 32 + 33 + 8]; // Skip discriminator (8), creator (32), challenger Option (33), entry_fee (8), then status
     
     let firestoreStatus: string;
     switch (statusByte) {

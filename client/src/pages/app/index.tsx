@@ -1018,7 +1018,7 @@ const ArenaHome: React.FC = () => {
                                     
                                     // Parse the challenge data to check status
                                     const data = accountInfo.data;
-                                    const statusByte = data[8 + 32 + 1 + 32 + 8]; // Skip discriminator, creator, challenger option, entry_fee, then status
+                                    const statusByte = data[8 + 32 + 33 + 8]; // Skip discriminator (8), creator (32), challenger Option (33), entry_fee (8), then status
                                     
                                     console.log('🔍 On-chain challenge status:', statusByte);
                                     console.log('🔍 Challenge data length:', data.length);
