@@ -10,9 +10,10 @@ pub const ESCROW_WALLET_SEED: &[u8] = b"escrow_wallet";
 pub mod usdfg_smart_contract {
     use super::*;
 
-    // Minimum and maximum entry fees in USDFG tokens
-    const MIN_ENTRY_FEE_USDFG: u64 = 1;  // 1 USDFG minimum
-    const MAX_ENTRY_FEE_USDFG: u64 = 1000; // 1000 USDFG maximum
+    // Minimum and maximum entry fees in lamports (smallest USDFG units)
+    // 1 USDFG = 1,000,000,000 lamports (9 decimals)
+    const MIN_ENTRY_FEE_LAMPORTS: u64 = 1_000_000_000;  // 1 USDFG minimum
+    const MAX_ENTRY_FEE_LAMPORTS: u64 = 1_000_000_000_000; // 1000 USDFG maximum
 
     pub fn initialize(ctx: Context<Initialize>, admin: Pubkey) -> Result<()> {
         let admin_state = &mut ctx.accounts.admin_state;
@@ -84,13 +85,13 @@ pub mod usdfg_smart_contract {
     }
 
     pub fn create_challenge(ctx: Context<CreateChallenge>, usdfg_amount: u64) -> Result<()> {
-        // Validate entry fee limits
+        // Validate entry fee limits (now in lamports)
         require!(
-            usdfg_amount >= MIN_ENTRY_FEE_USDFG,
+            usdfg_amount >= MIN_ENTRY_FEE_LAMPORTS,
             ChallengeError::EntryFeeTooLow
         );
         require!(
-            usdfg_amount <= MAX_ENTRY_FEE_USDFG,
+            usdfg_amount <= MAX_ENTRY_FEE_LAMPORTS,
             ChallengeError::EntryFeeTooHigh
         );
         
