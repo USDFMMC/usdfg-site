@@ -285,6 +285,8 @@ export async function acceptChallenge(
       { pubkey: adminStatePDA, isSigner: false, isWritable: false }, // admin_state
       { pubkey: pdas.escrowWalletPDA, isSigner: false, isWritable: false }, // escrow_wallet
       { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // mint
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program (needed for init_if_needed)
+      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }, // rent (needed for init_if_needed)
     ],
     data: instructionData,
   });
