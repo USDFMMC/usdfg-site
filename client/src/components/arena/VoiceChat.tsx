@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { Mic, MicOff } from "lucide-react";
 import { doc, setDoc, onSnapshot, deleteDoc, getDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase/config";
+import { setupAudioKeepAlive, keepAudioAlive } from "@/lib/audio-utils";
 
 interface VoiceChatProps {
   challengeId: string;
@@ -28,6 +29,10 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
     if (voiceDisabled) return;
     
     console.log("🎤 VoiceChat useEffect triggered - initializing...");
+    
+    // Setup audio keep-alive for mobile
+    setupAudioKeepAlive();
+    
     initVoiceChat();
     
     return () => {
@@ -238,6 +243,9 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
       track.enabled = !newMutedState; // enabled = true means NOT muted
     });
     setMuted(newMutedState);
+    
+    // Keep audio context alive on mobile
+    keepAudioAlive();
   };
 
   const cleanup = async () => {
