@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { updateChallengeStatus, archiveChallenge } from "../lib/firebase/firestore";
+import { updateChallengeStatus, cleanupExpiredChallenge, cleanupCompletedChallenge } from "../lib/firebase/firestore";
 
 /**
  * Watches all active challenges and auto-marks them completed when expired.
@@ -55,27 +55,48 @@ export function useChallengeExpiry(challenges: any[]) {
           }
         }
         
-        // DISABLED: Auto-archiving to prevent Firebase permission errors
-        // Expired challenges will remain in the database but won't be shown to users
-        // This prevents storage cost accumulation while avoiding permission issues
-        /*
-        if (challenge.status === "expired" && !archiveTimers.current.has(challenge.id) && !processedChallenges.current.has(challenge.id + '_archive')) {
-          console.log("🗑️ Found expired challenge that needs archiving:", challenge.id);
-          processedChallenges.current.add(challenge.id + '_archive');
+        // Auto-cleanup expired challenges (delete immediately to save storage)
+        if (challenge.status === "expired" && !archiveTimers.current.has(challenge.id) && !processedChallenges.current.has(challenge.id + '_cleanup')) {
+          console.log("🗑️ Found expired challenge that needs cleanup:", challenge.id);
+          processedChallenges.current.add(challenge.id + '_cleanup');
 
-          // Archive immediately (no need to wait 5s since it's already been marked)
+          // Cleanup immediately (no need to wait since it's already expired)
           setTimeout(async () => {
             try {
-              await archiveChallenge(challenge.id);
-              console.log("🏁 Challenge archived (cleanup):", challenge.id);
-              processedChallenges.current.delete(challenge.id + '_archive');
+              await cleanupExpiredChallenge(challenge.id);
+              console.log("🏁 Expired challenge cleaned up:", challenge.id);
+              processedChallenges.current.delete(challenge.id + '_cleanup');
             } catch (error) {
-              console.error("❌ Failed to archive challenge (cleanup):", error);
-              processedChallenges.current.delete(challenge.id + '_archive');
+              console.error("❌ Failed to cleanup expired challenge:", error);
+              processedChallenges.current.delete(challenge.id + '_cleanup');
             }
-          }, 2000); // Short delay to show "Expired" status
+          }, 1000); // Short delay to show "Expired" status
         }
-        */
+
+        // Auto-cleanup completed challenges (delete after 24 hours to save storage)
+        if (challenge.status === "completed" && !archiveTimers.current.has(challenge.id) && !processedChallenges.current.has(challenge.id + '_cleanup_completed')) {
+          const completedTime = challenge.results ? 
+            Math.max(...Object.values(challenge.results).map(r => r.submittedAt.toMillis())) : 
+            challenge.createdAt.toMillis();
+          
+          const hoursSinceCompletion = (Date.now() - completedTime) / (1000 * 60 * 60);
+          
+          if (hoursSinceCompletion >= 24) {
+            console.log("🗑️ Found completed challenge that needs cleanup (24h old):", challenge.id);
+            processedChallenges.current.add(challenge.id + '_cleanup_completed');
+
+            setTimeout(async () => {
+              try {
+                await cleanupCompletedChallenge(challenge.id);
+                console.log("🏁 Completed challenge cleaned up (24h old):", challenge.id);
+                processedChallenges.current.delete(challenge.id + '_cleanup_completed');
+              } catch (error) {
+                console.error("❌ Failed to cleanup completed challenge:", error);
+                processedChallenges.current.delete(challenge.id + '_cleanup_completed');
+              }
+            }, 1000);
+          }
+        }
       }
     };
 

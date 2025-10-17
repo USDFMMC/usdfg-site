@@ -35,26 +35,16 @@ export async function testFirestoreConnection() {
 // Collection references
 const usersCollection = collection(db, 'users');
 
-// Challenge interfaces
+// Optimized Challenge Data - Minimal Collection
 export interface ChallengeData {
   id?: string;
-  creator: string;
-  creatorTag: string;
-  game: string;
-  mode: string;
-  platform: string;
-  entryFee: number;
-  maxPlayers: number;
-  rules: string;
+  creator: string;                    // Creator wallet
+  challenger?: string;                // Challenger wallet (if accepted)
+  entryFee: number;                   // Entry fee amount
   status: 'pending' | 'active' | 'completed' | 'cancelled' | 'disputed' | 'in-progress';
-  players: string[];
-  createdAt: Timestamp;
-  expiresAt: Timestamp;
-  solanaAccountId?: string;
-  category: string;
-  prizePool: number;
-  // Cancel requests (for mutual cancellation)
-  cancelRequests?: string[]; // Array of wallet addresses that requested cancel
+  createdAt: Timestamp;               // Creation time
+  expiresAt: Timestamp;               // Expiration time
+  winner?: string;                    // Winner wallet (if completed)
   // Result submission fields
   results?: {
     [wallet: string]: {
@@ -62,8 +52,9 @@ export interface ChallengeData {
       submittedAt: Timestamp;
     }
   };
-  resultDeadline?: Timestamp; // 2 hours after match starts
-  winner?: string;
+  resultDeadline?: Timestamp;         // 2 hours after match starts
+  // REMOVED: game, rules, platform, mode, category, creatorTag, maxPlayers, players, solanaAccountId, prizePool, cancelRequests
+  // These are not needed for leaderboard and increase storage costs unnecessarily
 }
 
 // Challenge operations
@@ -264,14 +255,32 @@ export async function addChallengeDoc(data: any) {
   return docRef.id;
 }
 
+// Auto-cleanup for completed challenges (delete after 24 hours)
+export async function cleanupCompletedChallenge(id: string) {
+  try {
+    const challengeRef = doc(db, "challenges", id);
+    await deleteDoc(challengeRef);
+    console.log('🗑️ Completed challenge cleaned up:', id);
+  } catch (error) {
+    console.error('❌ Failed to cleanup completed challenge:', error);
+  }
+}
+
+// Auto-cleanup for expired challenges (delete immediately)
+export async function cleanupExpiredChallenge(id: string) {
+  try {
+    const challengeRef = doc(db, "challenges", id);
+    await deleteDoc(challengeRef);
+    console.log('🗑️ Expired challenge cleaned up:', id);
+  } catch (error) {
+    console.error('❌ Failed to cleanup expired challenge:', error);
+  }
+}
+
+// Legacy function - now redirects to cleanup
 export async function archiveChallenge(id: string) {
-  const src = doc(db, "challenges", id);
-  const dst = doc(db, "challenges_archive", id);
-  const batch = writeBatch(db);
-  batch.set(dst, { refId: id, movedAt: Timestamp.now() });
-  batch.delete(src);
-  await batch.commit();
-  console.log('🗄️ Challenge archived:', id);
+  console.log('⚠️ archiveChallenge is deprecated, using cleanup instead');
+  await cleanupCompletedChallenge(id);
 }
 
 // ============================================

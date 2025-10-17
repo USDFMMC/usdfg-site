@@ -295,21 +295,17 @@ const ArenaHome: React.FC = () => {
       const { addChallenge } = await import("@/lib/firebase/firestore");
       const { Timestamp } = await import("firebase/firestore");
       
+      // OPTIMIZED: Only store essential data for leaderboards
       const firestoreChallengeData = {
         creator: currentWallet,
-        creatorTag: challengeData.username,
-        game: challengeData.game,
-        mode: challengeData.mode === 'Custom Mode' ? challengeData.customMode : challengeData.mode,
-        platform: challengeData.platform,
+        challenger: undefined, // Will be set when someone accepts
         entryFee: challengeData.entryFee,
-        maxPlayers: maxPlayers, // Use the dynamic maxPlayers we calculated
-        rules: challengeData.rules || "",
         status: 'active' as const,
-        players: [currentWallet],
+        createdAt: Timestamp.now(),
         expiresAt: Timestamp.fromDate(new Date(Date.now() + (2 * 60 * 60 * 1000))), // 2 hours from now
-        solanaAccountId: challengeId,
-        category: getGameCategory(challengeData.game),
-        prizePool: Math.round(prizePool)
+        winner: undefined, // Will be set when match completes
+        // REMOVED: creatorTag, game, mode, platform, maxPlayers, rules, players, solanaAccountId, category, prizePool
+        // These are not needed for leaderboards and increase storage costs unnecessarily
       };
       
       console.log("🔥 Adding challenge to Firestore...");
