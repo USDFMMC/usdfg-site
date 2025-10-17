@@ -31,9 +31,7 @@ export async function isSmartContractInitialized(
       console.log('❌ Smart contract not initialized - admin state missing');
     }
     
-    // TEMPORARY: Skip initialization check to test challenge creation
-    console.log('⚠️  SKIPPING admin state check - assuming contract is ready');
-    return true;
+    return isInitialized;
   } catch (error) {
     console.log('❌ Error checking admin state:', error);
     return false;
@@ -78,6 +76,10 @@ export async function initializeSmartContract(
   const instructionData = Buffer.alloc(8 + 32);
   discriminatorHash.copy(instructionData, 0);
   ADMIN_WALLET.toBuffer().copy(instructionData, 8);
+  
+  console.log('🔧 Instruction data created:');
+  console.log('   Discriminator:', discriminatorHash.toString('hex'));
+  console.log('   Admin wallet:', ADMIN_WALLET.toString());
   
   // Create instruction
   const instruction = new TransactionInstruction({
