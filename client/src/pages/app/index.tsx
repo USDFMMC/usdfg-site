@@ -382,7 +382,7 @@ const ArenaHome: React.FC = () => {
 
   const isChallengeOwner = (challenge: any) => {
     const currentWallet = publicKey?.toString()?.toLowerCase() || null;
-    const challengeCreator = challenge.creator?.toLowerCase() || null;
+    const challengeCreator = challenge.creator?.toString()?.toLowerCase() || null;
     
     // Must have both wallet addresses to compare
     if (!currentWallet || !challengeCreator) {
@@ -843,7 +843,7 @@ const ArenaHome: React.FC = () => {
                                   <div className="text-3xl mb-2">🏆</div>
                                   <div className="text-xl font-bold text-yellow-400">Winner</div>
                                   <p className="text-xs text-gray-400 mt-1 font-mono break-all">{challenge.rawData.winner}</p>
-                                  {challenge.rawData.winner.toLowerCase() === publicKey?.toString().toLowerCase() && (
+                                  {challenge.rawData.winner?.toString()?.toLowerCase() === publicKey?.toString().toLowerCase() && (
                                     <p className="text-green-400 font-semibold mt-2">🎉 You Won!</p>
                                   )}
                                 </>
