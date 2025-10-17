@@ -158,6 +158,9 @@ export async function createChallenge(
 
   // Step 6: Create instruction (NEW CONTRACT - NO ORACLE NEEDED!)
   console.log('✅ Creating instruction with NEW smart contract (oracle-free)...');
+  console.log('📍 Escrow Token Account PDA:', pdas.escrowTokenAccountPDA.toString());
+  console.log('📍 Challenge PDA:', pdas.challengePDA.toString());
+  console.log('📍 Escrow Wallet PDA:', pdas.escrowWalletPDA.toString());
   
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
