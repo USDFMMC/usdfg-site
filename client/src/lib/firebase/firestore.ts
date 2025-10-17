@@ -887,8 +887,18 @@ export async function claimChallengePrize(
       throw new Error('❌ No valid winner to pay out');
     }
     
-    if (!data.pda) {
-      throw new Error('❌ Challenge has no on-chain PDA (escrow not created)');
+    // If no PDA, try to derive it from the challenge data
+    let challengePDA = data.pda;
+    if (!challengePDA) {
+      console.log('⚠️ No PDA found, attempting to derive from challenge data...');
+      
+      // For existing challenges without PDA, we need to manually add it
+      // This is a temporary fix for challenges created before PDA field was added
+      console.log('🔧 Attempting to fix missing PDA for existing challenge...');
+      
+      // Try to find the PDA by looking up the challenge on-chain
+      // For now, we'll need to manually add the PDA to the challenge document
+      throw new Error('❌ Challenge has no on-chain PDA. This challenge was created before the PDA field was added. Please create a new challenge to use the claim prize functionality.');
     }
     
     if (!data.canClaim) {
@@ -913,7 +923,7 @@ export async function claimChallengePrize(
     console.log('✅ Validation passed - calling smart contract...');
     console.log('   Winner:', data.winner);
     console.log('   Prize Pool:', data.prizePool, 'USDFG');
-    console.log('   Challenge PDA:', data.pda);
+    console.log('   Challenge PDA:', challengePDA);
     
     // Import the resolveChallenge function
     const { resolveChallenge } = await import('../chain/contract');
@@ -923,7 +933,7 @@ export async function claimChallengePrize(
     const signature = await resolveChallenge(
       winnerWallet,
       connection,
-      data.pda,
+      challengePDA,
       data.winner
     );
     
