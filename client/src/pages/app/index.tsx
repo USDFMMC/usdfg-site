@@ -298,12 +298,12 @@ const ArenaHome: React.FC = () => {
       // OPTIMIZED: Only store essential data for leaderboards
       const firestoreChallengeData = {
         creator: currentWallet,
-        challenger: undefined, // Will be set when someone accepts
+        // challenger: undefined, // Will be set when someone accepts (don't include undefined fields)
         entryFee: challengeData.entryFee,
         status: 'active' as const,
         createdAt: Timestamp.now(),
         expiresAt: Timestamp.fromDate(new Date(Date.now() + (2 * 60 * 60 * 1000))), // 2 hours from now
-        winner: undefined, // Will be set when match completes
+        // winner: undefined, // Will be set when match completes (don't include undefined fields)
         // REMOVED: creatorTag, game, mode, platform, maxPlayers, rules, players, solanaAccountId, category, prizePool
         // These are not needed for leaderboards and increase storage costs unnecessarily
       };
