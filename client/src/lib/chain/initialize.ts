@@ -68,7 +68,7 @@ export async function initializeSmartContract(
   console.log('🔧 Creating initialize instruction...');
   
   // Calculate discriminator for initialize function
-  const { sha256 } = await import('@noble/hashes/sha2');
+  const { sha256 } = await import('@noble/hashes/sha2.js');
   const discriminator = Buffer.from('global:initialize', 'utf8');
   const discriminatorHash = Buffer.from(sha256(discriminator)).slice(0, 8);
   
