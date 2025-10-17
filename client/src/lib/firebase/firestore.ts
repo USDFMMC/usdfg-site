@@ -364,6 +364,10 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     const results = data.results || {};
     const players = Object.keys(results);
     
+    console.log('🎯 Determining winner for challenge:', challengeId);
+    console.log('📊 Results:', results);
+    console.log('👥 Players who submitted:', players);
+    
     if (players.length !== 2) {
       console.log('⏳ Waiting for both players to submit results');
       return;
@@ -373,6 +377,9 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     const player2 = players[1];
     const player1Won = results[player1].didWin;
     const player2Won = results[player2].didWin;
+    
+    console.log(`Player 1 (${player1.slice(0,8)}...): didWin=${player1Won}`);
+    console.log(`Player 2 (${player2.slice(0,8)}...): didWin=${player2Won}`);
 
     const challengeRef = doc(db, "challenges", challengeId);
 
