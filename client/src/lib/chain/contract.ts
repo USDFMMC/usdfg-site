@@ -143,12 +143,15 @@ export async function createChallenge(
   console.log('💰 Created BN:', entryFeeBN.toString());
 
   // Create instruction data for create_challenge
+  // Calculate discriminator using SHA256 of "global:create_challenge"
+  const crypto = await import('crypto');
+  const hash = crypto.createHash('sha256').update('global:create_challenge').digest();
+  const discriminator = hash.slice(0, 8);
+  
   const instructionData = Buffer.alloc(8 + 8); // discriminator + entry_fee
-  // Correct discriminator for "global:create_challenge"
-  instructionData.writeUInt32LE(0x010fadef, 0); // Lower 32 bits: 0x010fadef
-  instructionData.writeUInt32LE(0xaaf42f01, 4); // Upper 32 bits: 0xaaf42f01
+  discriminator.copy(instructionData, 0);
   entryFeeBN.toArrayLike(Buffer, 'le', 8).copy(instructionData, 8);
-  console.log('📦 Instruction data created');
+  console.log('📦 Instruction data created', 'Discriminator:', discriminator.toString('hex'));
 
   // Step 6: Create instruction (NEW CONTRACT - NO ORACLE NEEDED!)
   console.log('✅ Creating instruction with NEW smart contract (oracle-free)...');
