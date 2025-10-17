@@ -437,6 +437,7 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     
     // Mark challenge as ready for winner to claim (Player pays gas, not admin!)
     await updateDoc(challengeRef, {
+      status: 'completed', // Keep status as completed!
       needsPayout: true,
       payoutTriggered: false,
       canClaim: true,
