@@ -161,6 +161,7 @@ const ArenaHome: React.FC = () => {
     
     // Determine max players based on mode
     const getMaxPlayers = (mode: string) => {
+      if (!mode) return 2; // Safety check for undefined mode
       switch (mode.toLowerCase()) {
         case 'head-to-head':
         case '1v1':
@@ -249,6 +250,7 @@ const ArenaHome: React.FC = () => {
       
       // Determine max players based on mode
       const getMaxPlayersForMode = (mode: string) => {
+        if (!mode) return 2; // Safety check for undefined mode
         switch (mode.toLowerCase()) {
           case 'head-to-head':
           case '1v1':
