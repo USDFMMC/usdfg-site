@@ -990,12 +990,46 @@ const ArenaHome: React.FC = () => {
                           }
 
                           // Show "Join" button for non-participants
+                          // Only show if Firestore says "active" AND we haven't checked on-chain status yet
                           if (challenge.status === "active" && challenge.players < challenge.capacity) {
                             return (
                               <button 
-                                onClick={() => {
-                                  setSelectedChallenge(challenge);
-                                  setShowJoinModal(true);
+                                onClick={async () => {
+                                  // Check on-chain status before allowing join
+                                  try {
+                                    const challengePDA = challenge.rawData?.pda || challenge.pda;
+                                    if (!challengePDA) {
+                                      alert('Challenge has no on-chain PDA. Cannot join this challenge.');
+                                      return;
+                                    }
+                                    
+                                    // Check if challenge is actually open on-chain
+                                    const { connection } = await import('@solana/web3.js');
+                                    const { PublicKey } = await import('@solana/web3.js');
+                                    const { PROGRAM_ID } = await import('@/lib/chain/config');
+                                    
+                                    const accountInfo = await connection.getAccountInfo(new PublicKey(challengePDA));
+                                    if (!accountInfo || !accountInfo.data) {
+                                      alert('Challenge not found on-chain. It may have been deleted.');
+                                      return;
+                                    }
+                                    
+                                    // Parse the challenge data to check status
+                                    const data = accountInfo.data;
+                                    const statusByte = data[8 + 32 + 1 + 32 + 8]; // Skip discriminator, creator, challenger option, entry_fee, then status
+                                    
+                                    if (statusByte !== 0) { // 0 = Open, 1 = InProgress, 2 = Completed, etc.
+                                      alert('This challenge is no longer open. It may have already been joined or completed.');
+                                      return;
+                                    }
+                                    
+                                    // Challenge is actually open, proceed with join
+                                    setSelectedChallenge(challenge);
+                                    setShowJoinModal(true);
+                                  } catch (error) {
+                                    console.error('Error checking on-chain status:', error);
+                                    alert('Failed to verify challenge status. Please try again.');
+                                  }
                                 }}
                                 className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50"
                                 disabled={!isConnected}

@@ -442,6 +442,66 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
 }
 
 /**
+ * Sync Firestore challenge status with on-chain status
+ * This helps prevent showing "Join Challenge" for already joined challenges
+ */
+export const syncChallengeStatus = async (challengeId: string, challengePDA: string): Promise<void> => {
+  try {
+    const { connection } = await import('@solana/web3.js');
+    const { PublicKey } = await import('@solana/web3.js');
+    
+    const accountInfo = await connection.getAccountInfo(new PublicKey(challengePDA));
+    if (!accountInfo || !accountInfo.data) {
+      console.log('Challenge not found on-chain:', challengePDA);
+      return;
+    }
+    
+    // Parse the challenge data to get on-chain status
+    const data = accountInfo.data;
+    const statusByte = data[8 + 32 + 1 + 32 + 8]; // Skip discriminator, creator, challenger option, entry_fee, then status
+    
+    let firestoreStatus: string;
+    switch (statusByte) {
+      case 0: // Open
+        firestoreStatus = 'active';
+        break;
+      case 1: // InProgress
+        firestoreStatus = 'in-progress';
+        break;
+      case 2: // Completed
+        firestoreStatus = 'completed';
+        break;
+      case 3: // Cancelled
+        firestoreStatus = 'cancelled';
+        break;
+      case 4: // Disputed
+        firestoreStatus = 'disputed';
+        break;
+      default:
+        console.log('Unknown on-chain status:', statusByte);
+        return;
+    }
+    
+    // Update Firestore if status differs
+    const challengeRef = doc(db, "challenges", challengeId);
+    const snap = await getDoc(challengeRef);
+    
+    if (snap.exists()) {
+      const currentData = snap.data();
+      if (currentData.status !== firestoreStatus) {
+        await updateDoc(challengeRef, {
+          status: firestoreStatus,
+          updatedAt: Timestamp.now(),
+        });
+        console.log(`🔄 Synced challenge status: ${currentData.status} → ${firestoreStatus}`);
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error syncing challenge status:', error);
+  }
+};
+
+/**
  * Start result submission phase when challenge goes in-progress
  * Sets a 2-hour deadline for result submission
  */

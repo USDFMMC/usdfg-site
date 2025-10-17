@@ -8,10 +8,23 @@ export const useChallenges = () => {
 
   useEffect(() => {
     // Set up real-time listener
-    const unsubscribe = listenToChallenges((newChallenges) => {
+    const unsubscribe = listenToChallenges(async (newChallenges) => {
       setChallenges(newChallenges);
       setLoading(false);
       setError(null);
+      
+      // Sync status for challenges that have PDAs
+      for (const challenge of newChallenges) {
+        const challengePDA = challenge.rawData?.pda || challenge.pda;
+        if (challengePDA) {
+          try {
+            const { syncChallengeStatus } = await import('@/lib/firebase/firestore');
+            await syncChallengeStatus(challenge.id, challengePDA);
+          } catch (error) {
+            console.error('Error syncing challenge status:', error);
+          }
+        }
+      }
     });
 
     // Fallback: fetch challenges once if listener fails
@@ -20,6 +33,19 @@ export const useChallenges = () => {
         const initialChallenges = await fetchChallenges();
         if (initialChallenges.length > 0) {
           setChallenges(initialChallenges);
+          
+          // Sync status for challenges that have PDAs
+          for (const challenge of initialChallenges) {
+            const challengePDA = challenge.rawData?.pda || challenge.pda;
+            if (challengePDA) {
+              try {
+                const { syncChallengeStatus } = await import('@/lib/firebase/firestore');
+                await syncChallengeStatus(challenge.id, challengePDA);
+              } catch (error) {
+                console.error('Error syncing challenge status:', error);
+              }
+            }
+          }
         }
       } catch (err) {
         console.error('❌ Failed to fetch initial challenges:', err);

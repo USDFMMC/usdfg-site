@@ -435,10 +435,6 @@ pub struct CreateChallenge<'info> {
     )]
     pub escrow_token_account: Account<'info, TokenAccount>,
     /// CHECK: This is the escrow wallet that holds the tokens
-    #[account(
-        seeds = [ESCROW_WALLET_SEED],
-        bump
-    )]
     pub escrow_wallet: AccountInfo<'info>,
     pub challenge_seed: Signer<'info>,
     pub system_program: Program<'info, System>,
