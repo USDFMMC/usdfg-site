@@ -139,14 +139,13 @@ const ArenaHome: React.FC = () => {
     if (myInProgressChallenges.length > 0 && !showSubmitResultModal) {
       const challenge = myInProgressChallenges[0];
       
-      // Check if both players have submitted - if so, don't auto-open (waiting for winner to claim)
+      // Check if current player has already submitted - if so, don't auto-open
       const results = challenge.rawData?.results || challenge.results || {};
-      const submissionCount = Object.keys(results).length;
-      const maxPlayers = challenge.rawData?.maxPlayers || challenge.maxPlayers || 2;
+      const hasSubmitted = currentWallet && results[currentWallet];
       
-      if (submissionCount >= maxPlayers) {
-        console.log("✅ Both players submitted - waiting for winner to claim prize. Not auto-opening lobby.");
-        return; // Don't auto-open if both already submitted
+      if (hasSubmitted) {
+        console.log("✅ You already submitted your result. Lobby stays closed.");
+        return; // Don't auto-open if you already submitted
       }
       
       console.log("🎮 Auto-opening Submit Result Room for in-progress challenge:", challenge.id);
