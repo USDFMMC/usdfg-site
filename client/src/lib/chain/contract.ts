@@ -144,9 +144,9 @@ export async function createChallenge(
 
   // Create instruction data for create_challenge
   // Calculate discriminator using SHA256 of "global:create_challenge"
-  const crypto = await import('crypto');
-  const hash = crypto.createHash('sha256').update('global:create_challenge').digest();
-  const discriminator = hash.slice(0, 8);
+  const { sha256 } = await import('@noble/hashes/sha2.js');
+  const hash = sha256(new TextEncoder().encode('global:create_challenge'));
+  const discriminator = Buffer.from(hash.slice(0, 8));
   
   const instructionData = Buffer.alloc(8 + 8); // discriminator + entry_fee
   discriminator.copy(instructionData, 0);
