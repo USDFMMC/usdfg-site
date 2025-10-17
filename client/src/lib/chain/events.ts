@@ -3,7 +3,8 @@ import { Connection, PublicKey, Transaction, SystemProgram, clusterApiUrl, Keypa
 const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
 
 // Registry account for cross-device challenge discovery
-const REGISTRY_ACCOUNT = "USDFGChallengeRegistry1111111111111111111111111111111111";
+// Using a valid Solana program ID format
+const REGISTRY_ACCOUNT = "11111111111111111111111111111111";
 
 export interface ChallengeMeta {
   id: string;
