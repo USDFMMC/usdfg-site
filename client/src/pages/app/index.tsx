@@ -179,7 +179,8 @@ const ArenaHome: React.FC = () => {
     };
 
     const maxPlayers = getMaxPlayers(mode);
-    const currentPlayers = challenge.players?.length || 1; // Creator is always 1st player
+    // Use players array if available, otherwise check challenger
+    const currentPlayers = challenge.players?.length || (challenge.challenger ? 2 : 1);
 
     return {
       id: challenge.id,
@@ -315,7 +316,10 @@ const ArenaHome: React.FC = () => {
         createdAt: Timestamp.now(),
         expiresAt: Timestamp.fromDate(new Date(Date.now() + (2 * 60 * 60 * 1000))), // 2 hours from now
         // winner: undefined, // Will be set when match completes (don't include undefined fields)
-        // REMOVED: creatorTag, game, mode, platform, maxPlayers, rules, players, solanaAccountId, category, prizePool
+        // UI fields for display
+        players: [currentWallet], // Creator is first player
+        maxPlayers: 2, // Default to 2 for Head-to-Head
+        // REMOVED: creatorTag, game, mode, platform, rules, solanaAccountId, category, prizePool
         // These are not needed for leaderboards and increase storage costs unnecessarily
       };
       

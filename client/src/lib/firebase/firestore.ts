@@ -53,7 +53,10 @@ export interface ChallengeData {
     }
   };
   resultDeadline?: Timestamp;         // 2 hours after match starts
-  // REMOVED: game, rules, platform, mode, category, creatorTag, maxPlayers, players, solanaAccountId, prizePool, cancelRequests
+  // UI fields (minimal for display)
+  players?: string[];                 // Array of player wallets
+  maxPlayers?: number;                // Maximum players allowed
+  // REMOVED: game, rules, platform, mode, category, creatorTag, solanaAccountId, prizePool, cancelRequests
   // These are not needed for leaderboard and increase storage costs unnecessarily
 }
 
