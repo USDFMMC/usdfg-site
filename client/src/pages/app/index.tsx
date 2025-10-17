@@ -150,6 +150,15 @@ const ArenaHome: React.FC = () => {
   
   // Convert Firestore challenges to the format expected by the UI
   const challenges = firestoreChallenges.map(challenge => {
+    // Provide default values for optimized data structure
+    const mode = challenge.mode || 'Head-to-Head';
+    const game = challenge.game || 'USDFG Arena';
+    const platform = challenge.platform || 'All Platforms';
+    const creatorTag = challenge.creatorTag || challenge.creator?.slice(0, 8) + '...' || 'Unknown';
+    const prizePool = challenge.prizePool || (challenge.entryFee * 2);
+    const category = challenge.category || 'Gaming';
+    const rules = challenge.rules || 'Standard USDFG Arena rules apply';
+    
     // Determine max players based on mode
     const getMaxPlayers = (mode: string) => {
       switch (mode.toLowerCase()) {
@@ -164,28 +173,28 @@ const ArenaHome: React.FC = () => {
         case 'team vs team':
           return 4;
         default:
-          return challenge.maxPlayers || 2; // Fallback to stored value or default
+          return 2; // Default to 2 players for Head-to-Head
       }
     };
 
-    const maxPlayers = getMaxPlayers(challenge.mode);
+    const maxPlayers = getMaxPlayers(mode);
     const currentPlayers = challenge.players?.length || 1; // Creator is always 1st player
 
     return {
       id: challenge.id,
       clientId: challenge.id,
-      title: `${challenge.game} ${challenge.mode}`,
-      game: challenge.game,
-      mode: challenge.mode,
-      platform: challenge.platform,
-      username: challenge.creatorTag,
+      title: `${game} ${mode}`,
+      game: game,
+      mode: mode,
+      platform: platform,
+      username: creatorTag,
       entryFee: challenge.entryFee,
-      prizePool: challenge.prizePool,
+      prizePool: prizePool,
       players: currentPlayers,
       capacity: maxPlayers,
-      category: challenge.category,
+      category: category,
       creator: challenge.creator,
-      rules: challenge.rules,
+      rules: rules,
       createdAt: challenge.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
       timestamp: challenge.createdAt?.toDate?.()?.getTime() || Date.now(),
       expiresAt: challenge.expiresAt?.toDate?.()?.getTime() || (Date.now() + (2 * 60 * 60 * 1000)),
