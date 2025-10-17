@@ -1004,9 +1004,11 @@ const ArenaHome: React.FC = () => {
                                     }
                                     
                                     // Check if challenge is actually open on-chain
-                                    const { connection } = await import('@solana/web3.js');
-                                    const { PublicKey } = await import('@solana/web3.js');
+                                    const { Connection, PublicKey } = await import('@solana/web3.js');
                                     const { PROGRAM_ID } = await import('@/lib/chain/config');
+                                    
+                                    // Use the connection from the hook
+                                    const connection = new Connection('https://api.devnet.solana.com');
                                     
                                     const accountInfo = await connection.getAccountInfo(new PublicKey(challengePDA));
                                     if (!accountInfo || !accountInfo.data) {
@@ -1018,8 +1020,14 @@ const ArenaHome: React.FC = () => {
                                     const data = accountInfo.data;
                                     const statusByte = data[8 + 32 + 1 + 32 + 8]; // Skip discriminator, creator, challenger option, entry_fee, then status
                                     
+                                    console.log('🔍 On-chain challenge status:', statusByte);
+                                    console.log('🔍 Challenge data length:', data.length);
+                                    console.log('🔍 First 50 bytes:', Array.from(data.slice(0, 50)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+                                    
                                     if (statusByte !== 0) { // 0 = Open, 1 = InProgress, 2 = Completed, etc.
-                                      alert('This challenge is no longer open. It may have already been joined or completed.');
+                                      const statusNames = ['Open', 'InProgress', 'Completed', 'Cancelled', 'Disputed'];
+                                      const statusName = statusNames[statusByte] || 'Unknown';
+                                      alert(`This challenge is no longer open. Current status: ${statusName} (${statusByte}). It may have already been joined or completed.`);
                                       return;
                                     }
                                     

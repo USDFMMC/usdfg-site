@@ -447,8 +447,8 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
  */
 export const syncChallengeStatus = async (challengeId: string, challengePDA: string): Promise<void> => {
   try {
-    const { connection } = await import('@solana/web3.js');
-    const { PublicKey } = await import('@solana/web3.js');
+    const { Connection, PublicKey } = await import('@solana/web3.js');
+    const connection = new Connection('https://api.devnet.solana.com');
     
     const accountInfo = await connection.getAccountInfo(new PublicKey(challengePDA));
     if (!accountInfo || !accountInfo.data) {
