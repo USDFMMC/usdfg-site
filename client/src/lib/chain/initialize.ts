@@ -101,8 +101,17 @@ export async function initializeSmartContract(
   const signature = await connection.sendRawTransaction(signedTransaction.serialize());
   
   console.log('⏳ Confirming transaction...');
-  await connection.confirmTransaction(signature, 'confirmed');
-  
-  console.log('✅ Smart contract initialized!');
-  console.log('🔗 Transaction:', `https://explorer.solana.com/tx/${signature}?cluster=devnet`);
+  try {
+    await connection.confirmTransaction(signature, 'confirmed');
+    console.log('✅ Smart contract initialized!');
+    console.log('🔗 Transaction:', `https://explorer.solana.com/tx/${signature}?cluster=devnet`);
+  } catch (confirmError: any) {
+    // Handle "already processed" error for initialization
+    if (confirmError.message?.includes('This transaction has already been processed') ||
+        confirmError.message?.includes('already been processed')) {
+      console.log('✅ Smart contract already initialized (transaction was processed)');
+      return;
+    }
+    throw confirmError;
+  }
 }

@@ -200,7 +200,8 @@ export async function createChallenge(
     // If confirmation fails but transaction actually succeeded, continue anyway
     console.log('⚠️  Confirmation warning:', confirmError.message);
     if (!confirmError.message?.includes('Transaction was not confirmed') && 
-        !confirmError.message?.includes('already been processed')) {
+        !confirmError.message?.includes('already been processed') &&
+        !confirmError.message?.includes('This transaction has already been processed')) {
       throw confirmError; // Only throw if it's a real error
     }
     console.log('✅ Transaction likely succeeded despite confirmation error');
