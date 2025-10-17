@@ -10,7 +10,7 @@ import { PublicKey } from '@solana/web3.js';
 // Smart Contract Program ID (deployed on devnet) - DEPLOYED VIA PLAYGROUND
 // Old contract: 2KL4BKvUtDmABvuvRopkCEb33myWM1W9BGodAZ82RWDT
 // NEW deployed contract with lamports fix: 9NBcMx3x8EotQi63fukhXpYbcBRgyWj6PcEFyEaL9oqo
-export const PROGRAM_ID = new PublicKey('YOUR_NEW_PROGRAM_ID_HERE');
+export const PROGRAM_ID = new PublicKey('9NBcMx3x8EotQi63fukhXpYbcBRgyWj6PcEFyEaL9oqo');
 
 // Admin wallet address
 export const ADMIN_WALLET = new PublicKey('3SeLoDGsajuQUt2pzSkZV7LmB7gKtckmrD693U69kcUd');
