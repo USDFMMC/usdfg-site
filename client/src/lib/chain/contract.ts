@@ -347,23 +347,24 @@ export async function cancelChallenge(
 }
 
 /**
- * Resolve Challenge (Admin Only - Triggers Payout to Winner)
+ * Resolve Challenge (Winner Claims Prize OR Admin Resolves)
  * 
  * SECURITY FEATURES:
- * ✅ Admin wallet required to sign
- * ✅ Winner must be a valid participant (creator or challenger)
+ * ✅ Winner can claim their own prize (pays gas)
+ * ✅ OR Admin can resolve for disputes (admin pays gas)
  * ✅ Smart contract validates winner address
+ * ✅ Smart contract validates caller is winner OR admin
  * ✅ Challenge must be in-progress
  * ✅ Reentrancy protection in smart contract
  * 
- * @param adminWallet - Admin wallet (must be ADMIN_WALLET from config)
+ * @param callerWallet - Wallet signing the transaction (winner or admin)
  * @param connection - Solana connection
  * @param challengePDA - Challenge account address
  * @param winnerAddress - Winner's wallet address
  * @returns Transaction signature
  */
 export async function resolveChallenge(
-  adminWallet: any,
+  callerWallet: any,
   connection: Connection,
   challengePDA: string,
   winnerAddress: string
@@ -372,9 +373,9 @@ export async function resolveChallenge(
   console.log('   Challenge PDA:', challengePDA);
   console.log('   Winner:', winnerAddress);
   
-  // Security: Verify admin wallet
-  if (!adminWallet || !adminWallet.publicKey) {
-    throw new Error('❌ Admin wallet not connected');
+  // Security: Verify caller wallet
+  if (!callerWallet || !callerWallet.publicKey) {
+    throw new Error('❌ Wallet not connected');
   }
 
   // Security: Verify winner address is valid
@@ -385,10 +386,10 @@ export async function resolveChallenge(
     throw new Error('❌ Invalid winner address');
   }
 
-  const admin = new PublicKey(adminWallet.publicKey.toString());
+  const caller = new PublicKey(callerWallet.publicKey.toString());
   const challengeAddress = new PublicKey(challengePDA);
   
-  console.log('✅ Admin wallet verified:', admin.toString());
+  console.log('✅ Caller wallet verified:', caller.toString());
   
   // Derive necessary PDAs
   const [adminStatePDA] = PublicKey.findProgramAddressSync(
@@ -423,10 +424,11 @@ export async function resolveChallenge(
   const hash = sha256(new TextEncoder().encode('global:resolve_challenge'));
   const discriminator = Buffer.from(hash.slice(0, 8));
   
-  // Create instruction data: discriminator + winner pubkey (32 bytes)
-  const instructionData = Buffer.alloc(8 + 32);
+  // Create instruction data: discriminator + winner pubkey (32 bytes) + caller pubkey (32 bytes)
+  const instructionData = Buffer.alloc(8 + 32 + 32);
   discriminator.copy(instructionData, 0);
   winnerPubkey.toBuffer().copy(instructionData, 8);
+  caller.toBuffer().copy(instructionData, 40); // Caller is the one signing (admin or winner)
   
   console.log('📦 Instruction data created');
   console.log('   Discriminator:', discriminator.toString('hex'));
@@ -452,10 +454,10 @@ export async function resolveChallenge(
   const transaction = new Transaction().add(instruction);
   const { blockhash } = await connection.getLatestBlockhash();
   transaction.recentBlockhash = blockhash;
-  transaction.feePayer = admin;
+  transaction.feePayer = caller;
   
-  console.log('🔧 Signing transaction with admin wallet...');
-  const signedTransaction = await adminWallet.signTransaction(transaction);
+  console.log('🔧 Signing transaction with caller wallet...');
+  const signedTransaction = await callerWallet.signTransaction(transaction);
   
   console.log('🚀 Sending transaction...');
   const signature = await connection.sendRawTransaction(signedTransaction.serialize());

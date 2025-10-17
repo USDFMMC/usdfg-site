@@ -405,15 +405,16 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     console.log('   Updating loser stats:', loser, 'as', loserDisplayName || 'Anonymous');
     await updatePlayerStats(loser, 'loss', 0, data.game, data.category, loserDisplayName);
     
-    // Mark challenge as needing payout (Admin will trigger on-chain resolution)
+    // Mark challenge as ready for winner to claim (Player pays gas, not admin!)
     await updateDoc(challengeRef, {
       needsPayout: true,
       payoutTriggered: false,
+      canClaim: true,
       updatedAt: Timestamp.now(),
     });
     
-    console.log('💰 Prize pool ready for payout:', data.prizePool, 'USDFG to', winner);
-    console.log('⚠️  Admin must trigger on-chain payout to release funds from escrow');
+    console.log('💰 Prize pool ready for claim:', data.prizePool, 'USDFG to', winner);
+    console.log('✅ Winner can now claim their prize (they pay gas, not you!)');
     
   } catch (error) {
     console.error('❌ Error determining winner:', error);
@@ -827,18 +828,100 @@ export async function getTopPlayers(limitCount: number = 10, sortBy: 'wins' | 'w
 }
 
 // ============================================
-// AUTOMATED PAYOUT SYSTEM
+// PLAYER-PAID PAYOUT SYSTEM
 // ============================================
 
 /**
- * NOTE: Payouts are now FULLY AUTOMATED via Firebase Cloud Functions!
+ * Claim prize for a completed challenge (WINNER ONLY)
  * 
- * When both players submit matching results, the Cloud Function automatically:
- * 1. Validates all security checks
- * 2. Calls the smart contract
- * 3. Releases funds to the winner
+ * Winner determines automatically, but winner must claim their prize themselves.
+ * This way the WINNER pays the gas fee (~$0.0005), not the platform admin.
  * 
- * NO MANUAL INTERVENTION NEEDED! ✅
- * 
- * See: functions/src/index.ts → processChallengePayout()
+ * @param challengeId - Firestore challenge ID
+ * @param winnerWallet - Winner's wallet (must sign transaction)
+ * @param connection - Solana connection
  */
+export async function claimChallengePrize(
+  challengeId: string,
+  winnerWallet: any,
+  connection: any
+): Promise<void> {
+  try {
+    console.log('🏆 Claiming prize for challenge:', challengeId);
+    
+    // Get challenge data from Firestore
+    const challengeRef = doc(db, 'challenges', challengeId);
+    const snap = await getDoc(challengeRef);
+    
+    if (!snap.exists()) {
+      throw new Error('❌ Challenge not found in Firestore');
+    }
+    
+    const data = snap.data() as ChallengeData;
+    
+    // Validate challenge is ready for claim
+    if (data.status !== 'completed') {
+      throw new Error('❌ Challenge is not completed');
+    }
+    
+    if (!data.winner || data.winner === 'forfeit' || data.winner === 'tie') {
+      throw new Error('❌ No valid winner to pay out');
+    }
+    
+    if (!data.pda) {
+      throw new Error('❌ Challenge has no on-chain PDA (escrow not created)');
+    }
+    
+    if (!data.canClaim) {
+      throw new Error('❌ Challenge is not ready for claim yet');
+    }
+    
+    // Validate caller is the winner
+    if (!winnerWallet || !winnerWallet.publicKey) {
+      throw new Error('❌ Wallet not connected');
+    }
+    
+    const callerAddress = winnerWallet.publicKey.toString();
+    if (callerAddress !== data.winner) {
+      throw new Error('❌ Only the winner can claim the prize');
+    }
+    
+    // Prevent duplicate claims
+    if (data.payoutTriggered) {
+      throw new Error('⚠️  Prize already claimed');
+    }
+    
+    console.log('✅ Validation passed - calling smart contract...');
+    console.log('   Winner:', data.winner);
+    console.log('   Prize Pool:', data.prizePool, 'USDFG');
+    console.log('   Challenge PDA:', data.pda);
+    
+    // Import the resolveChallenge function
+    const { resolveChallenge } = await import('../chain/contract');
+    
+    // Call smart contract (winner pays gas!)
+    console.log('🚀 Winner calling smart contract to release escrow...');
+    const signature = await resolveChallenge(
+      winnerWallet,
+      connection,
+      data.pda,
+      data.winner
+    );
+    
+    // Update Firestore to mark prize as claimed
+    await updateDoc(challengeRef, {
+      payoutTriggered: true,
+      payoutSignature: signature,
+      payoutTimestamp: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    });
+    
+    console.log('✅ PRIZE CLAIMED!');
+    console.log('   Transaction:', signature);
+    console.log('   Winner received:', data.prizePool, 'USDFG');
+    
+  } catch (error) {
+    console.error('❌ Error claiming prize:', error);
+    throw error;
+  }
+}

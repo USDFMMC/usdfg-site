@@ -182,16 +182,12 @@ pub mod usdfg_smart_contract {
         Ok(())
     }
 
-    pub fn resolve_challenge(ctx: Context<ResolveChallenge>, winner: Pubkey) -> Result<()> {
+    pub fn resolve_challenge(ctx: Context<ResolveChallenge>, winner: Pubkey, caller: Pubkey) -> Result<()> {
         let challenge = &mut ctx.accounts.challenge;
         require!(!challenge.processing, ChallengeError::ReentrancyDetected);
         challenge.processing = true;
         
         // Security checks...
-        require!(
-            ctx.accounts.admin_state.is_active,
-            ChallengeError::AdminInactive
-        );
         require!(challenge.status == ChallengeStatus::InProgress, ChallengeError::NotInProgress);
         require!(
             winner == challenge.creator || winner == challenge.challenger.unwrap(),
@@ -200,6 +196,14 @@ pub mod usdfg_smart_contract {
         require!(
             Clock::get()?.unix_timestamp < challenge.dispute_timer,
             ChallengeError::ChallengeExpired
+        );
+        
+        // Security: Allow EITHER the winner to claim OR admin to resolve
+        let is_admin = ctx.accounts.admin_state.is_active;
+        let is_winner_claiming = caller == winner;
+        require!(
+            is_winner_claiming || is_admin,
+            ChallengeError::Unauthorized
         );
 
         challenge.status = ChallengeStatus::Completed;
