@@ -257,21 +257,31 @@ export async function acceptChallenge(
   const pdas = await derivePDAs(challenger, challengeAddress);
   
   // Create instruction data for accept_challenge
+  // Calculate discriminator using SHA256 of "global:accept_challenge"
+  const { sha256 } = await import('@noble/hashes/sha2.js');
+  const hash = sha256(new TextEncoder().encode('global:accept_challenge'));
+  const discriminator = Buffer.from(hash.slice(0, 8));
+  
   const instructionData = Buffer.alloc(8); // discriminator only
-  instructionData.writeUInt32LE(0x87654321, 0); // Placeholder discriminator
-  instructionData.writeUInt32LE(0x12345678, 4); // Placeholder discriminator
+  discriminator.copy(instructionData, 0);
+
+  // Get admin state PDA
+  const [adminStatePDA] = PublicKey.findProgramAddressSync(
+    [SEEDS.ADMIN],
+    PROGRAM_ID
+  );
 
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
-      { pubkey: challengeAddress, isSigner: false, isWritable: true },
-      { pubkey: challenger, isSigner: true, isWritable: true },
-      { pubkey: challengerTokenAccount, isSigner: false, isWritable: true },
-      { pubkey: pdas.escrowTokenAccountPDA, isSigner: false, isWritable: true },
-      { pubkey: pdas.escrowWalletPDA, isSigner: false, isWritable: false },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      { pubkey: USDFG_MINT, isSigner: false, isWritable: false },
+      { pubkey: challengeAddress, isSigner: false, isWritable: true }, // challenge
+      { pubkey: challenger, isSigner: true, isWritable: true }, // challenger
+      { pubkey: challengerTokenAccount, isSigner: false, isWritable: true }, // challenger_token_account
+      { pubkey: pdas.escrowTokenAccountPDA, isSigner: false, isWritable: true }, // escrow_token_account
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
+      { pubkey: adminStatePDA, isSigner: false, isWritable: false }, // admin_state
+      { pubkey: pdas.escrowWalletPDA, isSigner: false, isWritable: false }, // escrow_wallet
+      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // mint
     ],
     data: instructionData,
   });

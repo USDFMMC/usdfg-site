@@ -594,7 +594,7 @@ export async function fetchPlayerEvents(playerAddress: string): Promise<any[]> {
 }
 
 /**
- * Join a challenge on-chain (placeholder for now)
+ * Join a challenge on-chain (calls smart contract)
  */
 export async function joinChallengeOnChain(
   challengeId: string, 
@@ -606,22 +606,22 @@ export async function joinChallengeOnChain(
     console.log(`💸 Joining challenge ${challengeId} with entry fee ${entryFee} USDFG`);
     console.log(`👤 Wallet: ${walletAddress}`);
     
-    // For now, simulate the join transaction
-    // In a real implementation, this would:
-    // 1. Transfer USDFG tokens to the challenge escrow account
-    // 2. Update the challenge account with the new player
-    // 3. Handle the escrow logic
+    // Import the acceptChallenge function from contract.ts
+    const { acceptChallenge } = await import('./contract');
     
-    // Example of how the real implementation would look:
-    // const transaction = new Transaction().add(
-    //   // USDFG token transfer instruction
-    //   // Challenge account update instruction
-    // );
-    // const signedTransaction = await wallet.signTransaction(transaction);
-    // const signature = await connection.sendRawTransaction(signedTransaction.serialize());
-    // await connection.confirmTransaction(signature);
+    // Create connection to devnet
+    const { Connection, clusterApiUrl } = await import('@solana/web3.js');
+    const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
     
-    console.log("✅ Join transaction simulated successfully");
+    // Call the smart contract to accept the challenge
+    console.log('🚀 Calling smart contract to accept challenge...');
+    const signature = await acceptChallenge(
+      wallet,
+      connection,
+      challengeId // This should be the PDA, not the Firestore ID
+    );
+    
+    console.log("✅ Challenge accepted on-chain! Signature:", signature);
     return true;
   } catch (error) {
     console.error("❌ Error joining challenge on-chain:", error);

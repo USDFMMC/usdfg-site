@@ -2038,7 +2038,13 @@ const JoinChallengeModal: React.FC<{
       console.log("🚀 Joining challenge:", challenge.id);
       
       // Step 1: Join on-chain (Solana transaction)
-      await joinChallengeOnChain(challenge.id, challenge.entryFee, walletAddress, {
+      // Use the PDA from the challenge data, not the Firestore ID
+      const challengePDA = challenge.rawData?.pda || challenge.pda;
+      if (!challengePDA) {
+        throw new Error('Challenge has no on-chain PDA. Cannot join this challenge.');
+      }
+      
+      await joinChallengeOnChain(challengePDA, challenge.entryFee, walletAddress, {
         signTransaction: signTransaction,
         publicKey: publicKey
       });
