@@ -55,9 +55,10 @@ export function useChallengeExpiry(challenges: any[]) {
           }
         }
         
-        // Handle challenges that are already marked as expired but not archived
-        // This catches any that failed to archive on previous attempts
-        // NOTE: We only auto-archive "expired" status, NOT "completed" (completed = players finished the match)
+        // DISABLED: Auto-archiving to prevent Firebase permission errors
+        // Expired challenges will remain in the database but won't be shown to users
+        // This prevents storage cost accumulation while avoiding permission issues
+        /*
         if (challenge.status === "expired" && !archiveTimers.current.has(challenge.id) && !processedChallenges.current.has(challenge.id + '_archive')) {
           console.log("🗑️ Found expired challenge that needs archiving:", challenge.id);
           processedChallenges.current.add(challenge.id + '_archive');
@@ -74,6 +75,7 @@ export function useChallengeExpiry(challenges: any[]) {
             }
           }, 2000); // Short delay to show "Expired" status
         }
+        */
       }
     };
 

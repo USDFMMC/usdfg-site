@@ -28,6 +28,12 @@ service cloud.firestore {
       allow write: if true; // Allow system to update stats (Solana wallet verification on-chain)
     }
     
+    // Challenge Archive - for expired challenges
+    match /challenges_archive/{challengeId} {
+      allow read: if true;
+      allow write: if true; // Allow archiving expired challenges
+    }
+    
     // User profiles (if you use them)
     match /users/{userId} {
       allow read: if true;
