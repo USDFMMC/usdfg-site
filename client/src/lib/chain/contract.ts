@@ -256,8 +256,15 @@ export async function acceptChallenge(
   // Get challenger's token account
   const challengerTokenAccount = await getAssociatedTokenAddress(USDFG_MINT, challenger);
   
-  // Derive PDAs
-  const pdas = await derivePDAs(challenger, challengeAddress);
+  // Derive only the PDAs needed for accept using the actual challenge PDA
+  const [escrowWalletPDA] = PublicKey.findProgramAddressSync(
+    [SEEDS.ESCROW_WALLET],
+    PROGRAM_ID
+  );
+  const [escrowTokenAccountPDA] = PublicKey.findProgramAddressSync(
+    [SEEDS.ESCROW_WALLET, challengeAddress.toBuffer(), USDFG_MINT.toBuffer()],
+    PROGRAM_ID
+  );
   
   // Create instruction data for accept_challenge
   // Calculate discriminator using SHA256 of "global:accept_challenge"
@@ -280,10 +287,10 @@ export async function acceptChallenge(
       { pubkey: challengeAddress, isSigner: false, isWritable: true }, // challenge
       { pubkey: challenger, isSigner: true, isWritable: true }, // challenger
       { pubkey: challengerTokenAccount, isSigner: false, isWritable: true }, // challenger_token_account
-      { pubkey: pdas.escrowTokenAccountPDA, isSigner: false, isWritable: true }, // escrow_token_account
+      { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // escrow_token_account
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
       { pubkey: adminStatePDA, isSigner: false, isWritable: false }, // admin_state
-      { pubkey: pdas.escrowWalletPDA, isSigner: false, isWritable: false }, // escrow_wallet
+      { pubkey: escrowWalletPDA, isSigner: false, isWritable: false }, // escrow_wallet
       { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // mint
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program (needed for init_if_needed)
       { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }, // rent (needed for init_if_needed)
