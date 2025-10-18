@@ -890,7 +890,26 @@ const ArenaHome: React.FC = () => {
                                   <div className="text-xl font-bold text-yellow-400">Winner</div>
                                   <p className="text-xs text-gray-400 mt-1 font-mono break-all">{challenge.rawData.winner}</p>
                                   {challenge.rawData.winner?.toString()?.toLowerCase() === publicKey?.toString().toLowerCase() && (
-                                    <p className="text-green-400 font-semibold mt-2">🎉 You Won!</p>
+                                    <>
+                                      <p className="text-green-400 font-semibold mt-2">🎉 You Won!</p>
+                                      {/* Claim Prize Button */}
+                                      {challenge.rawData?.canClaim && !challenge.rawData?.payoutTriggered && (
+                                        <button 
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleClaimPrize(challenge);
+                                          }}
+                                          className="mt-3 w-full px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all animate-pulse shadow-lg"
+                                        >
+                                          🏆 Claim Your Prize ({challenge.prizePool} USDFG)
+                                        </button>
+                                      )}
+                                      {challenge.rawData?.payoutTriggered && (
+                                        <div className="mt-3 px-6 py-3 bg-green-600/20 text-green-400 border border-green-600/30 font-semibold rounded-lg">
+                                          ✅ Prize Claimed
+                                        </div>
+                                      )}
+                                    </>
                                   )}
                                 </>
                               )}
