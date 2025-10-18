@@ -95,9 +95,9 @@ pub mod usdfg_smart_contract {
             ChallengeError::EntryFeeTooHigh
         );
         
-        // Set dispute_timer to now + 900 seconds (15 minutes)
+        // Set dispute_timer to now + 7200 seconds (2 hours)
         let now = Clock::get()?.unix_timestamp;
-        let dispute_timer = now + 900;
+        let dispute_timer = now + 7200;
         let challenge = &mut ctx.accounts.challenge;
         
         // Transfer tokens to escrow
@@ -197,10 +197,8 @@ pub mod usdfg_smart_contract {
             winner == challenge.creator || winner == challenge.challenger.unwrap(),
             ChallengeError::InvalidWinner
         );
-        require!(
-            Clock::get()?.unix_timestamp < challenge.dispute_timer,
-            ChallengeError::ChallengeExpired
-        );
+        // Removed timer check - winner should be able to claim anytime
+        // Timer only applies to joining, not claiming prizes
         
         // Security: Allow EITHER the winner to claim OR admin to resolve
         let is_admin = ctx.accounts.admin_state.is_active;
