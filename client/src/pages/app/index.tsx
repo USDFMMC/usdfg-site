@@ -1078,6 +1078,14 @@ const ArenaHome: React.FC = () => {
                             const isWinner = currentWallet && challenge.rawData?.winner?.toLowerCase() === currentWallet;
                             const canClaim = isWinner && challenge.rawData?.canClaim && !challenge.rawData?.payoutTriggered;
                             
+                            // Debug logging for claim button
+                            if (isWinner) {
+                              console.log('🏆 Winner detected for challenge:', challenge.id);
+                              console.log('   canClaim:', challenge.rawData?.canClaim);
+                              console.log('   payoutTriggered:', challenge.rawData?.payoutTriggered);
+                              console.log('   Should show button?:', canClaim);
+                            }
+                            
                             if (canClaim) {
                               return (
                                 <button 
