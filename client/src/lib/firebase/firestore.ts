@@ -500,6 +500,14 @@ export const syncChallengeStatus = async (challengeId: string, challengePDA: str
     
     if (snap.exists()) {
       const currentData = snap.data();
+      
+      // Don't overwrite 'completed' status with 'in-progress' from on-chain
+      // This happens because Firestore marks as completed when both submit, but on-chain is still InProgress
+      if (currentData.status === 'completed' && firestoreStatus === 'in-progress') {
+        console.log(`⏭️  Skipping sync: Firestore is 'completed', on-chain is 'in-progress' (waiting for claim)`);
+        return;
+      }
+      
       if (currentData.status !== firestoreStatus) {
         await updateDoc(challengeRef, {
           status: firestoreStatus,
