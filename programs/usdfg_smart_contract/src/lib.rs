@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer, Mint};
 
-declare_id!("9NBcMx3x8EotQi63fukhXpYbcBRgyWj6PcEFyEaL9oqo");
+declare_id!("DX4C2FyAKSiycDVSoYgm7WyDgmPNTdBKbvVDyKGGH6wK");
 
 // Escrow wallet seed
 pub const ESCROW_WALLET_SEED: &[u8] = b"escrow_wallet";
