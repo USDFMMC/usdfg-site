@@ -212,6 +212,7 @@ pub mod usdfg_smart_contract {
         challenge.last_updated = Clock::get()?.unix_timestamp;
 
         // Transfer all tokens to winner using PDA signing
+        // Use per-challenge escrow_token_account as authority (more secure - isolated per challenge)
         let escrow_seeds = [
             ESCROW_WALLET_SEED,
             challenge.to_account_info().key.as_ref(),
@@ -223,7 +224,7 @@ pub mod usdfg_smart_contract {
         let cpi_accounts = Transfer {
             from: ctx.accounts.escrow_token_account.to_account_info(),
             to: ctx.accounts.winner_token_account.to_account_info(),
-            authority: ctx.accounts.escrow_wallet.to_account_info(),
+            authority: ctx.accounts.escrow_token_account.to_account_info(), // Use escrow_token_account as authority
         };
         let cpi_ctx = CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
@@ -431,10 +432,10 @@ pub struct CreateChallenge<'info> {
         seeds = [ESCROW_WALLET_SEED, challenge.key().as_ref(), mint.key().as_ref()],
         bump,
         token::mint = mint,
-        token::authority = escrow_wallet
+        token::authority = escrow_token_account  // Self-authority for per-challenge isolation
     )]
     pub escrow_token_account: Account<'info, TokenAccount>,
-    /// CHECK: This is the escrow wallet that holds the tokens
+    /// CHECK: This is the escrow wallet that holds the tokens (not used as authority anymore)
     pub escrow_wallet: AccountInfo<'info>,
     pub challenge_seed: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -459,7 +460,7 @@ pub struct AcceptChallenge<'info> {
         seeds = [ESCROW_WALLET_SEED, challenge.key().as_ref(), mint.key().as_ref()],
         bump,
         token::mint = mint,
-        token::authority = escrow_wallet
+        token::authority = escrow_token_account  // Self-authority for per-challenge isolation
     )]
     pub escrow_token_account: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
@@ -482,7 +483,7 @@ pub struct ResolveChallenge<'info> {
         seeds = [ESCROW_WALLET_SEED, challenge.key().as_ref(), mint.key().as_ref()],
         bump,
         token::mint = mint,
-        token::authority = escrow_wallet
+        token::authority = escrow_token_account  // Self-authority for per-challenge isolation
     )]
     pub escrow_token_account: Account<'info, TokenAccount>,
     #[account(
