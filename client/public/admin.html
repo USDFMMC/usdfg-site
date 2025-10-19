@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>USDFG - Admin Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(34, 211, 238, 0.2);
+        }
+
+        h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #22d3ee 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #94a3b8;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .status-box {
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(34, 211, 238, 0.1);
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .status-item:last-child {
+            border-bottom: none;
+        }
+
+        .status-label {
+            color: #94a3b8;
+            font-size: 14px;
+        }
+
+        .status-value {
+            color: #22d3ee;
+            font-size: 14px;
+            font-weight: 600;
+            word-break: break-all;
+            max-width: 200px;
+            text-align: right;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #22d3ee 0%, #3b82f6 100%);
+            color: #fff;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(34, 211, 238, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: #fff;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: #fff;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .alert {
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .alert-info {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: #93c5fd;
+        }
+
+        .alert-success {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #6ee7b7;
+        }
+
+        .alert-warning {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: #fcd34d;
+        }
+
+        .alert-error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #22d3ee;
+        }
+
+        .spinner {
+            border: 3px solid rgba(34, 211, 238, 0.1);
+            border-top: 3px solid #22d3ee;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #22d3ee;
+        }
+
+        .link {
+            color: #22d3ee;
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.3s;
+        }
+
+        .link:hover {
+            border-bottom-color: #22d3ee;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 USDFG Admin Panel</h1>
+        <p class="subtitle">Smart Contract Initialization</p>
+
+        <div id="loadingSection" class="loading">
+            <div class="spinner"></div>
+            <p>Loading contract status...</p>
+        </div>
+
+        <div id="connectSection" class="hidden">
+            <div class="alert alert-info">
+                👋 Please connect your admin wallet to continue.
+            </div>
+            <button class="btn btn-primary" onclick="connectWallet()">
+                Connect Phantom Wallet
+            </button>
+        </div>
+
+        <div id="wrongWalletSection" class="hidden">
+            <div class="alert alert-error">
+                ❌ <strong>Wrong Wallet Connected!</strong><br>
+                Please connect with the admin wallet:<br>
+                <code id="adminWalletDisplay"></code>
+            </div>
+            <button class="btn btn-primary" onclick="connectWallet()">
+                Switch to Admin Wallet
+            </button>
+        </div>
+
+        <div id="initSection" class="hidden">
+            <div class="alert alert-warning">
+                ⚠️ <strong>Contract Not Initialized</strong><br>
+                The smart contract needs to be initialized before users can create challenges.
+            </div>
+
+            <div class="status-box">
+                <h3 style="margin-bottom: 15px; color: #22d3ee;">📋 Configuration</h3>
+                <div class="status-item">
+                    <span class="status-label">Admin Wallet</span>
+                    <span class="status-value" id="adminWallet"></span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Platform Wallet</span>
+                    <span class="status-value" id="platformWallet"></span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Platform Fee</span>
+                    <span class="status-value">5% (500 bps)</span>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" onclick="initializeContract()" id="initButton">
+                🚀 Initialize Contract
+            </button>
+        </div>
+
+        <div id="alreadyInitSection" class="hidden">
+            <div class="alert alert-success">
+                ✅ <strong>Contract Already Initialized!</strong><br>
+                The smart contract is ready and users can create challenges.
+            </div>
+
+            <div class="status-box">
+                <h3 style="margin-bottom: 15px; color: #10b981;">📊 Contract Status</h3>
+                <div class="status-item">
+                    <span class="status-label">Admin</span>
+                    <span class="status-value" id="currentAdmin"></span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Platform Wallet</span>
+                    <span class="status-value" id="currentPlatformWallet"></span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Platform Fee</span>
+                    <span class="status-value" id="currentFee"></span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Status</span>
+                    <span class="status-value" id="contractStatus"></span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Is Paused</span>
+                    <span class="status-value" id="isPaused"></span>
+                </div>
+            </div>
+
+            <a href="/app" class="btn btn-success" style="display: block; text-align: center; text-decoration: none;">
+                Go to App →
+            </a>
+        </div>
+
+        <div id="processingSection" class="hidden">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p id="processingMessage">Initializing contract...</p>
+            </div>
+        </div>
+
+        <div id="errorSection" class="hidden">
+            <div class="alert alert-error">
+                ❌ <strong>Error</strong><br>
+                <span id="errorMessage"></span>
+            </div>
+            <button class="btn btn-primary" onclick="checkStatus()">
+                Try Again
+            </button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { Connection, PublicKey, clusterApiUrl } from 'https://esm.sh/@solana/web3.js@1.87.6';
+        import { AnchorProvider, Program, web3 } from 'https://esm.sh/@coral-xyz/anchor@0.29.0';
+
+        const PROGRAM_ID = 'DX4C2FyAKSiycDVSoYgm7WyDgmPNTdBKbvVDyKGGH6wK';
+        const ADMIN_WALLET = '3SeLoDGsajuQUt2pzSkZV7LmB7gKtckmrD693U69kcUd';
+        const PLATFORM_WALLET = 'AcEV5t9TJdZP91ttbgKieWoWUxwUb4PT4MxvggDjjkkq';
+        const PLATFORM_FEE_BPS = 500;
+
+        let connection;
+        let wallet;
+        let program;
+        let adminStatePDA;
+
+        // Show/hide sections
+        function showSection(sectionId) {
+            ['loadingSection', 'connectSection', 'wrongWalletSection', 'initSection', 'alreadyInitSection', 'processingSection', 'errorSection'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById(sectionId).classList.remove('hidden');
+        }
+
+        function showError(message) {
+            document.getElementById('errorMessage').textContent = message;
+            showSection('errorSection');
+        }
+
+        // Connect wallet
+        window.connectWallet = async function() {
+            try {
+                if (!window.solana || !window.solana.isPhantom) {
+                    showError('Phantom wallet not found! Please install Phantom wallet extension.');
+                    return;
+                }
+
+                await window.solana.connect();
+                wallet = window.solana;
+                
+                await checkStatus();
+            } catch (error) {
+                console.error('Wallet connection error:', error);
+                showError('Failed to connect wallet: ' + error.message);
+            }
+        };
+
+        // Check contract status
+        window.checkStatus = async function() {
+            try {
+                showSection('loadingSection');
+
+                // Setup connection
+                connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
+
+                // Check if wallet is connected
+                if (!window.solana || !window.solana.publicKey) {
+                    showSection('connectSection');
+                    return;
+                }
+
+                wallet = window.solana;
+
+                // Check if correct wallet
+                if (wallet.publicKey.toString() !== ADMIN_WALLET) {
+                    document.getElementById('adminWalletDisplay').textContent = ADMIN_WALLET;
+                    showSection('wrongWalletSection');
+                    return;
+                }
+
+                // Load program (fetch IDL from your deployed site)
+                const idlResponse = await fetch('/idl/usdfg_smart_contract.json');
+                const idl = await idlResponse.json();
+
+                const programId = new PublicKey(PROGRAM_ID);
+                const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' });
+                program = new Program(idl, programId, provider);
+
+                // Derive admin state PDA
+                [adminStatePDA] = PublicKey.findProgramAddressSync(
+                    [Buffer.from('admin')],
+                    programId
+                );
+
+                // Check if initialized
+                try {
+                    const adminState = await program.account.adminState.fetch(adminStatePDA);
+                    
+                    // Already initialized
+                    document.getElementById('currentAdmin').textContent = adminState.admin.toString().slice(0, 8) + '...';
+                    document.getElementById('currentPlatformWallet').textContent = adminState.platformWallet.toString().slice(0, 8) + '...';
+                    document.getElementById('currentFee').textContent = adminState.platformFeeBps + ' bps (' + (adminState.platformFeeBps / 100) + '%)';
+                    document.getElementById('contractStatus').textContent = adminState.isActive ? '✅ Active' : '❌ Inactive';
+                    document.getElementById('isPaused').textContent = adminState.isPaused ? '⚠️ Yes' : '✅ No';
+                    
+                    showSection('alreadyInitSection');
+                } catch (error) {
+                    if (error.message.includes('Account does not exist')) {
+                        // Not initialized yet
+                        document.getElementById('adminWallet').textContent = ADMIN_WALLET.slice(0, 8) + '...';
+                        document.getElementById('platformWallet').textContent = PLATFORM_WALLET.slice(0, 8) + '...';
+                        showSection('initSection');
+                    } else {
+                        throw error;
+                    }
+                }
+            } catch (error) {
+                console.error('Status check error:', error);
+                showError('Failed to check contract status: ' + error.message);
+            }
+        };
+
+        // Initialize contract
+        window.initializeContract = async function() {
+            try {
+                showSection('processingSection');
+                document.getElementById('processingMessage').textContent = 'Sending transaction to Solana...';
+
+                const adminPubkey = new PublicKey(ADMIN_WALLET);
+                const platformWalletPubkey = new PublicKey(PLATFORM_WALLET);
+
+                const tx = await program.methods
+                    .initialize(adminPubkey, platformWalletPubkey, PLATFORM_FEE_BPS)
+                    .accounts({
+                        adminState: adminStatePDA,
+                        payer: wallet.publicKey,
+                        systemProgram: web3.SystemProgram.programId,
+                    })
+                    .rpc();
+
+                document.getElementById('processingMessage').textContent = 'Waiting for confirmation...';
+
+                await connection.confirmTransaction(tx, 'confirmed');
+
+                // Success! Reload status
+                await checkStatus();
+            } catch (error) {
+                console.error('Initialization error:', error);
+                showError('Failed to initialize contract: ' + error.message);
+            }
+        };
+
+        // Auto-check status on load
+        window.addEventListener('load', checkStatus);
+    </script>
+</body>
+</html>
+
