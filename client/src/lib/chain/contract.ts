@@ -275,12 +275,6 @@ export async function acceptChallenge(
   const instructionData = Buffer.alloc(8); // discriminator only
   discriminator.copy(instructionData, 0);
 
-  // Get admin state PDA
-  const [adminStatePDA] = PublicKey.findProgramAddressSync(
-    [SEEDS.ADMIN],
-    PROGRAM_ID
-  );
-
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
@@ -289,11 +283,8 @@ export async function acceptChallenge(
       { pubkey: challengerTokenAccount, isSigner: false, isWritable: true }, // challenger_token_account
       { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // escrow_token_account
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
-      { pubkey: adminStatePDA, isSigner: false, isWritable: false }, // admin_state
       { pubkey: escrowWalletPDA, isSigner: false, isWritable: false }, // escrow_wallet
       { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // mint
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program (needed for init_if_needed)
-      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }, // rent (needed for init_if_needed)
     ],
     data: instructionData,
   });
