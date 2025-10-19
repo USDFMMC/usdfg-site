@@ -132,6 +132,13 @@ export async function createChallenge(
   const pdas = await derivePDAs(creator, challengeSeed.publicKey);
   console.log(`📍 Challenge PDA: ${pdas.challengePDA.toString()}`);
 
+  // Step 3.5: Derive admin_state PDA
+  const [adminStatePDA] = await PublicKey.findProgramAddress(
+    [Buffer.from('admin')],
+    PROGRAM_ID
+  );
+  console.log(`📍 Admin State PDA: ${adminStatePDA.toString()}`);
+
   // Step 4: Get token account
   console.log('🔧 Step 4: Getting token account...');
   const creatorTokenAccount = await getAssociatedTokenAddress(USDFG_MINT, creator);
@@ -175,6 +182,7 @@ export async function createChallenge(
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
       { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }, // rent
       { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // mint
+      { pubkey: adminStatePDA, isSigner: false, isWritable: false }, // admin_state
     ],
     data: instructionData,
   });
@@ -452,6 +460,18 @@ export async function resolveChallenge(
     PROGRAM_ID
   );
   
+  // Read admin state to get platform_wallet
+  const adminStateAccount = await connection.getAccountInfo(adminStatePDA);
+  if (!adminStateAccount) {
+    throw new Error('❌ Admin state not initialized. Please initialize the contract first.');
+  }
+  
+  // Parse platform_wallet from admin state (offset: 8 discriminator + 32 admin = 40)
+  const platformWalletBytes = adminStateAccount.data.slice(40, 72);
+  const platformWallet = new PublicKey(platformWalletBytes);
+  
+  console.log('📍 Platform wallet:', platformWallet.toString());
+  
   const [escrowWalletPDA] = PublicKey.findProgramAddressSync(
     [SEEDS.ESCROW_WALLET],
     PROGRAM_ID
@@ -468,11 +488,19 @@ export async function resolveChallenge(
     winnerPubkey
   );
   
+  // Get platform's token account
+  const platformTokenAccount = await getAssociatedTokenAddress(
+    USDFG_MINT,
+    platformWallet
+  );
+  
   console.log('📍 Derived accounts:');
   console.log('   Admin State PDA:', adminStatePDA.toString());
+  console.log('   Platform Wallet:', platformWallet.toString());
   console.log('   Escrow Wallet PDA:', escrowWalletPDA.toString());
   console.log('   Escrow Token Account:', escrowTokenAccountPDA.toString());
   console.log('   Winner Token Account:', winnerTokenAccount.toString());
+  console.log('   Platform Token Account:', platformTokenAccount.toString());
   
   // Calculate discriminator for resolve_challenge
   const { sha256 } = await import('@noble/hashes/sha2.js');
@@ -495,6 +523,7 @@ export async function resolveChallenge(
       { pubkey: challengeAddress, isSigner: false, isWritable: true }, // challenge
       { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // escrow_token_account
       { pubkey: winnerTokenAccount, isSigner: false, isWritable: true }, // winner_token_account
+      { pubkey: platformTokenAccount, isSigner: false, isWritable: true }, // platform_token_account (NEW for fees)
       { pubkey: escrowWalletPDA, isSigner: false, isWritable: false }, // escrow_wallet
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
       { pubkey: adminStatePDA, isSigner: false, isWritable: false }, // admin_state
