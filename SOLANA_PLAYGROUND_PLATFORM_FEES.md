@@ -1,3 +1,8 @@
+# 🚀 Complete Smart Contract Code - With 5% Platform Fees
+
+## Copy This Code to Solana Playground
+
+```rust
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer, Mint};
 
@@ -15,16 +20,10 @@ pub mod usdfg_smart_contract {
     const MIN_ENTRY_FEE_LAMPORTS: u64 = 1_000_000_000;  // 1 USDFG minimum
     const MAX_ENTRY_FEE_LAMPORTS: u64 = 1_000_000_000_000; // 1000 USDFG maximum
 
-    pub fn initialize(ctx: Context<Initialize>, admin: Pubkey, platform_wallet: Pubkey, platform_fee_bps: u16) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>, admin: Pubkey, platform_wallet: Pubkey) -> Result<()> {
         let admin_state = &mut ctx.accounts.admin_state;
-        
-        // Validate platform fee (max 10% = 1000 bps)
-        require!(platform_fee_bps <= 1000, ChallengeError::InvalidPlatformFee);
-        
         admin_state.admin = admin;
-        admin_state.platform_wallet = platform_wallet;
-        admin_state.platform_fee_bps = platform_fee_bps;  // Set initial platform fee
-        admin_state.is_paused = false;  // Start unpaused
+        admin_state.platform_wallet = platform_wallet;  // NEW: Set platform wallet for fee collection
         admin_state.is_active = true;
         admin_state.created_at = Clock::get()?.unix_timestamp;
         admin_state.last_updated = Clock::get()?.unix_timestamp;
@@ -91,128 +90,7 @@ pub mod usdfg_smart_contract {
         Ok(())
     }
 
-    pub fn update_platform_wallet(ctx: Context<UpdateAdmin>, new_platform_wallet: Pubkey) -> Result<()> {
-        let admin_state = &mut ctx.accounts.admin_state;
-        
-        // Security: Verify current admin
-        require!(
-            admin_state.admin == ctx.accounts.current_admin.key(),
-            ChallengeError::Unauthorized
-        );
-        
-        // Security: Verify admin state is active
-        require!(
-            admin_state.is_active,
-            ChallengeError::AdminInactive
-        );
-
-        let old_wallet = admin_state.platform_wallet;
-        admin_state.platform_wallet = new_platform_wallet;
-        admin_state.last_updated = Clock::get()?.unix_timestamp;
-
-        emit!(PlatformWalletUpdated {
-            old_wallet: old_wallet,
-            new_wallet: new_platform_wallet,
-            timestamp: Clock::get()?.unix_timestamp,
-        });
-
-        Ok(())
-    }
-
-    pub fn update_platform_fee(ctx: Context<UpdateAdmin>, new_fee_bps: u16) -> Result<()> {
-        let admin_state = &mut ctx.accounts.admin_state;
-        
-        // Security: Verify current admin
-        require!(
-            admin_state.admin == ctx.accounts.current_admin.key(),
-            ChallengeError::Unauthorized
-        );
-        
-        // Security: Verify admin state is active
-        require!(
-            admin_state.is_active,
-            ChallengeError::AdminInactive
-        );
-
-        // Validate platform fee (max 10% = 1000 bps)
-        require!(new_fee_bps <= 1000, ChallengeError::InvalidPlatformFee);
-
-        let old_fee = admin_state.platform_fee_bps;
-        admin_state.platform_fee_bps = new_fee_bps;
-        admin_state.last_updated = Clock::get()?.unix_timestamp;
-
-        emit!(PlatformFeeUpdated {
-            old_fee_bps: old_fee,
-            new_fee_bps: new_fee_bps,
-            timestamp: Clock::get()?.unix_timestamp,
-        });
-
-        Ok(())
-    }
-
-    pub fn pause_contract(ctx: Context<UpdateAdmin>) -> Result<()> {
-        let admin_state = &mut ctx.accounts.admin_state;
-        
-        // Security: Verify current admin
-        require!(
-            admin_state.admin == ctx.accounts.current_admin.key(),
-            ChallengeError::Unauthorized
-        );
-        
-        // Security: Verify admin state is active
-        require!(
-            admin_state.is_active,
-            ChallengeError::AdminInactive
-        );
-
-        require!(!admin_state.is_paused, ChallengeError::AlreadyPaused);
-
-        admin_state.is_paused = true;
-        admin_state.last_updated = Clock::get()?.unix_timestamp;
-
-        emit!(ContractPaused {
-            admin: admin_state.admin,
-            timestamp: Clock::get()?.unix_timestamp,
-        });
-
-        Ok(())
-    }
-
-    pub fn unpause_contract(ctx: Context<UpdateAdmin>) -> Result<()> {
-        let admin_state = &mut ctx.accounts.admin_state;
-        
-        // Security: Verify current admin
-        require!(
-            admin_state.admin == ctx.accounts.current_admin.key(),
-            ChallengeError::Unauthorized
-        );
-        
-        // Security: Verify admin state is active
-        require!(
-            admin_state.is_active,
-            ChallengeError::AdminInactive
-        );
-
-        require!(admin_state.is_paused, ChallengeError::NotPaused);
-
-        admin_state.is_paused = false;
-        admin_state.last_updated = Clock::get()?.unix_timestamp;
-
-        emit!(ContractUnpaused {
-            admin: admin_state.admin,
-            timestamp: Clock::get()?.unix_timestamp,
-        });
-
-        Ok(())
-    }
-
     pub fn create_challenge(ctx: Context<CreateChallenge>, usdfg_amount: u64) -> Result<()> {
-        // Check if contract is paused
-        require!(
-            !ctx.accounts.admin_state.is_paused,
-            ChallengeError::ContractPaused
-        );
-        
         // Validate entry fee limits (now in lamports)
         require!(
             usdfg_amount >= MIN_ENTRY_FEE_LAMPORTS,
@@ -260,12 +138,6 @@ pub mod usdfg_smart_contract {
     }
 
     pub fn accept_challenge(ctx: Context<AcceptChallenge>) -> Result<()> {
-        // Check if contract is paused
-        require!(
-            !ctx.accounts.admin_state.is_paused,
-            ChallengeError::ContractPaused
-        );
-        
         // Security: Verify admin state is active
         require!(
             ctx.accounts.admin_state.is_active,
@@ -345,10 +217,10 @@ pub mod usdfg_smart_contract {
         challenge.winner = Some(winner);
         challenge.last_updated = Clock::get()?.unix_timestamp;
 
-        // Calculate platform fee using configurable basis points
+        // Calculate platform fee (5%) and winner payout (95%)
         let total_prize = challenge.entry_fee * 2;
-        let platform_fee = (total_prize * ctx.accounts.admin_state.platform_fee_bps as u64) / 10000;
-        let winner_payout = total_prize - platform_fee;
+        let platform_fee = total_prize / 20; // 5% = 1/20
+        let winner_payout = total_prize - platform_fee; // 95%
 
         // Setup PDA signing
         let escrow_seeds = [
@@ -557,9 +429,7 @@ pub struct RevokeAdmin<'info> {
 #[account]
 pub struct AdminState {
     pub admin: Pubkey,
-    pub platform_wallet: Pubkey,
-    pub platform_fee_bps: u16,  // Platform fee in basis points (500 = 5%, 1000 = 10%)
-    pub is_paused: bool,  // Emergency pause flag
+    pub platform_wallet: Pubkey,  // NEW: Wallet to receive platform fees
     pub is_active: bool,
     pub created_at: i64,
     pub last_updated: i64,
@@ -569,8 +439,6 @@ impl AdminState {
     pub const LEN: usize = 8 + // discriminator
         32 + // admin
         32 + // platform_wallet
-        2 + // platform_fee_bps
-        1 + // is_paused
         1 + // is_active
         8 + // created_at
         8; // last_updated
@@ -607,7 +475,6 @@ pub struct CreateChallenge<'info> {
     pub token_program: Program<'info, Token>,
     pub rent: Sysvar<'info, Rent>,
     pub mint: Account<'info, Mint>,
-    pub admin_state: Account<'info, AdminState>,
 }
 
 #[derive(Accounts)]
@@ -779,14 +646,6 @@ pub enum ChallengeError {
     ReentrancyDetected,
     #[msg("Challenge already accepted")]
     AlreadyAccepted,
-    #[msg("Contract is paused")]
-    ContractPaused,
-    #[msg("Contract is not paused")]
-    NotPaused,
-    #[msg("Contract is already paused")]
-    AlreadyPaused,
-    #[msg("Invalid platform fee (max 10%)")]
-    InvalidPlatformFee,
 }
 
 #[event]
@@ -866,29 +725,28 @@ pub struct PlatformFeeCollected {
     pub amount: u64,
     pub timestamp: i64,
 }
+```
 
-#[event]
-pub struct PlatformWalletUpdated {
-    pub old_wallet: Pubkey,
-    pub new_wallet: Pubkey,
-    pub timestamp: i64,
-}
+---
 
-#[event]
-pub struct PlatformFeeUpdated {
-    pub old_fee_bps: u16,
-    pub new_fee_bps: u16,
-    pub timestamp: i64,
-}
+## 📋 Deploy Instructions
 
-#[event]
-pub struct ContractPaused {
-    pub admin: Pubkey,
-    pub timestamp: i64,
-}
+1. Go to: https://beta.solpg.io/
+2. Create new file: `lib.rs`
+3. Copy and paste the code above
+4. Click "Build"
+5. Click "Deploy"
+6. Copy the new Program ID
+7. Share it with me to update your frontend!
 
-#[event]
-pub struct ContractUnpaused {
-    pub admin: Pubkey,
-    pub timestamp: i64,
-}
+---
+
+## 💰 What This Does
+
+**Example with 50 USDFG entry fee:**
+- Total: 100 USDFG (50 × 2)
+- Winner gets: **95 USDFG** (95%)
+- Platform gets: **5 USDFG** (5%)
+
+Platform fees are automatically collected on every prize claim!
+
