@@ -1677,7 +1677,8 @@ const CreateChallengeModal: React.FC<{
       errors.push('Please enter your username/gamertag');
     }
     
-    if (!formData.entryFee || formData.entryFee === '' || formData.entryFee < 0.001 || formData.entryFee > 999999999) {
+    const entryFee = typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) : formData.entryFee;
+    if (!formData.entryFee || formData.entryFee === '' || isNaN(entryFee) || entryFee < 0.001 || entryFee > 999999999) {
       errors.push('Entry fee must be between 0.001 and 999,999,999 USDFG');
     }
     
@@ -1939,25 +1940,29 @@ const CreateChallengeModal: React.FC<{
                   <div className="relative">
                     <input
                       type="text"
-                      value={formData.entryFee || ''}
+                      value={formData.entryFee === 0 ? '' : formData.entryFee || ''}
                       onChange={(e) => {
                         const value = e.target.value;
-                        // Allow empty string for better UX
+                        // Allow typing freely, including decimals
                         if (value === '') {
                           updateFormData({entryFee: ''});
+                        } else if (value === '.') {
+                          updateFormData({entryFee: '.'});
+                        } else if (value.endsWith('.')) {
+                          updateFormData({entryFee: value});
                         } else {
                           const numValue = parseFloat(value);
                           if (!isNaN(numValue)) {
                             updateFormData({entryFee: numValue});
+                          } else if (value.match(/^\d*\.?\d*$/)) {
+                            // Allow partial decimal input like "0." or "0.0"
+                            updateFormData({entryFee: value});
                           }
                         }
                       }}
                       className={`w-full rounded-xl bg-white/5 border px-3 py-2 text-white mt-4 mb-1 ${
                         hasFieldError('entry fee') ? 'border-red-500/50 bg-red-500/5' : 'border-white/10'
                       }`}
-                      min="0.001"
-                      step="0.001"
-                      max="999999999"
                       placeholder="0.1"
                       required
                       autoComplete="off"
