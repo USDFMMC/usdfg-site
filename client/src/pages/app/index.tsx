@@ -32,6 +32,7 @@ const ArenaHome: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState<string>('All');
   const [filterGame, setFilterGame] = useState<string>('All');
   const [showMyChallenges, setShowMyChallenges] = useState<boolean>(false);
+  const [claimingPrize, setClaimingPrize] = useState<string | null>(null);
   const [usdfgPrice, setUsdfgPrice] = useState<number>(0.15); // Mock price: $0.15 per USDFG
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [isLive, setIsLive] = useState<boolean>(true);
@@ -406,6 +407,14 @@ const ArenaHome: React.FC = () => {
       return;
     }
 
+    // Prevent double-clicks
+    if (claimingPrize === challenge.id) {
+      console.log("⏳ Already processing claim for this challenge");
+      return;
+    }
+
+    setClaimingPrize(challenge.id);
+
     try {
       console.log("🏆 Claiming prize for challenge:", challenge.id);
       
@@ -422,6 +431,8 @@ const ArenaHome: React.FC = () => {
     } catch (error) {
       console.error("❌ Failed to claim prize:", error);
       alert("Failed to claim prize: " + (error instanceof Error ? error.message : "Unknown error"));
+    } finally {
+      setClaimingPrize(null);
     }
   };
 
@@ -898,9 +909,14 @@ const ArenaHome: React.FC = () => {
                                             e.stopPropagation();
                                             handleClaimPrize(challenge);
                                           }}
-                                          className="mt-3 w-full px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all animate-pulse shadow-lg"
+                                          disabled={claimingPrize === challenge.id}
+                                          className={`mt-3 w-full px-6 py-3 text-white font-semibold rounded-lg transition-all shadow-lg ${
+                                            claimingPrize === challenge.id 
+                                              ? 'bg-gray-500 cursor-not-allowed' 
+                                              : 'bg-gradient-to-r from-green-600 to-emerald-500 hover:brightness-110 animate-pulse'
+                                          }`}
                                         >
-                                          🏆 Claim Your Prize ({challenge.prizePool} USDFG)
+                                          {claimingPrize === challenge.id ? '⏳ Processing...' : `🏆 Claim Your Prize (${challenge.prizePool} USDFG)`}
                                         </button>
                                       )}
                                       {challenge.rawData?.payoutTriggered && (
@@ -1111,9 +1127,14 @@ const ArenaHome: React.FC = () => {
                                     e.stopPropagation();
                                     handleClaimPrize(challenge);
                                   }}
-                                  className="w-full px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all animate-pulse"
+                                  disabled={claimingPrize === challenge.id}
+                                  className={`w-full px-4 py-2 text-white font-semibold rounded-lg transition-all ${
+                                    claimingPrize === challenge.id 
+                                      ? 'bg-gray-500 cursor-not-allowed' 
+                                      : 'bg-gradient-to-r from-green-600 to-emerald-500 hover:brightness-110 animate-pulse'
+                                  }`}
                                 >
-                                  🏆 Claim Prize
+                                  {claimingPrize === challenge.id ? '⏳ Processing...' : '🏆 Claim Prize'}
                                 </button>
                               );
                             } else if (isWinner && challenge.rawData?.payoutTriggered) {
