@@ -734,7 +734,7 @@ const ArenaHome: React.FC = () => {
                         className={`challenge-card p-4 cursor-pointer hover:bg-background-2/40 transition-colors ${challenge.status === "expired" ? "challenge-expired" : ""}`}
                         onClick={() => {
                           setSelectedChallenge(challenge);
-                          setShowDetailsModal(true);
+                          setShowJoinModal(true);
                         }}
                       >
                         <div className="flex items-center justify-between mb-3">
@@ -2127,7 +2127,25 @@ const JoinChallengeModal: React.FC<{
       }, 1500);
     } catch (err: any) {
       console.error("❌ Join failed:", err);
-      setError(err.message || 'Failed to join challenge. Please try again.');
+      
+      // Handle specific error cases
+      let errorMessage = 'Failed to join challenge. Please try again.';
+      
+      if (err.message?.includes('ChallengeExpired')) {
+        errorMessage = 'This challenge has expired and is no longer available to join.';
+      } else if (err.message?.includes('Challenge has expired')) {
+        errorMessage = 'This challenge has expired and is no longer available to join.';
+      } else if (err.message?.includes('InsufficientFunds')) {
+        errorMessage = 'You don\'t have enough USDFG tokens to join this challenge.';
+      } else if (err.message?.includes('SelfChallenge')) {
+        errorMessage = 'You cannot join your own challenge.';
+      } else if (err.message?.includes('NotOpen')) {
+        errorMessage = 'This challenge is no longer open for joining.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
       setState('error');
     }
   };
