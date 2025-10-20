@@ -1677,8 +1677,8 @@ const CreateChallengeModal: React.FC<{
       errors.push('Please enter your username/gamertag');
     }
     
-    if (!formData.entryFee || formData.entryFee < 10 || formData.entryFee > 10000) {
-      errors.push('Entry fee must be between 10 and 10,000 USDFG');
+    if (!formData.entryFee || formData.entryFee < 0.001 || formData.entryFee > 999999999) {
+      errors.push('Entry fee must be between 0.001 and 999,999,999 USDFG');
     }
     
     return errors;
