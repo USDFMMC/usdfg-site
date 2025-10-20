@@ -18,6 +18,7 @@ import ElegantModal from "@/components/ui/ElegantModal";
 import CreateChallengeForm from "@/components/arena/CreateChallengeForm";
 import ElegantNavbar from "@/components/layout/ElegantNavbar";
 import { SubmitResultRoom } from "@/components/arena/SubmitResultRoom";
+import PlayerProfileModal from "@/components/arena/PlayerProfileModal";
 
 const ArenaHome: React.FC = () => {
   const wallet = useWallet();
@@ -39,6 +40,8 @@ const ArenaHome: React.FC = () => {
   const [lastLocalChallenge, setLastLocalChallenge] = useState<number>(0);
   const [isCreatingChallenge, setIsCreatingChallenge] = useState<boolean>(false);
   const [topPlayers, setTopPlayers] = useState<PlayerStats[]>([]);
+  const [showPlayerProfile, setShowPlayerProfile] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState<PlayerStats | null>(null);
   const [loadingTopPlayers, setLoadingTopPlayers] = useState<boolean>(true);
   const [copiedWallet, setCopiedWallet] = useState<string | null>(null);
   const [showAllPlayers, setShowAllPlayers] = useState<boolean>(false);
@@ -1246,7 +1249,14 @@ const ArenaHome: React.FC = () => {
                       ];
                       
                       return (
-                        <div key={player.wallet} className={`bg-gradient-to-r ${bgColors[index]} rounded-lg p-4 border group`}>
+                        <div 
+                          key={player.wallet} 
+                          className={`bg-gradient-to-r ${bgColors[index]} rounded-lg p-4 border group cursor-pointer hover:scale-[1.02] transition-all`}
+                          onClick={() => {
+                            setSelectedPlayer(player);
+                            setShowPlayerProfile(true);
+                          }}
+                        >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3 flex-1">
                               <div className={`w-10 h-10 bg-gradient-to-r ${rankColors[index]} rounded-full flex items-center justify-center text-black font-bold shrink-0`}>
@@ -2351,6 +2361,17 @@ const JoinChallengeModal: React.FC<{
       </div>
     </div>
 
+    {/* Player Profile Modal */}
+    {selectedPlayer && (
+      <PlayerProfileModal
+        isOpen={showPlayerProfile}
+        onClose={() => {
+          setShowPlayerProfile(false);
+          setSelectedPlayer(null);
+        }}
+        player={selectedPlayer}
+      />
+    )}
   );
 };
 
