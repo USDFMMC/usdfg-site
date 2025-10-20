@@ -170,8 +170,13 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     
     if (step === 2) {
       if (!formData.mode) errors.push('Please select a challenge mode');
-      if (formData.entryFee < 0.001) errors.push('Minimum entry fee is 0.001 USDFG');
-      if (formData.entryFee > 999999999) errors.push('Maximum entry fee is 999,999,999 USDFG');
+      const entryFee = typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) : formData.entryFee;
+      if (!formData.entryFee || formData.entryFee === '' || isNaN(entryFee) || entryFee < 0.001) {
+        errors.push('Minimum entry fee is 0.001 USDFG');
+      }
+      if (entryFee > 999999999) {
+        errors.push('Maximum entry fee is 999,999,999 USDFG');
+      }
     }
     
     if (step === 3) {
@@ -333,29 +338,17 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                   value={formData.entryFee || ''}
                   onChange={(e) => {
                     const value = e.target.value;
-                    if (value === '') {
-                      handleInputChange('entryFee', '');
-                    } else if (value === '.') {
-                      handleInputChange('entryFee', '.');
-                    } else if (value.endsWith('.')) {
-                      handleInputChange('entryFee', value);
-                    } else {
-                      const numValue = parseFloat(value);
-                      if (!isNaN(numValue)) {
-                        handleInputChange('entryFee', numValue);
-                      } else if (value.match(/^\d*\.?\d*$/)) {
-                        handleInputChange('entryFee', value);
-                      }
-                    }
+                    // Always store as string to preserve decimal input
+                    handleInputChange('entryFee', value);
                   }}
                   className="flex-1 p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
                 />
                 <div className="text-sm text-gray-400">
-                  ≈ ${usdfgToUsd(formData.entryFee).toFixed(2)} USD
+                  ≈ ${usdfgToUsd(typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) || 0 : formData.entryFee || 0).toFixed(2)} USD
                 </div>
               </div>
               <div className="mt-2 text-sm text-gray-400">
-                Prize Pool: {formData.entryFee * 2} USDFG (2x entry fee)
+                Prize Pool: {(typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) || 0 : formData.entryFee || 0) * 2} USDFG (2x entry fee)
               </div>
             </div>
           </div>
