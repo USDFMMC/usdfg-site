@@ -2371,6 +2371,7 @@ const JoinChallengeModal: React.FC<{
           player={selectedPlayer}
         />
       )}
+      </div>
     </>
   );
 };
