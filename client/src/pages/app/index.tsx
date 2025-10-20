@@ -433,6 +433,8 @@ const ArenaHome: React.FC = () => {
               console.log("⚠️ Challenge already completed on-chain - prize already claimed");
               alert("This prize has already been claimed. Please refresh the page to see the latest status.");
               setClaimingPrize(null);
+              // Force refresh the page to sync with on-chain state
+              window.location.reload();
               return;
             }
           }
