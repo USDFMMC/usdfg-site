@@ -11,7 +11,6 @@ import { BN } from '@coral-xyz/anchor';
 import { Connection, PublicKey, Keypair, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction, TransactionInstruction } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
 import { PROGRAM_ID, USDFG_MINT, SEEDS, usdfgToLamports } from './config';
-import { initializeSmartContract, isSmartContractInitialized } from './initialize';
 import * as borsh from '@coral-xyz/borsh';
 
 /**
@@ -72,7 +71,7 @@ export async function derivePDAs(creator: PublicKey, challengeSeed: PublicKey) {
  * 
  * @param wallet - Connected wallet
  * @param connection - Solana connection
- * @param entryFeeUsdfg - Entry fee in USDFG tokens (e.g., 10 for 10 USDFG)
+ * @param entryFeeUsdfg - Entry fee in USDFG tokens (e.g., 0.001 for 0.001 USDFG)
  * @returns Challenge PDA address
  */
 export async function createChallenge(
@@ -102,15 +101,8 @@ export async function createChallenge(
 
   console.log('✅ Wallet has signTransaction method');
 
-  // Check if smart contract is initialized
-  const isInitialized = await isSmartContractInitialized(connection);
-  if (!isInitialized) {
-    console.log('🔧 Initializing smart contract...');
-    await initializeSmartContract(wallet, connection);
-    console.log('✅ Smart contract is ready (no oracle initialization needed)');
-  } else {
-    console.log('✅ Smart contract already initialized');
-  }
+  // Smart contract is ready (no initialization needed for player-consensus model)
+  console.log('✅ Smart contract ready for player-consensus challenges');
 
   // ✅ NEW CONTRACT: No oracle refresh needed!
 

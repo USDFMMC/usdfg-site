@@ -28,8 +28,8 @@ export const SEEDS = {
 
 // Challenge configuration
 export const CHALLENGE_CONFIG = {
-  MIN_ENTRY_FEE: 1, // 1 USDFG minimum
-  MAX_ENTRY_FEE: 1000, // 1000 USDFG maximum
+  MIN_ENTRY_FEE: 0.001, // 0.001 USDFG minimum (supports high-value tokens)
+  MAX_ENTRY_FEE: 999999999, // 999,999,999 USDFG maximum
   DISPUTE_TIMER: 900, // 15 minutes in seconds
   MAX_PLAYERS: 8,
 } as const;
