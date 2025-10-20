@@ -2359,7 +2359,7 @@ const JoinChallengeModal: React.FC<{
           </div>
         )}
       </div>
-    </div>
+      </div>
 
     {/* Player Profile Modal */}
     {selectedPlayer && (
