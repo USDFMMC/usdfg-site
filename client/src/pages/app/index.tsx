@@ -518,8 +518,10 @@ const ArenaHome: React.FC = () => {
         <meta name="description" content="Enter the USDFG Arena - Compete in skill-based challenges, earn USDFG, and prove your gaming prowess." />
       </Helmet>
 
-      <div className="min-h-screen bg-background-1 relative w-full overflow-x-hidden">
-        <div className="parallax-glow"></div>
+      <div className="relative min-h-screen w-full bg-[#040507] text-zinc-100 overflow-hidden">
+        {/* Ambient Background Glow */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] pointer-events-none" />
+        <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-transparent via-amber-300/50 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
         {/* Header */}
         <ElegantNavbar>
           {/* Desktop Only Buttons */}
@@ -600,8 +602,8 @@ const ArenaHome: React.FC = () => {
               <span className="text-xs text-text-dim ml-2 neocore-body">Live</span>
             </div>
             
-            <h1 className="neocore-h1 text-2xl sm:text-4xl lg:text-5xl">
-              Welcome to the <span className="bg-gradient-to-r from-glow-cyan to-glow-electric bg-clip-text text-transparent">Arena</span>
+            <h1 className="text-5xl font-bold text-white drop-shadow-[0_0_20px_rgba(255,215,130,0.3)]">
+              Welcome to the <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-200">Arena</span>
             </h1>
             <p className="text-base sm:text-xl max-w-2xl mx-auto neocore-body mb-6 sm:mb-8 px-4">
               Compete in skill-based challenges, earn USDFG, and prove your gaming prowess against players worldwide.
@@ -633,28 +635,28 @@ const ArenaHome: React.FC = () => {
 
           {/* Quick Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
-            <div className="bg-black/20 border border-gray-800 rounded-lg p-6 text-center backdrop-blur-sm">
-              <div className="text-4xl mb-2">🏆</div>
-              <div className="text-2xl font-bold text-white">1,247</div>
-              <div className="text-gray-400 text-sm">Active Challenges</div>
+            <div className="bg-[#0B0C12]/90 border border-zinc-800 rounded-2xl p-6 text-center hover:border-amber-300/50 shadow-[0_0_30px_rgba(255,215,130,0.05)] transition-all">
+              <div className="text-3xl mb-1">🏆</div>
+              <div className="text-2xl font-semibold text-white">1,247</div>
+              <div className="text-sm text-zinc-400 mt-1">Active Challenges</div>
             </div>
             
-            <div className="bg-black/20 border border-gray-800 rounded-lg p-6 text-center backdrop-blur-sm">
-              <div className="text-4xl mb-2">👥</div>
-              <div className="text-2xl font-bold text-white">8,432</div>
-              <div className="text-gray-400 text-sm">Players Online</div>
+            <div className="bg-[#0B0C12]/90 border border-zinc-800 rounded-2xl p-6 text-center hover:border-amber-300/50 shadow-[0_0_30px_rgba(255,215,130,0.05)] transition-all">
+              <div className="text-3xl mb-1">👥</div>
+              <div className="text-2xl font-semibold text-white">8,432</div>
+              <div className="text-sm text-zinc-400 mt-1">Players Online</div>
             </div>
             
-            <div className="bg-black/20 border border-gray-800 rounded-lg p-6 text-center backdrop-blur-sm">
-              <div className="text-4xl mb-2">⚡</div>
-              <div className="text-2xl font-bold text-white">45,678</div>
-              <div className="text-gray-400 text-sm">USDFG Rewarded</div>
+            <div className="bg-[#0B0C12]/90 border border-zinc-800 rounded-2xl p-6 text-center hover:border-amber-300/50 shadow-[0_0_30px_rgba(255,215,130,0.05)] transition-all">
+              <div className="text-3xl mb-1">⚡</div>
+              <div className="text-2xl font-semibold text-white">45,678</div>
+              <div className="text-sm text-zinc-400 mt-1">USDFG Rewarded</div>
             </div>
             
-            <div className="bg-black/20 border border-gray-800 rounded-lg p-6 text-center backdrop-blur-sm">
-              <div className="text-4xl mb-2">📈</div>
-              <div className="text-2xl font-bold text-white">+12.5%</div>
-              <div className="text-gray-400 text-sm">Win Rate</div>
+            <div className="bg-[#0B0C12]/90 border border-zinc-800 rounded-2xl p-6 text-center hover:border-amber-300/50 shadow-[0_0_30px_rgba(255,215,130,0.05)] transition-all">
+              <div className="text-3xl mb-1">📈</div>
+              <div className="text-2xl font-semibold text-white">+12.5%</div>
+              <div className="text-sm text-zinc-400 mt-1">Win Rate</div>
             </div>
           </div>
 
@@ -767,7 +769,7 @@ const ArenaHome: React.FC = () => {
                     return (
                       <div 
                         key={challenge.id} 
-                        className={`challenge-card p-4 cursor-pointer hover:bg-background-2/40 transition-colors ${challenge.status === "expired" ? "challenge-expired" : ""}`}
+                        className={`bg-[#0B0C12]/90 border border-zinc-800 rounded-2xl p-6 cursor-pointer hover:border-amber-300/50 shadow-[0_0_30px_rgba(255,215,130,0.05)] transition-all ${challenge.status === "expired" ? "challenge-expired" : ""}`}
                         onClick={() => {
                           // Don't open join modal for completed challenges
                           if (challenge.status === "completed" || challenge.rawData?.payoutTriggered) {
@@ -2348,6 +2350,13 @@ const JoinChallengeModal: React.FC<{
         )}
       </div>
     </div>
+
+    <style>{`
+      @keyframes borderPulse {
+        0%, 100% { opacity: 0.4; }
+        50% { opacity: 1; }
+      }
+    `}</style>
   );
 };
 
