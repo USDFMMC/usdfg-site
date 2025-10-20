@@ -329,11 +329,25 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
               </label>
               <div className="flex items-center space-x-3">
                 <input
-                  type="number"
-                  min="10"
-                  max="1000"
-                  value={formData.entryFee}
-                  onChange={(e) => handleInputChange('entryFee', parseInt(e.target.value) || 0)}
+                  type="text"
+                  value={formData.entryFee === 0 ? '' : formData.entryFee || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      handleInputChange('entryFee', '');
+                    } else if (value === '.') {
+                      handleInputChange('entryFee', '.');
+                    } else if (value.endsWith('.')) {
+                      handleInputChange('entryFee', value);
+                    } else {
+                      const numValue = parseFloat(value);
+                      if (!isNaN(numValue)) {
+                        handleInputChange('entryFee', numValue);
+                      } else if (value.match(/^\d*\.?\d*$/)) {
+                        handleInputChange('entryFee', value);
+                      }
+                    }
+                  }}
                   className="flex-1 p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
                 />
                 <div className="text-sm text-gray-400">
