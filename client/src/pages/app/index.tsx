@@ -1937,13 +1937,14 @@ const CreateChallengeModal: React.FC<{
                       className={`w-full rounded-xl bg-white/5 border px-3 py-2 text-white mt-4 mb-1 ${
                         hasFieldError('entry fee') ? 'border-red-500/50 bg-red-500/5' : 'border-white/10'
                       }`}
-                      min="1"
+                      min="0.001"
+                      step="0.001"
                       max="999999999"
-                      placeholder="50"
+                      placeholder="0.1"
                       required
                       autoComplete="off"
                       inputMode="numeric"
-                      pattern="[0-9]*"
+                      pattern="[0-9]*\.?[0-9]*"
                     />
                     <div className="absolute right-3 top-1/2 transform -translate-y-1/2 mt-2">
                       <span className="text-gray-400 text-sm">USDFG</span>

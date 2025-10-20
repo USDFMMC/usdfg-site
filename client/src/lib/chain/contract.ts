@@ -89,9 +89,9 @@ export async function createChallenge(
 
   console.log(`✅ Wallet connected: ${wallet.publicKey.toString()}`);
 
-  // Validate entry fee
-  if (entryFeeUsdfg < 1 || entryFeeUsdfg > 999999999) {
-    throw new Error('Entry fee must be between 1 and 999,999,999 USDFG');
+  // Validate entry fee (support decimals for high-value tokens)
+  if (entryFeeUsdfg < 0.001 || entryFeeUsdfg > 999999999) {
+    throw new Error('Entry fee must be between 0.001 and 999,999,999 USDFG');
   }
 
   console.log(`✅ Entry fee valid: ${entryFeeUsdfg} USDFG`);
