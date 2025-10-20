@@ -26,7 +26,6 @@ const ArenaHome: React.FC = () => {
   // Use MWA connection state
   const isConnected = connected;
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showSubmitResultModal, setShowSubmitResultModal] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<any>(null);
@@ -1062,7 +1061,7 @@ const ArenaHome: React.FC = () => {
                                     
                                     // Challenge is actually open, proceed with join
                                     setSelectedChallenge(challenge);
-                                    setShowDetailsModal(true);
+                                    setShowJoinModal(true);
                                   } catch (error) {
                                     console.error('Error checking on-chain status:', error);
                                     alert('Failed to verify challenge status. Please try again.');
@@ -1277,19 +1276,6 @@ const ArenaHome: React.FC = () => {
         </ElegantModal>
 
 
-        {/* Challenge Details Modal */}
-        {showDetailsModal && selectedChallenge && (
-          <ChallengeDetailsModal 
-            challenge={selectedChallenge}
-            onClose={() => setShowDetailsModal(false)}
-            onJoin={() => {
-              setShowDetailsModal(false);
-              setShowJoinModal(true);
-            }}
-            isConnected={isConnected}
-            onConnect={() => connect()}
-          />
-        )}
 
         {/* Join Challenge Modal */}
         {showJoinModal && selectedChallenge && (
@@ -2176,6 +2162,28 @@ const JoinChallengeModal: React.FC<{
                 <span className="text-gray-400">Players:</span>
                 <span className="text-white font-medium">{challenge.players}/{challenge.capacity}</span>
               </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Platform:</span>
+                <span className="text-white font-medium">{challenge.platform || 'All Platforms'}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Game:</span>
+                <span className="text-white font-medium">{challenge.game || 'USDFG Arena'}</span>
+              </div>
+              {challenge.expiresAt && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Expires:</span>
+                  <span className="text-white font-medium">
+                    {new Date(challenge.expiresAt).toLocaleString()}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">Rules:</span>
+                <span className="text-white font-medium text-xs">
+                  {challenge.rules || 'Standard USDFG Arena rules apply'}
+                </span>
+              </div>
             </div>
             
             <p className="text-xs text-gray-400">
@@ -2245,146 +2253,5 @@ const JoinChallengeModal: React.FC<{
   );
 };
 
-// Challenge Details Modal Component
-const ChallengeDetailsModal: React.FC<{ 
-  challenge: any; 
-  onClose: () => void; 
-  onJoin: () => void;
-  isConnected: boolean;
-  onConnect: () => void;
-}> = ({ challenge, onClose, onJoin, isConnected, onConnect }) => {
-  const [connecting, setConnecting] = useState(false);
-
-  const handleConnect = () => {
-    // Close the modal and let the user connect via the main wallet button
-    onClose();
-    console.log('🔗 Please connect your wallet using the main "Connect Wallet" button first');
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-background-2/95 border border-glow/20 rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto backdrop-blur-sm glow-soft">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-text-primary neocore-h2">
-            Challenge Details
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-text-dim hover:text-text-primary transition-colors"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="space-y-6">
-          {/* Challenge Header */}
-          <div className="flex items-center space-x-4">
-            <div className="w-16 h-16 bg-gradient-to-r from-glow-pink to-glow-electric rounded-xl flex items-center justify-center">
-              <span className="text-2xl">🥊</span>
-            </div>
-            <div>
-              <h3 className="text-xl font-semibold text-text-primary neocore-body">
-                {challenge.title}
-              </h3>
-              <p className="text-text-dim neocore-body">
-                {challenge.category} • {challenge.game}
-              </p>
-            </div>
-          </div>
-
-          {/* Challenge Info */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-background/50 rounded-lg p-4">
-              <div className="text-sm text-text-dim mb-1">Entry Fee</div>
-              <div className="text-lg font-semibold text-text-primary">
-                {challenge.entryFee} USDFG
-              </div>
-            </div>
-            <div className="bg-background/50 rounded-lg p-4">
-              <div className="text-sm text-text-dim mb-1">Prize Pool</div>
-              <div className="text-lg font-semibold text-text-primary">
-                {challenge.prizePool} USDFG
-              </div>
-            </div>
-            <div className="bg-background/50 rounded-lg p-4">
-              <div className="text-sm text-text-dim mb-1">Players</div>
-              <div className="text-lg font-semibold text-text-primary">
-                {challenge.players}/{challenge.capacity}
-              </div>
-            </div>
-            <div className="bg-background/50 rounded-lg p-4">
-              <div className="text-sm text-text-dim mb-1">Platform</div>
-              <div className="text-lg font-semibold text-text-primary">
-                {challenge.platform}
-              </div>
-            </div>
-          </div>
-
-          {/* Rules */}
-          <div>
-            <h4 className="text-lg font-semibold text-text-primary mb-3 neocore-body">
-              Rules & Requirements
-            </h4>
-            <div className="bg-background/50 rounded-lg p-4">
-              <pre className="text-text-primary whitespace-pre-wrap neocore-body">
-                {challenge.rules}
-              </pre>
-            </div>
-          </div>
-
-          {/* Creator Info */}
-          <div>
-            <h4 className="text-lg font-semibold text-text-primary mb-3 neocore-body">
-              Challenge Creator
-            </h4>
-            <div className="bg-background/50 rounded-lg p-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-full flex items-center justify-center">
-                  <span className="text-white font-semibold">
-                    {challenge.username?.charAt(0) || '👤'}
-                  </span>
-                </div>
-                <div>
-                  <div className="text-text-primary font-semibold neocore-body">
-                    {challenge.username || 'Anonymous Player'}
-                  </div>
-                  <div className="text-text-dim text-sm neocore-body">
-                    Created {new Date(challenge.createdAt).toLocaleDateString()}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex space-x-3">
-            {isConnected ? (
-              <button
-                onClick={onJoin}
-                className="flex-1 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-semibold py-3 px-6 rounded-lg hover:brightness-110 transition-all neocore-button"
-              >
-                Join Challenge
-              </button>
-            ) : (
-              <button
-                onClick={handleConnect}
-                disabled={connecting}
-                className="flex-1 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-semibold py-3 px-6 rounded-lg hover:brightness-110 transition-all disabled:opacity-50 neocore-button"
-              >
-                {connecting ? 'Connecting...' : 'Connect Wallet to Join'}
-              </button>
-            )}
-            <button
-              onClick={onClose}
-              className="px-6 py-3 border border-gray-600 text-text-primary rounded-lg hover:bg-gray-800 transition-colors"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export default ArenaHome;
