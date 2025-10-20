@@ -769,6 +769,11 @@ const ArenaHome: React.FC = () => {
                         key={challenge.id} 
                         className={`challenge-card p-4 cursor-pointer hover:bg-background-2/40 transition-colors ${challenge.status === "expired" ? "challenge-expired" : ""}`}
                         onClick={() => {
+                          // Don't open join modal for completed challenges
+                          if (challenge.status === "completed" || challenge.rawData?.payoutTriggered) {
+                            console.log("Challenge already completed - not opening join modal");
+                            return;
+                          }
                           setSelectedChallenge(challenge);
                           setShowJoinModal(true);
                         }}
@@ -945,7 +950,7 @@ const ArenaHome: React.FC = () => {
                                         </button>
                                       )}
                                       {challenge.rawData?.payoutTriggered && (
-                                        <div className="mt-3 px-6 py-3 bg-green-600/20 text-green-400 border border-green-600/30 font-semibold rounded-lg">
+                                        <div className="mt-3 px-6 py-3 bg-green-600/20 text-green-400 border border-green-600/30 font-semibold rounded-lg cursor-default">
                                           ✅ Prize Claimed
                                         </div>
                                       )}
@@ -1164,7 +1169,7 @@ const ArenaHome: React.FC = () => {
                               );
                             } else if (isWinner && challenge.rawData?.payoutTriggered) {
                               return (
-                                <div className="w-full px-4 py-2 bg-green-600/20 text-green-400 border border-green-600/30 font-semibold rounded-lg text-center">
+                                <div className="w-full px-4 py-2 bg-green-600/20 text-green-400 border border-green-600/30 font-semibold rounded-lg text-center cursor-default">
                                   ✅ Prize Claimed
                                 </div>
                               );
