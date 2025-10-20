@@ -12,7 +12,7 @@ pub const PLATFORM_WALLET: &str = "AcEV5t9TJdZP91ttbgKieWoWUxwUb4PT4MxvggDjjkkq"
 
 // Entry fee limits
 const MIN_ENTRY_FEE_LAMPORTS: u64 = 1_000_000_000; // 1 USDFG
-const MAX_ENTRY_FEE_LAMPORTS: u64 = 1_000_000_000_000; // 1000 USDFG
+const MAX_ENTRY_FEE_LAMPORTS: u64 = 999_999_999_000_000_000; // 999,999,999 USDFG (9 digits)
 
 #[program]
 pub mod usdfg_smart_contract {

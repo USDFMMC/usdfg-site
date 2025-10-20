@@ -1937,8 +1937,8 @@ const CreateChallengeModal: React.FC<{
                       className={`w-full rounded-xl bg-white/5 border px-3 py-2 text-white mt-4 mb-1 ${
                         hasFieldError('entry fee') ? 'border-red-500/50 bg-red-500/5' : 'border-white/10'
                       }`}
-                      min="10"
-                      max="10000"
+                      min="1"
+                      max="999999999"
                       placeholder="50"
                       required
                       autoComplete="off"
