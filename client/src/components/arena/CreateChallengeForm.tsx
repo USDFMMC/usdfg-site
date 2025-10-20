@@ -330,7 +330,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
               <div className="flex items-center space-x-3">
                 <input
                   type="text"
-                  value={formData.entryFee === 0 ? '' : formData.entryFee || ''}
+                  value={formData.entryFee || ''}
                   onChange={(e) => {
                     const value = e.target.value;
                     if (value === '') {

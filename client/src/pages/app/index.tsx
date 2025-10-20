@@ -1940,7 +1940,7 @@ const CreateChallengeModal: React.FC<{
                   <div className="relative">
                     <input
                       type="text"
-                      value={formData.entryFee === 0 ? '' : formData.entryFee || ''}
+                      value={formData.entryFee || ''}
                       onChange={(e) => {
                         const value = e.target.value;
                         // Allow typing freely, including decimals
