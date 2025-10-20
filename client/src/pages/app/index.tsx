@@ -1677,7 +1677,7 @@ const CreateChallengeModal: React.FC<{
       errors.push('Please enter your username/gamertag');
     }
     
-    if (!formData.entryFee || formData.entryFee < 0.001 || formData.entryFee > 999999999) {
+    if (!formData.entryFee || formData.entryFee === '' || formData.entryFee < 0.001 || formData.entryFee > 999999999) {
       errors.push('Entry fee must be between 0.001 and 999,999,999 USDFG');
     }
     
@@ -1938,9 +1938,20 @@ const CreateChallengeModal: React.FC<{
                 <Field label={<span className="flex items-center"><span className="mr-2">💰</span>Entry Fee <span className="text-red-400 ml-1">*</span></span>}>
                   <div className="relative">
                     <input
-                      type="number"
+                      type="text"
                       value={formData.entryFee || ''}
-                      onChange={(e) => updateFormData({entryFee: Number(e.target.value) || 0})}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        // Allow empty string for better UX
+                        if (value === '') {
+                          updateFormData({entryFee: ''});
+                        } else {
+                          const numValue = parseFloat(value);
+                          if (!isNaN(numValue)) {
+                            updateFormData({entryFee: numValue});
+                          }
+                        }
+                      }}
                       className={`w-full rounded-xl bg-white/5 border px-3 py-2 text-white mt-4 mb-1 ${
                         hasFieldError('entry fee') ? 'border-red-500/50 bg-red-500/5' : 'border-white/10'
                       }`}
