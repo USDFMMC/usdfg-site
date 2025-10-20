@@ -26,7 +26,6 @@ const ArenaHome: React.FC = () => {
   // Use MWA connection state
   const isConnected = connected;
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showJoinModal, setShowJoinModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showSubmitResultModal, setShowSubmitResultModal] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<any>(null);
@@ -1062,7 +1061,7 @@ const ArenaHome: React.FC = () => {
                                     
                                     // Challenge is actually open, proceed with join
                                     setSelectedChallenge(challenge);
-                                    setShowJoinModal(true);
+                                    setShowDetailsModal(true);
                                   } catch (error) {
                                     console.error('Error checking on-chain status:', error);
                                     alert('Failed to verify challenge status. Please try again.');
@@ -1276,24 +1275,37 @@ const ArenaHome: React.FC = () => {
           />
         </ElegantModal>
 
-        {/* Join Challenge Modal */}
-        {showJoinModal && selectedChallenge && (
-          <JoinChallengeModal 
-            challenge={selectedChallenge}
-            onClose={() => setShowJoinModal(false)}
-            isConnected={isConnected}
-            onConnect={() => connect()}
-          />
-        )}
 
         {/* Challenge Details Modal */}
         {showDetailsModal && selectedChallenge && (
           <ChallengeDetailsModal 
             challenge={selectedChallenge}
             onClose={() => setShowDetailsModal(false)}
-            onJoin={() => {
-              setShowDetailsModal(false);
-              setShowJoinModal(true);
+            onJoin={async () => {
+              // Handle join directly in the details modal - no second modal needed
+              try {
+                console.log("🚀 Joining challenge:", selectedChallenge.id);
+                
+                if (!selectedChallenge.pda) {
+                  throw new Error('Challenge has no on-chain PDA. Cannot join this challenge.');
+                }
+                
+                const challengePDA = new PublicKey(selectedChallenge.pda);
+                await joinChallengeOnChain(challengePDA, selectedChallenge.entryFee, walletAddress, {
+                  connection,
+                  wallet: { publicKey: walletAddress }
+                });
+                
+                await joinChallenge(selectedChallenge.id, walletAddress);
+                console.log("✅ Successfully joined challenge!");
+                setShowDetailsModal(false);
+                setSelectedChallenge(null);
+                // Refresh challenges
+                window.location.reload();
+              } catch (err: any) {
+                console.error('Error joining challenge:', err);
+                alert(err.message || 'Failed to join challenge. Please try again.');
+              }
             }}
             isConnected={isConnected}
             onConnect={() => connect()}
@@ -2074,174 +2086,6 @@ Prize pool: {(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5
   );
 };
 
-// Join Challenge Modal Component
-const JoinChallengeModal: React.FC<{ 
-  challenge: any; 
-  onClose: () => void; 
-  isConnected: boolean;
-  onConnect: () => void;
-}> = ({ challenge, onClose, isConnected, onConnect }) => {
-  const { publicKey, signTransaction } = useWallet();
-  const [state, setState] = useState<'review' | 'processing' | 'success' | 'error'>('review');
-  const [error, setError] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState(false);
-
-  const handleConnect = () => {
-    // Check if mobile
-    const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    if (isMobile) {
-      // Open in Phantom app on mobile
-      window.open('https://phantom.app/ul/browse/' + encodeURIComponent(window.location.href), '_blank');
-    } else {
-      // Desktop: close modal and let user connect via main button
-      onClose();
-    }
-  };
-
-  const handleJoin = async () => {
-    if (!isConnected || !publicKey || !signTransaction) {
-      setError('Please connect your wallet first');
-      setState('error');
-      return;
-    }
-
-    setState('processing');
-    
-    try {
-      const walletAddress = publicKey.toString();
-      if (!walletAddress) {
-        throw new Error('Wallet not connected');
-      }
-
-      console.log("🚀 Joining challenge:", challenge.id);
-      
-      // Step 1: Join on-chain (Solana transaction)
-      // Use the PDA from the challenge data, not the Firestore ID
-      const challengePDA = challenge.rawData?.pda || challenge.pda;
-      if (!challengePDA) {
-        throw new Error('Challenge has no on-chain PDA. Cannot join this challenge.');
-      }
-      
-      await joinChallengeOnChain(challengePDA, challenge.entryFee, walletAddress, {
-        signTransaction: signTransaction,
-        publicKey: publicKey
-      });
-      
-      // Step 2: Update Firestore
-      await joinChallenge(challenge.id, walletAddress);
-      
-      console.log("✅ Successfully joined challenge!");
-      setState('success');
-      
-      setTimeout(() => {
-        onClose();
-      }, 1500);
-    } catch (err: any) {
-      console.error("❌ Join failed:", err);
-      setError(err.message || 'Failed to join challenge. Please try again.');
-      setState('error');
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative w-[90vw] max-w-md rounded-2xl border border-gray-800 bg-gray-900 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-white">Join Challenge</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
-            ✕
-          </button>
-        </div>
-
-        {state === 'review' && (
-          <div className="space-y-4">
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Challenge:</span>
-                <span className="text-white font-medium">{challenge.title}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Entry Fee:</span>
-                <span className="text-white font-medium">{challenge.entryFee} USDFG</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Prize Pool:</span>
-                <span className="text-white font-medium">{challenge.prizePool} USDFG</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Players:</span>
-                <span className="text-white font-medium">{challenge.players}/{challenge.capacity}</span>
-              </div>
-            </div>
-            
-            <p className="text-xs text-gray-400">
-              You will need to approve a transaction in your wallet. Make sure you have enough USDFG and SOL for fees.
-            </p>
-
-            <div className="flex items-center justify-between pt-4">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleJoin}
-                className="bg-gradient-to-r from-purple-600 to-pink-500 text-white px-6 py-2 rounded-lg font-semibold hover:brightness-110 transition-all"
-              >
-                Join Challenge
-              </button>
-            </div>
-          </div>
-        )}
-
-        {state === 'processing' && (
-          <div className="text-center py-8">
-            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-gray-600 border-t-cyan-400 mb-4" />
-            <p className="text-gray-300">Processing your request...</p>
-          </div>
-        )}
-
-        {state === 'success' && (
-          <div className="text-center py-8">
-            <div className="mx-auto h-12 w-12 rounded-full bg-green-500/20 flex items-center justify-center mb-4">
-              <span className="text-green-400 text-xl">✓</span>
-            </div>
-            <p className="text-green-400 font-medium">Successfully joined the challenge!</p>
-            <p className="text-gray-400 text-sm mt-2">Good luck in the Arena!</p>
-          </div>
-        )}
-
-        {state === 'error' && (
-          <div className="text-center py-8">
-            <div className="mx-auto h-12 w-12 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
-              <span className="text-red-400 text-xl">✕</span>
-            </div>
-            <p className="text-red-400 font-medium">{error}</p>
-            {!isConnected ? (
-              <button
-                onClick={handleConnect}
-                disabled={connecting}
-                className="mt-4 bg-gradient-to-r from-cyan-400 to-purple-500 text-black px-4 py-2 rounded-lg font-semibold hover:brightness-110 transition-all disabled:opacity-50"
-              >
-                {connecting ? "Connecting..." : "Connect Wallet First"}
-              </button>
-            ) : (
-              <button
-                onClick={() => setState('review')}
-                className="mt-4 bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
-              >
-                Try Again
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
 
 // Challenge Details Modal Component
 const ChallengeDetailsModal: React.FC<{ 
