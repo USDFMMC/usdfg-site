@@ -2351,12 +2351,6 @@ const JoinChallengeModal: React.FC<{
       </div>
     </div>
 
-    <style>{`
-      @keyframes borderPulse {
-        0%, 100% { opacity: 0.4; }
-        50% { opacity: 1; }
-      }
-    `}</style>
   );
 };
 

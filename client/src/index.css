@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Arena page border pulse animation */
+@keyframes borderPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
 /* Safari compatibility fixes */
 @supports not (backdrop-filter: blur(10px)) {
   .backdrop-blur-sm {
