@@ -170,8 +170,8 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     
     if (step === 2) {
       if (!formData.mode) errors.push('Please select a challenge mode');
-      if (formData.entryFee < 10) errors.push('Minimum entry fee is 10 USDFG');
-      if (formData.entryFee > 1000) errors.push('Maximum entry fee is 1000 USDFG');
+      if (formData.entryFee < 0.001) errors.push('Minimum entry fee is 0.001 USDFG');
+      if (formData.entryFee > 999999999) errors.push('Maximum entry fee is 999,999,999 USDFG');
     }
     
     if (step === 3) {
