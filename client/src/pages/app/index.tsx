@@ -2141,6 +2141,10 @@ const JoinChallengeModal: React.FC<{
         errorMessage = 'You cannot join your own challenge.';
       } else if (err.message?.includes('NotOpen')) {
         errorMessage = 'This challenge is no longer open for joining.';
+      } else if (err.message?.includes('already been processed')) {
+        errorMessage = 'This challenge has already been joined or processed. Please refresh the page to see the latest status.';
+      } else if (err.message?.includes('Transaction simulation failed')) {
+        errorMessage = 'Transaction failed. This challenge may have already been joined or is no longer available.';
       } else if (err.message) {
         errorMessage = err.message;
       }
@@ -2257,12 +2261,20 @@ const JoinChallengeModal: React.FC<{
                 {connecting ? "Connecting..." : "Connect Wallet First"}
               </button>
             ) : (
-              <button
-                onClick={() => setState('review')}
-                className="mt-4 bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
-              >
-                Try Again
-              </button>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setState('review')}
+                  className="mt-4 bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
+                >
+                  Try Again
+                </button>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Refresh Page
+                </button>
+              </div>
             )}
           </div>
         )}
