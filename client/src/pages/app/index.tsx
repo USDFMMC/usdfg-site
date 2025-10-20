@@ -2360,17 +2360,18 @@ const JoinChallengeModal: React.FC<{
         )}
       </div>
 
-    {/* Player Profile Modal */}
-    {selectedPlayer && (
-      <PlayerProfileModal
-        isOpen={showPlayerProfile}
-        onClose={() => {
-          setShowPlayerProfile(false);
-          setSelectedPlayer(null);
-        }}
-        player={selectedPlayer}
-      />
-    )}
+      {/* Player Profile Modal */}
+      {selectedPlayer && (
+        <PlayerProfileModal
+          isOpen={showPlayerProfile}
+          onClose={() => {
+            setShowPlayerProfile(false);
+            setSelectedPlayer(null);
+          }}
+          player={selectedPlayer}
+        />
+      )}
+      </div>
     </>
   );
 };
