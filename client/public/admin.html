@@ -199,257 +199,48 @@
 </head>
 <body>
     <div class="container">
-        <h1>🔐 USDFG Admin Panel</h1>
-        <p class="subtitle">Smart Contract Initialization</p>
+        <h1>🎮 USDFG Arena</h1>
+        <p class="subtitle">Player-Driven Gaming Platform</p>
 
-        <div id="loadingSection" class="loading">
-            <div class="spinner"></div>
-            <p>Loading contract status...</p>
+        <div class="alert alert-success">
+            ✅ <strong>Contract Ready!</strong><br>
+            The smart contract is deployed and ready for players to create challenges.
         </div>
 
-        <div id="connectSection" class="hidden">
-            <div class="alert alert-info">
-                👋 Please connect your admin wallet to continue.
+        <div class="status-box">
+            <h3 style="margin-bottom: 15px; color: #10b981;">📊 Platform Status</h3>
+            <div class="status-item">
+                <span class="status-label">Contract Type</span>
+                <span class="status-value">Player Consensus</span>
             </div>
-            <button class="btn btn-primary" onclick="connectWallet()">
-                Connect Phantom Wallet
-            </button>
-        </div>
-
-        <div id="wrongWalletSection" class="hidden">
-            <div class="alert alert-error">
-                ❌ <strong>Wrong Wallet Connected!</strong><br>
-                Please connect with the admin wallet:<br>
-                <code id="adminWalletDisplay"></code>
+            <div class="status-item">
+                <span class="status-label">Platform Fee</span>
+                <span class="status-value">5% (Hardcoded)</span>
             </div>
-            <button class="btn btn-primary" onclick="connectWallet()">
-                Switch to Admin Wallet
-            </button>
-        </div>
-
-        <div id="initSection" class="hidden">
-            <div class="alert alert-warning">
-                ⚠️ <strong>Contract Not Initialized</strong><br>
-                The smart contract needs to be initialized before users can create challenges.
+            <div class="status-item">
+                <span class="status-label">Platform Wallet</span>
+                <span class="status-value">AcEV5t9TJ...Djjkkq</span>
             </div>
-
-            <div class="status-box">
-                <h3 style="margin-bottom: 15px; color: #22d3ee;">📋 Configuration</h3>
-                <div class="status-item">
-                    <span class="status-label">Admin Wallet</span>
-                    <span class="status-value" id="adminWallet"></span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Platform Wallet</span>
-                    <span class="status-value" id="platformWallet"></span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Platform Fee</span>
-                    <span class="status-value">5% (500 bps)</span>
-                </div>
-            </div>
-
-            <button class="btn btn-primary" onclick="initializeContract()" id="initButton">
-                🚀 Initialize Contract
-            </button>
-        </div>
-
-        <div id="alreadyInitSection" class="hidden">
-            <div class="alert alert-success">
-                ✅ <strong>Contract Already Initialized!</strong><br>
-                The smart contract is ready and users can create challenges.
-            </div>
-
-            <div class="status-box">
-                <h3 style="margin-bottom: 15px; color: #10b981;">📊 Contract Status</h3>
-                <div class="status-item">
-                    <span class="status-label">Admin</span>
-                    <span class="status-value" id="currentAdmin"></span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Platform Wallet</span>
-                    <span class="status-value" id="currentPlatformWallet"></span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Platform Fee</span>
-                    <span class="status-value" id="currentFee"></span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Status</span>
-                    <span class="status-value" id="contractStatus"></span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Is Paused</span>
-                    <span class="status-value" id="isPaused"></span>
-                </div>
-            </div>
-
-            <a href="/app" class="btn btn-success" style="display: block; text-align: center; text-decoration: none;">
-                Go to App →
-            </a>
-        </div>
-
-        <div id="processingSection" class="hidden">
-            <div class="loading">
-                <div class="spinner"></div>
-                <p id="processingMessage">Initializing contract...</p>
+            <div class="status-item">
+                <span class="status-label">Entry Fee Range</span>
+                <span class="status-value">0.001 - 999,999,999 USDFG</span>
             </div>
         </div>
 
-        <div id="errorSection" class="hidden">
-            <div class="alert alert-error">
-                ❌ <strong>Error</strong><br>
-                <span id="errorMessage"></span>
-            </div>
-            <button class="btn btn-primary" onclick="checkStatus()">
-                Try Again
-            </button>
+        <div class="alert alert-info">
+            🎯 <strong>How It Works:</strong><br>
+            • Players create challenges with any entry fee<br>
+            • Both players submit their results<br>
+            • If one player concedes ("I lost"), the other wins automatically<br>
+            • If both claim victory, both get 50% refund<br>
+            • Platform collects 5% fee on all completed challenges
         </div>
+
+        <a href="/app" class="btn btn-primary" style="display: block; text-align: center; text-decoration: none;">
+            🚀 Go to Arena
+        </a>
+
     </div>
-
-    <script type="module">
-        import { Connection, PublicKey, clusterApiUrl } from 'https://esm.sh/@solana/web3.js@1.87.6';
-        import { AnchorProvider, Program, web3 } from 'https://esm.sh/@coral-xyz/anchor@0.29.0';
-
-        const PROGRAM_ID = 'DX4C2FyAKSiycDVSoYgm7WyDgmPNTdBKbvVDyKGGH6wK';
-        const ADMIN_WALLET = '3SeLoDGsajuQUt2pzSkZV7LmB7gKtckmrD693U69kcUd';
-        const PLATFORM_WALLET = 'AcEV5t9TJdZP91ttbgKieWoWUxwUb4PT4MxvggDjjkkq';
-        const PLATFORM_FEE_BPS = 500;
-
-        let connection;
-        let wallet;
-        let program;
-        let adminStatePDA;
-
-        // Show/hide sections
-        function showSection(sectionId) {
-            ['loadingSection', 'connectSection', 'wrongWalletSection', 'initSection', 'alreadyInitSection', 'processingSection', 'errorSection'].forEach(id => {
-                document.getElementById(id).classList.add('hidden');
-            });
-            document.getElementById(sectionId).classList.remove('hidden');
-        }
-
-        function showError(message) {
-            document.getElementById('errorMessage').textContent = message;
-            showSection('errorSection');
-        }
-
-        // Connect wallet
-        window.connectWallet = async function() {
-            try {
-                if (!window.solana || !window.solana.isPhantom) {
-                    showError('Phantom wallet not found! Please install Phantom wallet extension.');
-                    return;
-                }
-
-                await window.solana.connect();
-                wallet = window.solana;
-                
-                await checkStatus();
-            } catch (error) {
-                console.error('Wallet connection error:', error);
-                showError('Failed to connect wallet: ' + error.message);
-            }
-        };
-
-        // Check contract status
-        window.checkStatus = async function() {
-            try {
-                showSection('loadingSection');
-
-                // Setup connection
-                connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
-
-                // Check if wallet is connected
-                if (!window.solana || !window.solana.publicKey) {
-                    showSection('connectSection');
-                    return;
-                }
-
-                wallet = window.solana;
-
-                // Check if correct wallet
-                if (wallet.publicKey.toString() !== ADMIN_WALLET) {
-                    document.getElementById('adminWalletDisplay').textContent = ADMIN_WALLET;
-                    showSection('wrongWalletSection');
-                    return;
-                }
-
-                // Load program (fetch IDL from your deployed site)
-                const idlResponse = await fetch('/idl/usdfg_smart_contract.json');
-                const idl = await idlResponse.json();
-
-                const programId = new PublicKey(PROGRAM_ID);
-                const provider = new AnchorProvider(connection, wallet, { commitment: 'confirmed' });
-                program = new Program(idl, programId, provider);
-
-                // Derive admin state PDA
-                [adminStatePDA] = PublicKey.findProgramAddressSync(
-                    [Buffer.from('admin')],
-                    programId
-                );
-
-                // Check if initialized
-                try {
-                    const adminState = await program.account.adminState.fetch(adminStatePDA);
-                    
-                    // Already initialized
-                    document.getElementById('currentAdmin').textContent = adminState.admin.toString().slice(0, 8) + '...';
-                    document.getElementById('currentPlatformWallet').textContent = adminState.platformWallet.toString().slice(0, 8) + '...';
-                    document.getElementById('currentFee').textContent = adminState.platformFeeBps + ' bps (' + (adminState.platformFeeBps / 100) + '%)';
-                    document.getElementById('contractStatus').textContent = adminState.isActive ? '✅ Active' : '❌ Inactive';
-                    document.getElementById('isPaused').textContent = adminState.isPaused ? '⚠️ Yes' : '✅ No';
-                    
-                    showSection('alreadyInitSection');
-                } catch (error) {
-                    if (error.message.includes('Account does not exist')) {
-                        // Not initialized yet
-                        document.getElementById('adminWallet').textContent = ADMIN_WALLET.slice(0, 8) + '...';
-                        document.getElementById('platformWallet').textContent = PLATFORM_WALLET.slice(0, 8) + '...';
-                        showSection('initSection');
-                    } else {
-                        throw error;
-                    }
-                }
-            } catch (error) {
-                console.error('Status check error:', error);
-                showError('Failed to check contract status: ' + error.message);
-            }
-        };
-
-        // Initialize contract
-        window.initializeContract = async function() {
-            try {
-                showSection('processingSection');
-                document.getElementById('processingMessage').textContent = 'Sending transaction to Solana...';
-
-                const adminPubkey = new PublicKey(ADMIN_WALLET);
-                const platformWalletPubkey = new PublicKey(PLATFORM_WALLET);
-
-                const tx = await program.methods
-                    .initialize(adminPubkey, platformWalletPubkey, PLATFORM_FEE_BPS)
-                    .accounts({
-                        adminState: adminStatePDA,
-                        payer: wallet.publicKey,
-                        systemProgram: web3.SystemProgram.programId,
-                    })
-                    .rpc();
-
-                document.getElementById('processingMessage').textContent = 'Waiting for confirmation...';
-
-                await connection.confirmTransaction(tx, 'confirmed');
-
-                // Success! Reload status
-                await checkStatus();
-            } catch (error) {
-                console.error('Initialization error:', error);
-                showError('Failed to initialize contract: ' + error.message);
-            }
-        };
-
-        // Auto-check status on load
-        window.addEventListener('load', checkStatus);
-    </script>
 </body>
 </html>
 
