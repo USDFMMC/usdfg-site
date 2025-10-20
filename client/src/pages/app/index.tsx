@@ -418,6 +418,29 @@ const ArenaHome: React.FC = () => {
     try {
       console.log("🏆 Claiming prize for challenge:", challenge.id);
       
+      // Pre-check: Verify challenge is actually claimable on-chain
+      if (challenge.pda) {
+        console.log("🔍 Checking on-chain status before claiming...");
+        try {
+          const accountInfo = await connection.getAccountInfo(new PublicKey(challenge.pda));
+          if (accountInfo && accountInfo.data) {
+            const data = accountInfo.data;
+            const statusByte = data[8 + 32 + 33 + 8]; // Skip discriminator, creator, challenger, entry_fee, then status
+            console.log("🔍 On-chain challenge status:", statusByte);
+            
+            // Status 2 = Completed (already resolved)
+            if (statusByte === 2) {
+              console.log("⚠️ Challenge already completed on-chain - prize already claimed");
+              alert("This prize has already been claimed. Please refresh the page to see the latest status.");
+              setClaimingPrize(null);
+              return;
+            }
+          }
+        } catch (onChainError) {
+          console.log("⚠️ Could not check on-chain status, proceeding with claim attempt");
+        }
+      }
+      
       // Import the claimChallengePrize function
       const { claimChallengePrize } = await import("@/lib/firebase/firestore");
       
