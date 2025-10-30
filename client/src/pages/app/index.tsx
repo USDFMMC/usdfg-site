@@ -111,6 +111,39 @@ const ArenaHome: React.FC = () => {
   const usdfgToUsd = useCallback((usdfgAmount: number) => {
     return usdfgAmount * usdfgPrice;
   }, [usdfgPrice]);
+
+  // Helper: extract a known game name from a title string
+  const extractGameFromTitle = (title: string): string => {
+    if (!title) return 'Gaming';
+    const t = title.toLowerCase();
+    if (t.includes('nba 2k')) return 'NBA 2K25';
+    if (t.includes('fifa') || t.includes('fc')) return 'FIFA 24';
+    if (t.includes('madden')) return 'Madden NFL 24';
+    if (t.includes('street fighter')) return 'Street Fighter 6';
+    if (t.includes('tekken 8')) return 'Tekken 8';
+    if (t.includes('call of duty') || t.includes('cod')) return 'Call of Duty';
+    if (t.includes('valorant')) return 'Valorant';
+    if (t.includes('forza')) return 'Forza Horizon';
+    return 'Gaming';
+  };
+
+  // Helper: map game to category
+  const getGameCategory = (game: string): string => {
+    if ([ 'NBA 2K25', 'FIFA 24', 'Madden NFL 24' ].includes(game)) return 'Sports';
+    if ([ 'Street Fighter 6', 'Tekken 8' ].includes(game)) return 'Fighting';
+    if ([ 'Call of Duty', 'Valorant' ].includes(game)) return 'Shooting';
+    if ([ 'Forza Horizon' ].includes(game)) return 'Racing';
+    return 'Other';
+  };
+
+  // Category → image mapping for card visuals
+  const categoryImageMap: Record<string, string> = {
+    Sports: '/assets/categories/sports.png',
+    Fighting: '/assets/categories/fighting.png',
+    Shooting: '/assets/categories/shooting.png',
+    Racing: '/assets/categories/racing.png',
+    Other: '/assets/categories/other.png',
+  };
   // Use Firestore real-time challenges
   const { challenges: firestoreChallenges, loading: challengesLoading, error: challengesError } = useChallenges();
   
@@ -546,7 +579,7 @@ const ArenaHome: React.FC = () => {
               disabled={hasActiveChallenge || isCreatingChallenge}
               title={hasActiveChallenge ? "You have an active challenge (created or joined)" : isCreatingChallenge ? "Creating challenge..." : "Create a new challenge"}
             >
-              {hasActiveChallenge ? "In Challenge" : isCreatingChallenge ? "Creating..." : "Create Challenge"}
+                {hasActiveChallenge ? "In Challenge" : isCreatingChallenge ? "Creating..." : "Create Challenge"}
             </ElegantButton>
             
             <WalletConnectSimple 
@@ -639,25 +672,25 @@ const ArenaHome: React.FC = () => {
           {/* Quick Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
             <div className="bg-[#0B0C12]/90 border border-zinc-800 rounded-2xl p-6 text-center hover:border-amber-300/50 shadow-[0_0_30px_rgba(255,215,130,0.05)] transition-all">
-              <div className="text-3xl mb-1">🏆</div>
+                <div className="text-3xl mb-1">🏆</div>
               <div className="text-2xl font-semibold text-white">1,247</div>
               <div className="text-sm text-zinc-400 mt-1">Active Challenges</div>
             </div>
             
             <div className="bg-[#0B0C12]/90 border border-zinc-800 rounded-2xl p-6 text-center hover:border-amber-300/50 shadow-[0_0_30px_rgba(255,215,130,0.05)] transition-all">
-              <div className="text-3xl mb-1">👥</div>
+                <div className="text-3xl mb-1">👥</div>
               <div className="text-2xl font-semibold text-white">8,432</div>
               <div className="text-sm text-zinc-400 mt-1">Players Online</div>
             </div>
             
             <div className="bg-[#0B0C12]/90 border border-zinc-800 rounded-2xl p-6 text-center hover:border-amber-300/50 shadow-[0_0_30px_rgba(255,215,130,0.05)] transition-all">
-              <div className="text-3xl mb-1">⚡</div>
+                <div className="text-3xl mb-1">⚡</div>
               <div className="text-2xl font-semibold text-white">45,678</div>
               <div className="text-sm text-zinc-400 mt-1">USDFG Rewarded</div>
             </div>
             
             <div className="bg-[#0B0C12]/90 border border-zinc-800 rounded-2xl p-6 text-center hover:border-amber-300/50 shadow-[0_0_30px_rgba(255,215,130,0.05)] transition-all">
-              <div className="text-3xl mb-1">📈</div>
+                <div className="text-3xl mb-1">📈</div>
               <div className="text-2xl font-semibold text-white">+12.5%</div>
               <div className="text-sm text-zinc-400 mt-1">Win Rate</div>
             </div>
@@ -772,7 +805,7 @@ const ArenaHome: React.FC = () => {
                     return (
                       <div 
                         key={challenge.id} 
-                        className={`bg-[#0B0C12]/90 border border-zinc-800 rounded-2xl p-6 cursor-pointer hover:border-amber-300/50 shadow-[0_0_30px_rgba(255,215,130,0.05)] transition-all ${challenge.status === "expired" ? "challenge-expired" : ""}`}
+                        className={`relative overflow-hidden bg-[#0B0C12]/90 border border-zinc-800 rounded-2xl p-6 cursor-pointer hover:border-amber-300/50 shadow-[0_0_30px_rgba(255,215,130,0.05)] transition-all ${challenge.status === "expired" ? "challenge-expired" : ""}`}
                         onClick={() => {
                           // Don't open join modal for completed challenges
                           if (challenge.status === "completed" || challenge.rawData?.payoutTriggered) {
@@ -783,40 +816,59 @@ const ArenaHome: React.FC = () => {
                           setShowJoinModal(true);
                         }}
                       >
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center space-x-3">
+                        {/* Full-card background image by category */}
+                        {(() => {
+                          const gameName = extractGameFromTitle(challenge.title || challenge.game || '');
+                          const cat = getGameCategory(gameName);
+                          const bgSrc = categoryImageMap[cat] || categoryImageMap.Other;
+                          return (
+                            <img
+                              src={bgSrc}
+                              alt={`${cat} background`}
+                              className="absolute inset-0 w-full h-full object-cover opacity-15 pointer-events-none"
+                              onError={(e) => {
+                                const img = e.currentTarget as HTMLImageElement;
+                                img.src = categoryImageMap.Other;
+                              }}
+                            />
+                          );
+                        })()}
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
+                        <div className="relative z-10">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center space-x-3">
                             <div className="w-10 h-10 bg-gradient-to-r from-glow-pink to-glow-electric rounded-lg flex items-center justify-center">
-                              <span className="text-white">🥊</span>
-                            </div>
-                            <div>
+                                <span className="text-white">🥊</span>
+                              </div>
+                              <div>
                               <h3 className="text-text-primary font-semibold neocore-body">{challenge.title}</h3>
                               <p className="text-text-dim text-sm neocore-body">{challenge.category} • {challenge.game}</p>
-                              {challenge.platform && challenge.username && (
-                                <p className="text-text-dim/60 text-xs neocore-body">
-                                  🖥️ {challenge.platform} • 👤 {challenge.username}
-                                </p>
-                              )}
-                              {challenge.createdAt && (
-                                <p className="text-text-dim/60 text-xs neocore-body">
-                                  Created {new Date(challenge.createdAt).toLocaleDateString()} at {new Date(challenge.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </p>
-                              )}
-                              {challenge.expiresAt && challenge.expiresAt > Date.now() && (
-                                <p className="text-orange-400/80 text-xs neocore-body">
-                                  ⏰ Expires in {Math.max(0, Math.floor((challenge.expiresAt - Date.now()) / (1000 * 60)))} minutes
-                                </p>
-                              )}
-                              {isOwner && (
-                                <span className="inline-block px-2 py-1 bg-glow-electric/20 text-glow-electric border border-glow-electric/30 rounded text-xs mt-1 neocore-body">
-                                  Your Challenge
-                                </span>
-                              )}
+                            {challenge.platform && challenge.username && (
+                              <p className="text-text-dim/60 text-xs neocore-body">
+                                🖥️ {challenge.platform} • 👤 {challenge.username}
+                              </p>
+                            )}
+                            {challenge.createdAt && (
+                              <p className="text-text-dim/60 text-xs neocore-body">
+                                Created {new Date(challenge.createdAt).toLocaleDateString()} at {new Date(challenge.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            )}
+                            {challenge.expiresAt && challenge.expiresAt > Date.now() && (
+                              <p className="text-orange-400/80 text-xs neocore-body">
+                                ⏰ Expires in {Math.max(0, Math.floor((challenge.expiresAt - Date.now()) / (1000 * 60)))} minutes
+                              </p>
+                            )}
+                            {isOwner && (
+                              <span className="inline-block px-2 py-1 bg-glow-electric/20 text-glow-electric border border-glow-electric/30 rounded text-xs mt-1 neocore-body">
+                                Your Challenge
+                              </span>
+                            )}
                             </div>
                           </div>
                           {challenge.status === "active" && (
-                            <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
-                              Active
-                            </span>
+                              <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
+                                Active
+                              </span>
                           )}
                           {challenge.status === "in-progress" && (
                             <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded text-xs">
@@ -1227,7 +1279,7 @@ const ArenaHome: React.FC = () => {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
                   </div>
                 ) : topPlayers.length === 0 ? (
-                  <div className="text-center py-8">
+                          <div className="text-center py-8">
                     <p className="text-gray-400 text-sm">No players yet. Be the first!</p>
                   </div>
                 ) : (
@@ -2360,18 +2412,6 @@ const JoinChallengeModal: React.FC<{
         )}
       </div>
     </div>
-
-    {/* Player Profile Modal */}
-    {selectedPlayer && (
-      <PlayerProfileModal
-        isOpen={showPlayerProfile}
-        onClose={() => {
-          setShowPlayerProfile(false);
-          setSelectedPlayer(null);
-        }}
-        player={selectedPlayer}
-      />
-    )}
   );
 };
 

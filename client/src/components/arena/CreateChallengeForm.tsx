@@ -35,10 +35,10 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
 
   // Game categories and options
   const gameCategories = {
-    Sports: ["EA UFC 6", "FC 26", "Madden 26", "NBA 2K26"],
-    Racing: ["F1 2023", "Mario Kart", "Gran Turismo 7"],
-    Fighting: ["Mortal Kombat 1", "Street Fighter 6", "Tekken 8"],
-    Shooting: ["COD MW3", "Fortnite", "Valorant"]
+    Sports: ["NBA 2K25", "FIFA 24", "Madden NFL 24", "EA UFC 6"],
+    Racing: ["Forza Horizon", "F1 2023", "Mario Kart", "Gran Turismo 7"],
+    Fighting: ["Street Fighter 6", "Tekken 8", "Mortal Kombat 1"],
+    Shooting: ["Call of Duty", "Valorant", "Fortnite"]
   };
 
   // Available games for selection (flattened + Custom)
@@ -77,18 +77,19 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
   // Game-specific modes - Enhanced with competitive options
   const gameModes = {
     'EA UFC 6': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
-    'FC 26': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
-    'Madden 26': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
-    'NBA 2K26': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
+    'FIFA 24': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
+    'Madden NFL 24': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
+    'NBA 2K25': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
+    'Forza Horizon': ['Best Lap Time', '1v1 Race to Finish', 'Custom Challenge'],
     'F1 2023': ['Best Lap Time', '1v1 Race to Finish', 'Custom Challenge'],
     'Mario Kart': ['Best Lap Time', '1v1 Race to Finish', 'Custom Challenge'],
     'Gran Turismo 7': ['Best Lap Time', '1v1 Race to Finish', 'Custom Challenge'],
     'Mortal Kombat 1': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Custom Challenge'],
     'Street Fighter 6': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Custom Challenge'],
     'Tekken 8': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Custom Challenge'],
-    'COD MW3': ['Run the Fade', '10 and Done', 'Snipers Only', 'Custom Challenge'],
-    'Fortnite': ['Run the Fade', '10 and Done', 'Snipers Only', 'Custom Challenge'],
+    'Call of Duty': ['Run the Fade', '10 and Done', 'Snipers Only', 'Custom Challenge'],
     'Valorant': ['Run the Fade', '10 and Done', 'Snipers Only', 'Custom Challenge'],
+    'Fortnite': ['Run the Fade', '10 and Done', 'Snipers Only', 'Custom Challenge'],
     'Custom': ['Custom Challenge']
   };
 
