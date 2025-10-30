@@ -8,6 +8,20 @@
   50% { opacity: 1; }
 }
 
+/* Trophy Modal Animations */
+@keyframes bounce-slow {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 3s ease-in-out infinite;
+}
+
 /* Safari compatibility fixes */
 @supports not (backdrop-filter: blur(10px)) {
   .backdrop-blur-sm {

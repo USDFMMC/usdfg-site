@@ -45,6 +45,8 @@ const ArenaHome: React.FC = () => {
   const [loadingTopPlayers, setLoadingTopPlayers] = useState<boolean>(true);
   const [copiedWallet, setCopiedWallet] = useState<string | null>(null);
   const [showAllPlayers, setShowAllPlayers] = useState<boolean>(false);
+  const [showTrophyModal, setShowTrophyModal] = useState<boolean>(false);
+  const [selectedTrophy, setSelectedTrophy] = useState<{ id: string; name: string; icon: string; requiredGames: number; isUnlocked: boolean; gamesPlayed: number } | null>(null);
   
   // Mock price API - simulates real-time price updates
   const fetchUsdfgPrice = useCallback(async () => {
@@ -144,6 +146,17 @@ const ArenaHome: React.FC = () => {
     Racing: '/assets/categories/racing.png',
     Other: '/assets/categories/other.png',
   };
+
+  // Trophy system with mystery requirements and hidden descriptions
+  const trophySystem = [
+    { id: 'initiate', name: 'USDFG INITIATE', icon: '/assets/trophies/usdfg-initiate.png', requiredGames: 2, description: 'The first step in your journey. Prove you have what it takes.' },
+    { id: 'contender', name: 'USDFG CONTENDER', icon: '/assets/trophies/usdfg-contender.png', requiredGames: 10, description: 'A true warrior emerges. Your dedication is noticed.' },
+    { id: 'veteran', name: 'USDFG VETERAN', icon: '/assets/trophies/usdfg-veteran.png', requiredGames: 15, description: 'Experience speaks volumes. You\'ve earned respect.' },
+    { id: 'enforcer', name: 'USDFG ENFORCER', icon: '/assets/trophies/usdfg-enforcer.png', requiredGames: 30, description: 'You enforce the rules of honor. Justice flows through you.' },
+    { id: 'unbroken', name: 'USDFG UNBROKEN', icon: '/assets/trophies/usdfg-unbroken.png', requiredGames: 60, description: 'Unbreakable spirit. Unbreakable will. Unbreakable legacy.' },
+    { id: 'disciple', name: 'USDFG DISCIPLE', icon: '/assets/trophies/usdfg-disciple.png', requiredGames: 90, description: 'You walk the path of excellence. Discipline is your foundation.' },
+    { id: 'immortal', name: 'USDFG IMMORTAL', icon: '/assets/trophies/usdfg-immortal.png', requiredGames: 120, description: 'Legendary. Eternal. Your name will never fade.' },
+  ];
   // Use Firestore real-time challenges
   const { challenges: firestoreChallenges, loading: challengesLoading, error: challengesError } = useChallenges();
   
@@ -388,6 +401,57 @@ const ArenaHome: React.FC = () => {
       alert("Failed to create challenge: " + (error instanceof Error ? error.message : "Unknown error"));
     } finally {
       setIsCreatingChallenge(false);
+    }
+  };
+
+  const handleJoinChallenge = async (challengeId: string) => {
+    if (!publicKey || !signTransaction) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    try {
+      const walletAddress = publicKey.toString();
+      const challenge = challenges.find(c => c.id === challengeId);
+      
+      if (!challenge) {
+        throw new Error('Challenge not found');
+      }
+
+      // Step 1: Join on-chain (Solana transaction)
+      const challengePDA = challenge.rawData?.pda || challenge.pda;
+      if (!challengePDA) {
+        throw new Error('Challenge has no on-chain PDA. Cannot join this challenge.');
+      }
+      
+      await joinChallengeOnChain(challengePDA, challenge.entryFee, walletAddress, {
+        signTransaction: signTransaction,
+        publicKey: publicKey
+      });
+      
+      // Step 2: Update Firestore
+      await joinChallenge(challengeId, walletAddress);
+      
+      alert("Successfully joined challenge!");
+      setShowJoinModal(false);
+      setSelectedChallenge(null);
+    } catch (err: any) {
+      console.error("❌ Join failed:", err);
+      let errorMessage = 'Failed to join challenge. Please try again.';
+      
+      if (err.message?.includes('ChallengeExpired') || err.message?.includes('Challenge has expired')) {
+        errorMessage = 'This challenge has expired and is no longer available to join.';
+      } else if (err.message?.includes('InsufficientFunds')) {
+        errorMessage = 'You don\'t have enough USDFG tokens to join this challenge.';
+      } else if (err.message?.includes('SelfChallenge')) {
+        errorMessage = 'You cannot join your own challenge.';
+      } else if (err.message?.includes('NotOpen')) {
+        errorMessage = 'This challenge is no longer open for joining.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      alert(errorMessage);
     }
   };
 
@@ -1326,7 +1390,8 @@ const ArenaHome: React.FC = () => {
                                     <span className="text-cyan-400 text-xs" title="Verified Player (5+ games)">✓</span>
                                   )}
                                   <button
-                                    onClick={() => {
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       navigator.clipboard.writeText(player.wallet);
                                       setCopiedWallet(player.wallet);
                                       setTimeout(() => setCopiedWallet(null), 2000);
@@ -1342,6 +1407,54 @@ const ArenaHome: React.FC = () => {
                                 </p>
                               </div>
                             </div>
+                            
+                            {/* Trophy Display - Middle Section */}
+                            <div className="flex items-center justify-center gap-1 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                              {(() => {
+                                const gamesPlayed = player.gamesPlayed || (player.wins + player.losses);
+                                const unlockedTrophies = trophySystem.filter(t => gamesPlayed >= t.requiredGames);
+                                const displayTrophies = trophySystem.slice(0, 3); // Show first 3 trophies
+                                
+                                return displayTrophies.map((trophy) => {
+                                  const isUnlocked = gamesPlayed >= trophy.requiredGames;
+                                  return (
+                                    <img
+                                      key={trophy.id}
+                                      src={trophy.icon}
+                                      alt={trophy.name}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        e.nativeEvent.stopImmediatePropagation();
+                                        setSelectedTrophy({
+                                          id: trophy.id,
+                                          name: trophy.name,
+                                          icon: trophy.icon,
+                                          requiredGames: trophy.requiredGames,
+                                          isUnlocked,
+                                          gamesPlayed
+                                        });
+                                        setShowTrophyModal(true);
+                                      }}
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                      }}
+                                      className={`w-6 h-6 transition-all duration-300 relative z-10 cursor-pointer ${
+                                        isUnlocked 
+                                          ? 'opacity-100 drop-shadow-[0_0_8px_rgba(255,215,130,0.6)] hover:drop-shadow-[0_0_12px_rgba(255,215,130,0.8)] hover:scale-110' 
+                                          : 'opacity-40 grayscale'
+                                      }`}
+                                      onError={(e) => {
+                                        e.currentTarget.style.display = 'none';
+                                      }}
+                                      title={isUnlocked ? trophy.name : 'Locked'}
+                                    />
+                                  );
+                                });
+                              })()}
+                            </div>
+                            
                             <div className="text-right shrink-0">
                               <div className="text-cyan-400 font-bold text-lg">{player.totalEarned.toFixed(0)}</div>
                               <div className="text-gray-400 text-xs">USDFG</div>
@@ -1394,12 +1507,109 @@ const ArenaHome: React.FC = () => {
 
         {/* Join Challenge Modal */}
         {showJoinModal && selectedChallenge && (
-          <JoinChallengeModal 
-            challenge={selectedChallenge}
-            onClose={() => setShowJoinModal(false)}
-            isConnected={isConnected}
-            onConnect={() => connect()}
-          />
+          <ElegantModal
+            isOpen={showJoinModal}
+            onClose={() => {
+              setShowJoinModal(false);
+              setSelectedChallenge(null);
+            }}
+            title={`Join ${selectedChallenge.title || 'Challenge'}`}
+          >
+            <div className="text-center space-y-4">
+              <p className="text-gray-300">
+                Are you sure you want to join this challenge for{" "}
+                <span className="font-bold text-white">{selectedChallenge.entryFee} USDFG</span>?
+              </p>
+              <ElegantButton onClick={() => handleJoinChallenge(selectedChallenge.id)} variant="amber">
+                Confirm Join
+              </ElegantButton>
+            </div>
+          </ElegantModal>
+        )}
+
+        {/* Trophy Modal - Mystery Requirements & Hidden Descriptions */}
+        {showTrophyModal && selectedTrophy && (
+          <ElegantModal
+            isOpen={showTrophyModal}
+            onClose={() => {
+              setShowTrophyModal(false);
+              setSelectedTrophy(null);
+            }}
+            title={selectedTrophy.name}
+          >
+            <div className="text-center space-y-4">
+              {/* Trophy Image */}
+              <div className="flex justify-center mb-4">
+                <div className="relative">
+                  <img
+                    src={selectedTrophy.icon}
+                    alt={selectedTrophy.name}
+                    className={`w-32 h-32 object-contain transition-all duration-300 animate-bounce-slow ${
+                      selectedTrophy.isUnlocked 
+                        ? 'drop-shadow-[0_0_30px_rgba(255,215,130,0.8)]' 
+                        : 'opacity-40 grayscale'
+                    }`}
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                  {selectedTrophy.isUnlocked && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-amber-400/20 via-yellow-400/20 to-amber-400/20 rounded-full animate-pulse"></div>
+                  )}
+                </div>
+              </div>
+
+              {/* Mystery Requirement - Hidden until unlocked */}
+              <div className="bg-[#07080C]/95 border border-amber-500/30 rounded-xl p-4">
+                <div className="text-sm text-amber-300 mb-2">Requirement:</div>
+                {selectedTrophy.isUnlocked ? (
+                  <div className="text-white font-semibold text-lg">
+                    {selectedTrophy.requiredGames} games played
+                  </div>
+                ) : (
+                  <div className="text-amber-400 font-bold text-xl">
+                    ??? games played
+                  </div>
+                )}
+              </div>
+
+              {/* Hidden Description - Mystery until unlocked */}
+              <div className="bg-[#07080C]/95 border border-amber-500/30 rounded-xl p-4">
+                <div className="text-sm text-amber-300 mb-2">Description:</div>
+                {selectedTrophy.isUnlocked ? (
+                  <div className="text-gray-300 text-sm italic">
+                    {trophySystem.find(t => t.id === selectedTrophy.id)?.description || '[Hidden Description - Unlock to reveal]'}
+                  </div>
+                ) : (
+                  <div className="text-amber-400/60 text-sm italic">
+                    [Hidden Description - Unlock to reveal]
+                    <div className="mt-2 text-xs text-amber-500/40">
+                      Keep playing to discover the secret!
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Progress Indicator */}
+              {!selectedTrophy.isUnlocked && (
+                <div className="text-xs text-gray-400">
+                  Your progress: {selectedTrophy.gamesPlayed} / {selectedTrophy.requiredGames} games
+                  <div className="mt-2 w-full bg-zinc-800 rounded-full h-2">
+                    <div 
+                      className="bg-gradient-to-r from-amber-400 to-yellow-400 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${Math.min((selectedTrophy.gamesPlayed / selectedTrophy.requiredGames) * 100, 100)}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+
+              {selectedTrophy.isUnlocked && (
+                <div className="text-xs text-green-400 font-semibold">
+                  ✓ Trophy Unlocked!
+                </div>
+              )}
+            </div>
+          </ElegantModal>
         )}
 
         {/* Submit Result Room */}
