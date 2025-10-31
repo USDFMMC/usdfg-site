@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import WalletConnectSimple from "@/components/arena/WalletConnectSimple";
 import { useWallet } from '@solana/wallet-adapter-react';
 // Removed legacy wallet import - using MWA hooks instead
-import { fetchActiveChallenges, fetchOpenChallenges, joinChallengeOnChain } from "@/lib/chain/events";
+import { joinChallengeOnChain } from "@/lib/chain/events";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
@@ -19,6 +19,9 @@ import CreateChallengeForm from "@/components/arena/CreateChallengeForm";
 import ElegantNavbar from "@/components/layout/ElegantNavbar";
 import { SubmitResultRoom } from "@/components/arena/SubmitResultRoom";
 import PlayerProfileModal from "@/components/arena/PlayerProfileModal";
+// import { ChallengeChatModal } from "@/components/arena/ChallengeChatModal";
+// import TrustReviewModal from "@/components/arena/TrustReviewModal";
+import { getUnlockedTrophies, getTrophyColorClass } from "@/lib/trophies";
 
 const ArenaHome: React.FC = () => {
   const wallet = useWallet();
@@ -26,6 +29,65 @@ const ArenaHome: React.FC = () => {
   const { connected, signTransaction, publicKey, connect, signAllTransactions } = wallet;
   // Use MWA connection state
   const isConnected = connected;
+
+  // Smart function to extract game name from challenge title (saves storage costs)
+  const getTrophyDescription = (trophyId: string) => {
+    const descriptions: { [key: string]: string } = {
+      'initiate': "Your first steps into the arena. Every legend begins here.",
+      'contender': "You've proven you belong. The competition takes notice.",
+      'veteran': "Battle-tested and battle-ready. Experience is your weapon.",
+      'enforcer': "You maintain order in chaos. Justice through victory.",
+      'unbroken': "Through fire and fury, you stand unshaken. Unbreakable spirit.",
+      'disciple': "You've mastered the cycle. Every challenge remembers you.",
+      'immortal': "Transcendent. Your legacy echoes through the ages."
+    };
+    return descriptions[trophyId] || "A trophy earned through dedication and skill.";
+  };
+
+  const extractGameFromTitle = (title: string) => {
+    const gameKeywords = [
+      'FIFA 24', 'Madden NFL 24', 'NBA 2K25',
+      'Street Fighter 6', 'Tekken 8',
+      'Call of Duty', 'Valorant',
+      'Forza Horizon'
+    ];
+    
+    for (const game of gameKeywords) {
+      if (title.includes(game)) {
+        return game;
+      }
+    }
+    
+    // If no specific game found, return a generic but more descriptive name
+    if (title.toLowerCase().includes('fifa')) return 'FIFA 24';
+    if (title.toLowerCase().includes('madden')) return 'Madden NFL 24';
+    if (title.toLowerCase().includes('nba') || title.toLowerCase().includes('2k')) return 'NBA 2K25';
+    if (title.toLowerCase().includes('street fighter')) return 'Street Fighter 6';
+    if (title.toLowerCase().includes('tekken')) return 'Tekken 8';
+    if (title.toLowerCase().includes('call of duty') || title.toLowerCase().includes('cod')) return 'Call of Duty';
+    if (title.toLowerCase().includes('valorant')) return 'Valorant';
+    if (title.toLowerCase().includes('forza')) return 'Forza Horizon';
+    
+    return 'Gaming'; // Fallback
+  };
+
+  // Determine category based on game
+  const getGameCategory = (game: string) => {
+    if (['NBA 2K25', 'FIFA 24', 'Madden NFL 24'].includes(game)) return 'Sports';
+    if (['Street Fighter 6', 'Tekken 8'].includes(game)) return 'Fighting';
+    if (['Call of Duty', 'Valorant'].includes(game)) return 'Shooting';
+    if (['Forza Horizon'].includes(game)) return 'Racing';
+    return 'Other';
+  };
+
+  // Category → Image mapping (drop your images in public/assets/categories)
+  const categoryImageMap: Record<string, string> = {
+    Sports: '/assets/categories/sports.png',
+    Fighting: '/assets/categories/fighting.png',
+    Shooting: '/assets/categories/shooting.png',
+    Racing: '/assets/categories/racing.png',
+    Other: '/assets/categories/other.png'
+  };
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showSubmitResultModal, setShowSubmitResultModal] = useState(false);
@@ -42,11 +104,34 @@ const ArenaHome: React.FC = () => {
   const [topPlayers, setTopPlayers] = useState<PlayerStats[]>([]);
   const [showPlayerProfile, setShowPlayerProfile] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerStats | null>(null);
+  const [showProfileSettings, setShowProfileSettings] = useState(false);
+  const [userGamerTag, setUserGamerTag] = useState<string>('');
+  const [userCountry, setUserCountry] = useState<string | null>(null);
+  const [userProfileImage, setUserProfileImage] = useState<string | null>(null);
   const [loadingTopPlayers, setLoadingTopPlayers] = useState<boolean>(true);
+  const [leaderboardSearchTerm, setLeaderboardSearchTerm] = useState<string>('');
+  
+  // Trust Review Modal state
+  const [showTrustReview, setShowTrustReview] = useState(false);
+  const [showTrophyModal, setShowTrophyModal] = useState(false);
+  const [selectedTrophy, setSelectedTrophy] = useState<any>(null);
+  const [trustReviewOpponent, setTrustReviewOpponent] = useState<string>('');
+  const [pendingMatchResult, setPendingMatchResult] = useState<{
+    didWin: boolean;
+    proofFile?: File | null;
+    challengeId?: string;
+  } | null>(null);
   const [copiedWallet, setCopiedWallet] = useState<string | null>(null);
   const [showAllPlayers, setShowAllPlayers] = useState<boolean>(false);
-  const [showTrophyModal, setShowTrophyModal] = useState<boolean>(false);
-  const [selectedTrophy, setSelectedTrophy] = useState<{ id: string; name: string; icon: string; requiredGames: number; isUnlocked: boolean; gamesPlayed: number } | null>(null);
+  const [showChatModal, setShowChatModal] = useState<boolean>(false);
+  const [selectedChatChallenge, setSelectedChatChallenge] = useState<any>(null);
+  // Founder Challenge Stats - simple and functional
+  const [founderStats, setFounderStats] = useState({
+    activeChallenges: 0, // Will show actual founder challenges
+    playersOnline: 1247, // Total users on site (with/without wallet)
+    usdfgRewarded: 0,    // Will show actual rewards
+    winRate: 0           // Will show actual win rate
+  });
   
   // Mock price API - simulates real-time price updates
   const fetchUsdfgPrice = useCallback(async () => {
@@ -71,6 +156,23 @@ const ArenaHome: React.FC = () => {
       console.log('🔍 Is admin?', publicKey.toString() === ADMIN_WALLET.toString());
     }
   }, [connected, publicKey]);
+
+  // Load user profile data from localStorage
+  useEffect(() => {
+    const savedGamerTag = localStorage.getItem('user_gamer_tag');
+    const savedCountry = localStorage.getItem('user_country');
+    const savedProfileImage = localStorage.getItem('user_profile_image');
+    
+    if (savedGamerTag) {
+      setUserGamerTag(savedGamerTag);
+    }
+    if (savedCountry) {
+      setUserCountry(savedCountry);
+    }
+    if (savedProfileImage) {
+      setUserProfileImage(savedProfileImage);
+    }
+  }, []);
 
   // Update price every 30 seconds
   useEffect(() => {
@@ -113,50 +215,6 @@ const ArenaHome: React.FC = () => {
   const usdfgToUsd = useCallback((usdfgAmount: number) => {
     return usdfgAmount * usdfgPrice;
   }, [usdfgPrice]);
-
-  // Helper: extract a known game name from a title string
-  const extractGameFromTitle = (title: string): string => {
-    if (!title) return 'Gaming';
-    const t = title.toLowerCase();
-    if (t.includes('nba 2k')) return 'NBA 2K25';
-    if (t.includes('fifa') || t.includes('fc')) return 'FIFA 24';
-    if (t.includes('madden')) return 'Madden NFL 24';
-    if (t.includes('street fighter')) return 'Street Fighter 6';
-    if (t.includes('tekken 8')) return 'Tekken 8';
-    if (t.includes('call of duty') || t.includes('cod')) return 'Call of Duty';
-    if (t.includes('valorant')) return 'Valorant';
-    if (t.includes('forza')) return 'Forza Horizon';
-    return 'Gaming';
-  };
-
-  // Helper: map game to category
-  const getGameCategory = (game: string): string => {
-    if ([ 'NBA 2K25', 'FIFA 24', 'Madden NFL 24' ].includes(game)) return 'Sports';
-    if ([ 'Street Fighter 6', 'Tekken 8' ].includes(game)) return 'Fighting';
-    if ([ 'Call of Duty', 'Valorant' ].includes(game)) return 'Shooting';
-    if ([ 'Forza Horizon' ].includes(game)) return 'Racing';
-    return 'Other';
-  };
-
-  // Category → image mapping for card visuals
-  const categoryImageMap: Record<string, string> = {
-    Sports: '/assets/categories/sports.png',
-    Fighting: '/assets/categories/fighting.png',
-    Shooting: '/assets/categories/shooting.png',
-    Racing: '/assets/categories/racing.png',
-    Other: '/assets/categories/other.png',
-  };
-
-  // Trophy system with mystery requirements and hidden descriptions
-  const trophySystem = [
-    { id: 'initiate', name: 'USDFG INITIATE', icon: '/assets/trophies/usdfg-initiate.png', requiredGames: 2, description: 'The first step in your journey. Prove you have what it takes.' },
-    { id: 'contender', name: 'USDFG CONTENDER', icon: '/assets/trophies/usdfg-contender.png', requiredGames: 10, description: 'A true warrior emerges. Your dedication is noticed.' },
-    { id: 'veteran', name: 'USDFG VETERAN', icon: '/assets/trophies/usdfg-veteran.png', requiredGames: 15, description: 'Experience speaks volumes. You\'ve earned respect.' },
-    { id: 'enforcer', name: 'USDFG ENFORCER', icon: '/assets/trophies/usdfg-enforcer.png', requiredGames: 30, description: 'You enforce the rules of honor. Justice flows through you.' },
-    { id: 'unbroken', name: 'USDFG UNBROKEN', icon: '/assets/trophies/usdfg-unbroken.png', requiredGames: 60, description: 'Unbreakable spirit. Unbreakable will. Unbreakable legacy.' },
-    { id: 'disciple', name: 'USDFG DISCIPLE', icon: '/assets/trophies/usdfg-disciple.png', requiredGames: 90, description: 'You walk the path of excellence. Discipline is your foundation.' },
-    { id: 'immortal', name: 'USDFG IMMORTAL', icon: '/assets/trophies/usdfg-immortal.png', requiredGames: 120, description: 'Legendary. Eternal. Your name will never fade.' },
-  ];
   // Use Firestore real-time challenges
   const { challenges: firestoreChallenges, loading: challengesLoading, error: challengesError } = useChallenges();
   
@@ -211,7 +269,8 @@ const ArenaHome: React.FC = () => {
   const challenges = firestoreChallenges.map(challenge => {
     // Provide default values for optimized data structure
     const mode = challenge.mode || 'Head-to-Head';
-    const game = challenge.game || 'USDFG Arena';
+    // Extract game from title if available, otherwise use default
+    const game = challenge.title ? extractGameFromTitle(challenge.title) : (challenge.game || 'NBA 2K25');
     const platform = challenge.platform || 'All Platforms';
     const creatorTag = challenge.creatorTag || challenge.creator?.slice(0, 8) + '...' || 'Unknown';
     const prizePool = challenge.prizePool || (challenge.entryFee * 2);
@@ -269,6 +328,42 @@ const ArenaHome: React.FC = () => {
     console.error("❌ Challenges error:", challengesError);
   }
 
+  const handleChallengePlayer = (playerData: any) => {
+    const currentWallet = publicKey?.toString();
+    if (!currentWallet) {
+      alert("Please connect your wallet first");
+      return;
+    }
+
+    // Check if user has an active challenge they created
+    const userActiveChallenge = challenges.find(c => 
+      c.creator === currentWallet && 
+      (c.status === 'active' || c.status === 'pending')
+    );
+
+    if (userActiveChallenge) {
+      // User has an active challenge, send it to this specific player
+      const confirmSend = confirm(
+        `Send your challenge "${userActiveChallenge.title}" to ${playerData.displayName || playerData.name}?\n\n` +
+        `Game: ${userActiveChallenge.game}\n` +
+        `Entry Fee: ${userActiveChallenge.entryFee} USDFG\n` +
+        `Prize Pool: ${userActiveChallenge.prizePool} USDFG`
+      );
+      
+      if (confirmSend) {
+        // TODO: Implement sending challenge to specific player
+        // This would involve updating the challenge to target this specific player
+        alert(`Challenge sent to ${playerData.displayName || playerData.name}! They will be notified.`);
+        setShowPlayerProfile(false);
+      }
+    } else {
+      // User doesn't have an active challenge, redirect to create one
+      alert("You need to create a challenge first before you can send it to other players.\n\nRedirecting to challenge creation...");
+      setShowPlayerProfile(false);
+      setShowCreateModal(true);
+    }
+  };
+
   const handleCreateChallenge = async (challengeData: any) => {
     // Prevent double-clicks
     if (isCreatingChallenge) {
@@ -320,6 +415,10 @@ const ArenaHome: React.FC = () => {
             return 8;
           case 'battle royale':
             return 16;
+          case 'lobby':
+          case 'community lobby':
+          case 'open lobby':
+            return 24; // Support up to 24 players for lobby mode
           case 'team vs team':
             return 4;
           default:
@@ -353,14 +452,6 @@ const ArenaHome: React.FC = () => {
       const totalPrize = challengeData.entryFee * 2; // Challenger matches entry fee
       const prizePool = totalPrize - (totalPrize * platformFee); // Minus platform fee
       
-      // Determine category based on game
-      const getGameCategory = (game: string) => {
-        if (['NBA 2K25', 'FIFA 24', 'Madden NFL 24'].includes(game)) return 'Sports';
-        if (['Street Fighter 6', 'Tekken 8'].includes(game)) return 'Fighting';
-        if (['Call of Duty', 'Valorant'].includes(game)) return 'Shooting';
-        if (['Forza Horizon'].includes(game)) return 'Racing';
-        return 'Other';
-      };
       
       // Create Firestore challenge data
       const { addChallenge } = await import("@/lib/firebase/firestore");
@@ -381,6 +472,8 @@ const ArenaHome: React.FC = () => {
         // Prize claim fields
         pda: challengeId, // Store the challenge PDA from smart contract
         prizePool: challengeData.entryFee * 2 * 0.95, // Total prize pool (2x entry fee minus 5% platform fee)
+        // Store only the title which contains game info - saves storage costs
+        title: challengeData.title, // This contains the game name in the title
         // REMOVED: creatorTag, game, mode, platform, rules, solanaAccountId, category
         // These are not needed for leaderboards and increase storage costs unnecessarily
       };
@@ -404,57 +497,6 @@ const ArenaHome: React.FC = () => {
     }
   };
 
-  const handleJoinChallenge = async (challengeId: string) => {
-    if (!publicKey || !signTransaction) {
-      alert('Please connect your wallet first');
-      return;
-    }
-
-    try {
-      const walletAddress = publicKey.toString();
-      const challenge = challenges.find(c => c.id === challengeId);
-      
-      if (!challenge) {
-        throw new Error('Challenge not found');
-      }
-
-      // Step 1: Join on-chain (Solana transaction)
-      const challengePDA = challenge.rawData?.pda || challenge.pda;
-      if (!challengePDA) {
-        throw new Error('Challenge has no on-chain PDA. Cannot join this challenge.');
-      }
-      
-      await joinChallengeOnChain(challengePDA, challenge.entryFee, walletAddress, {
-        signTransaction: signTransaction,
-        publicKey: publicKey
-      });
-      
-      // Step 2: Update Firestore
-      await joinChallenge(challengeId, walletAddress);
-      
-      alert("Successfully joined challenge!");
-      setShowJoinModal(false);
-      setSelectedChallenge(null);
-    } catch (err: any) {
-      console.error("❌ Join failed:", err);
-      let errorMessage = 'Failed to join challenge. Please try again.';
-      
-      if (err.message?.includes('ChallengeExpired') || err.message?.includes('Challenge has expired')) {
-        errorMessage = 'This challenge has expired and is no longer available to join.';
-      } else if (err.message?.includes('InsufficientFunds')) {
-        errorMessage = 'You don\'t have enough USDFG tokens to join this challenge.';
-      } else if (err.message?.includes('SelfChallenge')) {
-        errorMessage = 'You cannot join your own challenge.';
-      } else if (err.message?.includes('NotOpen')) {
-        errorMessage = 'This challenge is no longer open for joining.';
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-      
-      alert(errorMessage);
-    }
-  };
-
   const handleDeleteChallenge = async (challengeId: string) => {
     console.log("🗑️ Attempting to delete challenge:", challengeId);
     
@@ -473,7 +515,36 @@ const ArenaHome: React.FC = () => {
     }
   };
 
-  // Handle result submission
+  const handleShareChallenge = async (challenge: any) => {
+    try {
+      // Create shareable URL
+      const shareUrl = `${window.location.origin}/app?challenge=${challenge.id}`;
+      
+      // Create share text
+      const shareText = `🎮 Join my USDFG Arena challenge!\n\n"${challenge.title}"\n💰 ${challenge.entryFee} USDFG Entry • 🏆 ${challenge.prizePool} USDFG Prize\n🎯 ${extractGameFromTitle(challenge.title)} • ${getGameCategory(extractGameFromTitle(challenge.title))}\n\nJoin now: ${shareUrl}`;
+      
+      // Try to use Web Share API if available (mobile)
+      if (navigator.share) {
+        await navigator.share({
+          title: `USDFG Arena Challenge: ${challenge.title}`,
+          text: shareText,
+          url: shareUrl
+        });
+      } else {
+        // Fallback: copy to clipboard
+        await navigator.clipboard.writeText(shareText);
+        alert('Challenge link copied to clipboard! Share it with your friends!');
+      }
+    } catch (error) {
+      console.error('Error sharing challenge:', error);
+      // Fallback: show share text in alert
+      const shareUrl = `${window.location.origin}/app?challenge=${challenge.id}`;
+      const shareText = `🎮 Join my USDFG Arena challenge!\n\n"${challenge.title}"\n💰 ${challenge.entryFee} USDFG Entry • 🏆 ${challenge.prizePool} USDFG Prize\n🎯 ${extractGameFromTitle(challenge.title)} • ${getGameCategory(extractGameFromTitle(challenge.title))}\n\nJoin now: ${shareUrl}`;
+      alert(`Share this challenge:\n\n${shareText}`);
+    }
+  };
+
+  // Handle result submission - now stores result and shows trust review
   const handleSubmitResult = async (didWin: boolean, proofFile?: File | null) => {
     if (!selectedChallenge || !publicKey) {
       console.error("❌ No challenge selected or wallet not connected");
@@ -483,19 +554,97 @@ const ArenaHome: React.FC = () => {
     try {
       console.log("📝 Submitting result:", { challengeId: selectedChallenge.id, didWin, hasProof: !!proofFile });
       
-      // TODO: Upload proof image to Firebase Storage if provided
-      // For now, we'll just submit the result without the proof URL
-      await submitChallengeResult(selectedChallenge.id, publicKey.toBase58(), didWin);
+      // Store the match result for later submission with trust review
+      const matchResult = { 
+        didWin, 
+        proofFile, 
+        challengeId: selectedChallenge.id 
+      };
+      setPendingMatchResult(matchResult);
+      console.log("💾 Stored pending match result:", matchResult);
       
-      console.log("✅ Result submitted successfully");
+      // Get opponent name for trust review
+      const opponentWallet = selectedChallenge.players?.find((p: string) => p !== publicKey.toBase58());
+      const opponentName = opponentWallet ? `${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}` : 'Opponent';
+      
+      // Show Trust Review Modal
+      setTrustReviewOpponent(opponentName);
+      setShowTrustReview(true);
       setShowSubmitResultModal(false);
-      setSelectedChallenge(null);
       
-      // Show success message
-      alert(didWin ? "🏆 You submitted that you WON! Waiting for opponent..." : "😔 You submitted that you LOST. Waiting for opponent...");
     } catch (error) {
       console.error("❌ Failed to submit result:", error);
       throw error; // Let modal handle the error
+    }
+  };
+
+  // Handle trust review submission - now submits both match result and trust review
+  const handleTrustReviewSubmit = async (payload: {
+    honesty: number;
+    fairness: number;
+    sportsmanship: number;
+    tags: string[];
+    trustScore10: number;
+  }) => {
+    console.log("🏆 Trust review submitted:", payload);
+    console.log("🔍 Debug state:", {
+      selectedChallenge: selectedChallenge?.id,
+      publicKey: publicKey?.toBase58(),
+      pendingMatchResult
+    });
+    
+    if (!publicKey || !pendingMatchResult) {
+      console.error("❌ Missing wallet or pending match result");
+      console.error("❌ Details:", {
+        hasPublicKey: !!publicKey,
+        hasPendingResult: !!pendingMatchResult
+      });
+      setShowTrustReview(false);
+      setTrustReviewOpponent('');
+      return;
+    }
+
+    // Use stored challenge ID as fallback if selectedChallenge is cleared
+    const challengeId = selectedChallenge?.id || pendingMatchResult.challengeId;
+    if (!challengeId) {
+      console.error("❌ No challenge ID available");
+      setShowTrustReview(false);
+      setTrustReviewOpponent('');
+      return;
+    }
+
+    try {
+      // Submit the match result to Firestore
+      await submitChallengeResult(challengeId, publicKey.toBase58(), pendingMatchResult.didWin);
+      
+      // Store trust review data
+      const trustData = {
+        challengeId: challengeId,
+        reviewer: publicKey.toBase58(),
+        opponent: selectedChallenge?.players?.find((p: string) => p !== publicKey.toBase58()) || 'Unknown',
+        review: payload,
+        timestamp: new Date().toISOString()
+      };
+      
+      // Store in localStorage (in production, this would go to Firestore)
+      const existingReviews = JSON.parse(localStorage.getItem('trustReviews') || '[]');
+      existingReviews.push(trustData);
+      localStorage.setItem('trustReviews', JSON.stringify(existingReviews));
+      
+      console.log("✅ Match result and trust review submitted successfully");
+      
+      // Close modals and clear state
+      setShowTrustReview(false);
+      setTrustReviewOpponent('');
+      setPendingMatchResult(null);
+      setSelectedChallenge(null);
+      
+      // Show success message
+      alert(pendingMatchResult.didWin ? "🏆 You submitted that you WON! Trust review recorded." : "😔 You submitted that you LOST. Trust review recorded.");
+      
+    } catch (error) {
+      console.error("❌ Failed to submit result and trust review:", error);
+      alert("Failed to submit result and trust review. Please try again.");
     }
   };
 
@@ -585,6 +734,7 @@ const ArenaHome: React.FC = () => {
   const uniqueGames = ['All', ...Array.from(new Set(challenges.map(c => c.game)))];
   const categories = ['All', 'Fighting', 'Sports', 'Shooting', 'Racing'];
 
+
   // Check if user has active challenge (for button disable logic)
   const currentWallet = publicKey?.toString() || null;
   const hasActiveChallenge = currentWallet && challenges.some(c => {
@@ -625,8 +775,8 @@ const ArenaHome: React.FC = () => {
         {/* Header */}
         <ElegantNavbar>
           {/* Desktop Only Buttons */}
-          <div className="hidden md:flex items-center gap-3">
-            <ElegantButton
+          <div className="hidden md:flex items-center justify-center gap-3 h-10">
+            <button
               onClick={() => {
                 if (hasActiveChallenge) {
                   alert("You already have an active challenge (created or joined). Complete it before creating a new one.");
@@ -639,12 +789,38 @@ const ArenaHome: React.FC = () => {
                 console.log("🔥 CREATE CHALLENGE BUTTON CLICKED!");
                 setShowCreateModal(true);
               }}
-              variant="cyan"
               disabled={hasActiveChallenge || isCreatingChallenge}
+              className="flex items-center justify-center gap-2 px-4 py-2 h-10 bg-zinc-800/50 hover:bg-zinc-700/50 rounded-xl border border-zinc-700 hover:border-amber-300/50 transition-all text-white text-sm font-semibold"
               title={hasActiveChallenge ? "You have an active challenge (created or joined)" : isCreatingChallenge ? "Creating challenge..." : "Create a new challenge"}
             >
+              <span className="text-amber-300">⚡</span>
+              <span className="text-white">
                 {hasActiveChallenge ? "In Challenge" : isCreatingChallenge ? "Creating..." : "Create Challenge"}
-            </ElegantButton>
+              </span>
+            </button>
+            
+            {publicKey && (
+              <button
+                onClick={() => {
+                  // Create a mock player object for the current user
+                  const currentUserPlayer = {
+                    wallet: publicKey.toString(),
+                    displayName: userGamerTag || 'Player',
+                    name: userGamerTag || 'Player',
+                    wins: 0, // You can get these from Firestore later
+                    losses: 0,
+                    winRate: 0,
+                    rank: 1
+                  };
+                  setSelectedPlayer(currentUserPlayer);
+                  setShowPlayerProfile(true);
+                }}
+                className="flex items-center justify-center gap-2 px-4 py-2 h-10 bg-zinc-800/50 hover:bg-zinc-700/50 rounded-xl border border-zinc-700 hover:border-amber-300/50 transition-all text-white text-sm font-semibold"
+              >
+                <span className="text-amber-300">👤</span>
+                <span className="text-white">Profile</span>
+              </button>
+            )}
             
             <WalletConnectSimple 
               isConnected={isConnected}
@@ -691,41 +867,41 @@ const ArenaHome: React.FC = () => {
         </div>
 
         {/* Main Content */}
-        <div className="container mx-auto px-4 py-4 sm:py-8 w-full">
+        <div className="container mx-auto px-2 py-1 sm:py-2 w-full">
           {/* Hero Section */}
           <div className="text-center neocore-section">
             {/* USDFG Price Ticker */}
-            <div className="inline-flex items-center bg-background-2/60 border border-glow/20 rounded-full px-4 py-2 mb-6 backdrop-blur-sm glow-soft">
-              <div className="w-2 h-2 bg-glow-cyan rounded-full mr-2 animate-pulse"></div>
-              <span className="text-sm text-text-dim mr-2 neocore-body">USDFG Price:</span>
-              <span className="text-glow-cyan font-semibold neocore-body">{usdfgPrice.toFixed(4)} USDFG</span>
-              <span className="text-xs text-text-dim ml-2 neocore-body">Live</span>
+            <div className="inline-flex items-center bg-[#07080C]/95 border border-amber-500/30 rounded-full px-2 py-1 mb-2 backdrop-blur-sm shadow-[0_0_20px_rgba(255,215,130,0.15)] hover:shadow-[0_0_30px_rgba(255,215,130,0.25)] transition-all">
+              <div className="w-2 h-2 bg-amber-400 rounded-full mr-2 animate-pulse"></div>
+              <span className="text-sm text-amber-300 mr-2">USDFG Price:</span>
+              <span className="text-amber-400 font-semibold">{usdfgPrice.toFixed(4)} USDFG</span>
+              <span className="text-xs text-amber-300 ml-2">Live</span>
             </div>
             
-            <h1 className="text-5xl font-bold text-white drop-shadow-[0_0_20px_rgba(255,215,130,0.3)]">
+            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white drop-shadow-[0_0_20px_rgba(255,215,130,0.3)]">
               Welcome to the <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-200">Arena</span>
             </h1>
-            <p className="text-base sm:text-xl max-w-2xl mx-auto neocore-body mb-6 sm:mb-8 px-4">
+            <p className="text-sm md:text-base max-w-2xl mx-auto neocore-body mb-4 px-4">
               Compete in skill-based challenges, earn USDFG, and prove your gaming prowess against players worldwide.
             </p>
             
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 px-4">
-              <button 
-                onClick={() => setShowCreateModal(true)}
-                className="elite-btn neocore-button px-4 sm:px-6 py-2 sm:py-3 w-full sm:w-auto text-sm sm:text-base"
-              >
-                Create Challenge
-              </button>
-              <Link 
-                to="#challenges"
-                className="text-glow-cyan underline underline-offset-4 hover:text-glow-cyan/80 transition-colors neocore-body text-sm sm:text-base"
-              >
-                Browse Challenges
-              </Link>
-            </div>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-4">
+                  <button 
+                    onClick={() => setShowCreateModal(true)}
+                    className="elite-btn neocore-button px-2 sm:px-3 py-1 sm:py-1.5 w-full sm:w-auto text-xs sm:text-sm"
+                  >
+                    Create Challenge
+                  </button>
+                  <Link 
+                    to="#challenges"
+                    className="text-glow-cyan underline underline-offset-4 hover:text-glow-cyan/80 transition-colors neocore-body text-sm sm:text-base"
+                  >
+                    Browse Challenges
+                  </Link>
+                </div>
             
             {!isConnected && (
-              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 max-w-md mx-auto">
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-2 max-w-md mx-auto">
                 <p className="text-yellow-400 text-sm">
                   Connect your wallet to start competing and earning rewards!
                 </p>
@@ -733,72 +909,85 @@ const ArenaHome: React.FC = () => {
             )}
           </div>
 
-          {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
-            <div className="bg-[#0B0C12]/90 border border-zinc-800 rounded-2xl p-6 text-center hover:border-amber-300/50 shadow-[0_0_30px_rgba(255,215,130,0.05)] transition-all">
-                <div className="text-3xl mb-1">🏆</div>
-              <div className="text-2xl font-semibold text-white">1,247</div>
-              <div className="text-sm text-zinc-400 mt-1">Active Challenges</div>
-            </div>
-            
-            <div className="bg-[#0B0C12]/90 border border-zinc-800 rounded-2xl p-6 text-center hover:border-amber-300/50 shadow-[0_0_30px_rgba(255,215,130,0.05)] transition-all">
-                <div className="text-3xl mb-1">👥</div>
-              <div className="text-2xl font-semibold text-white">8,432</div>
-              <div className="text-sm text-zinc-400 mt-1">Players Online</div>
-            </div>
-            
-            <div className="bg-[#0B0C12]/90 border border-zinc-800 rounded-2xl p-6 text-center hover:border-amber-300/50 shadow-[0_0_30px_rgba(255,215,130,0.05)] transition-all">
-                <div className="text-3xl mb-1">⚡</div>
-              <div className="text-2xl font-semibold text-white">45,678</div>
-              <div className="text-sm text-zinc-400 mt-1">USDFG Rewarded</div>
-            </div>
-            
-            <div className="bg-[#0B0C12]/90 border border-zinc-800 rounded-2xl p-6 text-center hover:border-amber-300/50 shadow-[0_0_30px_rgba(255,215,130,0.05)] transition-all">
-                <div className="text-3xl mb-1">📈</div>
-              <div className="text-2xl font-semibold text-white">+12.5%</div>
-              <div className="text-sm text-zinc-400 mt-1">Win Rate</div>
-            </div>
-          </div>
+              {/* Founder Challenge Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-4">
+                <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
+                  <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
+                  <div className="relative z-10">
+                    <div className="text-lg mb-1">🏆</div>
+                    <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">
+                      {founderStats.activeChallenges}
+                    </div>
+                    <div className="text-sm text-amber-400 mt-1 font-semibold">Founder Challenges</div>
+                  </div>
+                </div>
+                
+                <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
+                  <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
+                  <div className="relative z-10">
+                    <div className="text-lg mb-1">👥</div>
+                    <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">
+                      {founderStats.playersOnline}
+                    </div>
+                    <div className="text-sm text-amber-400 mt-1 font-semibold">Players Online</div>
+                  </div>
+                </div>
+                
+                <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
+                  <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
+                  <div className="relative z-10">
+                    <div className="text-lg mb-1">⚡</div>
+                    <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">
+                      {founderStats.usdfgRewarded.toFixed(9)} USDFG
+                    </div>
+                    <div className="text-sm text-amber-400 mt-1 font-semibold">USDFG Rewarded</div>
+                  </div>
+                </div>
+                
+                <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
+                  <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
+                  <div className="relative z-10">
+                    <div className="text-lg mb-1">📈</div>
+                    <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">
+                      {founderStats.winRate}%
+                    </div>
+                    <div className="text-sm text-amber-400 mt-1 font-semibold">Success Rate</div>
+                  </div>
+                </div>
+              </div>
 
           {/* Available Challenges Section */}
           <section id="challenges" className="mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-white">Available Challenges</h2>
-              <div className="hidden md:flex">
-                <ElegantButton
-                  onClick={() => setShowCreateModal(true)}
-                  variant="cyan"
-                  size="md"
-                  className="px-6 py-3"
-                >
-                  Create Challenge
-                </ElegantButton>
-              </div>
-            </div>
           </section>
 
           {/* Simple Content */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-black/20 border border-gray-800 rounded-lg backdrop-blur-sm">
-              <div className="p-6 border-b border-gray-800">
+            <div className="relative rounded-[20px] bg-[#07080C]/95 border border-amber-500/30 overflow-hidden shadow-[0_0_40px_rgba(255,215,130,0.08)]">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
+              <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-amber-400/10 via-transparent to-transparent" />
+              <div className="relative z-10 p-6">
                 <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-white flex items-center">
+                <h2 className="text-2xl font-bold uppercase tracking-wider text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)] flex items-center">
                   <span className="mr-2">🎯</span>
                   Available Challenges
                 </h2>
-                  <span className="text-sm text-gray-400">
+                  <span className="text-sm text-amber-400 font-semibold">
                     {filteredChallenges.length} challenge{filteredChallenges.length !== 1 ? 's' : ''}
                   </span>
                 </div>
                 
                 {/* Filter Controls */}
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-3 mb-6">
                   <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-400">Category:</label>
+                    <label className="text-sm font-medium text-amber-300">Category:</label>
                     <select
                       value={filterCategory}
                       onChange={(e) => setFilterCategory(e.target.value)}
-                      className="px-3 py-1.5 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:border-cyan-400 focus:outline-none"
+                      className="px-3 py-1.5 bg-zinc-800/50 border border-amber-500/30 rounded-lg text-white text-sm focus:border-amber-400 focus:outline-none hover:border-amber-400/60 transition-all"
                     >
                       {categories.map(category => (
                         <option key={category} value={category}>{category}</option>
@@ -807,11 +996,11 @@ const ArenaHome: React.FC = () => {
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-400">Game:</label>
+                    <label className="text-sm font-medium text-amber-300">Game:</label>
                     <select
                       value={filterGame}
                       onChange={(e) => setFilterGame(e.target.value)}
-                      className="px-3 py-1.5 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:border-cyan-400 focus:outline-none"
+                      className="px-3 py-1.5 bg-zinc-800/50 border border-amber-500/30 rounded-lg text-white text-sm focus:border-amber-400 focus:outline-none hover:border-amber-400/60 transition-all"
                     >
                       {uniqueGames.map(game => (
                         <option key={game} value={game}>{game}</option>
@@ -825,8 +1014,8 @@ const ArenaHome: React.FC = () => {
                         onClick={() => setShowMyChallenges(!showMyChallenges)}
                         className={`px-3 py-1.5 rounded-lg border text-sm transition-all ${
                           showMyChallenges 
-                            ? 'bg-cyan-500/20 border-cyan-500/30 text-cyan-400' 
-                            : 'bg-gray-800 border-gray-600 text-white hover:bg-gray-700'
+                            ? 'bg-amber-600/20 border-amber-500/30 text-amber-400' 
+                            : 'bg-zinc-800/50 border-amber-500/30 text-amber-300 hover:bg-amber-600/20 hover:border-amber-400/50'
                         }`}
                       >
                         {showMyChallenges ? '👤 My Challenges' : '🌐 All Challenges'}
@@ -841,14 +1030,13 @@ const ArenaHome: React.FC = () => {
                         setFilterGame('All');
                         setShowMyChallenges(false);
                       }}
-                      className="px-3 py-1.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-sm hover:bg-red-500/30 transition-colors"
+                      className="px-3 py-1.5 bg-amber-600/20 text-amber-400 border border-amber-500/30 rounded-lg text-sm hover:bg-amber-600/30 transition-colors"
                     >
                       Clear Filters
                     </button>
                   )}
                 </div>
-              </div>
-              <div className="p-6">
+                
                 <div className="space-y-4">
                   {filteredChallenges.length === 0 ? (
                     <div className="text-center py-8">
@@ -858,7 +1046,7 @@ const ArenaHome: React.FC = () => {
                           setFilterCategory('All');
                           setFilterGame('All');
                         }}
-                        className="text-cyan-400 hover:text-cyan-300 text-sm underline"
+                        className="text-amber-400 hover:text-amber-300 text-sm underline"
                       >
                         Clear filters to see all challenges
                       </button>
@@ -869,7 +1057,7 @@ const ArenaHome: React.FC = () => {
                     return (
                       <div 
                         key={challenge.id} 
-                        className={`relative overflow-hidden bg-[#0B0C12]/90 border border-zinc-800 rounded-2xl p-6 cursor-pointer hover:border-amber-300/50 shadow-[0_0_30px_rgba(255,215,130,0.05)] transition-all ${challenge.status === "expired" ? "challenge-expired" : ""}`}
+                        className={`relative bg-[#07080C]/95 border border-amber-500/30 rounded-2xl p-6 cursor-pointer hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden ${challenge.status === "expired" ? "challenge-expired" : ""}`}
                         onClick={() => {
                           // Don't open join modal for completed challenges
                           if (challenge.status === "completed" || challenge.rawData?.payoutTriggered) {
@@ -880,33 +1068,94 @@ const ArenaHome: React.FC = () => {
                           setShowJoinModal(true);
                         }}
                       >
-                        {/* Full-card background image by category */}
+                        {/* Background Category Image (full-card) */}
                         {(() => {
-                          const gameName = extractGameFromTitle(challenge.title || challenge.game || '');
-                          const cat = getGameCategory(gameName);
-                          const bgSrc = categoryImageMap[cat] || categoryImageMap.Other;
+                          const game = extractGameFromTitle(challenge.title);
+                          const category = getGameCategory(game);
+                          const bgSrc = categoryImageMap[category] || categoryImageMap.Other;
                           return (
                             <img
                               src={bgSrc}
-                              alt={`${cat} background`}
-                              className="absolute inset-0 w-full h-full object-cover opacity-15 pointer-events-none"
+                              alt={`${category} background`}
+                              className="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none"
                               onError={(e) => {
                                 const img = e.currentTarget as HTMLImageElement;
-                                img.src = categoryImageMap.Other;
+                                img.src = categoryImageMap.Other || '/assets/categories/other.png';
                               }}
                             />
                           );
                         })()}
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
-                        <div className="relative z-10">
+
+                        {/* Ambient Glow */}
+                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60 rounded-2xl" />
+                        <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite] rounded-t-2xl" />
+                        <div className="relative z-10 mb-4">
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-gradient-to-r from-glow-pink to-glow-electric rounded-lg flex items-center justify-center">
-                                <span className="text-white">🥊</span>
-                              </div>
+                              {(() => {
+                                const game = extractGameFromTitle(challenge.title);
+                                const category = getGameCategory(game);
+                                const imgSrc = categoryImageMap[category] || categoryImageMap.Other;
+                                // Debug log to verify resolution
+                                try { console.log('🎯 Challenge card image:', { title: challenge.title, game, category, imgSrc }); } catch {}
+                                const emojiMap: Record<string, string> = {
+                                  Sports: '🏈',
+                                  Fighting: '🥊',
+                                  Shooting: '🎯',
+                                  Racing: '🏎️',
+                                  Other: '🎮'
+                                };
+                                return (
+                                  <div className="relative w-10 h-10 bg-gradient-to-r from-amber-400 to-orange-500 rounded-lg flex items-center justify-center shadow-lg shadow-amber-500/20 overflow-hidden">
+                                    <span className="category-emoji absolute text-lg select-none opacity-70">{emojiMap[category] || '🎮'}</span>
+                                    <img
+                                      src={imgSrc}
+                                      alt={category}
+                                      className="w-full h-full object-cover"
+                                      onLoad={(e) => {
+                                        // Hide emoji fallback when real image is loaded
+                                        const parent = e.currentTarget.parentElement;
+                                        const emoji = parent?.querySelector('.category-emoji') as HTMLElement | null;
+                                        if (emoji) emoji.style.display = 'none';
+                                      }}
+                                      onError={(e) => {
+                                        // One-shot fallback to generic image
+                                        const img = e.currentTarget as HTMLImageElement;
+                                        if (!img.dataset.fallback) {
+                                          img.dataset.fallback = '1';
+                                          img.src = categoryImageMap.Other || '/assets/categories/other.png';
+                                        } else {
+                                          // If even fallback fails, hide image so emoji shows
+                                          img.style.display = 'none';
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                );
+                              })()}
                               <div>
-                              <h3 className="text-text-primary font-semibold neocore-body">{challenge.title}</h3>
-                              <p className="text-text-dim text-sm neocore-body">{challenge.category} • {challenge.game}</p>
+                                <h3 className="text-white font-bold text-lg drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">{challenge.title}</h3>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-text-dim text-sm neocore-body">{getGameCategory(extractGameFromTitle(challenge.title))}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Game Name - Most Prominent */}
+                          <div className="mb-3">
+                            <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-400/40 rounded-lg shadow-[0_0_20px_rgba(255,215,130,0.2)]">
+                              <span className="text-amber-300 mr-2 text-lg">🎮</span>
+                              <span className="text-amber-200 font-bold text-lg drop-shadow-[0_0_8px_rgba(255,215,130,0.4)]">
+                                {extractGameFromTitle(challenge.title)}
+                              </span>
+                            </div>
+                          </div>
+
+                          
+                          
+                          {/* Challenge Details */}
+                          <div className="mb-3">
                             {challenge.platform && challenge.username && (
                               <p className="text-text-dim/60 text-xs neocore-body">
                                 🖥️ {challenge.platform} • 👤 {challenge.username}
@@ -927,12 +1176,23 @@ const ArenaHome: React.FC = () => {
                                 Your Challenge
                               </span>
                             )}
-                            </div>
                           </div>
                           {challenge.status === "active" && (
+                            <div className="flex items-center gap-2">
                               <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
                                 Active
                               </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleShareChallenge(challenge);
+                                }}
+                                className="px-2 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded text-xs hover:bg-amber-500/30 transition-all flex items-center gap-1"
+                                title="Share Challenge"
+                              >
+                                📤 Share
+                              </button>
+                            </div>
                           )}
                           {challenge.status === "in-progress" && (
                             <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded text-xs">
@@ -956,20 +1216,20 @@ const ArenaHome: React.FC = () => {
                           )}
                         </div>
                         
-                        <div className="grid grid-cols-3 gap-4 mb-4">
+                        <div className="relative z-10 grid grid-cols-3 gap-4 mb-4">
                           <div className="text-center">
-                            <div className="text-white font-semibold">{challenge.entryFee} USDFG</div>
-                            <div className="text-gray-400 text-xs">Entry Fee</div>
+                            <div className="text-white font-bold text-lg drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">{challenge.entryFee} USDFG</div>
+                            <div className="text-amber-200 text-xs">Entry Fee</div>
                           </div>
                           <div className="text-center">
-                            <div className="text-white font-semibold">{challenge.prizePool} USDFG</div>
-                            <div className="text-gray-400 text-xs">Prize Pool</div>
+                            <div className="text-white font-bold text-lg drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">{challenge.prizePool} USDFG</div>
+                            <div className="text-amber-200 text-xs">Prize Pool</div>
                           </div>
                           <div className="text-center">
-                            <div className="text-white font-semibold">
+                            <div className="text-white font-bold text-lg drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">
                               {challenge.players || 0}/{challenge.capacity || 2}
                             </div>
-                            <div className="text-gray-400 text-xs">Players</div>
+                            <div className="text-amber-200 text-xs">Players</div>
                           </div>
                         </div>
 
@@ -994,7 +1254,7 @@ const ArenaHome: React.FC = () => {
                         {(challenge.description || challenge.rules || challenge.requirements) && (
                           <div className="mb-4">
                             <details className="group">
-                              <summary className="cursor-pointer text-sm text-cyan-400 hover:text-cyan-300 flex items-center">
+                              <summary className="cursor-pointer text-sm text-amber-400 hover:text-amber-300 flex items-center">
                                 <span className="mr-2">📋</span>
                                 Challenge Details
                                 <span className="ml-auto group-open:rotate-180 transition-transform">▼</span>
@@ -1118,16 +1378,30 @@ const ArenaHome: React.FC = () => {
                               <div className="flex space-x-2">
                                 <button 
                                   onClick={(e) => {
+                                    e.preventDefault();
                                     e.stopPropagation();
+                                    e.nativeEvent.stopImmediatePropagation();
                                     handleDeleteChallenge(challenge.id);
                                   }}
-                                  className="flex-1 px-4 py-2 bg-red-600/20 text-red-400 border border-red-600/30 font-semibold rounded-lg hover:bg-red-600/30 transition-all"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                  }}
+                                  className="flex-1 px-4 py-2 bg-red-600/20 text-red-400 border border-red-600/30 font-semibold rounded-lg hover:bg-red-600/30 transition-all relative z-20"
                                 >
                                   🗑️ Delete
                                 </button>
                                 <button 
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="flex-1 px-4 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 font-semibold rounded-lg hover:bg-gray-600/30 transition-all"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    e.nativeEvent.stopImmediatePropagation();
+                                  }}
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                  }}
+                                  className="flex-1 px-4 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 font-semibold rounded-lg hover:bg-gray-600/30 transition-all relative z-20"
                                   disabled
                                 >
                                   ✏️ Edit (Coming Soon)
@@ -1146,7 +1420,7 @@ const ArenaHome: React.FC = () => {
                                     e.stopPropagation();
                                     connect();
                                   }}
-                                  className="w-full px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all"
+                                  className="w-full px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-500 text-white font-bold rounded-lg hover:brightness-110 transition-all shadow-lg shadow-amber-500/20"
                                 >
                                   🔌 Connect to Submit Result
                                 </button>
@@ -1219,10 +1493,10 @@ const ArenaHome: React.FC = () => {
                                     console.log('🔍 Challenge data length:', data.length);
                                     console.log('🔍 First 50 bytes:', Array.from(data.slice(0, 50)).map(b => b.toString(16).padStart(2, '0')).join(' '));
                                     
-                                    if (statusByte !== 0) { // 0 = Open, 1 = InProgress, 2 = Completed, etc.
+                                    if (statusByte > 1) { // Only block if status is > 1 (Completed, Cancelled, Disputed)
                                       const statusNames = ['Open', 'InProgress', 'Completed', 'Cancelled', 'Disputed'];
                                       const statusName = statusNames[statusByte] || 'Unknown';
-                                      alert(`This challenge is no longer open. Current status: ${statusName} (${statusByte}). It may have already been joined or completed.`);
+                                      alert(`This challenge is no longer open. Current status: ${statusName} (${statusByte}). It may have already been completed or cancelled.`);
                                       return;
                                     }
                                     
@@ -1234,7 +1508,7 @@ const ArenaHome: React.FC = () => {
                                     alert('Failed to verify challenge status. Please try again.');
                                   }
                                 }}
-                                className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50"
+                                className="w-full px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-500 text-white font-bold rounded-lg hover:brightness-110 transition-all disabled:opacity-50 shadow-lg shadow-amber-500/20"
                                 disabled={!isConnected}
                               >
                                 {!isConnected ? "Connect to Join" : "Join Challenge"}
@@ -1323,28 +1597,291 @@ const ArenaHome: React.FC = () => {
                             </div>
                           );
                         })()}
+                        
+                        {/* Join Chat Button - Show for all active challenges */}
+                        {(challenge.status === "active" || challenge.status === "in-progress") && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedChatChallenge(challenge);
+                              setShowChatModal(true);
+                            }}
+                            className="w-full mt-2 px-4 py-2 bg-blue-600/20 text-blue-400 border border-blue-600/30 font-semibold rounded-lg hover:bg-blue-600/30 transition-all flex items-center justify-center space-x-2"
+                          >
+                            <span>💬</span>
+                            <span>Join Chat</span>
+                          </button>
+                        )}
+
                       </div>
                     );
-                    }))}
+                  }))}
                 </div>
               </div>
             </div>
 
-            <div className="bg-black/20 border border-gray-800 rounded-lg backdrop-blur-sm">
-              <div className="p-6 border-b border-gray-800">
-                <h2 className="text-xl font-bold text-white flex items-center">
+            <div className="relative rounded-[20px] bg-[#07080C]/95 border border-zinc-800 overflow-hidden shadow-[0_0_40px_rgba(255,215,130,0.08)]">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
+              <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-amber-400/10 via-transparent to-transparent" />
+              <div className="relative z-10 text-center py-6">
+                <h2 className="text-2xl font-bold uppercase tracking-wider text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)] flex items-center justify-center">
                   <span className="mr-2">🏆</span>
-                  Top Players
+                  Arena Leaders
                 </h2>
+                <p className="text-xs text-zinc-400 mt-1">Top ranked players • Search by name or wallet address</p>
+                
+                {/* Search Bar */}
+                <div className="mt-4 px-6">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search by name or wallet address..."
+                      value={leaderboardSearchTerm}
+                      onChange={(e) => setLeaderboardSearchTerm(e.target.value)}
+                      className="w-full px-4 py-2 bg-zinc-900/50 border border-zinc-700 rounded-xl text-white placeholder-zinc-400 focus:border-amber-300/50 focus:outline-none transition-all text-sm"
+                    />
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <span className="text-zinc-400 text-sm">🔍</span>
+                    </div>
+                  </div>
+                </div>
               </div>
               <div className="p-6">
+                
                 {loadingTopPlayers ? (
                   <div className="flex justify-center items-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div>
                   </div>
-                ) : topPlayers.length === 0 ? (
+                ) : topPlayers.length === 0 || true ? (
+                  <div className="divide-y divide-zinc-800">
+                    {(() => {
+                      const filteredPlayers = [
+                        { 
+                          rank: 1, 
+                          name: "Ghostly", 
+                          country: "🇺🇸", 
+                          trust: 9.8, 
+                          wins: 214, 
+                          streak: 12, 
+                          integrity: 9.7, 
+                          wallet: "3SeLoDGs...kcUd",
+                        },
+                        { 
+                          rank: 2, 
+                          name: "Nova", 
+                          country: "🇨🇦", 
+                          trust: 9.5, 
+                          wins: 199, 
+                          streak: 9, 
+                          integrity: 9.2, 
+                          wallet: "7Kj9Mn2...xYz1",
+                        },
+                        { 
+                          rank: 3, 
+                          name: "Zypher", 
+                          country: "🇩🇪", 
+                          trust: 9.4, 
+                          wins: 185, 
+                          streak: 7, 
+                          integrity: 9.0, 
+                          wallet: "9Pq4Rt8...wE3v",
+                        },
+                        { 
+                          rank: 4, 
+                          name: "Kairo", 
+                          country: "🇯🇵", 
+                          trust: 9.2, 
+                          wins: 171, 
+                          streak: 6, 
+                          integrity: 8.8, 
+                          wallet: "2Hf6Np9...mQ7s",
+                          recentGames: Array.from({ length: 6 }, (_, i) => ({ 
+                            flagged: false, 
+                            complaints: 0, 
+                            verified: true 
+                          })) // 6 clean games
+                        },
+                        { 
+                          rank: 5, 
+                          name: "Vex", 
+                          country: "🇫🇷", 
+                          trust: 8.9, 
+                          wins: 162, 
+                          streak: 5, 
+                          integrity: 8.6, 
+                          wallet: "5Lm8Kj2...rT4u",
+                          recentGames: Array.from({ length: 5 }, (_, i) => ({ 
+                            flagged: false, 
+                            complaints: 0, 
+                            verified: true 
+                          })) // 5 clean games
+                        },
+                      ].filter(player => 
+                        leaderboardSearchTerm === '' || 
+                        player.name.toLowerCase().includes(leaderboardSearchTerm.toLowerCase()) ||
+                        player.wallet.toLowerCase().includes(leaderboardSearchTerm.toLowerCase())
+                      );
+
+                      if (filteredPlayers.length === 0 && leaderboardSearchTerm !== '') {
+                        return (
                           <div className="text-center py-8">
-                    <p className="text-gray-400 text-sm">No players yet. Be the first!</p>
+                            <div className="text-zinc-400 text-sm">
+                              No players found matching "{leaderboardSearchTerm}"
+                            </div>
+                            <div className="text-zinc-500 text-xs mt-2">
+                              Try a different search term
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return filteredPlayers.map((player) => (
+                      <div
+                        key={player.rank}
+                        className={`flex items-center justify-between px-6 py-4 hover:bg-[#0B0C12]/60 transition cursor-pointer relative group ${
+                          player.rank <= 3 ? "bg-gradient-to-r from-amber-300/10 to-transparent" : ""
+                        }`}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          // Create a mock PlayerStats object for the modal
+                          const mockPlayerStats: PlayerStats = {
+                            wallet: player.wallet,
+                            displayName: player.name,
+                            wins: player.wins,
+                            losses: Math.floor(player.wins * 0.3), // Estimate losses
+                            winRate: Math.round((player.wins / (player.wins + Math.floor(player.wins * 0.3))) * 100 * 10) / 10,
+                            totalEarned: player.wins * 10, // Estimate earnings
+                            gamesPlayed: player.wins + Math.floor(player.wins * 0.3),
+                            lastActive: new Date(),
+                            trustScore: player.trust,
+                            trustReviews: Math.floor(player.wins * 0.8),
+                            gameStats: {},
+                            categoryStats: {}
+                          };
+                          setSelectedPlayer(mockPlayerStats);
+                          setShowPlayerProfile(true);
+                        }}
+                        style={{ zIndex: 10, position: 'relative' }}
+                      >
+                        <div className="flex items-center gap-4 pointer-events-none">
+                          <div
+                            className={`h-10 w-10 flex items-center justify-center rounded-full text-sm font-bold border ${
+                              player.rank === 1
+                                ? "border-amber-300 text-amber-300"
+                                : player.rank === 2
+                                ? "border-zinc-400 text-zinc-300"
+                                : player.rank === 3
+                                ? "border-orange-400 text-orange-300"
+                                : "border-zinc-700 text-zinc-400"
+                            }`}
+                          >
+                            {player.rank}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 text-lg font-semibold text-white">
+                              {player.name} <span>{player.country}</span>
+                              {player.rank === 1 && <span className="text-amber-300">👑</span>}
+                            </div>
+                            <div className="text-xs text-zinc-400">Integrity {player.integrity}/10 • Streak {player.streak}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <div className="text-xs text-zinc-500 font-mono">{player.wallet}</div>
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  e.nativeEvent.stopImmediatePropagation();
+                                  navigator.clipboard.writeText(player.wallet);
+                                  // Show a brief success indicator
+                                  const button = e.target as HTMLElement;
+                                  const originalText = button.textContent;
+                                  button.textContent = '✓';
+                                  button.className = 'text-xs text-green-400 transition-colors';
+                                  setTimeout(() => {
+                                    button.textContent = originalText;
+                                    button.className = 'text-xs text-zinc-400 hover:text-zinc-300 transition-colors cursor-pointer';
+                                  }, 1000);
+                                }}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                }}
+                                className="text-xs text-zinc-400 hover:text-zinc-300 transition-colors cursor-pointer pointer-events-auto"
+                                title="Copy wallet address"
+                                style={{ zIndex: 20 }}
+                              >
+                                📋
+                              </button>
+                            </div>
+                            </div>
+                          </div>
+
+                          {/* Trophy Display - Middle Section */}
+                          <div className="flex items-center justify-center gap-1 pointer-events-auto">
+                            {(() => {
+                              const gamesPlayed = player.wins + Math.floor(player.wins * 0.3);
+                              const allTrophies = [
+                                { id: 'initiate', icon: '/assets/trophies/usdfg-initiate.png', requiredGames: 2 },
+                                { id: 'contender', icon: '/assets/trophies/usdfg-contender.png', requiredGames: 10 },
+                                { id: 'veteran', icon: '/assets/trophies/usdfg-veteran.png', requiredGames: 15 },
+                                { id: 'enforcer', icon: '/assets/trophies/usdfg-enforcer.png', requiredGames: 30 },
+                                { id: 'unbroken', icon: '/assets/trophies/usdfg-unbroken.png', requiredGames: 60 },
+                                { id: 'disciple', icon: '/assets/trophies/usdfg-disciple.png', requiredGames: 90 },
+                                { id: 'immortal', icon: '/assets/trophies/usdfg-immortal.png', requiredGames: 120 }
+                              ];
+                              
+                              return allTrophies.slice(0, 3).map((trophy, index) => {
+                                const isUnlocked = gamesPlayed >= trophy.requiredGames;
+                                return (
+                                  <img
+                                    key={trophy.id}
+                                    src={trophy.icon}
+                                    alt={trophy.id}
+                                    className={`w-6 h-6 transition-all duration-300 cursor-pointer ${
+                                      isUnlocked 
+                                        ? 'opacity-100 drop-shadow-[0_0_8px_rgba(255,215,130,0.6)] hover:drop-shadow-[0_0_12px_rgba(255,215,130,0.8)] hover:scale-110' 
+                                        : 'opacity-40 grayscale'
+                                    }`}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      e.nativeEvent.stopImmediatePropagation();
+                                      setSelectedTrophy({
+                                        id: trophy.id,
+                                        name: trophy.id.toUpperCase(),
+                                        description: getTrophyDescription(trophy.id),
+                                        icon: trophy.icon,
+                                        requiredGames: trophy.requiredGames
+                                      });
+                                      setShowTrophyModal(true);
+                                    }}
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                    }}
+                                  />
+                                );
+                              });
+                            })()}
+                          </div>
+
+                          <div className="flex items-center gap-6 pointer-events-none">
+                          <div className="flex items-center gap-1 text-green-400 text-sm">
+                            W {player.wins}
+                          </div>
+                          <div className="flex items-center gap-1 text-red-400 text-sm">
+                            L {Math.floor(player.wins * 0.3)}
+                          </div>
+                          <div className="flex items-center gap-1 text-amber-200 text-sm">
+                            🛡️ {player.trust}
+                          </div>
+                        </div>
+                      </div>
+                      ));
+                    })()}
+                    <div className="absolute bottom-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[pulseLine_3s_ease-in-out_infinite]" />
+                    <style>{`
+                      @keyframes pulseLine {0%,100%{opacity:.4}50%{opacity:1}}
+                    `}</style>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -1353,15 +1890,15 @@ const ArenaHome: React.FC = () => {
                         'from-yellow-400 to-orange-500', // 1st place
                         'from-gray-300 to-gray-400',     // 2nd place
                         'from-amber-600 to-yellow-700',  // 3rd place
-                        'from-cyan-400 to-blue-500',     // 4th place
-                        'from-purple-400 to-pink-500'    // 5th place
+                        'from-amber-400 to-orange-500',     // 4th place
+                        'from-yellow-400 to-amber-500'    // 5th place
                       ];
                       const bgColors = [
                         'from-yellow-500/20 to-orange-500/20 border-yellow-500/30',
                         'from-gray-400/20 to-gray-500/20 border-gray-400/30',
                         'from-amber-600/20 to-yellow-700/20 border-amber-600/30',
-                        'from-cyan-400/20 to-blue-500/20 border-cyan-400/30',
-                        'from-purple-400/20 to-pink-500/20 border-purple-400/30'
+                        'from-amber-400/20 to-orange-500/20 border-amber-400/30',
+                        'from-yellow-400/20 to-amber-500/20 border-yellow-400/30'
                       ];
                       
                       return (
@@ -1387,16 +1924,15 @@ const ArenaHome: React.FC = () => {
                                     {player.displayName || `${player.wallet.slice(0, 6)}...${player.wallet.slice(-4)}`}
                                   </h3>
                                   {player.gamesPlayed >= 5 && (
-                                    <span className="text-cyan-400 text-xs" title="Verified Player (5+ games)">✓</span>
+                                    <span className="text-amber-400 text-xs" title="Verified Player (5+ games)">✓</span>
                                   )}
                                   <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
+                                    onClick={() => {
                                       navigator.clipboard.writeText(player.wallet);
                                       setCopiedWallet(player.wallet);
                                       setTimeout(() => setCopiedWallet(null), 2000);
                                     }}
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-cyan-400 text-xs"
+                                    className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-amber-400 text-xs"
                                     title="Copy wallet address"
                                   >
                                     {copiedWallet === player.wallet ? '✓' : '📋'}
@@ -1407,56 +1943,8 @@ const ArenaHome: React.FC = () => {
                                 </p>
                               </div>
                             </div>
-                            
-                            {/* Trophy Display - Middle Section */}
-                            <div className="flex items-center justify-center gap-1 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
-                              {(() => {
-                                const gamesPlayed = player.gamesPlayed || (player.wins + player.losses);
-                                const unlockedTrophies = trophySystem.filter(t => gamesPlayed >= t.requiredGames);
-                                const displayTrophies = trophySystem.slice(0, 3); // Show first 3 trophies
-                                
-                                return displayTrophies.map((trophy) => {
-                                  const isUnlocked = gamesPlayed >= trophy.requiredGames;
-                                  return (
-                                    <img
-                                      key={trophy.id}
-                                      src={trophy.icon}
-                                      alt={trophy.name}
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        e.nativeEvent.stopImmediatePropagation();
-                                        setSelectedTrophy({
-                                          id: trophy.id,
-                                          name: trophy.name,
-                                          icon: trophy.icon,
-                                          requiredGames: trophy.requiredGames,
-                                          isUnlocked,
-                                          gamesPlayed
-                                        });
-                                        setShowTrophyModal(true);
-                                      }}
-                                      onMouseDown={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                      }}
-                                      className={`w-6 h-6 transition-all duration-300 relative z-10 cursor-pointer ${
-                                        isUnlocked 
-                                          ? 'opacity-100 drop-shadow-[0_0_8px_rgba(255,215,130,0.6)] hover:drop-shadow-[0_0_12px_rgba(255,215,130,0.8)] hover:scale-110' 
-                                          : 'opacity-40 grayscale'
-                                      }`}
-                                      onError={(e) => {
-                                        e.currentTarget.style.display = 'none';
-                                      }}
-                                      title={isUnlocked ? trophy.name : 'Locked'}
-                                    />
-                                  );
-                                });
-                              })()}
-                            </div>
-                            
                             <div className="text-right shrink-0">
-                              <div className="text-cyan-400 font-bold text-lg">{player.totalEarned.toFixed(0)}</div>
+                              <div className="text-amber-400 font-bold text-lg">{player.totalEarned.toFixed(0)}</div>
                               <div className="text-gray-400 text-xs">USDFG</div>
                             </div>
                           </div>
@@ -1474,7 +1962,7 @@ const ArenaHome: React.FC = () => {
                         setShowAllPlayers(!showAllPlayers);
                         setLoadingTopPlayers(true);
                       }}
-                      className="w-full py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-cyan-400 text-sm font-semibold transition-colors"
+                      className="w-full py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-amber-400 text-sm font-semibold transition-colors"
                     >
                       {showAllPlayers ? '← Show Less' : `View All Players →`}
                     </button>
@@ -1500,6 +1988,7 @@ const ArenaHome: React.FC = () => {
             onCreateChallenge={handleCreateChallenge}
             usdfgPrice={usdfgPrice}
             usdfgToUsd={usdfgToUsd}
+            userGamerTag={userGamerTag}
           />
         </ElegantModal>
 
@@ -1507,109 +1996,12 @@ const ArenaHome: React.FC = () => {
 
         {/* Join Challenge Modal */}
         {showJoinModal && selectedChallenge && (
-          <ElegantModal
-            isOpen={showJoinModal}
-            onClose={() => {
-              setShowJoinModal(false);
-              setSelectedChallenge(null);
-            }}
-            title={`Join ${selectedChallenge.title || 'Challenge'}`}
-          >
-            <div className="text-center space-y-4">
-              <p className="text-gray-300">
-                Are you sure you want to join this challenge for{" "}
-                <span className="font-bold text-white">{selectedChallenge.entryFee} USDFG</span>?
-              </p>
-              <ElegantButton onClick={() => handleJoinChallenge(selectedChallenge.id)} variant="amber">
-                Confirm Join
-              </ElegantButton>
-            </div>
-          </ElegantModal>
-        )}
-
-        {/* Trophy Modal - Mystery Requirements & Hidden Descriptions */}
-        {showTrophyModal && selectedTrophy && (
-          <ElegantModal
-            isOpen={showTrophyModal}
-            onClose={() => {
-              setShowTrophyModal(false);
-              setSelectedTrophy(null);
-            }}
-            title={selectedTrophy.name}
-          >
-            <div className="text-center space-y-4">
-              {/* Trophy Image */}
-              <div className="flex justify-center mb-4">
-                <div className="relative">
-                  <img
-                    src={selectedTrophy.icon}
-                    alt={selectedTrophy.name}
-                    className={`w-32 h-32 object-contain transition-all duration-300 animate-bounce-slow ${
-                      selectedTrophy.isUnlocked 
-                        ? 'drop-shadow-[0_0_30px_rgba(255,215,130,0.8)]' 
-                        : 'opacity-40 grayscale'
-                    }`}
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
-                  {selectedTrophy.isUnlocked && (
-                    <div className="absolute inset-0 bg-gradient-to-r from-amber-400/20 via-yellow-400/20 to-amber-400/20 rounded-full animate-pulse"></div>
-                  )}
-                </div>
-              </div>
-
-              {/* Mystery Requirement - Hidden until unlocked */}
-              <div className="bg-[#07080C]/95 border border-amber-500/30 rounded-xl p-4">
-                <div className="text-sm text-amber-300 mb-2">Requirement:</div>
-                {selectedTrophy.isUnlocked ? (
-                  <div className="text-white font-semibold text-lg">
-                    {selectedTrophy.requiredGames} games played
-                  </div>
-                ) : (
-                  <div className="text-amber-400 font-bold text-xl">
-                    ??? games played
-                  </div>
-                )}
-              </div>
-
-              {/* Hidden Description - Mystery until unlocked */}
-              <div className="bg-[#07080C]/95 border border-amber-500/30 rounded-xl p-4">
-                <div className="text-sm text-amber-300 mb-2">Description:</div>
-                {selectedTrophy.isUnlocked ? (
-                  <div className="text-gray-300 text-sm italic">
-                    {trophySystem.find(t => t.id === selectedTrophy.id)?.description || '[Hidden Description - Unlock to reveal]'}
-                  </div>
-                ) : (
-                  <div className="text-amber-400/60 text-sm italic">
-                    [Hidden Description - Unlock to reveal]
-                    <div className="mt-2 text-xs text-amber-500/40">
-                      Keep playing to discover the secret!
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Progress Indicator */}
-              {!selectedTrophy.isUnlocked && (
-                <div className="text-xs text-gray-400">
-                  Your progress: {selectedTrophy.gamesPlayed} / {selectedTrophy.requiredGames} games
-                  <div className="mt-2 w-full bg-zinc-800 rounded-full h-2">
-                    <div 
-                      className="bg-gradient-to-r from-amber-400 to-yellow-400 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${Math.min((selectedTrophy.gamesPlayed / selectedTrophy.requiredGames) * 100, 100)}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )}
-
-              {selectedTrophy.isUnlocked && (
-                <div className="text-xs text-green-400 font-semibold">
-                  ✓ Trophy Unlocked!
-                </div>
-              )}
-            </div>
-          </ElegantModal>
+          <JoinChallengeModal 
+            challenge={selectedChallenge}
+            onClose={() => setShowJoinModal(false)}
+            isConnected={isConnected}
+            onConnect={() => connect()}
+          />
         )}
 
         {/* Submit Result Room */}
@@ -1638,16 +2030,138 @@ const ArenaHome: React.FC = () => {
           className={`fixed bottom-20 right-6 md:hidden ${
             hasActiveChallenge || isCreatingChallenge 
               ? 'bg-gray-600/50 cursor-not-allowed' 
-              : 'bg-gradient-to-r from-cyan-400 to-purple-500 hover:brightness-110'
-          } text-white p-4 rounded-full shadow-[0_0_20px_rgba(34,211,238,0.5)] transition-all z-40 flex items-center justify-center`}
+              : 'bg-gradient-to-r from-amber-400 to-orange-500 hover:brightness-110'
+          } text-white p-4 rounded-full shadow-[0_0_20px_rgba(255,215,130,0.5)] transition-all z-40 flex items-center justify-center`}
           title={hasActiveChallenge ? "You have an active challenge" : "Create Challenge"}
         >
           <span className="text-2xl font-bold">+</span>
         </button>
       </div>
-    </>
-  );
-};
+
+      {/* Player Profile Modal */}
+      {selectedPlayer && (
+        <PlayerProfileModal
+          isOpen={showPlayerProfile}
+          onClose={() => {
+            setShowPlayerProfile(false);
+            setSelectedPlayer(null);
+          }}
+          player={{
+            ...selectedPlayer,
+            country: userCountry,
+            profileImage: userProfileImage,
+            lastActive: selectedPlayer.lastActive
+          }}
+          isCurrentUser={publicKey && selectedPlayer.wallet === publicKey.toString()}
+          onEditProfile={(newName) => {
+            setUserGamerTag(newName);
+            localStorage.setItem('user_gamer_tag', newName);
+          }}
+          onCountryChange={(country) => {
+            setUserCountry(country);
+            if (country) {
+              localStorage.setItem('user_country', country);
+            } else {
+              localStorage.removeItem('user_country');
+            }
+          }}
+          onProfileImageChange={(image) => {
+            setUserProfileImage(image);
+            if (image) {
+              localStorage.setItem('user_profile_image', image);
+            } else {
+              localStorage.removeItem('user_profile_image');
+            }
+          }}
+          onChallengePlayer={handleChallengePlayer}
+          hasActiveChallenge={publicKey ? challenges.some(c => 
+            c.creator === publicKey.toString() && 
+            (c.status === 'active' || c.status === 'pending')
+          ) : false}
+        />
+      )}
+
+      {/* Profile Settings Modal */}
+      <ProfileSettingsModal
+        isOpen={showProfileSettings}
+        onClose={() => setShowProfileSettings(false)}
+        currentGamerTag={userGamerTag}
+        onSave={async (gamerTag) => {
+          setUserGamerTag(gamerTag);
+          // Store in localStorage for persistence
+          localStorage.setItem('user_gamer_tag', gamerTag);
+        }}
+      />
+
+      {/* Challenge Chat Modal - Temporarily disabled */}
+      {/* {showChatModal && selectedChatChallenge && (
+        <ChallengeChatModal
+          isOpen={showChatModal}
+          onClose={() => {
+            setShowChatModal(false);
+            setSelectedChatChallenge(null);
+          }}
+          challengeId={selectedChatChallenge.id}
+          challengeTitle={selectedChatChallenge.title}
+          currentWallet={publicKey?.toString() || ""}
+          allowSpectators={true}
+          isParticipant={(() => {
+            const currentWallet = publicKey?.toString()?.toLowerCase();
+            return currentWallet && selectedChatChallenge.rawData?.players?.some((p: string) => p.toLowerCase() === currentWallet);
+          })()}
+        />
+      )} */}
+
+      {/* Trust Review Modal - Temporarily disabled */}
+      {/* <TrustReviewModal
+            isOpen={showTrustReview}
+            opponentName={trustReviewOpponent}
+            completionRate={1} // Default to 1 (100% completion)
+            onClose={() => {
+              setShowTrustReview(false);
+              setTrustReviewOpponent('');
+            }}
+            onSubmit={handleTrustReviewSubmit}
+          /> */}
+
+          {/* Trophy Modal */}
+          {showTrophyModal && selectedTrophy && (
+            <ElegantModal
+              isOpen={showTrophyModal}
+              onClose={() => {
+                setShowTrophyModal(false);
+                setSelectedTrophy(null);
+              }}
+              title={selectedTrophy.name}
+            >
+              <div className="text-center space-y-6">
+                <div className="relative">
+                  <img
+                    src={selectedTrophy.icon}
+                    alt={selectedTrophy.name}
+                    className="w-32 h-32 mx-auto animate-bounce-slow drop-shadow-[0_0_20px_rgba(255,215,130,0.6)]"
+                  />
+                  <div className="absolute inset-0 w-32 h-32 mx-auto rounded-full bg-gradient-to-r from-amber-400/20 to-yellow-300/20 animate-pulse"></div>
+                </div>
+                <p className="text-amber-200 text-lg leading-relaxed">
+                  [Hidden Description - Unlock to reveal]
+                </p>
+                <div className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-400/30 rounded-xl p-6">
+                  <h3 className="text-amber-400 font-bold text-lg mb-3">Mystery Requirement</h3>
+                  <p className="text-amber-200 font-bold text-2xl">
+                    ??? games played
+                  </p>
+                  <p className="text-amber-300 text-sm mt-2 italic">
+                    Keep playing to discover the secret!
+                  </p>
+                </div>
+              </div>
+            </ElegantModal>
+          )}
+
+        </>
+      );
+    };
 
 // Field component for form inputs
 const Field = ({ label, children, helperText }: { label: string | React.ReactNode; children: React.ReactNode; helperText?: string }) => (
@@ -2499,10 +3013,10 @@ const JoinChallengeModal: React.FC<{
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative w-[90vw] max-w-md rounded-2xl border border-gray-800 bg-gray-900 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-white">Join Challenge</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
+      <div className="relative w-[90vw] max-w-md rounded-2xl border border-amber-400/30 bg-[#07080C]/95 p-6 shadow-[0_25px_50px_rgba(0,0,0,0.8)] shadow-amber-400/10">
+        <div className="flex items-center justify-between mb-6 border-b border-amber-400/30 pb-4">
+          <h3 className="text-xl font-bold bg-gradient-to-r from-amber-300 to-yellow-200 bg-clip-text text-transparent">Join Challenge</h3>
+          <button onClick={onClose} className="p-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors">
             ✕
           </button>
         </div>
@@ -2557,13 +3071,13 @@ const JoinChallengeModal: React.FC<{
             <div className="flex items-center justify-between pt-4">
               <button
                 onClick={onClose}
-                className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+                className="px-4 py-2 text-zinc-400 hover:text-amber-300 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleJoin}
-                className="bg-gradient-to-r from-purple-600 to-pink-500 text-white px-6 py-2 rounded-lg font-semibold hover:brightness-110 transition-all"
+                className="bg-gradient-to-r from-amber-500 to-orange-500 text-black px-6 py-2 rounded-lg font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(255,215,130,0.35)]"
               >
                 Join Challenge
               </button>
@@ -2573,7 +3087,7 @@ const JoinChallengeModal: React.FC<{
 
         {state === 'processing' && (
           <div className="text-center py-8">
-            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-gray-600 border-t-cyan-400 mb-4" />
+            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-gray-600 border-t-amber-400 mb-4" />
             <p className="text-gray-300">Processing your request...</p>
           </div>
         )}
@@ -2625,5 +3139,97 @@ const JoinChallengeModal: React.FC<{
   );
 };
 
+
+// Profile Settings Modal Component
+const ProfileSettingsModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  currentGamerTag: string;
+  onSave: (gamerTag: string) => void;
+}> = ({ isOpen, onClose, currentGamerTag, onSave }) => {
+  const [gamerTag, setGamerTag] = useState(currentGamerTag);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!gamerTag.trim()) {
+      alert('Please enter a gamer tag');
+      return;
+    }
+    
+    setSaving(true);
+    try {
+      await onSave(gamerTag.trim());
+      onClose();
+    } catch (error) {
+      console.error('Error saving gamer tag:', error);
+      alert('Error saving gamer tag. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="relative w-full max-w-md rounded-[28px] border border-zinc-800 bg-[#07080C]/95 p-6 shadow-[0_0_60px_rgba(255,215,130,0.08)]">
+        {/* Ambient Glow */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)]" />
+        <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
+        
+        <div className="relative z-10">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-2xl font-bold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.25)]">
+              Profile Settings
+            </h3>
+            <button 
+              onClick={onClose}
+              className="p-2 rounded-full bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors"
+            >
+              <span className="text-zinc-400 hover:text-white text-lg">✕</span>
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-white mb-2">
+                Gamer Tag
+              </label>
+              <input
+                type="text"
+                value={gamerTag}
+                onChange={(e) => setGamerTag(e.target.value)}
+                placeholder="Enter your gamer tag"
+                className="w-full p-3 bg-[#0B0C12]/90 border border-zinc-800 rounded-2xl text-white placeholder-zinc-400 hover:border-amber-300/50 focus:border-amber-300/70 focus:outline-none transition-all"
+                maxLength={20}
+              />
+              <p className="text-xs text-zinc-400 mt-1">
+                This will be shown when you create challenges (max 20 characters)
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <button
+                onClick={onClose}
+                className="flex-1 px-4 py-3 bg-zinc-800/50 hover:bg-zinc-700/50 text-white rounded-xl transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving || !gamerTag.trim()}
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-amber-300 to-yellow-200 hover:from-amber-200 hover:to-yellow-100 disabled:opacity-50 disabled:cursor-not-allowed text-zinc-900 font-semibold rounded-xl transition-all"
+              >
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+    </div>
+  );
+};
 
 export default ArenaHome;
