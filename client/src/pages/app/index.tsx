@@ -11,7 +11,8 @@ import { useResultDeadlines } from "@/hooks/useResultDeadlines";
 import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, PlayerStats } from "@/lib/firebase/firestore";
 import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
-import { ADMIN_WALLET } from '@/lib/chain/config';
+import { ADMIN_WALLET, USDFG_MINT } from '@/lib/chain/config';
+import { getAssociatedTokenAddress } from '@solana/spl-token';
 import { testFirestoreConnection } from "@/lib/firebase/firestore";
 import ElegantButton from "@/components/ui/ElegantButton";
 import ElegantModal from "@/components/ui/ElegantModal";
@@ -114,6 +115,7 @@ const ArenaHome: React.FC = () => {
   const [usdfgPrice, setUsdfgPrice] = useState<number>(0.15); // Mock price: $0.15 per USDFG
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [isLive, setIsLive] = useState<boolean>(true);
+  const [userUsdfgBalance, setUserUsdfgBalance] = useState<number | null>(null);
   const [lastLocalChallenge, setLastLocalChallenge] = useState<number>(0);
   const [isCreatingChallenge, setIsCreatingChallenge] = useState<boolean>(false);
   const [topPlayers, setTopPlayers] = useState<PlayerStats[]>([]);
@@ -189,6 +191,26 @@ const ArenaHome: React.FC = () => {
     const priceInterval = setInterval(fetchUsdfgPrice, 30000);
     return () => clearInterval(priceInterval);
   }, [fetchUsdfgPrice]);
+
+  // Fetch USDFG balance when wallet is connected
+  useEffect(() => {
+    if (isConnected && publicKey) {
+      getAssociatedTokenAddress(USDFG_MINT, publicKey)
+        .then(tokenAccount => {
+          return connection.getTokenAccountBalance(tokenAccount);
+        })
+        .then(tokenBalance => {
+          const usdfg = tokenBalance.value.uiAmount || 0;
+          setUserUsdfgBalance(usdfg);
+        })
+        .catch(err => {
+          console.error("❌ USDFG balance fetch failed:", err);
+          setUserUsdfgBalance(0); // Default to 0 if no token account exists yet
+        });
+    } else {
+      setUserUsdfgBalance(null);
+    }
+  }, [isConnected, publicKey, connection]);
 
   // Fetch top players for sidebar
   useEffect(() => {
@@ -862,8 +884,31 @@ const ArenaHome: React.FC = () => {
             
           </div>
 
-          {/* Mobile Only - Wallet Button */}
-          <div className="flex md:hidden items-center">
+          {/* Mobile Only - Wallet and Profile Buttons */}
+          <div className="flex md:hidden items-center gap-2">
+            {publicKey && isConnected && (
+              <button
+                onClick={() => {
+                  // Create a mock player object for the current user
+                  const currentUserPlayer = {
+                    wallet: publicKey.toString(),
+                    displayName: userGamerTag || 'Player',
+                    name: userGamerTag || 'Player',
+                    wins: 0, // You can get these from Firestore later
+                    losses: 0,
+                    winRate: 0,
+                    rank: 1
+                  };
+                  setSelectedPlayer(currentUserPlayer);
+                  setShowPlayerProfile(true);
+                }}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-800/50 hover:bg-zinc-700/50 rounded-xl border border-zinc-700 hover:border-amber-300/50 transition-all text-white text-sm font-semibold"
+                title="Profile"
+              >
+                <span className="text-amber-300 text-base">👤</span>
+                <span className="hidden sm:inline text-white">Profile</span>
+              </button>
+            )}
             <WalletConnectSimple 
               isConnected={isConnected}
               onConnect={() => {
@@ -904,6 +949,15 @@ const ArenaHome: React.FC = () => {
               <span className="text-amber-400 font-semibold">{usdfgPrice.toFixed(4)} USDFG</span>
               <span className="text-xs text-amber-300 ml-2">Live</span>
             </div>
+            
+            {/* Mobile USDFG Balance Display - Show when connected */}
+            {isConnected && userUsdfgBalance !== null && (
+              <div className="md:hidden inline-flex items-center bg-[#07080C]/95 border border-amber-500/30 rounded-full px-3 py-1.5 mb-2 backdrop-blur-sm shadow-[0_0_20px_rgba(255,215,130,0.15)] hover:shadow-[0_0_30px_rgba(255,215,130,0.25)] transition-all">
+                <div className="w-2 h-2 bg-amber-400 rounded-full mr-2"></div>
+                <span className="text-sm text-amber-300 mr-2">Your Balance:</span>
+                <span className="text-amber-400 font-bold text-base">{userUsdfgBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDFG</span>
+              </div>
+            )}
             
             <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white drop-shadow-[0_0_20px_rgba(255,215,130,0.3)]">
               Welcome to the <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-200">Arena</span>
@@ -1606,7 +1660,7 @@ const ArenaHome: React.FC = () => {
                               setSelectedChatChallenge(challenge);
                               setShowChatModal(true);
                             }}
-                            className="w-full mt-2 px-4 py-2 bg-amber-600/20 text-amber-300 border border-amber-500/30 font-semibold rounded-lg hover:bg-amber-600/30 transition-all flex items-center justify-center space-x-2"
+                            className="w-full mt-2 px-4 py-2.5 bg-gradient-to-r from-amber-600/40 to-amber-700/40 text-amber-200 border-2 border-amber-400/60 font-semibold rounded-lg hover:bg-gradient-to-r hover:from-amber-600/60 hover:to-amber-700/60 hover:border-amber-400 hover:text-amber-100 transition-all flex items-center justify-center space-x-2 shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40"
                           >
                             <span>💬</span>
                             <span>Join Chat</span>
@@ -1738,7 +1792,7 @@ const ArenaHome: React.FC = () => {
                       return filteredPlayers.map((player) => (
                       <div
                         key={player.rank}
-                        className={`flex items-center justify-between px-6 py-4 hover:bg-[#0B0C12]/60 transition cursor-pointer relative group ${
+                        className={`flex flex-col sm:flex-row items-stretch sm:items-center justify-between px-4 sm:px-6 py-3 sm:py-4 hover:bg-[#0B0C12]/60 transition cursor-pointer relative group ${
                           player.rank <= 3 ? "bg-gradient-to-r from-amber-300/10 to-transparent" : ""
                         }`}
                         onClick={(e) => {
@@ -1764,9 +1818,10 @@ const ArenaHome: React.FC = () => {
                         }}
                         style={{ zIndex: 10, position: 'relative' }}
                       >
-                        <div className="flex items-center gap-4 pointer-events-none">
+                        {/* Top Row: Rank, Name, and Basic Info */}
+                        <div className="flex items-center gap-3 sm:gap-4 pointer-events-none flex-1 min-w-0">
                           <div
-                            className={`h-10 w-10 flex items-center justify-center rounded-full text-sm font-bold border ${
+                            className={`h-12 w-12 sm:h-10 sm:w-10 flex items-center justify-center rounded-full text-base sm:text-sm font-bold border shrink-0 ${
                               player.rank === 1
                                 ? "border-amber-300 text-amber-300"
                                 : player.rank === 2
@@ -1778,14 +1833,14 @@ const ArenaHome: React.FC = () => {
                           >
                             {player.rank}
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2 text-lg font-semibold text-white">
-                              {player.name} <span>{player.country}</span>
-                              {player.rank === 1 && <span className="text-amber-300">👑</span>}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 text-base sm:text-lg font-semibold text-white">
+                              <span className="truncate">{player.name}</span> <span className="shrink-0">{player.country}</span>
+                              {player.rank === 1 && <span className="text-amber-300 shrink-0">👑</span>}
                             </div>
-                            <div className="text-xs text-zinc-400">Integrity {player.integrity}/10 • Streak {player.streak}</div>
+                            <div className="text-xs sm:text-xs text-zinc-400 mt-0.5">Integrity {player.integrity}/10 • Streak {player.streak}</div>
                             <div className="flex items-center gap-2 mt-1">
-                              <div className="text-xs text-zinc-500 font-mono">{player.wallet}</div>
+                              <div className="text-xs text-zinc-500 font-mono truncate">{player.wallet}</div>
                               <button
                                 onClick={(e) => {
                                   e.preventDefault();
@@ -1796,28 +1851,30 @@ const ArenaHome: React.FC = () => {
                                   const button = e.target as HTMLElement;
                                   const originalText = button.textContent;
                                   button.textContent = '✓';
-                                  button.className = 'text-xs text-green-400 transition-colors';
+                                  button.className = 'text-xs text-green-400 transition-colors shrink-0';
                                   setTimeout(() => {
                                     button.textContent = originalText;
-                                    button.className = 'text-xs text-zinc-400 hover:text-zinc-300 transition-colors cursor-pointer';
+                                    button.className = 'text-xs text-zinc-400 hover:text-zinc-300 transition-colors cursor-pointer pointer-events-auto shrink-0';
                                   }, 1000);
                                 }}
                                 onMouseDown={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
                                 }}
-                                className="text-xs text-zinc-400 hover:text-zinc-300 transition-colors cursor-pointer pointer-events-auto"
+                                className="text-xs text-zinc-400 hover:text-zinc-300 transition-colors cursor-pointer pointer-events-auto shrink-0"
                                 title="Copy wallet address"
                                 style={{ zIndex: 20 }}
                               >
                                 📋
                               </button>
                             </div>
-                            </div>
                           </div>
+                        </div>
 
-                          {/* Trophy Display - Middle Section */}
-                          <div className="flex items-center justify-center gap-1 pointer-events-auto">
+                        {/* Mobile: Trophies and Stats in a Row Below */}
+                        <div className="flex items-center justify-between gap-3 sm:hidden mt-2 pt-2 border-t border-zinc-800/50">
+                          {/* Trophy Display - Mobile */}
+                          <div className="flex items-center justify-start gap-2 pointer-events-auto">
                             {(() => {
                               const gamesPlayed = player.wins + Math.floor(player.wins * 0.3);
                               const allTrophies = [
@@ -1837,7 +1894,7 @@ const ArenaHome: React.FC = () => {
                                     key={trophy.id}
                                     src={trophy.icon}
                                     alt={trophy.id}
-                                    className={`w-6 h-6 transition-all duration-300 cursor-pointer relative z-10 ${
+                                    className={`w-8 h-8 sm:w-6 sm:h-6 transition-all duration-300 cursor-pointer relative z-10 ${
                                       isUnlocked 
                                         ? 'opacity-100 drop-shadow-[0_0_8px_rgba(255,215,130,0.6)] hover:drop-shadow-[0_0_12px_rgba(255,215,130,0.8)] hover:scale-110' 
                                         : 'opacity-40 grayscale'
@@ -1867,15 +1924,90 @@ const ArenaHome: React.FC = () => {
                             })()}
                           </div>
 
-                          <div className="flex items-center gap-6 pointer-events-none">
-                          <div className="flex items-center gap-1 text-green-400 text-sm">
-                            W {player.wins}
+                          {/* Stats - Mobile: Horizontal Layout */}
+                          <div className="flex items-center gap-3 pointer-events-none">
+                            <div className="flex flex-col items-center gap-0">
+                              <div className="text-xs text-zinc-500">W</div>
+                              <div className="text-sm font-bold text-green-400">{player.wins}</div>
+                            </div>
+                            <div className="flex flex-col items-center gap-0">
+                              <div className="text-xs text-zinc-500">L</div>
+                              <div className="text-sm font-bold text-red-400">{Math.floor(player.wins * 0.3)}</div>
+                            </div>
+                            <div className="flex flex-col items-center gap-0">
+                              <div className="text-xs text-zinc-500">🛡️</div>
+                              <div className="text-sm font-bold text-amber-200">{player.trust}</div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1 text-red-400 text-sm">
-                            L {Math.floor(player.wins * 0.3)}
+                        </div>
+
+                        {/* Desktop: Trophy Display and Stats Side by Side */}
+                        <div className="hidden sm:flex items-center gap-4 pointer-events-none">
+                          {/* Trophy Display - Desktop */}
+                          <div className="flex items-center justify-center gap-1.5 pointer-events-auto">
+                            {(() => {
+                              const gamesPlayed = player.wins + Math.floor(player.wins * 0.3);
+                              const allTrophies = [
+                                { id: 'initiate', icon: '/assets/trophies/usdfg-initiate.png', requiredGames: 2 },
+                                { id: 'contender', icon: '/assets/trophies/usdfg-contender.png', requiredGames: 10 },
+                                { id: 'veteran', icon: '/assets/trophies/usdfg-veteran.png', requiredGames: 15 },
+                                { id: 'enforcer', icon: '/assets/trophies/usdfg-enforcer.png', requiredGames: 30 },
+                                { id: 'unbroken', icon: '/assets/trophies/usdfg-unbroken.png', requiredGames: 60 },
+                                { id: 'disciple', icon: '/assets/trophies/usdfg-disciple.png', requiredGames: 90 },
+                                { id: 'immortal', icon: '/assets/trophies/usdfg-immortal.png', requiredGames: 120 }
+                              ];
+                              
+                              return allTrophies.slice(0, 3).map((trophy, index) => {
+                                const isUnlocked = gamesPlayed >= trophy.requiredGames;
+                                return (
+                                  <img
+                                    key={trophy.id}
+                                    src={trophy.icon}
+                                    alt={trophy.id}
+                                    className={`w-8 h-8 transition-all duration-300 cursor-pointer relative z-10 ${
+                                      isUnlocked 
+                                        ? 'opacity-100 drop-shadow-[0_0_8px_rgba(255,215,130,0.6)] hover:drop-shadow-[0_0_12px_rgba(255,215,130,0.8)] hover:scale-110' 
+                                        : 'opacity-40 grayscale'
+                                    }`}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      e.nativeEvent.stopImmediatePropagation();
+                                      setSelectedTrophy({
+                                        id: trophy.id,
+                                        name: `USDFG ${trophy.id.toUpperCase()}`,
+                                        icon: trophy.icon,
+                                        requiredGames: trophy.requiredGames
+                                      });
+                                      setShowTrophyModal(true);
+                                    }}
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                    }}
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                    }}
+                                  />
+                                );
+                              });
+                            })()}
                           </div>
-                          <div className="flex items-center gap-1 text-amber-200 text-sm">
-                            🛡️ {player.trust}
+
+                          {/* Stats - Desktop: Horizontal Layout */}
+                          <div className="flex items-center gap-4 pointer-events-none">
+                            <div className="flex items-center gap-1 text-green-400 text-sm font-semibold">
+                              <span className="text-xs text-zinc-500">W</span>
+                              <span>{player.wins}</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-red-400 text-sm font-semibold">
+                              <span className="text-xs text-zinc-500">L</span>
+                              <span>{Math.floor(player.wins * 0.3)}</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-amber-200 text-sm font-semibold">
+                              <span>🛡️</span>
+                              <span>{player.trust}</span>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -2020,7 +2152,7 @@ const ArenaHome: React.FC = () => {
           onSubmit={handleSubmitResult}
         />
 
-        {/* Mobile FAB - Create Challenge */}
+        {/* Mobile FAB - Create Challenge - Smaller and positioned to not block content */}
         <button
           onClick={() => {
             if (hasActiveChallenge) {
@@ -2030,14 +2162,14 @@ const ArenaHome: React.FC = () => {
             setShowCreateModal(true);
           }}
           disabled={hasActiveChallenge || isCreatingChallenge}
-          className={`fixed bottom-20 right-6 md:hidden ${
+          className={`fixed bottom-20 right-4 md:hidden ${
             hasActiveChallenge || isCreatingChallenge 
               ? 'bg-gray-600/50 cursor-not-allowed' 
               : 'bg-gradient-to-r from-amber-400 to-orange-500 hover:brightness-110'
-          } text-white p-4 rounded-full shadow-[0_0_20px_rgba(255,215,130,0.5)] transition-all z-40 flex items-center justify-center`}
+          } text-white p-3 rounded-full shadow-[0_0_20px_rgba(255,215,130,0.5)] transition-all z-30 flex items-center justify-center w-12 h-12`}
           title={hasActiveChallenge ? "You have an active challenge" : "Create Challenge"}
         >
-          <span className="text-2xl font-bold">+</span>
+          <span className="text-xl font-bold">+</span>
         </button>
       </div>
 

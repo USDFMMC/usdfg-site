@@ -81,14 +81,21 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     // Compact mode for mobile
     if (compact) {
       return (
-        <button
-          onClick={() => disconnect()}
-          className="px-2 py-1.5 bg-green-500/20 text-green-400 border border-green-500/30 rounded-md text-xs font-medium hover:bg-green-500/30 transition-colors flex items-center gap-1"
-        >
-          <span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
-          <span className="hidden sm:inline">{publicKey.toString().slice(0, 4)}...</span>
-          <span className="sm:hidden">Connected</span>
-        </button>
+        <div className="flex flex-col items-end gap-1">
+          {usdfgBalance !== null && (
+            <div className="text-xs text-amber-300 font-semibold">
+              {usdfgBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDFG
+            </div>
+          )}
+          <button
+            onClick={() => disconnect()}
+            className="px-2 py-1.5 bg-green-500/20 text-green-400 border border-green-500/30 rounded-md text-xs font-medium hover:bg-green-500/30 transition-colors flex items-center gap-1"
+          >
+            <span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
+            <span className="hidden sm:inline">{publicKey.toString().slice(0, 4)}...</span>
+            <span className="sm:hidden">Connected</span>
+          </button>
+        </div>
       );
     }
     
