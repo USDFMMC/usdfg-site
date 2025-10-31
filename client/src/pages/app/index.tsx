@@ -70,14 +70,14 @@ const ArenaHome: React.FC = () => {
     if (['NBA 2K25', 'FIFA 24', 'Madden NFL 24'].includes(normalizedGame)) return 'Sports';
     if (['Street Fighter 6', 'Tekken 8'].includes(normalizedGame)) return 'Fighting';
     if (['Call of Duty', 'Valorant'].includes(normalizedGame)) return 'Shooting';
-    if (['Forza Horizon'].includes(normalizedGame)) return 'Racing';
+    if (['Forza Horizon', 'Gran Turismo 7', 'Forza Motorsport'].includes(normalizedGame)) return 'Racing';
     
     // Fallback: try case-insensitive matching
     const lowerGame = normalizedGame.toLowerCase();
     if (lowerGame.includes('nba') || lowerGame.includes('fifa') || lowerGame.includes('madden') || lowerGame.includes('sports')) return 'Sports';
     if (lowerGame.includes('street fighter') || lowerGame.includes('tekken') || lowerGame.includes('fighting')) return 'Fighting';
     if (lowerGame.includes('call of duty') || lowerGame.includes('cod') || lowerGame.includes('valorant') || lowerGame.includes('shooting')) return 'Shooting';
-    if (lowerGame.includes('forza') || lowerGame.includes('racing')) return 'Racing';
+    if (lowerGame.includes('forza') || lowerGame.includes('gran turismo') || lowerGame.includes('f1') || lowerGame.includes('mario kart') || lowerGame.includes('racing')) return 'Racing';
     
     return 'Sports'; // Default fallback to Sports
   };
@@ -613,8 +613,9 @@ const ArenaHome: React.FC = () => {
       setPendingMatchResult(matchResult);
       console.log("💾 Stored pending match result:", matchResult);
       
-      // Get opponent name for trust review
-      const opponentWallet = selectedChallenge.players?.find((p: string) => p !== publicKey.toBase58());
+      // Get opponent name for trust review - check rawData.players array first
+      const playersArray = selectedChallenge.rawData?.players || (Array.isArray(selectedChallenge.players) ? selectedChallenge.players : []);
+      const opponentWallet = playersArray.find((p: string) => p?.toLowerCase() !== publicKey.toBase58().toLowerCase());
       const opponentName = opponentWallet ? `${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}` : 'Opponent';
       
       // Show Trust Review Modal
@@ -635,6 +636,7 @@ const ArenaHome: React.FC = () => {
     sportsmanship: number;
     tags: string[];
     trustScore10: number;
+    comment?: string;
   }) => {
     console.log("🏆 Trust review submitted:", payload);
     console.log("🔍 Debug state:", {
@@ -667,11 +669,14 @@ const ArenaHome: React.FC = () => {
       // Submit the match result to Firestore
       await submitChallengeResult(challengeId, publicKey.toBase58(), pendingMatchResult.didWin);
       
-      // Store trust review data
+      // Store trust review data - get opponent from players array
+      const playersArray = selectedChallenge?.rawData?.players || (Array.isArray(selectedChallenge?.players) ? selectedChallenge.players : []);
+      const opponentWallet = playersArray.find((p: string) => p?.toLowerCase() !== publicKey.toBase58().toLowerCase());
+      
       const trustData = {
         challengeId: challengeId,
         reviewer: publicKey.toBase58(),
-        opponent: selectedChallenge?.players?.find((p: string) => p !== publicKey.toBase58()) || 'Unknown',
+        opponent: opponentWallet || 'Unknown',
         review: payload,
         timestamp: new Date().toISOString()
       };
@@ -950,15 +955,6 @@ const ArenaHome: React.FC = () => {
               <span className="text-xs text-amber-300 ml-2">Live</span>
             </div>
             
-            {/* Mobile USDFG Balance Display - Show when connected */}
-            {isConnected && userUsdfgBalance !== null && (
-              <div className="md:hidden inline-flex items-center bg-[#07080C]/95 border border-amber-500/30 rounded-full px-3 py-1.5 mb-2 backdrop-blur-sm shadow-[0_0_20px_rgba(255,215,130,0.15)] hover:shadow-[0_0_30px_rgba(255,215,130,0.25)] transition-all">
-                <div className="w-2 h-2 bg-amber-400 rounded-full mr-2"></div>
-                <span className="text-sm text-amber-300 mr-2">Your Balance:</span>
-                <span className="text-amber-400 font-bold text-base">{userUsdfgBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDFG</span>
-              </div>
-            )}
-            
             <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white drop-shadow-[0_0_20px_rgba(255,215,130,0.3)]">
               Welcome to the <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-200">Arena</span>
             </h1>
@@ -1130,7 +1126,7 @@ const ArenaHome: React.FC = () => {
                     return (
                       <div 
                         key={challenge.id} 
-                        className={`relative bg-[#07080C]/95 border border-amber-500/30 rounded-2xl p-6 cursor-pointer hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden ${challenge.status === "expired" ? "challenge-expired" : ""}`}
+                        className={`relative bg-[#07080C]/95 border border-amber-500/30 rounded-xl p-4 cursor-pointer hover:border-amber-400/50 shadow-[0_0_20px_rgba(255,215,130,0.05)] hover:shadow-[0_0_30px_rgba(255,215,130,0.08)] transition-all overflow-hidden ${challenge.status === "expired" ? "challenge-expired" : ""}`}
                         onClick={() => {
                           // Don't open join modal for completed challenges
                           if (challenge.status === "completed" || challenge.rawData?.payoutTriggered) {
@@ -1156,7 +1152,7 @@ const ArenaHome: React.FC = () => {
                               <img
                                 src={imagePath}
                                 alt={gameName}
-                                className="absolute inset-0 w-full h-full object-cover opacity-40"
+                                className="absolute inset-0 w-full h-full object-cover object-center opacity-60"
                                 loading="lazy"
                                 decoding="async"
                                 onError={(e) => {
@@ -1167,7 +1163,7 @@ const ArenaHome: React.FC = () => {
                               />
                             );
                           })()}
-                          <div className="absolute inset-0 bg-gradient-to-br from-[#07080C]/80 via-[#07080C]/70 to-[#07080C]/80 rounded-2xl" />
+                          <div className="absolute inset-0 bg-gradient-to-br from-[#07080C]/60 via-[#07080C]/50 to-[#07080C]/60 rounded-2xl" />
                         </div>
                         
                         {/* Ambient Glow */}
@@ -1351,19 +1347,23 @@ const ArenaHome: React.FC = () => {
 
                         {/* Winner Display for Completed/Disputed Challenges */}
                         {(challenge.status === "completed" || challenge.status === "disputed") && challenge.rawData?.winner && (
-                          <div className="mb-4 p-4 rounded-lg border-2 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-yellow-500/30">
+                          <div className="mb-3 p-3 rounded-lg border border-amber-400/30 bg-gradient-to-r from-amber-500/10 to-orange-500/10 backdrop-blur-sm">
                             <div className="text-center">
                               {challenge.rawData.winner === "tie" ? (
                                 <>
-                                  <div className="text-3xl mb-2">🤝</div>
-                                  <div className="text-xl font-bold text-yellow-400">TIE - Entry Fees Returned</div>
-                                  <p className="text-sm text-gray-400 mt-1">Entry fees will be returned to both players</p>
+                                  <div className="text-2xl mb-1.5">🤝</div>
+                                  <div className="text-base font-semibold text-amber-300">TIE - Entry Fees Returned</div>
+                                  <p className="text-xs text-gray-400 mt-1">Entry fees will be returned to both players</p>
                                 </>
                               ) : (
                                 <>
-                                  <div className="text-3xl mb-2">🏆</div>
-                                  <div className="text-xl font-bold text-yellow-400">Winner</div>
-                                  <p className="text-xs text-gray-400 mt-1 font-mono break-all">{challenge.rawData.winner}</p>
+                                  <div className="flex items-center justify-center gap-2 mb-2">
+                                    <span className="text-xl">🏆</span>
+                                    <div className="text-base font-semibold text-amber-300">Winner</div>
+                                  </div>
+                                  <div className="bg-black/40 rounded-md px-3 py-1.5 border border-amber-400/20">
+                                    <p className="text-xs font-medium text-amber-200 font-mono break-all">{challenge.rawData.winner}</p>
+                                  </div>
                                   {challenge.rawData.winner?.toString()?.toLowerCase() === publicKey?.toString().toLowerCase() && (
                                     <>
                                       <p className="text-green-400 font-semibold mt-2">🎉 You Won!</p>
@@ -1375,7 +1375,7 @@ const ArenaHome: React.FC = () => {
                                             handleClaimPrize(challenge);
                                           }}
                                           disabled={claimingPrize === challenge.id}
-                                          className={`mt-3 w-full px-6 py-3 text-white font-semibold rounded-lg transition-all shadow-lg ${
+                                          className={`mt-2 w-full px-4 py-2 text-white font-semibold rounded-lg transition-all shadow-[0_0_15px_rgba(255,215,130,0.15)] ${
                                             claimingPrize === challenge.id 
                                               ? 'bg-gray-500 cursor-not-allowed' 
                                               : 'bg-gradient-to-r from-green-600 to-emerald-500 hover:brightness-110 animate-pulse'
@@ -1398,9 +1398,9 @@ const ArenaHome: React.FC = () => {
                         )}
 
                         {challenge.status === "disputed" && (
-                          <div className="mb-4 p-4 rounded-lg border-2 bg-gradient-to-r from-red-500/10 to-pink-500/10 border-red-500/30">
+                          <div className="mb-3 p-3 rounded-lg border bg-gradient-to-r from-red-500/10 to-pink-500/10 border-red-500/20">
                             <div className="text-center">
-                              <div className="text-3xl mb-2">⚠️</div>
+                              <div className="text-xl mb-1.5">⚠️</div>
                               <div className="text-xl font-bold text-red-400">Dispute</div>
                               <p className="text-sm text-gray-400 mt-1">Both players claimed they won. Admin review required.</p>
                             </div>
@@ -1474,7 +1474,7 @@ const ArenaHome: React.FC = () => {
                                     e.stopPropagation();
                                     connect();
                                   }}
-                                  className="w-full px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-500 text-white font-bold rounded-lg hover:brightness-110 transition-all shadow-lg shadow-amber-500/20"
+                                  className="w-full px-4 py-2 bg-zinc-800/90 hover:bg-zinc-700/90 text-amber-300 border border-amber-400/30 hover:border-amber-400/50 font-semibold rounded-lg transition-all backdrop-blur-sm"
                                 >
                                   🔌 Connect to Submit Result
                                 </button>
@@ -1562,7 +1562,7 @@ const ArenaHome: React.FC = () => {
                                     alert('Failed to verify challenge status. Please try again.');
                                   }
                                 }}
-                                className="w-full px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-500 text-white font-bold rounded-lg hover:brightness-110 transition-all disabled:opacity-50 shadow-lg shadow-amber-500/20"
+                                className="w-full px-4 py-2 bg-zinc-800/90 hover:bg-zinc-700/90 text-amber-300 border border-amber-400/30 hover:border-amber-400/50 font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
                                 disabled={!isConnected}
                               >
                                 {!isConnected ? "Connect to Join" : "Join Challenge"}
@@ -1660,7 +1660,7 @@ const ArenaHome: React.FC = () => {
                               setSelectedChatChallenge(challenge);
                               setShowChatModal(true);
                             }}
-                            className="w-full mt-2 px-4 py-2.5 bg-gradient-to-r from-amber-600/40 to-amber-700/40 text-amber-200 border-2 border-amber-400/60 font-semibold rounded-lg hover:bg-gradient-to-r hover:from-amber-600/60 hover:to-amber-700/60 hover:border-amber-400 hover:text-amber-100 transition-all flex items-center justify-center space-x-2 shadow-lg shadow-amber-500/20 hover:shadow-amber-500/40"
+                            className="w-full mt-2 px-4 py-2 bg-gradient-to-r from-amber-600/40 to-amber-700/40 text-amber-200 border border-amber-400/40 font-semibold rounded-lg hover:bg-gradient-to-r hover:from-amber-600/60 hover:to-amber-700/60 hover:border-amber-400/60 hover:text-amber-100 transition-all flex items-center justify-center space-x-2 shadow-[0_0_15px_rgba(255,215,130,0.15)] hover:shadow-[0_0_20px_rgba(255,215,130,0.25)]"
                           >
                             <span>💬</span>
                             <span>Join Chat</span>
@@ -1868,8 +1868,8 @@ const ArenaHome: React.FC = () => {
                                 📋
                               </button>
                             </div>
+                            </div>
                           </div>
-                        </div>
 
                         {/* Mobile: Trophies and Stats in a Row Below */}
                         <div className="flex items-center justify-between gap-3 sm:hidden mt-2 pt-2 border-t border-zinc-800/50">
@@ -1929,11 +1929,11 @@ const ArenaHome: React.FC = () => {
                             <div className="flex flex-col items-center gap-0">
                               <div className="text-xs text-zinc-500">W</div>
                               <div className="text-sm font-bold text-green-400">{player.wins}</div>
-                            </div>
+                          </div>
                             <div className="flex flex-col items-center gap-0">
                               <div className="text-xs text-zinc-500">L</div>
                               <div className="text-sm font-bold text-red-400">{Math.floor(player.wins * 0.3)}</div>
-                            </div>
+                          </div>
                             <div className="flex flex-col items-center gap-0">
                               <div className="text-xs text-zinc-500">🛡️</div>
                               <div className="text-sm font-bold text-amber-200">{player.trust}</div>
@@ -2139,18 +2139,21 @@ const ArenaHome: React.FC = () => {
           />
         )}
 
-        {/* Submit Result Room */}
+        {/* Submit Result Room - Only render when we have a valid challenge */}
+        {selectedChallenge?.id && (
         <SubmitResultRoom
           isOpen={showSubmitResultModal}
           onClose={() => {
             setShowSubmitResultModal(false);
-            setSelectedChallenge(null);
+              // Delay clearing selectedChallenge to allow components to cleanup
+              setTimeout(() => setSelectedChallenge(null), 100);
           }}
-          challengeId={selectedChallenge?.id || ""}
-          challengeTitle={selectedChallenge?.title || ""}
+            challengeId={selectedChallenge.id}
+            challengeTitle={selectedChallenge.title || ""}
           currentWallet={publicKey?.toString() || ""}
           onSubmit={handleSubmitResult}
         />
+        )}
 
         {/* Mobile FAB - Create Challenge - Smaller and positioned to not block content */}
         <button
@@ -2228,16 +2231,17 @@ const ArenaHome: React.FC = () => {
         }}
       />
 
-      {/* Challenge Chat Modal */}
-      {showChatModal && selectedChatChallenge && (
+      {/* Challenge Chat Modal - Only render when we have a valid challenge */}
+      {showChatModal && selectedChatChallenge?.id && (
         <ChallengeChatModal
           isOpen={showChatModal}
           onClose={() => {
             setShowChatModal(false);
-            setSelectedChatChallenge(null);
+            // Delay clearing selectedChatChallenge to allow components to cleanup
+            setTimeout(() => setSelectedChatChallenge(null), 100);
           }}
           challengeId={selectedChatChallenge.id}
-          challengeTitle={selectedChatChallenge.title}
+          challengeTitle={selectedChatChallenge.title || ""}
           currentWallet={publicKey?.toString() || ""}
           allowSpectators={true}
           isParticipant={(() => {
@@ -2281,7 +2285,7 @@ const ArenaHome: React.FC = () => {
             <p className="text-amber-200 text-lg leading-relaxed">
               [Hidden Description - Unlock to reveal]
             </p>
-            <div className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-400/30 rounded-xl p-6">
+            <div className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-400/30 rounded-lg p-4">
               <h3 className="text-amber-400 font-bold text-lg mb-3">Mystery Requirement</h3>
               <p className="text-amber-200 font-bold text-2xl">
                 ??? games played
@@ -2706,7 +2710,7 @@ const CreateChallengeModal: React.FC<{
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative w-[92vw] max-w-xl max-h-[90vh] rounded-2xl border border-amber-400/20 bg-gradient-to-br from-gray-900/95 via-gray-900/95 to-black/95 backdrop-blur-md p-5 overflow-y-auto shadow-[0_25px_50px_rgba(0,0,0,0.8)] shadow-amber-400/10">
+      <div className="relative w-[92vw] max-w-xl max-h-[90vh] rounded-xl border border-amber-400/20 bg-gradient-to-br from-gray-900/95 via-gray-900/95 to-black/95 backdrop-blur-md p-4 overflow-y-auto shadow-[0_0_40px_rgba(0,0,0,0.6)] shadow-amber-400/8">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-lg font-semibold text-white">Create Challenge</h3>
@@ -3001,7 +3005,7 @@ Prize pool: {(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5
             {/* Step 3: Review & Confirm */}
             {currentStep === 3 && (
               <div className="space-y-4">
-                <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-6">
+                <div className="rounded-lg border border-amber-400/20 bg-amber-400/5 p-4">
                   <h3 className="text-lg font-bold text-white mb-4 flex items-center">
                     <span className="mr-2">📋</span>Challenge Summary
                   </h3>
@@ -3148,7 +3152,7 @@ const JoinChallengeModal: React.FC<{
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative w-[90vw] max-w-md rounded-2xl border border-amber-400/30 bg-[#07080C]/95 p-6 shadow-[0_0_60px_rgba(255,215,130,0.08)]">
+      <div className="relative w-[90vw] max-w-md rounded-xl border border-amber-400/30 bg-[#07080C]/95 p-4 shadow-[0_0_40px_rgba(255,215,130,0.06)]">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-bold text-white">Join Challenge</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-white">
@@ -3307,7 +3311,7 @@ const ProfileSettingsModal: React.FC<{
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="relative w-full max-w-md rounded-[28px] border border-zinc-800 bg-[#07080C]/95 p-6 shadow-[0_0_60px_rgba(255,215,130,0.08)]">
+      <div className="relative w-full max-w-md rounded-xl border border-zinc-800 bg-[#07080C]/95 p-4 shadow-[0_0_40px_rgba(255,215,130,0.06)]">
         {/* Ambient Glow */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)]" />
         <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />

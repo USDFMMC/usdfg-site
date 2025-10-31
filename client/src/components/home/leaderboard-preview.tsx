@@ -145,19 +145,19 @@ const LeaderboardPreview: React.FC = () => {
 
         <div className="max-w-5xl mx-auto relative">
           {/* Glass reflection overlay */}
-          <div className="pointer-events-none absolute inset-0 z-10 rounded-2xl overflow-hidden">
+          <div className="pointer-events-none absolute inset-0 z-10 rounded-lg overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1/3 bg-gradient-to-b from-white/30 to-transparent opacity-30 animate-glass-reflection" />
           </div>
           {/* Leaderboard Tabs */}
-          <div className="flex flex-wrap justify-center mb-6 border-b border-cyan-800/60">
+          <div className="flex flex-wrap justify-center mb-6 border-b border-amber-800/60">
             {tabs.map((tab) => (
               <Button
                 key={tab.id}
                 variant={activeTab === tab.id ? "default" : "ghost"}
                 className={`rounded-none rounded-t-md font-bold tracking-wide px-6 py-2 text-lg ${
                   activeTab === tab.id 
-                    ? "bg-gradient-to-r from-cyan-400 to-purple-500 text-black shadow-[0_0_16px_#22d3ee99]" 
-                    : "text-cyan-300 hover:text-white"
+                    ? "bg-gradient-to-r from-amber-400 to-orange-500 text-black shadow-[0_0_15px_rgba(255,215,130,0.3)]" 
+                    : "text-amber-300 hover:text-white"
                 }`}
                 onClick={() => setActiveTab(tab.id)}
               >
@@ -167,7 +167,7 @@ const LeaderboardPreview: React.FC = () => {
           </div>
 
           {/* Leaderboard Table */}
-          <div className="overflow-x-auto rounded-2xl bg-gradient-to-br from-white/10 to-[#00ffff22] border-2 border-cyan-400/40 shadow-2xl backdrop-blur-md p-2 relative neon-outline">
+          <div className="overflow-x-auto rounded-lg bg-gradient-to-br from-white/10 to-amber-900/20 border border-amber-400/30 shadow-[0_0_40px_rgba(0,0,0,0.5)] backdrop-blur-md p-2 relative neon-outline">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -233,12 +233,12 @@ const LeaderboardPreview: React.FC = () => {
                       <TableCell className="text-center">{player.losses}</TableCell>
                       <TableCell className="text-center">{player.winRate}</TableCell>
                       <TableCell className="text-center">{player.winStreak}</TableCell>
-                      <TableCell className="text-center font-bold text-cyan-300">{formatUSDFG(player.gains)}</TableCell>
+                      <TableCell className="text-center font-bold text-amber-300">{formatUSDFG(player.gains)}</TableCell>
                       <TableCell className="text-center">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full font-semibold text-white shadow-md border-2 ${
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-semibold text-white shadow-[0_0_8px_rgba(255,215,130,0.15)] border ${
                                 player.rankTitle === "Gold"
                                   ? "bg-gradient-to-r from-yellow-400 to-yellow-600 border-yellow-400"
                                   : player.rankTitle === "Silver"

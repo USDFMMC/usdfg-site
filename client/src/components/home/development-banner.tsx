@@ -20,12 +20,12 @@ const AboutSection: React.FC = () => {
       </picture>
       
       <div className="relative z-10 w-full max-w-4xl mx-auto px-4">
-        <div className="relative w-full max-w-4xl mx-auto px-8 py-12 rounded-2xl bg-gradient-to-br from-white/10 to-[#00ffff22] border border-cyan-400/30 shadow-xl backdrop-blur-md flex flex-col items-center group transition-all duration-500 hover:shadow-[0_0_30px_rgba(0,255,255,0.2)]">
+        <div className="relative w-full max-w-4xl mx-auto px-6 py-8 rounded-lg bg-gradient-to-br from-white/10 to-amber-900/20 border border-amber-400/30 shadow-[0_0_30px_rgba(255,215,130,0.15)] backdrop-blur-md flex flex-col items-center group transition-all duration-500 hover:shadow-[0_0_40px_rgba(255,215,130,0.2)]">
           {/* Radial glow effect */}
-          <div className="absolute inset-0 rounded-2xl bg-gradient-radial from-cyan-400/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+          <div className="absolute inset-0 rounded-lg bg-gradient-radial from-amber-400/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
           
           <div className="relative z-10 w-full flex flex-col items-center text-center space-y-8">
-            <h2 className="text-4xl font-bold text-center mb-6">What is <span className="text-cyan-400">USDFG?</span></h2>
+            <h2 className="text-3xl font-bold text-center mb-4">What is <span className="text-amber-400">USDFG?</span></h2>
             <div className="max-w-2xl mx-auto text-center">
               <p className="text-lg text-center mb-4 font-bold">
                 USDFG is the access token for a decentralized competition platform—built for those who outperform, not those who get lucky.
@@ -34,14 +34,14 @@ const AboutSection: React.FC = () => {
                 <strong>No gambling. No randomness. Only verified performance.</strong>
               </p>
               <p className="text-base text-center mb-4">
-                Every challenge is <span className="text-cyan-400 font-medium">merit-based</span>, and every reward is <span className="text-cyan-400 font-medium">earned</span>.<br/>
+                Every challenge is <span className="text-amber-400 font-medium">merit-based</span>, and every reward is <span className="text-amber-400 font-medium">earned</span>.<br/>
                 USDFG exists to reward skill—not speculation.
               </p>
               <p className="text-base text-center mb-4">
                 This isn't a passive asset. It's a <strong>competitive layer for digital performance</strong>, tied to strategy, execution, and outcome.
               </p>
               <p className="text-base text-center mb-4">
-                <strong>Fixed supply.</strong> No inflation. No hidden mechanics. Just a clean contract and a clear goal: <span className="text-cyan-400 font-medium">reward performance</span>.
+                <strong>Fixed supply.</strong> No inflation. No hidden mechanics. Just a clean contract and a clear goal: <span className="text-amber-400 font-medium">reward performance</span>.
               </p>
               <p className="text-base text-center mt-6 font-bold">
                 USDFG is for players who win on skill—nothing else.<br/>
@@ -66,7 +66,7 @@ const AboutSection: React.FC = () => {
           }
         }
         .drop-shadow-glow {
-          filter: drop-shadow(0 0 8px #00ffff);
+          filter: drop-shadow(0 0 6px rgba(255,215,130,0.6));
         }
         .neon-pulse {
           box-shadow: 0 0 16px #00ffff, 0 0 32px #00ffff44;

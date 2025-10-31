@@ -37,15 +37,15 @@ const ElegantModal: React.FC<ElegantModalProps> = ({
       {/* Modal */}
       <div
         className={`
-          relative w-[90vw] max-w-2xl max-h-[90vh] overflow-hidden rounded-2xl border border-amber-400/20
+          relative w-[90vw] max-w-2xl max-h-[90vh] overflow-hidden rounded-xl border border-amber-400/20
           bg-gradient-to-br from-gray-900/95 via-gray-900/95 to-black/95 backdrop-blur-md
-          shadow-[0_25px_50px_rgba(0,0,0,0.8)] shadow-amber-400/10
+          shadow-[0_0_40px_rgba(0,0,0,0.6)] shadow-amber-400/8
           ${className}
         `}
       >
         {/* Header */}
         {title && (
-          <div className="p-6 border-b border-amber-400/20">
+          <div className="p-4 border-b border-amber-400/20">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">
                 {title}
@@ -61,7 +61,7 @@ const ElegantModal: React.FC<ElegantModalProps> = ({
         )}
         
         {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+        <div className="p-4 overflow-y-auto max-h-[calc(90vh-100px)]">
           {children}
         </div>
       </div>

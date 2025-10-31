@@ -28,6 +28,13 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet }) 
 
   // Listen for real-time messages
   useEffect(() => {
+    // Skip if challengeId is invalid
+    if (!challengeId || challengeId.trim() === '') {
+      console.log("📨 ChatBox skipped - invalid challengeId:", challengeId);
+      setMessages([]);
+      return;
+    }
+
     const messagesRef = collection(db, "challenge_chats");
     // Query without orderBy to avoid index requirement - we'll sort client-side
     const q = query(

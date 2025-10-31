@@ -20,12 +20,16 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 3;
+  const unsubscribeSignalRef = useRef<(() => void) | null>(null);
 
   console.log("🎤 VoiceChat component mounted", { challengeId, currentWallet });
 
-  // Initialize voice chat
+  // Initialize voice chat - only if challengeId is valid
   useEffect(() => {
-    if (voiceDisabled) return;
+    if (voiceDisabled || !challengeId || challengeId.trim() === '') {
+      console.log("🎤 VoiceChat skipped - voice disabled or invalid challengeId:", challengeId);
+      return;
+    }
     
     console.log("🎤 VoiceChat useEffect triggered - initializing...");
     initVoiceChat();
@@ -36,7 +40,59 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
     };
   }, [challengeId, currentWallet, voiceDisabled]);
 
+  // Preserve audio connection when page visibility changes (backgrounding on mobile)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        console.log("📱 Page hidden - preserving audio connection");
+        // Don't cleanup when page is hidden - keep connection alive
+        // The audio tracks will continue playing in background
+      } else {
+        console.log("📱 Page visible - resuming audio if needed");
+        // Resume audio playback if it was paused
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.play().catch(err => {
+            console.log("Audio resume failed (may need user interaction):", err);
+          });
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Also handle page blur/focus events for additional reliability
+    const handleBlur = () => {
+      console.log("📱 Page blurred - keeping audio active");
+    };
+    
+    const handleFocus = () => {
+      console.log("📱 Page focused - ensuring audio is active");
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.play().catch(err => {
+          console.log("Audio resume on focus failed:", err);
+        });
+      }
+    };
+
+    window.addEventListener('blur', handleBlur);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleBlur);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
+
   const initVoiceChat = async () => {
+    // Validate challengeId before proceeding
+    if (!challengeId || challengeId.trim() === '') {
+      console.error("❌ Invalid challengeId for voice chat:", challengeId);
+      setStatus("Error: Invalid challenge ID");
+      setConnected(false);
+      return;
+    }
+
     console.log("🎤 Starting voice chat initialization...");
     try {
       // Get user's microphone
@@ -139,7 +195,16 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
 
       // Listen for remote signals from the shared document
       const signalRef = doc(db, "voice_signals", challengeId);
+      
+      // Store unsubscribe function for cleanup
       const unsubscribe = onSnapshot(signalRef, async (snapshot) => {
+        // Check if challengeId is still valid (in case it changed)
+        const currentChallengeId = challengeId; // Capture in closure
+        if (!currentChallengeId || currentChallengeId.trim() === '') {
+          console.log("⚠️ challengeId became invalid during snapshot, ignoring");
+          return;
+        }
+        
         const data = snapshot.data();
         if (!data) return;
 
@@ -183,7 +248,19 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
         } catch (error) {
           console.error("❌ Error handling WebRTC signal:", error);
         }
+      }, (error) => {
+        // Handle snapshot errors (e.g., permission denied, invalid path)
+        if (error.code === 'invalid-argument' || error.message.includes('segments')) {
+          console.error("❌ Invalid Firestore path - challengeId may be empty:", error);
+          setStatus("Error: Invalid challenge ID");
+          setConnected(false);
+        } else {
+          console.error("❌ Firestore snapshot error:", error);
+        }
       });
+      
+      // Store unsubscribe function for cleanup
+      unsubscribeSignalRef.current = unsubscribe;
 
       // Small delay to let listener attach
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -243,6 +320,27 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
   const cleanup = async () => {
     console.log("🧹 Cleaning up voice chat...");
     
+    // Unsubscribe from Firestore signals listener first
+    if (unsubscribeSignalRef.current) {
+      unsubscribeSignalRef.current();
+      unsubscribeSignalRef.current = null;
+      console.log("✅ Unsubscribed from Firestore signals");
+    }
+    
+    // Clean up Firestore signals document only if we have a valid challengeId
+    if (challengeId && challengeId.trim() !== '') {
+      try {
+        const { deleteDoc, doc } = await import("firebase/firestore");
+        await deleteDoc(doc(db, "voice_signals", challengeId));
+        console.log("✅ Cleaned up Firestore signals document");
+      } catch (error: any) {
+        // Ignore errors if document doesn't exist or is already deleted
+        if (error.code !== 'not-found' && !error.message?.includes('not found')) {
+          console.log("⚠️ Could not delete Firestore signals document (may already be cleaned up):", error);
+        }
+      }
+    }
+    
     // Stop all local tracks
     if (localStream.current) {
       localStream.current.getTracks().forEach((track) => {
@@ -258,17 +356,11 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
       peerConnection.current = null;
     }
     
-    // Clean up Firestore signals
-    try {
-      await deleteDoc(doc(db, "voice_signals", challengeId));
-      console.log("✅ Cleaned up Firestore signals");
-    } catch (error) {
-      console.error("Failed to clean up voice signals:", error);
-    }
-    
+    // Reset connection states
     setConnected(false);
     setPeerConnected(false);
     setMuted(false);
+    setStatus("");
   };
 
   // If voice is disabled, show minimal UI
@@ -346,7 +438,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
           onClick={toggleMute}
           disabled={!connected}
           className={`px-3 py-2 rounded-lg text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 ${
-            muted ? 'bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/20' : 'bg-green-600 hover:bg-green-700 shadow-lg shadow-green-500/20'
+            muted ? 'bg-red-600 hover:bg-red-700 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 'bg-green-600 hover:bg-green-700 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
           }`}
         >
           {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}

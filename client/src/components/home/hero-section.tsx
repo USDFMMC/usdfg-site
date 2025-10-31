@@ -56,7 +56,7 @@ USDFG
             <div className="flex flex-col sm:flex-row justify-center lg:justify-start gap-2">
               <a href="#platform">
                 <Button
-                  className="w-full sm:w-auto px-4 py-3 transition-all btn-animation"
+                  className="w-full sm:w-auto px-4 py-2 transition-all btn-animation"
                   style={{
                     background: "var(--primary-color)",
                     color: "var(--text-light)",
@@ -69,7 +69,7 @@ USDFG
 
               <Link to="/whitepaper">
                 <Button
-                  className="w-full sm:w-auto px-4 py-3 transition-all btn-animation border-2 border-cyan-400 text-white font-bold bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 hover:brightness-125 hover:scale-105"
+                  className="w-full sm:w-auto px-4 py-2 transition-all btn-animation border border-amber-400/50 text-white font-bold bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 hover:brightness-125 hover:scale-105"
                   style={{ boxShadow: "0 0 16px #00e8fc99, 0 0 4px #fff1", fontWeight: 700 }}
                 >
                   WHITEPAPER

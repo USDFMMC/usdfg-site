@@ -168,7 +168,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           {isMobile && !isPhantomInjected ? (
             <button
               onClick={handleMobileConnect}
-              className="w-full px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold rounded-lg hover:brightness-110 transition-all flex items-center justify-center space-x-2 border border-amber-400/50 shadow-lg shadow-amber-500/20"
+              className="w-full px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold rounded-lg hover:brightness-110 transition-all flex items-center justify-center space-x-2 border border-amber-400/50 shadow-[0_0_15px_rgba(255,215,130,0.2)]"
               style={{ 
                 minHeight: '40px',
                 fontSize: '14px'

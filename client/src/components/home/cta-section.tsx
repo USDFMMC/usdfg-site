@@ -49,7 +49,7 @@ const CTASection: React.FC = () => {
             Ready to <span className="text-purple-400">Game</span>, <span className="text-blue-400">Earn</span>, and <span className="text-purple-400">Conquer</span>?
           </p>
           <Link to="/app" className="flex justify-center">
-            <button className="mt-4 px-6 py-2 text-sm font-semibold bg-gradient-to-r from-cyan-400 to-purple-500 text-black rounded-full shadow-lg transition-all duration-200 hover:scale-105 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-cyan-400/60">
+            <button className="mt-4 px-5 py-2 text-sm font-semibold bg-gradient-to-r from-amber-400 to-orange-500 text-black rounded-full shadow-[0_0_15px_rgba(255,215,130,0.2)] transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_rgba(255,215,130,0.3)] focus:outline-none focus:ring-2 focus:ring-amber-400/50">
               Enter the Arena →
             </button>
           </Link>

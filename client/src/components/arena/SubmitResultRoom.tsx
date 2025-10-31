@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, memo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Trophy, Loader2, Camera, Upload, Image as ImageIcon } from "lucide-react";
+import { X, Trophy, Loader2, Camera, Upload, Image as ImageIcon, Minimize2, Maximize2 } from "lucide-react";
 import { ChatBox } from "./ChatBox";
 import { VoiceChat } from "./VoiceChat";
 
@@ -27,6 +27,7 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = memo(({
   const [isLoading, setIsLoading] = useState(false);
   const [proofImage, setProofImage] = useState<string | null>(null);
   const [proofFile, setProofFile] = useState<File | null>(null);
+  const [isMinimized, setIsMinimized] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImageCapture = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,46 +82,75 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = memo(({
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50"
-            onClick={onClose}
-          />
+          {/* Minimized floating button */}
+          {isMinimized ? (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="fixed bottom-20 left-4 z-40 md:bottom-24 md:left-6"
+            >
+              <button
+                onClick={() => setIsMinimized(false)}
+                className="px-4 py-2 bg-gradient-to-r from-yellow-600 to-orange-500 text-white rounded-lg shadow-[0_0_15px_rgba(255,215,130,0.2)] hover:brightness-110 transition-all flex items-center gap-2"
+              >
+                <Maximize2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Submit Result</span>
+              </button>
+            </motion.div>
+          ) : (
+            <>
+              {/* Light backdrop - non-blocking */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40"
+                onClick={() => setIsMinimized(true)}
+              />
 
-          {/* Main Panel - Slides up from bottom */}
-          <motion.div
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "tween", duration: 0.3, ease: "easeOut" }}
-            className="fixed bottom-0 left-0 right-0 z-50 flex justify-center"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-full max-w-2xl bg-gradient-to-br from-gray-900 via-amber-900/20 to-gray-900 border-t-2 border-x-2 border-amber-500/30 rounded-t-3xl shadow-2xl max-h-[90vh] overflow-y-auto">
-              <div className="p-6 space-y-4">
-                {/* Header */}
-                <div className="flex justify-between items-start sticky top-0 bg-gray-900/95 backdrop-blur-sm -mx-6 px-6 py-4 border-b border-gray-800 z-10">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg">
-                      <Trophy className="w-6 h-6 text-white" />
+              {/* Main Panel - Slides up from bottom, non-blocking */}
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "tween", duration: 0.3, ease: "easeOut" }}
+                className="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="w-full max-w-2xl bg-gradient-to-br from-gray-900 via-amber-900/20 to-gray-900 border-t border-x border-amber-500/30 rounded-t-xl shadow-[0_0_40px_rgba(0,0,0,0.5)] max-h-[90vh] overflow-y-auto pointer-events-auto">
+                  <div className="p-4 space-y-3">
+                    {/* Header */}
+                    <div className="flex justify-between items-start sticky top-0 bg-gray-900/95 backdrop-blur-sm -mx-6 px-6 py-4 border-b border-gray-800 z-10">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg">
+                          <Trophy className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <h2 className="text-2xl font-bold text-white">Submit Result</h2>
+                          <p className="text-sm text-gray-400 mt-0.5">{challengeTitle}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setIsMinimized(true)}
+                          disabled={isLoading || isSubmitting}
+                          className="text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+                          title="Minimize"
+                        >
+                          <Minimize2 className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={onClose}
+                          disabled={isLoading || isSubmitting}
+                          className="text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+                          title="Close"
+                        >
+                          <X className="w-6 h-6" />
+                        </button>
+                      </div>
                     </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-white">Submit Result</h2>
-                      <p className="text-sm text-gray-400 mt-0.5">{challengeTitle}</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={onClose}
-                    disabled={isLoading || isSubmitting}
-                    className="text-gray-400 hover:text-white transition-colors disabled:opacity-50"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
 
                 {/* Result Selection */}
                 <div>
@@ -137,11 +167,11 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = memo(({
                       onClick={() => setSelectedResult(true)}
                       disabled={isLoading || isSubmitting}
                       className={`
-                        relative overflow-hidden p-6 rounded-xl border-2 transition-all duration-200
+                        relative overflow-hidden p-4 rounded-lg border transition-all duration-200
                         disabled:opacity-50 disabled:cursor-not-allowed
                         ${
                           selectedResult === true
-                            ? "border-green-500 bg-gradient-to-br from-green-500/20 to-emerald-500/20 shadow-lg shadow-green-500/20"
+                            ? "border-green-500 bg-gradient-to-br from-green-500/20 to-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
                             : "border-gray-600 bg-gray-800/50 hover:border-green-500/50 hover:bg-green-500/10"
                         }
                       `}
@@ -165,11 +195,11 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = memo(({
                       onClick={() => setSelectedResult(false)}
                       disabled={isLoading || isSubmitting}
                       className={`
-                        relative overflow-hidden p-6 rounded-xl border-2 transition-all duration-200
+                        relative overflow-hidden p-4 rounded-lg border transition-all duration-200
                         disabled:opacity-50 disabled:cursor-not-allowed
                         ${
                           selectedResult === false
-                            ? "border-red-500 bg-gradient-to-br from-red-500/20 to-rose-500/20 shadow-lg shadow-red-500/20"
+                            ? "border-red-500 bg-gradient-to-br from-red-500/20 to-rose-500/20 shadow-[0_0_15px_rgba(239,68,68,0.2)]"
                             : "border-gray-600 bg-gray-800/50 hover:border-red-500/50 hover:bg-red-500/10"
                         }
                       `}
@@ -269,11 +299,15 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = memo(({
                   </motion.div>
                 )}
 
-                {/* Voice Chat - Only render when modal is open */}
-                {isOpen && <VoiceChat challengeId={challengeId} currentWallet={currentWallet} />}
+                {/* Voice Chat - Only render when modal is open and challengeId is valid */}
+                {challengeId && challengeId.trim() !== '' && (
+                  <VoiceChat challengeId={challengeId} currentWallet={currentWallet} />
+                )}
 
-                {/* Text Chat - Only render when modal is open */}
-                {isOpen && <ChatBox challengeId={challengeId} currentWallet={currentWallet} />}
+                {/* Text Chat - Only render when modal is open and challengeId is valid */}
+                {challengeId && challengeId.trim() !== '' && (
+                  <ChatBox challengeId={challengeId} currentWallet={currentWallet} />
+                )}
 
                 {/* Info Box */}
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
@@ -293,7 +327,7 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = memo(({
                       disabled:opacity-50 disabled:cursor-not-allowed
                       ${
                         selectedResult !== null
-                          ? "bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white shadow-lg shadow-amber-500/20"
+                          ? "bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white shadow-[0_0_15px_rgba(255,215,130,0.2)]"
                           : "bg-gray-700 text-gray-400 cursor-not-allowed"
                       }
                     `}
@@ -313,9 +347,11 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = memo(({
                 <p className="text-xs text-gray-500 text-center">
                   ⚠️ Results are final and cannot be changed after submission
                 </p>
-              </div>
-            </div>
-          </motion.div>
+                  </div>
+                </div>
+              </motion.div>
+            </>
+          )}
         </>
       )}
     </AnimatePresence>

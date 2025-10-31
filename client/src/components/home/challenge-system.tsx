@@ -154,8 +154,8 @@ const ChallengeSystem: React.FC = () => {
         </section>
 
         {/* Rules / Explainer */}
-        <Card className="relative bg-gradient-to-br from-[#0a0f1aee] to-[#0a1f2aee] border-2 border-cyan-400/40 max-w-4xl mx-auto shadow-2xl backdrop-blur-md transition-all duration-300 hover:scale-[1.01] hover:shadow-[0_0_32px_#00f0ff99]">
-          <CardContent className="relative z-10 p-8 md:p-10">
+        <Card className="relative bg-gradient-to-br from-[#0a0f1aee] to-[#0a1f2aee] border border-amber-400/30 max-w-4xl mx-auto shadow-[0_0_40px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all duration-300 hover:scale-[1.01] hover:shadow-[0_0_50px_rgba(255,215,130,0.15)]">
+          <CardContent className="relative z-10 p-4 md:p-6">
             <div className="mb-10">
               <motion.h3
                 initial={{ opacity: 0, y: 20 }}
@@ -235,9 +235,9 @@ const ChallengeSystem: React.FC = () => {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="mb-8"
             >
-              <div className="bg-gradient-to-br from-cyan-900/40 to-purple-900/30 border border-cyan-400/40 rounded-xl p-4 text-base text-center shadow-lg backdrop-blur-md flex items-center justify-center gap-3">
+              <div className="bg-gradient-to-br from-amber-900/30 to-orange-900/20 border border-amber-400/30 rounded-lg p-3 text-sm text-center shadow-[0_0_15px_rgba(255,215,130,0.15)] backdrop-blur-md flex items-center justify-center gap-3">
                 <FaExclamationTriangle className="text-yellow-300 w-5 h-5" />
-                <span className="font-semibold text-cyan-100">
+                <span className="font-semibold text-amber-100">
                   Make sure your challenge description clearly defines all win conditions and game settings.
                 </span>
               </div>
@@ -251,8 +251,8 @@ const ChallengeSystem: React.FC = () => {
               transition={{ duration: 0.5, delay: 0.3 }}
               className="flex justify-center mt-4"
             >
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-cyan-700 to-purple-700 border-2 border-cyan-400/40 shadow-md text-cyan-100 text-sm font-bold">
-                <FaUserShield className="text-cyan-300 w-5 h-5 mr-1" />
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-700/80 to-orange-700/80 border border-amber-400/30 shadow-[0_0_12px_rgba(255,215,130,0.15)] text-amber-100 text-xs font-semibold">
+                <FaUserShield className="text-amber-300 w-5 h-5 mr-1" />
                 Fair Play Guaranteed
               </div>
             </motion.div>

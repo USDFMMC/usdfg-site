@@ -138,7 +138,7 @@ const ChromaModal: React.FC<ChromaModalProps> = ({
         
         {/* Header */}
         {title && (
-          <div className="relative z-10 p-6 border-b border-amber-400/20">
+          <div className="relative z-10 p-4 border-b border-amber-400/20">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">
                 {title}

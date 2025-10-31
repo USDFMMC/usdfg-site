@@ -85,16 +85,16 @@ const GameCategories: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.5 }}
-          className="relative max-w-2xl mx-auto mb-6 px-3 py-3 rounded-2xl bg-gradient-to-br from-white/10 to-[#00ffff22] border border-cyan-400/40 shadow-xl backdrop-blur-md text-center"
+          className="relative max-w-2xl mx-auto mb-6 px-3 py-2 rounded-lg bg-gradient-to-br from-white/10 to-amber-900/20 border border-amber-400/30 shadow-[0_0_20px_rgba(255,215,130,0.15)] backdrop-blur-md text-center"
         >
           <p className="text-lg md:text-xl font-extrabold text-white mb-2 drop-shadow-glow">
             The Arena Is Open. Any Game. No Excuses.
           </p>
-          <p className="text-sm md:text-base text-cyan-100 leading-relaxed font-medium">
+          <p className="text-sm md:text-base text-amber-100 leading-relaxed font-medium">
             Dominate in the games you know. Rise through the ones they don't expect.<br />
             USDFG supports verified competitive play across all major genres — sports, fighting, racing, and more.<br />
             If it can be played with skill, it can be challenged.<br />
-            <span className="text-cyan-300 font-semibold">Custom rules. Public results. Smart contract enforcement.</span><br />
+            <span className="text-amber-300 font-semibold">Custom rules. Public results. Smart contract enforcement.</span><br />
             <span className="text-white font-bold">No odds. No bets. Just performance.</span>
           </p>
         </motion.div>
@@ -112,19 +112,19 @@ const GameCategories: React.FC = () => {
               variants={cardVariants}
               className="group relative h-full flex flex-col"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-500 animate-pulse" />
-              <div className="relative bg-[#0d0d0d]/80 backdrop-blur-sm border border-cyan-500/30 rounded-xl p-4 shadow-[0_0_16px_rgba(72,216,255,0.2)] hover:shadow-[0_0_32px_rgba(72,216,255,0.4)] transition-all duration-500 hover:scale-[1.02] hover:border-cyan-500/50 h-full flex flex-col">
+              <div className="absolute inset-0 bg-gradient-to-r from-amber-500/20 to-orange-500/20 rounded-lg blur-xl group-hover:blur-2xl transition-all duration-500 animate-pulse" />
+              <div className="relative bg-[#0d0d0d]/80 backdrop-blur-sm border border-amber-400/30 rounded-lg p-3 shadow-[0_0_12px_rgba(255,215,130,0.15)] hover:shadow-[0_0_20px_rgba(255,215,130,0.25)] transition-all duration-500 hover:scale-[1.02] hover:border-amber-400/50 h-full flex flex-col">
                 <div className="relative">
                   <img
                     src={game.image.replace('.png', '.webp')}
                     alt={game.alt}
-                    className="w-full h-32 object-cover rounded-lg mb-2 shadow-lg"
+                    className="w-full h-32 object-cover rounded-lg mb-2 shadow-[0_0_12px_rgba(255,215,130,0.1)]"
                     loading="lazy" decoding="async"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-lg" />
                 </div>
                 <div className="flex-1 flex flex-col">
-                  <h3 className="text-lg font-bold mb-1 flex items-center gap-2 group-hover:text-cyan-400 transition-colors duration-300">
+                  <h3 className="text-base font-semibold mb-1 flex items-center gap-2 group-hover:text-amber-400 transition-colors duration-300">
                     <span className="animate-bounce">{game.title.split(' ')[0]}</span>
                     <span>{game.title.split(' ').slice(1).join(' ')}</span>
                   </h3>

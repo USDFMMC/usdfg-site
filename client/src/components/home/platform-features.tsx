@@ -42,20 +42,20 @@ const PlatformFeatures: React.FC = () => {
         {features.map((feature, idx) => (
           <div
             key={feature.title}
-            className="feature-card group bg-[#111]/90 border border-[#22d3ee] rounded-lg shadow-lg backdrop-blur-md p-4 transition-all duration-300 hover:scale-102 hover:shadow-[0_0_24px_#22d3ee66] hover:border-cyan-300/70 relative overflow-hidden animate-fade-in-up"
+            className="feature-card group bg-[#111]/90 border border-amber-400/30 rounded-lg shadow-[0_0_15px_rgba(255,215,130,0.15)] backdrop-blur-md p-3 transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_20px_rgba(255,215,130,0.25)] hover:border-amber-400/50 relative overflow-hidden animate-fade-in-up"
             tabIndex={0}
-            style={{ boxShadow: '0 0 16px #22d3ee22, 0 0 4px #a78bfa22' }}
+            style={{ boxShadow: '0 0 12px rgba(255,215,130,0.12), 0 0 3px rgba(255,215,130,0.06)' }}
           >
             <span className="block text-2xl mb-2 drop-shadow-glow animate-bounce-slow">{feature.icon}</span>
-            <h3 className="text-lg font-extrabold tracking-wide text-cyan-300 mb-1 drop-shadow-glow">{feature.title}</h3>
-            <p className="text-cyan-100 text-base leading-relaxed font-medium">{feature.description}</p>
+            <h3 className="text-base font-semibold tracking-wide text-amber-300 mb-1 drop-shadow-glow">{feature.title}</h3>
+            <p className="text-amber-100 text-sm leading-relaxed font-medium">{feature.description}</p>
           </div>
         ))}
       </div>
       {/* Custom Animations & Neon Glow */}
       <style>{`
         .drop-shadow-glow {
-          filter: drop-shadow(0 0 4px #00ffff66);
+          filter: drop-shadow(0 0 3px rgba(255,215,130,0.5));
         }
         .neon-glow {
           box-shadow: 0 0 16px #00ffff44, 0 0 32px #00ffff22;
