@@ -27,36 +27,36 @@ const HeroSection: React.FC = () => {
   };
 
   return (
-    <section className="hero relative py-20 lg:py-32 overflow-hidden">
+    <section className="hero relative py-12 lg:py-20 overflow-hidden">
       {/* Removed particles-container - using StarBackground */}
-      <div className="container mx-auto px-4 relative z-10">
+        <div className="container mx-auto px-2 relative z-10">
         <div className="flex flex-col lg:flex-row items-center">
           {/* Left copy */}
-          <div className="lg:w-1/2 mb-12 lg:mb-0 text-center lg:text-left">
+          <div className="lg:w-1/2 mb-6 lg:mb-0 text-center lg:text-left">
             <div
-              className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4"
+              className="text-2xl md:text-3xl lg:text-4xl font-bold mb-2"
               style={{ color: "var(--secondary-color)", textShadow: "var(--neon-glow)" }}
             >
 USDFG
             </div>
 
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
+            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-4">
               <span className="text-white">GAME. EARN. </span>
               <span className="conquer-glow" style={{ color: "var(--accent-color)" }}>
                 CONQUER.
               </span>
             </h1>
 
-            <p className="text-lg md:text-xl mb-8 max-w-xl" style={{ color: "var(--text-light)" }}>
+            <p className="text-sm md:text-base mb-4 max-w-xl" style={{ color: "var(--text-light)" }}>
               USDFG wasn't built for everyone.<br />
               It was built for the ones who don't blink.<br />
               Compete. Earn. Walk away with the token — if you can.
             </p>
 
-            <div className="flex flex-col sm:flex-row justify-center lg:justify-start gap-4">
+            <div className="flex flex-col sm:flex-row justify-center lg:justify-start gap-2">
               <a href="#platform">
                 <Button
-                  className="w-full sm:w-auto px-6 py-5 transition-all btn-animation"
+                  className="w-full sm:w-auto px-4 py-3 transition-all btn-animation"
                   style={{
                     background: "var(--primary-color)",
                     color: "var(--text-light)",
@@ -69,7 +69,7 @@ USDFG
 
               <Link to="/whitepaper">
                 <Button
-                  className="w-full sm:w-auto px-6 py-5 transition-all btn-animation border-2 border-cyan-400 text-white font-bold bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 hover:brightness-125 hover:scale-105"
+                  className="w-full sm:w-auto px-4 py-3 transition-all btn-animation border-2 border-cyan-400 text-white font-bold bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 hover:brightness-125 hover:scale-105"
                   style={{ boxShadow: "0 0 16px #00e8fc99, 0 0 4px #fff1", fontWeight: 700 }}
                 >
                   WHITEPAPER
@@ -80,7 +80,7 @@ USDFG
 
           {/* Right mascot */}
           <div className="lg:w-1/2 flex justify-center lg:justify-end">
-            <div ref={mascotRef} className="relative w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96">
+            <div ref={mascotRef} className="relative w-48 h-48 md:w-64 md:h-64 lg:w-80 lg:h-80">
               <picture>
                 <source srcSet={MASCOT_WEBP} type="image/webp" />
                 <img
@@ -90,7 +90,7 @@ USDFG
                   loading="eager"
                   decoding="async"
                   onError={handleImgError}
-                  className="w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 max-w-full object-contain"
+                  className="w-48 h-48 md:w-64 md:h-64 lg:w-80 lg:h-80 max-w-full object-contain"
                 />
               </picture>
             </div>

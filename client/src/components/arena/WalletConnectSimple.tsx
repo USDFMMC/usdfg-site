@@ -56,8 +56,8 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           setBalance(null);
         });
       
-      // Fetch USDFG balance
-      getAssociatedTokenAddress(USDFG_MINT, publicKey)
+
+        getAssociatedTokenAddress(USDFG_MINT, publicKey)
         .then(tokenAccount => {
           return connection.getTokenAccountBalance(tokenAccount);
         })
@@ -142,14 +142,14 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         isMobile && !isPhantomInjected ? (
           <button
             onClick={handleMobileConnect}
-            className="px-2.5 py-1.5 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-md text-xs font-medium hover:bg-cyan-500/30 transition-colors"
+            className="px-2.5 py-1.5 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-md text-xs font-medium hover:bg-amber-600/30 transition-colors"
           >
             Connect Wallet
           </button>
         ) : (
           <div className="wallet-adapter-button-trigger-wrapper">
             <WalletMultiButton 
-              className="!px-2.5 !py-1.5 !bg-cyan-500/20 !text-cyan-400 !border !border-cyan-500/30 !rounded-md !text-xs !font-medium hover:!bg-cyan-500/30 !transition-colors !min-w-0"
+              className="!px-2.5 !py-1.5 !bg-amber-600/20 !text-amber-300 !border !border-amber-500/30 !rounded-md !text-xs !font-medium hover:!bg-amber-600/30 !transition-colors !min-w-0"
             >
               Connect Wallet
             </WalletMultiButton>
@@ -161,23 +161,23 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           {isMobile && !isPhantomInjected ? (
             <button
               onClick={handleMobileConnect}
-              className="w-full px-4 py-3 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-bold rounded-lg hover:brightness-110 transition-all flex items-center justify-center space-x-2 border-2 border-purple-400 shadow-lg"
+              className="w-full px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold rounded-lg hover:brightness-110 transition-all flex items-center justify-center space-x-2 border border-amber-400/50 shadow-lg shadow-amber-500/20"
               style={{ 
-                minHeight: '48px',
-                fontSize: '16px'
+                minHeight: '40px',
+                fontSize: '14px'
               }}
             >
-              <span style={{ fontSize: '20px' }}>👻</span>
+              <span style={{ fontSize: '18px' }}>👻</span>
               <span>Connect Wallet</span>
             </button>
           ) : (
             <>
-              <WalletMultiButton className="px-4 py-2 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50">
+              <WalletMultiButton className="px-3 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50 border border-amber-400/50 shadow-lg shadow-amber-500/20 text-sm">
                 Connect Wallet
               </WalletMultiButton>
               
               {connecting && (
-                <div className="text-sm text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded p-2">
+                <div className="text-sm text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded p-2">
                   🔗 Please approve the connection in your wallet popup.
                 </div>
               )}

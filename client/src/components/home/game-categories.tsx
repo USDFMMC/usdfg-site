@@ -61,13 +61,13 @@ const GameCategories: React.FC = () => {
   };
 
   return (
-    <section className="py-20 px-4 text-white relative overflow-hidden">
+    <section className="py-12 px-2 text-white relative overflow-hidden">
       <div className="max-w-7xl mx-auto">
         <motion.h2 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="text-3xl md:text-4xl font-extrabold tracking-wide mb-2 text-center drop-shadow-glow"
+          className="text-xl md:text-2xl font-extrabold tracking-wide mb-2 text-center drop-shadow-glow"
         >
           Supported Games
         </motion.h2>
@@ -77,7 +77,7 @@ const GameCategories: React.FC = () => {
           initial={{ width: 0 }}
           animate={{ width: "200px" }}
           transition={{ duration: 0.8, delay: 0.3 }}
-          className="mx-auto mb-12 h-1 rounded-full bg-gradient-to-r from-cyan-400 via-purple-500 to-cyan-400 animate-pulse shadow-[0_0_32px_#22d3ee99]"
+          className="mx-auto mb-6 h-1 rounded-full bg-gradient-to-r from-cyan-400 via-purple-500 to-cyan-400 animate-pulse shadow-[0_0_32px_#22d3ee99]"
         />
 
         {/* Elite/Premium Intro Paragraph */}
@@ -85,12 +85,12 @@ const GameCategories: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.5 }}
-          className="relative max-w-2xl mx-auto mb-12 px-6 py-6 rounded-2xl bg-gradient-to-br from-white/10 to-[#00ffff22] border border-cyan-400/40 shadow-xl backdrop-blur-md text-center"
+          className="relative max-w-2xl mx-auto mb-6 px-3 py-3 rounded-2xl bg-gradient-to-br from-white/10 to-[#00ffff22] border border-cyan-400/40 shadow-xl backdrop-blur-md text-center"
         >
-          <p className="text-xl md:text-2xl font-extrabold text-white mb-2 drop-shadow-glow">
+          <p className="text-lg md:text-xl font-extrabold text-white mb-2 drop-shadow-glow">
             The Arena Is Open. Any Game. No Excuses.
           </p>
-          <p className="text-md md:text-lg text-cyan-100 leading-relaxed font-medium">
+          <p className="text-sm md:text-base text-cyan-100 leading-relaxed font-medium">
             Dominate in the games you know. Rise through the ones they don't expect.<br />
             USDFG supports verified competitive play across all major genres — sports, fighting, racing, and more.<br />
             If it can be played with skill, it can be challenged.<br />
@@ -104,7 +104,7 @@ const GameCategories: React.FC = () => {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-100px" }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch h-full"
+          className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch h-full"
         >
           {games.map((game, index) => (
             <motion.div
@@ -113,18 +113,18 @@ const GameCategories: React.FC = () => {
               className="group relative h-full flex flex-col"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all duration-500 animate-pulse" />
-              <div className="relative bg-[#0d0d0d]/80 backdrop-blur-sm border border-cyan-500/30 rounded-xl p-6 shadow-[0_0_16px_rgba(72,216,255,0.2)] hover:shadow-[0_0_32px_rgba(72,216,255,0.4)] transition-all duration-500 hover:scale-[1.02] hover:border-cyan-500/50 h-full flex flex-col">
+              <div className="relative bg-[#0d0d0d]/80 backdrop-blur-sm border border-cyan-500/30 rounded-xl p-4 shadow-[0_0_16px_rgba(72,216,255,0.2)] hover:shadow-[0_0_32px_rgba(72,216,255,0.4)] transition-all duration-500 hover:scale-[1.02] hover:border-cyan-500/50 h-full flex flex-col">
                 <div className="relative">
                   <img
                     src={game.image.replace('.png', '.webp')}
                     alt={game.alt}
-                    className="w-full h-48 object-cover rounded-lg mb-4 shadow-lg"
+                    className="w-full h-32 object-cover rounded-lg mb-2 shadow-lg"
                     loading="lazy" decoding="async"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-lg" />
                 </div>
                 <div className="flex-1 flex flex-col">
-                  <h3 className="text-xl font-bold mb-2 flex items-center gap-2 group-hover:text-cyan-400 transition-colors duration-300">
+                  <h3 className="text-lg font-bold mb-1 flex items-center gap-2 group-hover:text-cyan-400 transition-colors duration-300">
                     <span className="animate-bounce">{game.title.split(' ')[0]}</span>
                     <span>{game.title.split(' ').slice(1).join(' ')}</span>
                   </h3>

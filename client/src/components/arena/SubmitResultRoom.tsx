@@ -100,7 +100,7 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = memo(({
             className="fixed bottom-0 left-0 right-0 z-50 flex justify-center"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="w-full max-w-2xl bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-900 border-t-2 border-x-2 border-purple-500/30 rounded-t-3xl shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="w-full max-w-2xl bg-gradient-to-br from-gray-900 via-amber-900/20 to-gray-900 border-t-2 border-x-2 border-amber-500/30 rounded-t-3xl shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="p-6 space-y-4">
                 {/* Header */}
                 <div className="flex justify-between items-start sticky top-0 bg-gray-900/95 backdrop-blur-sm -mx-6 px-6 py-4 border-b border-gray-800 z-10">
@@ -124,7 +124,7 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = memo(({
 
                 {/* Result Selection */}
                 <div>
-                  <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl p-4 mb-4">
+                  <div className="bg-gradient-to-r from-amber-500/10 to-amber-600/10 border border-amber-500/20 rounded-xl p-4 mb-4">
                     <p className="text-xl font-semibold text-white text-center">
                       Did you win this match?
                     </p>
@@ -198,9 +198,9 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = memo(({
                     exit={{ opacity: 0, height: 0 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-4">
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
                       <div className="flex items-center justify-between mb-3">
-                        <p className="text-sm font-semibold text-purple-300">
+                        <p className="text-sm font-semibold text-amber-300">
                           📸 Upload Proof (Optional but Recommended)
                         </p>
                       </div>
@@ -220,7 +220,7 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = memo(({
                             <button
                               type="button"
                               onClick={() => fileInputRef.current?.click()}
-                              className="flex items-center justify-center gap-2 p-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg transition-all"
+                              className="flex items-center justify-center gap-2 p-3 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white rounded-lg transition-all"
                             >
                               <Camera className="w-5 h-5" />
                               <span className="text-sm font-medium">Take Photo</span>
@@ -234,7 +234,7 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = memo(({
                                   fileInputRef.current.click();
                                 }
                               }}
-                              className="flex items-center justify-center gap-2 p-3 bg-purple-700 hover:bg-purple-800 text-white rounded-lg transition-all"
+                              className="flex items-center justify-center gap-2 p-3 bg-amber-700 hover:bg-amber-800 text-white rounded-lg transition-all"
                             >
                               <Upload className="w-5 h-5" />
                               <span className="text-sm font-medium">Upload</span>
@@ -293,7 +293,7 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = memo(({
                       disabled:opacity-50 disabled:cursor-not-allowed
                       ${
                         selectedResult !== null
-                          ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg shadow-purple-500/20"
+                          ? "bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white shadow-lg shadow-amber-500/20"
                           : "bg-gray-700 text-gray-400 cursor-not-allowed"
                       }
                     `}

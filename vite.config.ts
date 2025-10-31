@@ -42,6 +42,10 @@ export default defineConfig({
       '@solana/wallet-adapter-solflare',
       '@solana-mobile/wallet-adapter-mobile',
     ],
+    exclude: [
+      '@coral-xyz/borsh',
+      '@coral-xyz/anchor',
+    ],
   },
   resolve: {
     alias: {

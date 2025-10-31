@@ -7,11 +7,22 @@
  * ✅ ORACLE REMOVED - No more oracle dependencies!
  */
 
-import { BN } from '@coral-xyz/anchor';
 import { Connection, PublicKey, Keypair, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction, TransactionInstruction } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
 import { PROGRAM_ID, USDFG_MINT, SEEDS, usdfgToLamports } from './config';
-import * as borsh from '@coral-xyz/borsh';
+
+/**
+ * Convert a number to a little-endian 8-byte buffer (replaces BN)
+ */
+function numberToU64Buffer(value: number): Buffer {
+  const buffer = Buffer.allocUnsafe(8);
+  // Use BigInt for precision and convert to little-endian
+  const bigValue = BigInt(Math.floor(value));
+  for (let i = 0; i < 8; i++) {
+    buffer[i] = Number((bigValue >> BigInt(i * 8)) & BigInt(0xFF));
+  }
+  return buffer;
+}
 
 /**
  * Get the Anchor program instance
@@ -133,9 +144,7 @@ export async function createChallenge(
   console.log('💰 Entry fee (raw USDFG):', entryFeeUsdfg);
   // Convert USDFG to lamports (smallest units)
   const entryFeeLamports = Math.floor(entryFeeUsdfg * Math.pow(10, 9)); // 9 decimals
-  const entryFeeBN = new BN(entryFeeLamports);
   console.log('💰 Entry fee in lamports:', entryFeeLamports);
-  console.log('💰 Created BN:', entryFeeBN.toString());
 
   // Create instruction data for create_challenge
   // Calculate discriminator using SHA256 of "global:create_challenge"
@@ -145,7 +154,8 @@ export async function createChallenge(
   
   const instructionData = Buffer.alloc(8 + 8); // discriminator + entry_fee
   discriminator.copy(instructionData, 0);
-  entryFeeBN.toArrayLike(Buffer, 'le', 8).copy(instructionData, 8);
+  const entryFeeBuffer = numberToU64Buffer(entryFeeLamports);
+  entryFeeBuffer.copy(instructionData, 8);
   console.log('📦 Instruction data created', 'Discriminator:', discriminator.toString('hex'));
 
   // Step 6: Create instruction (NEW CONTRACT - NO ORACLE NEEDED!)

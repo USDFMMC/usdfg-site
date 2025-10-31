@@ -19,9 +19,8 @@ import CreateChallengeForm from "@/components/arena/CreateChallengeForm";
 import ElegantNavbar from "@/components/layout/ElegantNavbar";
 import { SubmitResultRoom } from "@/components/arena/SubmitResultRoom";
 import PlayerProfileModal from "@/components/arena/PlayerProfileModal";
-// import { ChallengeChatModal } from "@/components/arena/ChallengeChatModal";
-// import TrustReviewModal from "@/components/arena/TrustReviewModal";
-import { getUnlockedTrophies, getTrophyColorClass } from "@/lib/trophies";
+import { ChallengeChatModal } from "@/components/arena/ChallengeChatModal";
+import TrustReviewModal from "@/components/arena/TrustReviewModal";
 
 const ArenaHome: React.FC = () => {
   const wallet = useWallet();
@@ -31,19 +30,6 @@ const ArenaHome: React.FC = () => {
   const isConnected = connected;
 
   // Smart function to extract game name from challenge title (saves storage costs)
-  const getTrophyDescription = (trophyId: string) => {
-    const descriptions: { [key: string]: string } = {
-      'initiate': "Your first steps into the arena. Every legend begins here.",
-      'contender': "You've proven you belong. The competition takes notice.",
-      'veteran': "Battle-tested and battle-ready. Experience is your weapon.",
-      'enforcer': "You maintain order in chaos. Justice through victory.",
-      'unbroken': "Through fire and fury, you stand unshaken. Unbreakable spirit.",
-      'disciple': "You've mastered the cycle. Every challenge remembers you.",
-      'immortal': "Transcendent. Your legacy echoes through the ages."
-    };
-    return descriptions[trophyId] || "A trophy earned through dedication and skill.";
-  };
-
   const extractGameFromTitle = (title: string) => {
     const gameKeywords = [
       'FIFA 24', 'Madden NFL 24', 'NBA 2K25',
@@ -73,20 +59,49 @@ const ArenaHome: React.FC = () => {
 
   // Determine category based on game
   const getGameCategory = (game: string) => {
-    if (['NBA 2K25', 'FIFA 24', 'Madden NFL 24'].includes(game)) return 'Sports';
-    if (['Street Fighter 6', 'Tekken 8'].includes(game)) return 'Fighting';
-    if (['Call of Duty', 'Valorant'].includes(game)) return 'Shooting';
-    if (['Forza Horizon'].includes(game)) return 'Racing';
-    return 'Other';
+    if (!game || game === 'Gaming' || game === 'Other/Custom') {
+      return 'Sports'; // Default to Sports for unknown games
+    }
+    
+    // Normalize game name for comparison
+    const normalizedGame = game.trim();
+    
+    if (['NBA 2K25', 'FIFA 24', 'Madden NFL 24'].includes(normalizedGame)) return 'Sports';
+    if (['Street Fighter 6', 'Tekken 8'].includes(normalizedGame)) return 'Fighting';
+    if (['Call of Duty', 'Valorant'].includes(normalizedGame)) return 'Shooting';
+    if (['Forza Horizon'].includes(normalizedGame)) return 'Racing';
+    
+    // Fallback: try case-insensitive matching
+    const lowerGame = normalizedGame.toLowerCase();
+    if (lowerGame.includes('nba') || lowerGame.includes('fifa') || lowerGame.includes('madden') || lowerGame.includes('sports')) return 'Sports';
+    if (lowerGame.includes('street fighter') || lowerGame.includes('tekken') || lowerGame.includes('fighting')) return 'Fighting';
+    if (lowerGame.includes('call of duty') || lowerGame.includes('cod') || lowerGame.includes('valorant') || lowerGame.includes('shooting')) return 'Shooting';
+    if (lowerGame.includes('forza') || lowerGame.includes('racing')) return 'Racing';
+    
+    return 'Sports'; // Default fallback to Sports
   };
 
-  // Category → Image mapping (drop your images in public/assets/categories)
-  const categoryImageMap: Record<string, string> = {
-    Sports: '/assets/categories/sports.png',
-    Fighting: '/assets/categories/fighting.png',
-    Shooting: '/assets/categories/shooting.png',
-    Racing: '/assets/categories/racing.png',
-    Other: '/assets/categories/other.png'
+  // Get game/category image based on game name - using category images from /assets/categories/
+  const getGameImage = (game: string) => {
+    if (!game || game === 'Gaming') {
+      return '/assets/categories/sports.png'; // Default fallback
+    }
+    
+    const category = getGameCategory(game);
+    console.log(`🎮 Game: ${game}, Category: ${category}`); // Debug log
+    
+    switch (category) {
+      case 'Sports':
+        return '/assets/categories/sports.png';
+      case 'Racing':
+        return '/assets/categories/racing.png';
+      case 'Shooting':
+        return '/assets/categories/shooting.png';
+      case 'Fighting':
+        return '/assets/categories/shooting.png'; // Fighting games can use shooting image or we can create a fighting image
+      default:
+        return '/assets/categories/sports.png'; // Default to sports category image
+    }
   };
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -113,9 +128,10 @@ const ArenaHome: React.FC = () => {
   
   // Trust Review Modal state
   const [showTrustReview, setShowTrustReview] = useState(false);
+  const [trustReviewOpponent, setTrustReviewOpponent] = useState<string>('');
+  // Trophy Modal state
   const [showTrophyModal, setShowTrophyModal] = useState(false);
   const [selectedTrophy, setSelectedTrophy] = useState<any>(null);
-  const [trustReviewOpponent, setTrustReviewOpponent] = useState<string>('');
   const [pendingMatchResult, setPendingMatchResult] = useState<{
     didWin: boolean;
     proofFile?: File | null;
@@ -125,13 +141,6 @@ const ArenaHome: React.FC = () => {
   const [showAllPlayers, setShowAllPlayers] = useState<boolean>(false);
   const [showChatModal, setShowChatModal] = useState<boolean>(false);
   const [selectedChatChallenge, setSelectedChatChallenge] = useState<any>(null);
-  // Founder Challenge Stats - simple and functional
-  const [founderStats, setFounderStats] = useState({
-    activeChallenges: 0, // Will show actual founder challenges
-    playersOnline: 1247, // Total users on site (with/without wallet)
-    usdfgRewarded: 0,    // Will show actual rewards
-    winRate: 0           // Will show actual win rate
-  });
   
   // Mock price API - simulates real-time price updates
   const fetchUsdfgPrice = useCallback(async () => {
@@ -269,8 +278,7 @@ const ArenaHome: React.FC = () => {
   const challenges = firestoreChallenges.map(challenge => {
     // Provide default values for optimized data structure
     const mode = challenge.mode || 'Head-to-Head';
-    // Extract game from title if available, otherwise use default
-    const game = challenge.title ? extractGameFromTitle(challenge.title) : (challenge.game || 'NBA 2K25');
+    const game = challenge.game || 'USDFG Arena';
     const platform = challenge.platform || 'All Platforms';
     const creatorTag = challenge.creatorTag || challenge.creator?.slice(0, 8) + '...' || 'Unknown';
     const prizePool = challenge.prizePool || (challenge.entryFee * 2);
@@ -370,6 +378,14 @@ const ArenaHome: React.FC = () => {
       return;
     }
     
+    console.log('🎮 Challenge Data Received:', challengeData);
+    console.log('🎮 Game from challengeData:', challengeData.game);
+    if (challengeData.game) {
+      const category = getGameCategory(challengeData.game);
+      const image = getGameImage(challengeData.game);
+      console.log(`🎮 Game: ${challengeData.game}, Category: ${category}, Image: ${image}`);
+    }
+    
     setIsCreatingChallenge(true);
     
     try {
@@ -458,6 +474,10 @@ const ArenaHome: React.FC = () => {
       const { Timestamp } = await import("firebase/firestore");
       
       // OPTIMIZED: Only store essential data for leaderboards
+      // Generate title from challenge data
+      const challengeTitle = challengeData.title || 
+        `${challengeData.game || 'Game'} - ${challengeData.mode || 'Challenge'}${challengeData.username ? ` by ${challengeData.username}` : ''}`;
+      
       const firestoreChallengeData = {
         creator: currentWallet,
         // challenger: undefined, // Will be set when someone accepts (don't include undefined fields)
@@ -468,17 +488,25 @@ const ArenaHome: React.FC = () => {
         // winner: undefined, // Will be set when match completes (don't include undefined fields)
         // UI fields for display
         players: [currentWallet], // Creator is first player
-        maxPlayers: 2, // Default to 2 for Head-to-Head
+        maxPlayers: challengeData.maxPlayers || 2, // Use provided maxPlayers or default to 2 for Head-to-Head
         // Prize claim fields
         pda: challengeId, // Store the challenge PDA from smart contract
         prizePool: challengeData.entryFee * 2 * 0.95, // Total prize pool (2x entry fee minus 5% platform fee)
         // Store only the title which contains game info - saves storage costs
-        title: challengeData.title, // This contains the game name in the title
-        // REMOVED: creatorTag, game, mode, platform, rules, solanaAccountId, category
+        title: challengeTitle, // Generated title with game info
+        // Store game name for display - players need to know which game
+        game: challengeData.game || extractGameFromTitle(challengeTitle), // Store game name separately
+        category: getGameCategory(challengeData.game || extractGameFromTitle(challengeTitle)), // Store category for filtering
+        // REMOVED: creatorTag, mode, platform, rules, solanaAccountId
         // These are not needed for leaderboards and increase storage costs unnecessarily
       };
       
       console.log("🔥 Adding challenge to Firestore...");
+      console.log("🔥 Firestore Challenge Data:", {
+        game: firestoreChallengeData.game,
+        category: firestoreChallengeData.category,
+        title: firestoreChallengeData.title
+      });
       const firestoreId = await addChallenge(firestoreChallengeData);
       console.log("✅ Challenge added to Firestore with ID:", firestoreId);
       
@@ -734,7 +762,6 @@ const ArenaHome: React.FC = () => {
   const uniqueGames = ['All', ...Array.from(new Set(challenges.map(c => c.game)))];
   const categories = ['All', 'Fighting', 'Sports', 'Shooting', 'Racing'];
 
-
   // Check if user has active challenge (for button disable logic)
   const currentWallet = publicKey?.toString() || null;
   const hasActiveChallenge = currentWallet && challenges.some(c => {
@@ -894,7 +921,7 @@ const ArenaHome: React.FC = () => {
                   </button>
                   <Link 
                     to="#challenges"
-                    className="text-glow-cyan underline underline-offset-4 hover:text-glow-cyan/80 transition-colors neocore-body text-sm sm:text-base"
+                    className="text-glow-amber underline underline-offset-4 hover:text-glow-amber/80 transition-colors neocore-body text-sm sm:text-base"
                   >
                     Browse Challenges
                   </Link>
@@ -909,56 +936,48 @@ const ArenaHome: React.FC = () => {
             )}
           </div>
 
-              {/* Founder Challenge Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-4">
-                <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
-                  <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
-                  <div className="relative z-10">
-                    <div className="text-lg mb-1">🏆</div>
-                    <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">
-                      {founderStats.activeChallenges}
-                    </div>
-                    <div className="text-sm text-amber-400 mt-1 font-semibold">Founder Challenges</div>
-                  </div>
-                </div>
-                
-                <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
-                  <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
-                  <div className="relative z-10">
-                    <div className="text-lg mb-1">👥</div>
-                    <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">
-                      {founderStats.playersOnline}
-                    </div>
-                    <div className="text-sm text-amber-400 mt-1 font-semibold">Players Online</div>
-                  </div>
-                </div>
-                
-                <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
-                  <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
-                  <div className="relative z-10">
-                    <div className="text-lg mb-1">⚡</div>
-                    <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">
-                      {founderStats.usdfgRewarded.toFixed(9)} USDFG
-                    </div>
-                    <div className="text-sm text-amber-400 mt-1 font-semibold">USDFG Rewarded</div>
-                  </div>
-                </div>
-                
-                <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
-                  <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
-                  <div className="relative z-10">
-                    <div className="text-lg mb-1">📈</div>
-                    <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">
-                      {founderStats.winRate}%
-                    </div>
-                    <div className="text-sm text-amber-400 mt-1 font-semibold">Success Rate</div>
-                  </div>
-                </div>
+          {/* Quick Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-4">
+            <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
+              <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
+              <div className="relative z-10">
+                <div className="text-lg mb-1">🏆</div>
+                <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">1,247</div>
+                <div className="text-sm text-amber-400 mt-1 font-semibold">Active Challenges</div>
               </div>
+            </div>
+            
+            <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
+              <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
+              <div className="relative z-10">
+                <div className="text-lg mb-1">👥</div>
+                <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">8,432</div>
+                <div className="text-sm text-amber-400 mt-1 font-semibold">Players Online</div>
+              </div>
+            </div>
+            
+            <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
+              <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
+              <div className="relative z-10">
+                <div className="text-lg mb-1">⚡</div>
+                <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">45,678</div>
+                <div className="text-sm text-amber-400 mt-1 font-semibold">USDFG Rewarded</div>
+              </div>
+            </div>
+            
+            <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
+              <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
+              <div className="relative z-10">
+                <div className="text-lg mb-1">📈</div>
+                <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">+12.5%</div>
+                <div className="text-sm text-amber-400 mt-1 font-semibold">Win Rate</div>
+              </div>
+            </div>
+          </div>
 
           {/* Available Challenges Section */}
           <section id="challenges" className="mb-8">
@@ -1068,75 +1087,58 @@ const ArenaHome: React.FC = () => {
                           setShowJoinModal(true);
                         }}
                       >
-                        {/* Background Category Image (full-card) */}
-                        {(() => {
-                          const game = extractGameFromTitle(challenge.title);
-                          const category = getGameCategory(game);
-                          const bgSrc = categoryImageMap[category] || categoryImageMap.Other;
-                          return (
-                            <img
-                              src={bgSrc}
-                              alt={`${category} background`}
-                              className="absolute inset-0 w-full h-full object-cover opacity-20 pointer-events-none"
-                              onError={(e) => {
-                                const img = e.currentTarget as HTMLImageElement;
-                                img.src = categoryImageMap.Other || '/assets/categories/other.png';
-                              }}
-                            />
-                          );
-                        })()}
-
+                        {/* Full Background Image */}
+                        <div className="absolute inset-0 overflow-hidden rounded-2xl z-0">
+                          {(() => {
+                            const gameName = challenge.game || extractGameFromTitle(challenge.title);
+                            const category = getGameCategory(gameName);
+                            const imagePath = getGameImage(gameName);
+                            // Debug log for first challenge only to avoid spam
+                            if (challenge === challenges[0]) {
+                              console.log(`🖼️ Challenge Card - Game: ${gameName}, Category: ${category}, Image: ${imagePath}`);
+                              console.log(`🖼️ Challenge object:`, { game: challenge.game, title: challenge.title });
+                            }
+                            return (
+                              <img
+                                src={imagePath}
+                                alt={gameName}
+                                className="absolute inset-0 w-full h-full object-cover opacity-40"
+                                loading="lazy"
+                                decoding="async"
+                                onError={(e) => {
+                                  const target = e.currentTarget as HTMLImageElement;
+                                  console.error(`❌ Failed to load image: ${imagePath}`);
+                                  target.src = '/assets/usdfg-logo-transparent.png';
+                                }}
+                              />
+                            );
+                          })()}
+                          <div className="absolute inset-0 bg-gradient-to-br from-[#07080C]/80 via-[#07080C]/70 to-[#07080C]/80 rounded-2xl" />
+                        </div>
+                        
                         {/* Ambient Glow */}
                         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60 rounded-2xl" />
                         <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite] rounded-t-2xl" />
                         <div className="relative z-10 mb-4">
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center space-x-3">
-                              {(() => {
-                                const game = extractGameFromTitle(challenge.title);
-                                const category = getGameCategory(game);
-                                const imgSrc = categoryImageMap[category] || categoryImageMap.Other;
-                                // Debug log to verify resolution
-                                try { console.log('🎯 Challenge card image:', { title: challenge.title, game, category, imgSrc }); } catch {}
-                                const emojiMap: Record<string, string> = {
-                                  Sports: '🏈',
-                                  Fighting: '🥊',
-                                  Shooting: '🎯',
-                                  Racing: '🏎️',
-                                  Other: '🎮'
-                                };
-                                return (
-                                  <div className="relative w-10 h-10 bg-gradient-to-r from-amber-400 to-orange-500 rounded-lg flex items-center justify-center shadow-lg shadow-amber-500/20 overflow-hidden">
-                                    <span className="category-emoji absolute text-lg select-none opacity-70">{emojiMap[category] || '🎮'}</span>
-                                    <img
-                                      src={imgSrc}
-                                      alt={category}
-                                      className="w-full h-full object-cover"
-                                      onLoad={(e) => {
-                                        // Hide emoji fallback when real image is loaded
-                                        const parent = e.currentTarget.parentElement;
-                                        const emoji = parent?.querySelector('.category-emoji') as HTMLElement | null;
-                                        if (emoji) emoji.style.display = 'none';
-                                      }}
-                                      onError={(e) => {
-                                        // One-shot fallback to generic image
-                                        const img = e.currentTarget as HTMLImageElement;
-                                        if (!img.dataset.fallback) {
-                                          img.dataset.fallback = '1';
-                                          img.src = categoryImageMap.Other || '/assets/categories/other.png';
-                                        } else {
-                                          // If even fallback fails, hide image so emoji shows
-                                          img.style.display = 'none';
-                                        }
-                                      }}
-                                    />
-                                  </div>
-                                );
-                              })()}
+                              <div className="w-10 h-10 rounded-lg overflow-hidden shadow-lg shadow-amber-500/20 border border-amber-400/30">
+                                <img
+                                  src={getGameImage(challenge.game || extractGameFromTitle(challenge.title))}
+                                  alt={challenge.game || extractGameFromTitle(challenge.title)}
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                  decoding="async"
+                                  onError={(e) => {
+                                    const target = e.currentTarget as HTMLImageElement;
+                                    target.src = '/assets/usdfg-logo-transparent.png';
+                                  }}
+                                />
+                              </div>
                               <div>
                                 <h3 className="text-white font-bold text-lg drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">{challenge.title}</h3>
                                 <div className="flex items-center gap-2">
-                                  <span className="text-text-dim text-sm neocore-body">{getGameCategory(extractGameFromTitle(challenge.title))}</span>
+                                  <span className="text-text-dim text-sm neocore-body">{getGameCategory(challenge.game || extractGameFromTitle(challenge.title))}</span>
                                 </div>
                               </div>
                             </div>
@@ -1147,12 +1149,10 @@ const ArenaHome: React.FC = () => {
                             <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-400/40 rounded-lg shadow-[0_0_20px_rgba(255,215,130,0.2)]">
                               <span className="text-amber-300 mr-2 text-lg">🎮</span>
                               <span className="text-amber-200 font-bold text-lg drop-shadow-[0_0_8px_rgba(255,215,130,0.4)]">
-                                {extractGameFromTitle(challenge.title)}
+                                {challenge.game || extractGameFromTitle(challenge.title) || 'Game'}
                               </span>
                             </div>
                           </div>
-
-                          
                           
                           {/* Challenge Details */}
                           <div className="mb-3">
@@ -1187,7 +1187,7 @@ const ArenaHome: React.FC = () => {
                                   e.stopPropagation();
                                   handleShareChallenge(challenge);
                                 }}
-                                className="px-2 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded text-xs hover:bg-amber-500/30 transition-all flex items-center gap-1"
+                                className="px-2 py-1 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded text-xs hover:bg-amber-600/30 transition-all flex items-center gap-1"
                                 title="Share Challenge"
                               >
                                 📤 Share
@@ -1240,7 +1240,7 @@ const ArenaHome: React.FC = () => {
                               href={`https://explorer.solana.com/address/${challenge.solanaAccountId}?cluster=devnet`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center justify-center gap-2 px-3 py-2 bg-purple-600/20 text-purple-400 border border-purple-600/30 rounded-lg hover:bg-purple-600/30 transition-all text-sm"
+                              className="flex items-center justify-center gap-2 px-3 py-2 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-lg hover:bg-amber-600/30 transition-all text-sm"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <span>🔗</span>
@@ -1431,7 +1431,7 @@ const ArenaHome: React.FC = () => {
                             if (isParticipant) {
                               if (hasSubmittedResult) {
                                 return (
-                                  <div className="w-full px-4 py-2 bg-blue-600/20 text-blue-400 border border-blue-600/30 font-semibold rounded-lg text-center">
+                                  <div className="w-full px-4 py-2 bg-amber-600/20 text-amber-300 border border-amber-500/30 font-semibold rounded-lg text-center">
                                     ✅ Result Submitted
                                   </div>
                                 );
@@ -1452,7 +1452,7 @@ const ArenaHome: React.FC = () => {
 
                             // If wallet connected but not a participant, just show status
                             return (
-                              <div className="w-full px-4 py-2 bg-purple-600/20 text-purple-400 border border-purple-600/30 font-semibold rounded-lg text-center">
+                              <div className="w-full px-4 py-2 bg-amber-600/20 text-amber-300 border border-amber-500/30 font-semibold rounded-lg text-center">
                                 ⚔️ Match In Progress
                               </div>
                             );
@@ -1606,7 +1606,7 @@ const ArenaHome: React.FC = () => {
                               setSelectedChatChallenge(challenge);
                               setShowChatModal(true);
                             }}
-                            className="w-full mt-2 px-4 py-2 bg-blue-600/20 text-blue-400 border border-blue-600/30 font-semibold rounded-lg hover:bg-blue-600/30 transition-all flex items-center justify-center space-x-2"
+                            className="w-full mt-2 px-4 py-2 bg-amber-600/20 text-amber-300 border border-amber-500/30 font-semibold rounded-lg hover:bg-amber-600/30 transition-all flex items-center justify-center space-x-2"
                           >
                             <span>💬</span>
                             <span>Join Chat</span>
@@ -1837,7 +1837,7 @@ const ArenaHome: React.FC = () => {
                                     key={trophy.id}
                                     src={trophy.icon}
                                     alt={trophy.id}
-                                    className={`w-6 h-6 transition-all duration-300 cursor-pointer ${
+                                    className={`w-6 h-6 transition-all duration-300 cursor-pointer relative z-10 ${
                                       isUnlocked 
                                         ? 'opacity-100 drop-shadow-[0_0_8px_rgba(255,215,130,0.6)] hover:drop-shadow-[0_0_12px_rgba(255,215,130,0.8)] hover:scale-110' 
                                         : 'opacity-40 grayscale'
@@ -1848,12 +1848,15 @@ const ArenaHome: React.FC = () => {
                                       e.nativeEvent.stopImmediatePropagation();
                                       setSelectedTrophy({
                                         id: trophy.id,
-                                        name: trophy.id.toUpperCase(),
-                                        description: getTrophyDescription(trophy.id),
+                                        name: `USDFG ${trophy.id.toUpperCase()}`,
                                         icon: trophy.icon,
                                         requiredGames: trophy.requiredGames
                                       });
                                       setShowTrophyModal(true);
+                                    }}
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
                                     }}
                                     onError={(e) => {
                                       e.currentTarget.style.display = 'none';
@@ -1891,14 +1894,14 @@ const ArenaHome: React.FC = () => {
                         'from-gray-300 to-gray-400',     // 2nd place
                         'from-amber-600 to-yellow-700',  // 3rd place
                         'from-amber-400 to-orange-500',     // 4th place
-                        'from-yellow-400 to-amber-500'    // 5th place
+                        'from-amber-500 to-orange-600'    // 5th place
                       ];
                       const bgColors = [
                         'from-yellow-500/20 to-orange-500/20 border-yellow-500/30',
                         'from-gray-400/20 to-gray-500/20 border-gray-400/30',
                         'from-amber-600/20 to-yellow-700/20 border-amber-600/30',
                         'from-amber-400/20 to-orange-500/20 border-amber-400/30',
-                        'from-yellow-400/20 to-amber-500/20 border-yellow-400/30'
+                        'from-amber-500/20 to-orange-600/20 border-amber-500/30'
                       ];
                       
                       return (
@@ -2093,8 +2096,8 @@ const ArenaHome: React.FC = () => {
         }}
       />
 
-      {/* Challenge Chat Modal - Temporarily disabled */}
-      {/* {showChatModal && selectedChatChallenge && (
+      {/* Challenge Chat Modal */}
+      {showChatModal && selectedChatChallenge && (
         <ChallengeChatModal
           isOpen={showChatModal}
           onClose={() => {
@@ -2110,58 +2113,58 @@ const ArenaHome: React.FC = () => {
             return currentWallet && selectedChatChallenge.rawData?.players?.some((p: string) => p.toLowerCase() === currentWallet);
           })()}
         />
-      )} */}
+      )}
 
-      {/* Trust Review Modal - Temporarily disabled */}
-      {/* <TrustReviewModal
-            isOpen={showTrustReview}
-            opponentName={trustReviewOpponent}
-            completionRate={1} // Default to 1 (100% completion)
-            onClose={() => {
-              setShowTrustReview(false);
-              setTrustReviewOpponent('');
-            }}
-            onSubmit={handleTrustReviewSubmit}
-          /> */}
+      {/* Trust Review Modal */}
+      <TrustReviewModal
+        isOpen={showTrustReview}
+        opponentName={trustReviewOpponent}
+        completionRate={1} // Default to 1 (100% completion)
+        onClose={() => {
+          setShowTrustReview(false);
+          setTrustReviewOpponent('');
+        }}
+        onSubmit={handleTrustReviewSubmit}
+      />
 
-          {/* Trophy Modal */}
-          {showTrophyModal && selectedTrophy && (
-            <ElegantModal
-              isOpen={showTrophyModal}
-              onClose={() => {
-                setShowTrophyModal(false);
-                setSelectedTrophy(null);
-              }}
-              title={selectedTrophy.name}
-            >
-              <div className="text-center space-y-6">
-                <div className="relative">
-                  <img
-                    src={selectedTrophy.icon}
-                    alt={selectedTrophy.name}
-                    className="w-32 h-32 mx-auto animate-bounce-slow drop-shadow-[0_0_20px_rgba(255,215,130,0.6)]"
-                  />
-                  <div className="absolute inset-0 w-32 h-32 mx-auto rounded-full bg-gradient-to-r from-amber-400/20 to-yellow-300/20 animate-pulse"></div>
-                </div>
-                <p className="text-amber-200 text-lg leading-relaxed">
-                  [Hidden Description - Unlock to reveal]
-                </p>
-                <div className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-400/30 rounded-xl p-6">
-                  <h3 className="text-amber-400 font-bold text-lg mb-3">Mystery Requirement</h3>
-                  <p className="text-amber-200 font-bold text-2xl">
-                    ??? games played
-                  </p>
-                  <p className="text-amber-300 text-sm mt-2 italic">
-                    Keep playing to discover the secret!
-                  </p>
-                </div>
-              </div>
-            </ElegantModal>
-          )}
+      {/* Trophy Modal */}
+      {showTrophyModal && selectedTrophy && (
+        <ElegantModal
+          isOpen={showTrophyModal}
+          onClose={() => {
+            setShowTrophyModal(false);
+            setSelectedTrophy(null);
+          }}
+          title={selectedTrophy.name}
+        >
+          <div className="text-center space-y-6">
+            <div className="relative">
+              <img
+                src={selectedTrophy.icon}
+                alt={selectedTrophy.name}
+                className="w-32 h-32 mx-auto animate-bounce-slow drop-shadow-[0_0_20px_rgba(255,215,130,0.6)]"
+              />
+              <div className="absolute inset-0 w-32 h-32 mx-auto rounded-full bg-gradient-to-r from-amber-400/20 to-yellow-300/20 animate-pulse"></div>
+            </div>
+            <p className="text-amber-200 text-lg leading-relaxed">
+              [Hidden Description - Unlock to reveal]
+            </p>
+            <div className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-400/30 rounded-xl p-6">
+              <h3 className="text-amber-400 font-bold text-lg mb-3">Mystery Requirement</h3>
+              <p className="text-amber-200 font-bold text-2xl">
+                ??? games played
+              </p>
+              <p className="text-amber-300 text-sm mt-2 italic">
+                Keep playing to discover the secret!
+              </p>
+            </div>
+          </div>
+        </ElegantModal>
+      )}
 
-        </>
-      );
-    };
+    </>
+  );
+};
 
 // Field component for form inputs
 const Field = ({ label, children, helperText }: { label: string | React.ReactNode; children: React.ReactNode; helperText?: string }) => (
@@ -2186,7 +2189,7 @@ const PrimaryButton = ({ children, onClick, disabled, className = "", type }: {
     type={type || "button"}
     disabled={disabled}
     onClick={onClick}
-    className={`inline-flex items-center justify-center rounded-xl px-4 py-2 font-semibold text-black bg-cyan-400 hover:bg-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+    className={`inline-flex items-center justify-center rounded-xl px-4 py-2 font-semibold text-black bg-amber-400 hover:bg-amber-300 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
   >
     {children}
   </button>
@@ -2571,7 +2574,7 @@ const CreateChallengeModal: React.FC<{
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative w-[92vw] max-w-xl max-h-[90vh] rounded-2xl border border-white/10 bg-[#11051E] p-5 overflow-y-auto">
+      <div className="relative w-[92vw] max-w-xl max-h-[90vh] rounded-2xl border border-amber-400/20 bg-gradient-to-br from-gray-900/95 via-gray-900/95 to-black/95 backdrop-blur-md p-5 overflow-y-auto shadow-[0_25px_50px_rgba(0,0,0,0.8)] shadow-amber-400/10">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-lg font-semibold text-white">Create Challenge</h3>
@@ -2589,7 +2592,7 @@ const CreateChallengeModal: React.FC<{
               <div
                 key={i}
                 className={`h-1 flex-1 rounded-full ${
-                  i + 1 <= currentStep ? 'bg-cyan-400' : 'bg-white/10'
+                  i + 1 <= currentStep ? 'bg-amber-400' : 'bg-white/10'
                 }`}
               />
             ))}
@@ -2763,10 +2766,10 @@ const CreateChallengeModal: React.FC<{
                   </div>
                   
                   {/* USD Conversion Display */}
-                  <div className="mt-2 mb-4 p-3 bg-cyan-400/5 border border-cyan-400/20 rounded-lg">
+                  <div className="mt-2 mb-4 p-3 bg-amber-400/5 border border-amber-400/20 rounded-lg">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
-                        <span className="text-cyan-400 text-sm">💵 USD Equivalent:</span>
+                        <span className="text-amber-400 text-sm">💵 USD Equivalent:</span>
                         <span className="text-white font-semibold">
 {usdfgToUsd(formData.entryFee).toFixed(2)} USD
                         </span>
@@ -2787,7 +2790,7 @@ Prize pool: {(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5
                       Next: Customize Rules
                     </PrimaryButton>
                   ) : (
-                    <PrimaryButton onClick={nextStep} className="min-h-[44px] px-6 py-3 text-base touch-manipulation bg-gradient-to-r from-cyan-400 to-purple-500 hover:from-cyan-300 hover:to-purple-400">
+                    <PrimaryButton onClick={nextStep} className="min-h-[44px] px-6 py-3 text-base touch-manipulation bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400">
                       Review & Create Challenge
                     </PrimaryButton>
                   )}
@@ -2802,8 +2805,8 @@ Prize pool: {(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5
                 <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-4">
                   <h4 className="text-white font-semibold mb-2">📋 Challenge Preview</h4>
                   <div className="text-sm text-gray-300">
-                    <span className="text-cyan-400">🎮 {formData.game}</span> • 
-                    <span className="text-purple-400 ml-1">🎯 {formData.mode === 'Custom Mode' ? formData.customMode : formData.mode}</span> • 
+                    <span className="text-amber-400">🎮 {formData.game}</span> • 
+                    <span className="text-amber-300 ml-1">🎯 {formData.mode === 'Custom Mode' ? formData.customMode : formData.mode}</span> • 
                     <span className="text-green-400 ml-1">🖥️ {formData.platform}</span>
                   </div>
                 </div>
@@ -2815,7 +2818,7 @@ Prize pool: {(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5
                         type="checkbox"
                         checked={formData.customRules}
                         onChange={(e) => updateFormData({customRules: e.target.checked})}
-                        className="mr-2 rounded border-gray-600 bg-gray-700 text-cyan-400 focus:ring-cyan-400"
+                        className="mr-2 rounded border-gray-600 bg-gray-700 text-amber-400 focus:ring-amber-400"
                       />
                       Custom Rules (override presets)
                     </label>
@@ -2839,8 +2842,8 @@ Prize pool: {(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5
                 </Field>
 
                 {!formData.customRules && (
-                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-                    <div className="flex items-center text-blue-400 text-sm mb-1">
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+                    <div className="flex items-center text-amber-300 text-sm mb-1">
                       <span className="mr-2">ℹ️</span>
                       Professional Rules Applied
                     </div>
@@ -2855,7 +2858,7 @@ Prize pool: {(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5
                   {formData.mode === 'Custom Mode' ? (
                     <PrimaryButton onClick={nextStep} className="min-h-[44px] px-6 py-3 text-base touch-manipulation">Review & Create</PrimaryButton>
                   ) : (
-                    <PrimaryButton type="submit" className="min-h-[44px] px-6 py-3 text-base touch-manipulation bg-gradient-to-r from-cyan-400 to-purple-500 hover:from-cyan-300 hover:to-purple-400">
+                    <PrimaryButton type="submit" className="min-h-[44px] px-6 py-3 text-base touch-manipulation bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400">
                       Create Challenge
                     </PrimaryButton>
                   )}
@@ -2866,7 +2869,7 @@ Prize pool: {(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5
             {/* Step 3: Review & Confirm */}
             {currentStep === 3 && (
               <div className="space-y-4">
-                <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-6">
+                <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-6">
                   <h3 className="text-lg font-bold text-white mb-4 flex items-center">
                     <span className="mr-2">📋</span>Challenge Summary
                   </h3>
@@ -2882,7 +2885,7 @@ Prize pool: {(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5
                     <div className="flex justify-between items-center py-2 border-b border-white/10">
                       <span className="text-gray-400">💰 Entry Fee:</span>
                       <div className="text-right">
-                        <span className="text-cyan-400 font-bold">{formData.entryFee} USDFG</span>
+                        <span className="text-amber-400 font-bold">{formData.entryFee} USDFG</span>
                         <div className="text-xs text-gray-400">{usdfgToUsd(formData.entryFee).toFixed(2)} USD</div>
                       </div>
                       </div>
@@ -2904,7 +2907,7 @@ Prize pool: {(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5
 
                 <div className="flex justify-between">
                   <TertiaryButton onClick={prevStep}>Back</TertiaryButton>
-                  <PrimaryButton type="submit" className="bg-gradient-to-r from-cyan-400 to-purple-500 hover:from-cyan-300 hover:to-purple-400">
+                  <PrimaryButton type="submit" className="bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400">
                     Create Challenge
                   </PrimaryButton>
                 </div>
@@ -3013,10 +3016,10 @@ const JoinChallengeModal: React.FC<{
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative w-[90vw] max-w-md rounded-2xl border border-amber-400/30 bg-[#07080C]/95 p-6 shadow-[0_25px_50px_rgba(0,0,0,0.8)] shadow-amber-400/10">
-        <div className="flex items-center justify-between mb-6 border-b border-amber-400/30 pb-4">
-          <h3 className="text-xl font-bold bg-gradient-to-r from-amber-300 to-yellow-200 bg-clip-text text-transparent">Join Challenge</h3>
-          <button onClick={onClose} className="p-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors">
+      <div className="relative w-[90vw] max-w-md rounded-2xl border border-amber-400/30 bg-[#07080C]/95 p-6 shadow-[0_0_60px_rgba(255,215,130,0.08)]">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold text-white">Join Challenge</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">
             ✕
           </button>
         </div>
@@ -3071,13 +3074,13 @@ const JoinChallengeModal: React.FC<{
             <div className="flex items-center justify-between pt-4">
               <button
                 onClick={onClose}
-                className="px-4 py-2 text-zinc-400 hover:text-amber-300 transition-colors"
+                className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleJoin}
-                className="bg-gradient-to-r from-amber-500 to-orange-500 text-black px-6 py-2 rounded-lg font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(255,215,130,0.35)]"
+                className="bg-gradient-to-r from-amber-400 to-orange-500 text-black px-6 py-2 rounded-lg font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(255,215,130,0.35)]"
               >
                 Join Challenge
               </button>
@@ -3112,7 +3115,7 @@ const JoinChallengeModal: React.FC<{
               <button
                 onClick={handleConnect}
                 disabled={connecting}
-                className="mt-4 bg-gradient-to-r from-cyan-400 to-purple-500 text-black px-4 py-2 rounded-lg font-semibold hover:brightness-110 transition-all disabled:opacity-50"
+                className="mt-4 bg-gradient-to-r from-amber-400 to-orange-500 text-black px-4 py-2 rounded-lg font-semibold hover:brightness-110 transition-all disabled:opacity-50"
               >
                 {connecting ? "Connecting..." : "Connect Wallet First"}
               </button>
@@ -3126,7 +3129,7 @@ const JoinChallengeModal: React.FC<{
                 </button>
                 <button
                   onClick={() => window.location.reload()}
-                  className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  className="mt-4 bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors"
                 >
                   Refresh Page
                 </button>
@@ -3226,7 +3229,6 @@ const ProfileSettingsModal: React.FC<{
           </div>
         </div>
       </div>
-
 
     </div>
   );

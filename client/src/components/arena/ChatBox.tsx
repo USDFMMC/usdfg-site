@@ -138,7 +138,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet }) 
                 <div
                   className={`max-w-[80%] px-3 py-1.5 rounded-lg text-sm ${
                     isMe
-                      ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white"
+                      ? "bg-gradient-to-r from-amber-600 to-amber-700 text-white"
                       : "bg-gray-800 text-gray-200"
                   }`}
                 >
@@ -159,7 +159,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet }) 
       {/* Input */}
       <div className="flex items-center gap-2">
         <input
-          className="flex-1 bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-700 focus:border-purple-500 focus:outline-none placeholder-gray-500"
+          className="flex-1 bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-700 focus:border-amber-500 focus:outline-none placeholder-gray-500"
           placeholder="Type message..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -169,7 +169,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet }) 
         <button
           onClick={sendMessage}
           disabled={!input.trim() || sending}
-          className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-50 disabled:cursor-not-allowed text-white p-2 rounded-lg transition-all"
+          className="bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 disabled:opacity-50 disabled:cursor-not-allowed text-white p-2 rounded-lg transition-all"
         >
           <Send className="w-4 h-4" />
         </button>

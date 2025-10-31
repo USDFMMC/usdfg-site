@@ -31,23 +31,23 @@ const PlatformFeatures: React.FC = () => {
   ];
 
   return (
-    <section id="platform" className="py-20 px-4 text-white text-center relative overflow-hidden">
-      <h2 className="text-4xl md:text-5xl font-bold text-center mb-4 text-white animate-fade-in" style={{ textShadow: 'var(--primary-glow)' }}>
+    <section id="platform" className="py-12 px-2 text-white text-center relative overflow-hidden">
+      <h2 className="text-2xl md:text-3xl font-bold text-center mb-2 text-white animate-fade-in" style={{ textShadow: 'var(--primary-glow)' }}>
         USDFG – The Bitcoin of Gaming
       </h2>
-      <p className="text-center text-lg text-muted-foreground mb-12 animate-fade-in" style={{ textShadow: 'var(--neon-glow)' }}>
+      <p className="text-center text-sm text-muted-foreground mb-6 animate-fade-in" style={{ textShadow: 'var(--neon-glow)' }}>
         A decentralized arena where skill is the only currency.
       </p>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-7xl mx-auto">
         {features.map((feature, idx) => (
           <div
             key={feature.title}
-            className="feature-card group bg-[#111]/90 border border-[#22d3ee] rounded-lg shadow-lg backdrop-blur-md p-8 transition-all duration-300 hover:scale-102 hover:shadow-[0_0_24px_#22d3ee66] hover:border-cyan-300/70 relative overflow-hidden animate-fade-in-up"
+            className="feature-card group bg-[#111]/90 border border-[#22d3ee] rounded-lg shadow-lg backdrop-blur-md p-4 transition-all duration-300 hover:scale-102 hover:shadow-[0_0_24px_#22d3ee66] hover:border-cyan-300/70 relative overflow-hidden animate-fade-in-up"
             tabIndex={0}
             style={{ boxShadow: '0 0 16px #22d3ee22, 0 0 4px #a78bfa22' }}
           >
-            <span className="block text-4xl mb-4 drop-shadow-glow animate-bounce-slow">{feature.icon}</span>
-            <h3 className="text-xl font-extrabold tracking-wide text-cyan-300 mb-2 drop-shadow-glow">{feature.title}</h3>
+            <span className="block text-2xl mb-2 drop-shadow-glow animate-bounce-slow">{feature.icon}</span>
+            <h3 className="text-lg font-extrabold tracking-wide text-cyan-300 mb-1 drop-shadow-glow">{feature.title}</h3>
             <p className="text-cyan-100 text-base leading-relaxed font-medium">{feature.description}</p>
           </div>
         ))}

@@ -268,6 +268,22 @@ export async function addChallengeDoc(data: any) {
 // Auto-cleanup for completed challenges (delete after 24 hours)
 export async function cleanupCompletedChallenge(id: string) {
   try {
+    // First, clean up all chat messages for this challenge
+    console.log('🗑️ Cleaning up chat messages for challenge:', id);
+    const chatQuery = query(
+      collection(db, 'challenge_chats'),
+      where('challengeId', '==', id)
+    );
+    const chatSnapshot = await getDocs(chatQuery);
+    
+    // Delete all chat messages
+    const chatDeletePromises = chatSnapshot.docs.map(docSnapshot => 
+      deleteDoc(doc(db, 'challenge_chats', docSnapshot.id))
+    );
+    await Promise.all(chatDeletePromises);
+    console.log(`🗑️ Deleted ${chatSnapshot.size} chat messages for challenge:`, id);
+    
+    // Then delete the challenge document
     const challengeRef = doc(db, "challenges", id);
     await deleteDoc(challengeRef);
     console.log('🗑️ Completed challenge cleaned up:', id);
@@ -279,6 +295,22 @@ export async function cleanupCompletedChallenge(id: string) {
 // Auto-cleanup for expired challenges (delete immediately)
 export async function cleanupExpiredChallenge(id: string) {
   try {
+    // First, clean up all chat messages for this challenge
+    console.log('🗑️ Cleaning up chat messages for expired challenge:', id);
+    const chatQuery = query(
+      collection(db, 'challenge_chats'),
+      where('challengeId', '==', id)
+    );
+    const chatSnapshot = await getDocs(chatQuery);
+    
+    // Delete all chat messages
+    const chatDeletePromises = chatSnapshot.docs.map(docSnapshot => 
+      deleteDoc(doc(db, 'challenge_chats', docSnapshot.id))
+    );
+    await Promise.all(chatDeletePromises);
+    console.log(`🗑️ Deleted ${chatSnapshot.size} chat messages for expired challenge:`, id);
+    
+    // Then delete the challenge document
     const challengeRef = doc(db, "challenges", id);
     await deleteDoc(challengeRef);
     console.log('🗑️ Expired challenge cleaned up:', id);
@@ -760,6 +792,9 @@ export interface PlayerStats {
   totalEarned: number;
   gamesPlayed: number;
   lastActive: Timestamp;
+  // Trust score fields
+  trustScore?: number; // Average trust score (0-10)
+  trustReviews?: number; // Number of trust reviews received
   gameStats: {
     [game: string]: {
       wins: number;
@@ -777,6 +812,39 @@ export interface PlayerStats {
 }
 
 /**
+ * Calculate trust score for a player from localStorage data
+ */
+function calculateTrustScore(wallet: string): { trustScore: number; trustReviews: number } {
+  try {
+    const trustReviews = JSON.parse(localStorage.getItem('trustReviews') || '[]');
+    
+    // Filter reviews for this specific player
+    const playerReviews = trustReviews.filter((review: any) => 
+      review.opponent && review.opponent.toLowerCase() === wallet.toLowerCase()
+    );
+    
+    if (playerReviews.length === 0) {
+      return { trustScore: 0, trustReviews: 0 };
+    }
+    
+    // Calculate average trust score
+    const totalScore = playerReviews.reduce((sum: number, review: any) => {
+      return sum + (review.review?.trustScore10 || 0);
+    }, 0);
+    
+    const averageScore = totalScore / playerReviews.length;
+    
+    return {
+      trustScore: Math.round(averageScore * 10) / 10, // Round to 1 decimal
+      trustReviews: playerReviews.length
+    };
+  } catch (error) {
+    console.error('❌ Error calculating trust score:', error);
+    return { trustScore: 0, trustReviews: 0 };
+  }
+}
+
+/**
  * Update player stats after a challenge completes
  */
 async function updatePlayerStats(
@@ -791,6 +859,9 @@ async function updatePlayerStats(
     const playerRef = doc(db, 'player_stats', wallet);
     const playerSnap = await getDoc(playerRef);
 
+    // Calculate trust score for this player
+    const { trustScore, trustReviews } = calculateTrustScore(wallet);
+
     if (!playerSnap.exists()) {
       // Create new player stats
       const newStats: PlayerStats = {
@@ -802,6 +873,8 @@ async function updatePlayerStats(
         totalEarned: amountEarned,
         gamesPlayed: 1,
         lastActive: Timestamp.now(),
+        trustScore,
+        trustReviews,
         gameStats: {
           [game]: {
             wins: result === 'win' ? 1 : 0,
@@ -819,7 +892,7 @@ async function updatePlayerStats(
       };
       
       await setDoc(playerRef, newStats);
-      console.log('✅ Created new player stats:', wallet, 'as', displayName || 'Anonymous');
+      console.log(`✅ Created new player stats: ${wallet} - ${result} (+${amountEarned} USDFG) - Trust: ${trustScore}/10 (${trustReviews} reviews) - ${displayName || 'Anonymous'}`);
     } else {
       // Update existing player stats
       const currentStats = playerSnap.data() as PlayerStats;
@@ -853,6 +926,8 @@ async function updatePlayerStats(
         totalEarned: currentStats.totalEarned + amountEarned,
         gamesPlayed: newGamesPlayed,
         lastActive: Timestamp.now(),
+        trustScore,
+        trustReviews,
         gameStats,
         categoryStats
       };
@@ -866,7 +941,7 @@ async function updatePlayerStats(
       
       await updateDoc(playerRef, updateData);
 
-      console.log(`✅ Updated player stats: ${wallet} - ${result} (+${amountEarned} USDFG)`);
+      console.log(`✅ Updated player stats: ${wallet} - ${result} (+${amountEarned} USDFG) - Trust: ${trustScore}/10 (${trustReviews} reviews)`);
     }
   } catch (error) {
     console.error('❌ Error updating player stats:', error);

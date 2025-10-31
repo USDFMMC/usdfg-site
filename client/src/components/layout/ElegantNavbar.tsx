@@ -7,7 +7,7 @@ interface ElegantNavbarProps {
 
 const ElegantNavbar: React.FC<ElegantNavbarProps> = ({ children }) => {
   return (
-    <header className="sticky top-0 z-50 border-b border-cyan-400/20 shadow-[0_2px_24px_rgba(0,232,252,0.1)] backdrop-blur-md bg-black/80">
+    <header className="sticky top-0 z-50 border-b border-amber-400/20 shadow-[0_2px_24px_rgba(251,191,36,0.1)] backdrop-blur-md bg-black/80">
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
           {/* Logo */}
@@ -17,40 +17,37 @@ const ElegantNavbar: React.FC<ElegantNavbarProps> = ({ children }) => {
             title="Built for the ones who don't blink."
           >
             <div className="relative">
-              <div className="w-10 h-10 bg-gradient-to-r from-cyan-400 via-purple-500 to-rose-400 rounded-lg flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
-                <span className="text-black font-bold text-lg">🎮</span>
-              </div>
-              <div className="absolute inset-0 bg-gradient-to-r from-cyan-400 via-purple-500 to-rose-400 rounded-lg blur-md opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+              <picture>
+                <source srcSet="/assets/usdfg-mascot-144.png" type="image/png" />
+                <img 
+                  src="/assets/usdfg-mascot-144.png" 
+                  alt="USDFG Mascot" 
+                  className="w-10 h-10 object-contain transition-transform duration-300 group-hover:scale-110"
+                  loading="lazy" decoding="async"
+                />
+              </picture>
+              <div className="absolute inset-0 bg-gradient-to-r from-amber-300 to-yellow-200 rounded-lg blur-md opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
             </div>
-            <span className="bg-gradient-to-r from-cyan-400 via-purple-500 to-rose-400 bg-clip-text text-transparent font-extrabold text-xl tracking-wide">
+            <span className="bg-gradient-to-r from-amber-300 to-yellow-200 bg-clip-text text-transparent font-extrabold text-xl tracking-wide">
               USDFG
             </span>
           </Link>
 
-          {/* Navigation Links */}
-          <nav className="hidden md:flex items-center space-x-6">
-            <Link 
-              to="/" 
-              className="text-white/80 hover:text-cyan-400 transition-colors duration-300 font-medium relative group"
-            >
-              Home
-              <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-cyan-400 to-purple-500 group-hover:w-full transition-all duration-300"></div>
-            </Link>
-            <Link 
-              to="/app" 
-              className="text-white/80 hover:text-cyan-400 transition-colors duration-300 font-medium relative group"
-            >
-              Arena
-              <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-cyan-400 to-purple-500 group-hover:w-full transition-all duration-300"></div>
-            </Link>
-            <Link 
-              to="/whitepaper" 
-              className="text-white/80 hover:text-cyan-400 transition-colors duration-300 font-medium relative group"
-            >
-              Whitepaper
-              <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-cyan-400 to-purple-500 group-hover:w-full transition-all duration-300"></div>
-            </Link>
-          </nav>
+          {/* Live Stats */}
+          <div className="hidden md:flex items-center space-x-6">
+            <div className="flex items-center gap-2 text-white/80">
+              <span className="text-amber-400">🔥</span>
+              <span className="text-sm font-medium">Live Arena</span>
+            </div>
+            <div className="flex items-center gap-2 text-white/80">
+              <span className="text-green-400">●</span>
+              <span className="text-sm font-medium">Active Now</span>
+            </div>
+            <div className="flex items-center gap-2 text-white/80">
+              <span className="text-blue-400">⚡</span>
+              <span className="text-sm font-medium">Real-time</span>
+            </div>
+          </div>
 
           {/* Right side content */}
           <div className="flex items-center space-x-4">

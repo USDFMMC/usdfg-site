@@ -111,7 +111,7 @@ const ChromaModal: React.FC<ChromaModalProps> = ({
         onPointerMove={handleMove}
         onPointerLeave={handleLeave}
         className={`
-          relative w-[90vw] max-w-2xl max-h-[90vh] overflow-hidden rounded-2xl border border-cyan-400/30
+          relative w-[90vw] max-w-2xl max-h-[90vh] overflow-hidden rounded-2xl border border-amber-400/30
           ${className}
         `}
         style={
@@ -132,15 +132,15 @@ const ChromaModal: React.FC<ChromaModalProps> = ({
           className="absolute inset-0 pointer-events-none transition-opacity duration-300 opacity-0 hover:opacity-100"
           style={{
             background:
-              'radial-gradient(circle at var(--mouse-x) var(--mouse-y), rgba(0, 232, 252, 0.2), transparent 70%)'
+              'radial-gradient(circle at var(--mouse-x) var(--mouse-y), rgba(251, 191, 36, 0.2), transparent 70%)'
           }}
         />
         
         {/* Header */}
         {title && (
-          <div className="relative z-10 p-6 border-b border-cyan-400/20">
+          <div className="relative z-10 p-6 border-b border-amber-400/20">
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">
                 {title}
               </h2>
               <button

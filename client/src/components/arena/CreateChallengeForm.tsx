@@ -7,6 +7,7 @@ interface CreateChallengeFormProps {
   onCreateChallenge: (data: any) => void;
   usdfgPrice: number;
   usdfgToUsd: (amount: number) => number;
+  userGamerTag: string;
 }
 
 const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
@@ -14,12 +15,13 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
   onConnect,
   onCreateChallenge,
   usdfgPrice,
-  usdfgToUsd
+  usdfgToUsd,
+  userGamerTag
 }) => {
   const [formData, setFormData] = useState({
     game: 'NBA 2K25',
     platform: 'PS5',
-    username: '',
+    username: userGamerTag || '',
     entryFee: 50,
     mode: 'Head-to-Head',
     customMode: '',
@@ -35,10 +37,10 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
 
   // Game categories and options
   const gameCategories = {
-    Sports: ["NBA 2K25", "FIFA 24", "Madden NFL 24", "EA UFC 6"],
-    Racing: ["Forza Horizon", "F1 2023", "Mario Kart", "Gran Turismo 7"],
-    Fighting: ["Street Fighter 6", "Tekken 8", "Mortal Kombat 1"],
-    Shooting: ["Call of Duty", "Valorant", "Fortnite"]
+    Sports: ["EA UFC 6", "FC 26", "Madden 26", "NBA 2K26"],
+    Racing: ["F1 2023", "Mario Kart", "Gran Turismo 7"],
+    Fighting: ["Mortal Kombat 1", "Street Fighter 6", "Tekken 8"],
+    Shooting: ["COD MW3", "Fortnite", "Valorant"]
   };
 
   // Available games for selection (flattened + Custom)
@@ -77,19 +79,18 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
   // Game-specific modes - Enhanced with competitive options
   const gameModes = {
     'EA UFC 6': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
-    'FIFA 24': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
-    'Madden NFL 24': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
-    'NBA 2K25': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
-    'Forza Horizon': ['Best Lap Time', '1v1 Race to Finish', 'Custom Challenge'],
+    'FC 26': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
+    'Madden 26': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
+    'NBA 2K26': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
     'F1 2023': ['Best Lap Time', '1v1 Race to Finish', 'Custom Challenge'],
     'Mario Kart': ['Best Lap Time', '1v1 Race to Finish', 'Custom Challenge'],
     'Gran Turismo 7': ['Best Lap Time', '1v1 Race to Finish', 'Custom Challenge'],
     'Mortal Kombat 1': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Custom Challenge'],
     'Street Fighter 6': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Custom Challenge'],
     'Tekken 8': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Custom Challenge'],
-    'Call of Duty': ['Run the Fade', '10 and Done', 'Snipers Only', 'Custom Challenge'],
-    'Valorant': ['Run the Fade', '10 and Done', 'Snipers Only', 'Custom Challenge'],
+    'COD MW3': ['Run the Fade', '10 and Done', 'Snipers Only', 'Custom Challenge'],
     'Fortnite': ['Run the Fade', '10 and Done', 'Snipers Only', 'Custom Challenge'],
+    'Valorant': ['Run the Fade', '10 and Done', 'Snipers Only', 'Custom Challenge'],
     'Custom': ['Custom Challenge']
   };
 
@@ -230,14 +231,14 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
           <div key={i} className="flex items-center">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
               i + 1 <= currentStep 
-                ? 'bg-gradient-to-r from-cyan-400 to-purple-500 text-black' 
-                : 'bg-gray-700 text-gray-400'
+                ? 'bg-gradient-to-r from-amber-300 to-yellow-200 text-zinc-900 shadow-[0_0_10px_rgba(255,215,130,0.3)]' 
+                : 'bg-zinc-800 text-zinc-400'
             }`}>
               {i + 1}
             </div>
             {i < totalSteps - 1 && (
               <div className={`w-8 h-0.5 ${
-                i + 1 < currentStep ? 'bg-gradient-to-r from-cyan-400 to-purple-500' : 'bg-gray-700'
+                i + 1 < currentStep ? 'bg-gradient-to-r from-amber-300 to-yellow-200 shadow-[0_0_5px_rgba(255,215,130,0.3)]' : 'bg-zinc-800'
               }`} />
             )}
           </div>
@@ -255,10 +256,10 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                 <button
                   key={game}
                   onClick={() => handleInputChange('game', game)}
-                  className={`p-3 rounded-lg border-2 transition-all duration-300 ${
+                  className={`p-3 rounded-2xl border-2 transition-all duration-300 ${
                     formData.game === game
-                      ? 'border-cyan-400 bg-cyan-400/10 text-cyan-400'
-                      : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
+                      ? 'border-amber-300 bg-amber-300/10 text-amber-300 shadow-[0_0_15px_rgba(255,215,130,0.2)]'
+                      : 'border-zinc-800 bg-[#0B0C12]/90 text-zinc-300 hover:border-amber-300/50 hover:shadow-[0_0_10px_rgba(255,215,130,0.1)]'
                   }`}
                 >
                   {game}
@@ -272,7 +273,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
             <select
               value={formData.platform}
               onChange={(e) => handleInputChange('platform', e.target.value)}
-              className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+              className="w-full p-3 bg-[#0B0C12]/90 border border-zinc-800 rounded-2xl text-white hover:border-amber-300/50 focus:border-amber-300/70 focus:outline-none transition-all shadow-[0_0_20px_rgba(255,215,130,0.03)]"
             >
               {platforms.map(platform => (
                 <option key={platform} value={platform}>{platform}</option>
@@ -287,7 +288,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
               value={formData.username}
               onChange={(e) => handleInputChange('username', e.target.value)}
               placeholder="Enter your gaming username"
-              className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+              className="w-full p-3 bg-[#0B0C12]/90 border border-zinc-800 rounded-2xl text-white placeholder-zinc-400 hover:border-amber-300/50 focus:border-amber-300/70 focus:outline-none transition-all shadow-[0_0_20px_rgba(255,215,130,0.03)]"
             />
           </div>
         </div>
@@ -304,7 +305,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
               <select
                 value={formData.mode}
                 onChange={(e) => handleInputChange('mode', e.target.value)}
-                className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
               >
                 {gameModes[formData.game as keyof typeof gameModes]?.map(mode => (
                   <option key={mode} value={mode}>{mode}</option>
@@ -342,7 +343,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                     // Always store as string to preserve decimal input
                     handleInputChange('entryFee', value);
                   }}
-                  className="flex-1 p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                  className="flex-1 p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
                 />
                 <div className="text-sm text-gray-400">
                   ≈ ${usdfgToUsd(typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) || 0 : formData.entryFee || 0).toFixed(2)} USD
@@ -371,7 +372,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                 onChange={(e) => handleInputChange('rules', e.target.value)}
                 placeholder="Enter detailed rules for your challenge..."
                 rows={6}
-                className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 resize-none"
+                className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 resize-none"
               />
               <div className="mt-2 text-sm text-gray-400">
                 Be specific about game settings, time limits, and winning conditions.

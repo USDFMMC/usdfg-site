@@ -8,20 +8,6 @@
   50% { opacity: 1; }
 }
 
-/* Trophy Modal Animations */
-@keyframes bounce-slow {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-.animate-bounce-slow {
-  animation: bounce-slow 3s ease-in-out infinite;
-}
-
 /* Safari compatibility fixes */
 @supports not (backdrop-filter: blur(10px)) {
   .backdrop-blur-sm {
@@ -113,11 +99,25 @@ body {
   animation: fadeOut 1s ease-in-out forwards;
 }
 
+/* Trophy Modal Animations */
+@keyframes bounce-slow {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-bounce-slow {
+  animation: bounce-slow 3s ease-in-out infinite;
+}
+
 @layer base {
   :root {
     /* Original Site Colors */
     --primary-color: #6c11f3; /* Purple */
-    --secondary-color: #00e8fc; /* Cyan */
+    --secondary-color: #ffc107; /* Amber/Gold */
     --accent-color: #ff0055; /* Red/Pink */
     --text-light: #f5f5f5;
     --text-dark: #202020;
@@ -188,11 +188,11 @@ body {
     --background-1: #050505;
     --background-2: #0a0f14;
     --background-3: #10151b;
-    --glow-cyan: #00fff0;
-    --glow-electric: #0077ff;
+    --glow-cyan: #ffc107; /* Amber/Gold */
+    --glow-electric: #ffc107; /* Amber/Gold */
     --glow-pink: #ff006a;
     --border-soft: rgba(255,255,255,0.05);
-    --border-glow: rgba(0,255,255,0.3);
+    --border-glow: rgba(251, 191, 36, 0.3); /* Amber/Gold */
     --text-primary: #e6e6e6;
     --text-dim: #808080;
   }
@@ -560,12 +560,46 @@ body {
   line-height: inherit !important;
 }
 
-/* Override default "Select Wallet" text */
-.wallet-adapter-button:not(.wallet-adapter-button-connected) {
-  white-space: nowrap;
-}
-
 /* Ensure Connect Wallet text is visible */
 .wallet-adapter-button .wallet-adapter-button-start-icon {
   margin-right: 8px;
+}
+
+/* Override wallet adapter button to match Create Challenge button size and style - gold/amber theme */
+.wallet-adapter-button:not(.wallet-adapter-button-connected),
+button.wallet-adapter-button:not(.wallet-adapter-button-connected) {
+  white-space: nowrap;
+  background: rgba(39, 39, 42, 0.5) !important; /* zinc-800/50 - matches Create Challenge */
+  background-image: none !important; /* Remove any gradient backgrounds */
+  border: 1px solid rgba(63, 63, 70, 1) !important; /* border-zinc-700 - matches Create Challenge */
+  color: rgba(251, 191, 36, 1) !important; /* amber-300 text for goldish look */
+  padding: 0.5rem 1rem !important; /* px-4 py-2 - matches Create Challenge */
+  height: 2.5rem !important; /* h-10 - matches Create Challenge */
+  font-size: 0.875rem !important; /* text-sm - matches Create Challenge */
+  font-weight: 600 !important; /* font-semibold - matches Create Challenge */
+  border-radius: 0.75rem !important; /* rounded-xl - matches Create Challenge */
+  transition: all 0.2s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.5rem !important; /* gap-2 - matches Create Challenge */
+  min-width: auto !important;
+  box-shadow: none !important;
+}
+
+.wallet-adapter-button:not(.wallet-adapter-button-connected):hover,
+button.wallet-adapter-button:not(.wallet-adapter-button-connected):hover {
+  background: rgba(63, 63, 70, 0.5) !important; /* zinc-700/50 - matches Create Challenge hover */
+  background-image: none !important; /* Remove any gradient backgrounds */
+  border-color: rgba(251, 191, 36, 0.5) !important; /* amber-300/50 - matches Create Challenge hover */
+}
+
+.wallet-adapter-button:not(.wallet-adapter-button-connected):active {
+  transform: scale(0.98) !important;
+}
+
+/* Override wallet adapter button icon colors to match gold/amber theme */
+.wallet-adapter-button:not(.wallet-adapter-button-connected) .wallet-adapter-button-start-icon,
+.wallet-adapter-button:not(.wallet-adapter-button-connected) .wallet-adapter-button-end-icon {
+  color: rgba(251, 191, 36, 1) !important; /* amber-300 to match text */
 }

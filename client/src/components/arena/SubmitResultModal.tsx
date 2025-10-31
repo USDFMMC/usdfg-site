@@ -63,7 +63,7 @@ export const SubmitResultModal: React.FC<SubmitResultModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-900 border-2 border-purple-500/30 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+      <div className="bg-gradient-to-br from-gray-900 via-amber-900/20 to-gray-900 border-2 border-amber-500/30 rounded-2xl max-w-md w-full p-6 shadow-2xl">
         {/* Header */}
         <div className="flex justify-between items-start mb-6">
           <div className="flex items-center gap-3">
@@ -86,7 +86,7 @@ export const SubmitResultModal: React.FC<SubmitResultModalProps> = ({
 
         {/* Question */}
         <div className="mb-8">
-          <div className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl p-4 mb-6">
+          <div className="bg-gradient-to-r from-amber-500/10 to-amber-600/10 border border-amber-500/20 rounded-xl p-4 mb-6">
             <p className="text-xl font-semibold text-white text-center">
               Did you win this match?
             </p>
@@ -155,9 +155,9 @@ export const SubmitResultModal: React.FC<SubmitResultModalProps> = ({
         {/* Proof Upload Section */}
         {selectedResult === true && (
           <div className="mb-6">
-            <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-4">
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-semibold text-purple-300">
+                <p className="text-sm font-semibold text-amber-300">
                   📸 Upload Proof (Optional but Recommended)
                 </p>
               </div>
@@ -180,7 +180,7 @@ export const SubmitResultModal: React.FC<SubmitResultModalProps> = ({
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="flex items-center justify-center gap-2 p-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg transition-all"
+                      className="flex items-center justify-center gap-2 p-3 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white rounded-lg transition-all"
                     >
                       <Camera className="w-5 h-5" />
                       <span className="text-sm font-medium">Take Photo</span>
@@ -195,7 +195,7 @@ export const SubmitResultModal: React.FC<SubmitResultModalProps> = ({
                           fileInputRef.current.click();
                         }
                       }}
-                      className="flex items-center justify-center gap-2 p-3 bg-purple-700 hover:bg-purple-800 text-white rounded-lg transition-all"
+                      className="flex items-center justify-center gap-2 p-3 bg-amber-700 hover:bg-amber-800 text-white rounded-lg transition-all"
                     >
                       <Upload className="w-5 h-5" />
                       <span className="text-sm font-medium">Upload</span>
@@ -246,7 +246,7 @@ export const SubmitResultModal: React.FC<SubmitResultModalProps> = ({
             disabled:opacity-50 disabled:cursor-not-allowed
             ${
               selectedResult !== null
-                ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg shadow-purple-500/20"
+                ? "bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white shadow-lg shadow-amber-500/20"
                 : "bg-gray-700 text-gray-400 cursor-not-allowed"
             }
           `}
