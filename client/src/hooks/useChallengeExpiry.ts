@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { updateChallengeStatus, cleanupExpiredChallenge, cleanupCompletedChallenge } from "../lib/firebase/firestore";
+import { updateChallengeStatus, cleanupExpiredChallenge, cleanupCompletedChallenge, archiveChallenge } from "../lib/firebase/firestore";
 
 /**
  * Watches all active challenges and auto-marks them completed when expired.

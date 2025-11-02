@@ -75,8 +75,8 @@ export default function TrustReviewModal({
 
   const StarRating = ({ value, onChange, label }: { value: number; onChange: (v: number) => void; label: string }) => (
     <div>
-      <label className="text-gray-300 mb-2 block">{label}</label>
-      <div className="flex items-center gap-2 mb-2">
+      <label className="text-gray-300 mb-1.5 block text-sm">{label}</label>
+      <div className="flex items-center gap-1 mb-1">
         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
           <button
             key={star}
@@ -84,37 +84,37 @@ export default function TrustReviewModal({
             onClick={() => onChange(star)}
             className={`transition-all ${
               star <= value
-                ? 'text-amber-400 scale-110'
-                : 'text-gray-600 hover:text-gray-400'
+                ? 'text-amber-400 scale-105'
+                : 'text-gray-600/60 hover:text-gray-400/80'
             }`}
           >
-            <StarIcon className={`w-5 h-5 ${star <= value ? 'fill-current' : ''}`} />
+            <StarIcon className={`w-3.5 h-3.5 ${star <= value ? 'fill-current' : ''}`} />
           </button>
         ))}
-        <span className="ml-2 text-amber-300 font-semibold">{value}/10</span>
+        <span className="ml-2 text-amber-300 font-semibold text-sm">{value}/10</span>
       </div>
     </div>
   );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="relative w-full max-w-2xl rounded-xl border border-amber-400/30 bg-[#07080C]/95 p-4 shadow-[0_0_40px_rgba(255,215,130,0.06)] max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-6">
+      <div className="relative w-full max-w-xl rounded-xl border border-amber-400/20 bg-[#07080C]/98 p-3 shadow-[0_0_40px_rgba(255,215,130,0.06)] max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-3">
           <div>
-            <h3 className="text-2xl font-bold text-white">Review Your Opponent</h3>
-            <p className="text-sm text-gray-400 mt-1">{opponentName}</p>
+            <h3 className="text-lg font-bold text-white">Review Your Opponent</h3>
+            <p className="text-xs text-gray-400 mt-0.5">{opponentName}</p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors p-2"
+            className="text-gray-400 hover:text-white transition-colors p-1.5"
           >
-            <X className="w-6 h-6" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-3">
           {/* Rating Fields */}
-          <div className="space-y-4">
+          <div className="space-y-2.5">
             <StarRating 
               value={honesty} 
               onChange={setHonesty} 
@@ -134,17 +134,17 @@ export default function TrustReviewModal({
 
           {/* Tags */}
           <div>
-            <label className="text-gray-300 mb-3 block">Tags (Optional)</label>
-            <div className="flex flex-wrap gap-2">
+            <label className="text-gray-300 mb-1.5 block text-sm">Tags (Optional)</label>
+            <div className="flex flex-wrap gap-1.5">
               {reviewTags.map((tag) => (
                 <button
                   key={tag}
                   type="button"
                   onClick={() => handleTagToggle(tag)}
-                  className={`px-3 py-1.5 rounded-lg text-sm transition-all ${
+                  className={`px-2 py-1 rounded-md text-xs transition-all ${
                     selectedTags.includes(tag)
-                      ? 'bg-amber-500 text-white border border-amber-400'
-                      : 'bg-zinc-800 text-gray-300 border border-zinc-700 hover:border-amber-500/50'
+                      ? 'bg-amber-500/90 text-white border border-amber-400/50'
+                      : 'bg-zinc-800/60 text-gray-300 border border-zinc-700/50 hover:border-amber-500/30'
                   }`}
                 >
                   {tag}
@@ -155,37 +155,37 @@ export default function TrustReviewModal({
 
           {/* Comment */}
           <div>
-            <label className="text-gray-300 mb-2 block">Additional Comments (Optional)</label>
+            <label className="text-gray-300 mb-1.5 block text-sm">Additional Comments (Optional)</label>
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              className="w-full px-4 py-3 bg-zinc-800 border border-amber-400/30 rounded-lg text-white placeholder-gray-500 focus:border-amber-400 focus:outline-none"
-              rows={3}
+              className="w-full px-3 py-2 bg-zinc-800/60 border border-amber-400/20 rounded-lg text-sm text-white placeholder-gray-500 focus:border-amber-400/50 focus:outline-none resize-none"
+              rows={2}
               placeholder="Share your experience with this player..."
             />
           </div>
 
           {/* Overall Trust Score Display */}
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+          <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-2">
             <div className="flex items-center justify-between">
-              <span className="text-gray-300 font-medium">Overall Trust Score:</span>
-              <span className="text-2xl font-bold text-amber-400">
+              <span className="text-gray-300 font-medium text-sm">Overall Trust Score:</span>
+              <span className="text-xl font-bold text-amber-400">
                 {Math.round((honesty + fairness + sportsmanship) / 3 * 10) / 10}/10
               </span>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-2 pt-2">
             <button
               onClick={onClose}
-              className="flex-1 px-4 py-3 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 transition-colors font-semibold"
+              className="flex-1 px-3 py-2 bg-zinc-800/60 text-white rounded-lg hover:bg-zinc-700/60 transition-colors text-sm font-semibold border border-zinc-700/50"
             >
               Skip Review
             </button>
             <button
               onClick={handleSubmit}
-              className="flex-1 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg font-semibold hover:brightness-110 transition-all"
+              className="flex-1 px-3 py-2 bg-gradient-to-r from-amber-500/90 to-orange-500/90 text-white rounded-lg font-semibold hover:brightness-110 transition-all text-sm border border-amber-400/30"
             >
               Submit Review
             </button>

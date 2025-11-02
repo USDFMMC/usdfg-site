@@ -1,7 +1,5 @@
 import React from "react";
 import { motion } from 'framer-motion';
-import { Card, CardContent } from "@/components/ui/card";
-import { Trophy, Swords, Flag, Crosshair } from "lucide-react";
 
 interface Game {
   image: string;
@@ -61,13 +59,13 @@ const GameCategories: React.FC = () => {
   };
 
   return (
-    <section className="py-12 px-2 text-white relative overflow-hidden">
+    <section className="py-8 px-3 text-white relative overflow-hidden bg-[#07080C]">
       <div className="max-w-7xl mx-auto">
         <motion.h2 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="text-xl md:text-2xl font-extrabold tracking-wide mb-2 text-center drop-shadow-glow"
+          className="text-xl md:text-2xl font-extrabold tracking-wide mb-3 text-center drop-shadow-glow"
         >
           Supported Games
         </motion.h2>
@@ -75,9 +73,9 @@ const GameCategories: React.FC = () => {
         {/* Animated Divider */}
         <motion.div 
           initial={{ width: 0 }}
-          animate={{ width: "200px" }}
+          animate={{ width: "180px" }}
           transition={{ duration: 0.8, delay: 0.3 }}
-          className="mx-auto mb-6 h-1 rounded-full bg-gradient-to-r from-cyan-400 via-purple-500 to-cyan-400 animate-pulse shadow-[0_0_32px_#22d3ee99]"
+          className="mx-auto mb-6 h-0.5 rounded-full bg-gradient-to-r from-cyan-400/80 via-purple-500/80 to-cyan-400/80 animate-pulse shadow-[0_0_20px_#22d3ee66]"
         />
 
         {/* Elite/Premium Intro Paragraph */}
@@ -85,9 +83,9 @@ const GameCategories: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.5 }}
-          className="relative max-w-2xl mx-auto mb-6 px-3 py-2 rounded-lg bg-gradient-to-br from-white/10 to-amber-900/20 border border-amber-400/30 shadow-[0_0_20px_rgba(255,215,130,0.15)] backdrop-blur-md text-center"
+          className="relative max-w-2xl mx-auto mb-6 px-4 py-3 rounded-lg bg-[#07080C]/98 border border-amber-400/20 shadow-[0_0_15px_rgba(255,215,130,0.08)] backdrop-blur-md text-center"
         >
-          <p className="text-lg md:text-xl font-extrabold text-white mb-2 drop-shadow-glow">
+          <p className="text-base md:text-lg font-extrabold text-white mb-2 drop-shadow-glow">
             The Arena Is Open. Any Game. No Excuses.
           </p>
           <p className="text-sm md:text-base text-amber-100 leading-relaxed font-medium">
@@ -104,7 +102,7 @@ const GameCategories: React.FC = () => {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-100px" }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch h-full"
+          className="grid grid-cols-1 md:grid-cols-2 gap-3 items-stretch h-full"
         >
           {games.map((game, index) => (
             <motion.div
@@ -112,23 +110,21 @@ const GameCategories: React.FC = () => {
               variants={cardVariants}
               className="group relative h-full flex flex-col"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-amber-500/20 to-orange-500/20 rounded-lg blur-xl group-hover:blur-2xl transition-all duration-500 animate-pulse" />
-              <div className="relative bg-[#0d0d0d]/80 backdrop-blur-sm border border-amber-400/30 rounded-lg p-3 shadow-[0_0_12px_rgba(255,215,130,0.15)] hover:shadow-[0_0_20px_rgba(255,215,130,0.25)] transition-all duration-500 hover:scale-[1.02] hover:border-amber-400/50 h-full flex flex-col">
+              <div className="relative bg-[#07080C]/98 backdrop-blur-sm border border-amber-400/20 rounded-lg p-2 shadow-[0_0_10px_rgba(255,215,130,0.08)] hover:shadow-[0_0_15px_rgba(255,215,130,0.15)] transition-all duration-500 hover:scale-[1.02] hover:border-amber-400/30 h-full flex flex-col">
                 <div className="relative">
                   <img
                     src={game.image.replace('.png', '.webp')}
                     alt={game.alt}
-                    className="w-full h-32 object-cover rounded-lg mb-2 shadow-[0_0_12px_rgba(255,215,130,0.1)]"
+                    className="w-full h-24 object-cover rounded-lg mb-2 shadow-[0_0_8px_rgba(255,215,130,0.08)]"
                     loading="lazy" decoding="async"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-lg" />
                 </div>
                 <div className="flex-1 flex flex-col">
-                  <h3 className="text-base font-semibold mb-1 flex items-center gap-2 group-hover:text-amber-400 transition-colors duration-300">
+                  <h3 className="text-base font-semibold mb-2 flex items-center gap-2 group-hover:text-amber-400 transition-colors duration-300">
                     <span className="animate-bounce">{game.title.split(' ')[0]}</span>
                     <span>{game.title.split(' ').slice(1).join(' ')}</span>
                   </h3>
-                  <p className="text-gray-300 whitespace-pre-line leading-relaxed">
+                  <p className="text-gray-300 text-sm whitespace-pre-line leading-relaxed">
                     {game.challenges}
                   </p>
                 </div>

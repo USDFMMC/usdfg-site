@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import ElegantButton from '@/components/ui/ElegantButton';
+import { ADMIN_WALLET } from '@/lib/chain/config';
 
 interface CreateChallengeFormProps {
   isConnected: boolean;
@@ -8,6 +9,7 @@ interface CreateChallengeFormProps {
   usdfgPrice: number;
   usdfgToUsd: (amount: number) => number;
   userGamerTag: string;
+  currentWallet?: string | null; // Add wallet prop to check if admin
 }
 
 const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
@@ -16,7 +18,8 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
   onCreateChallenge,
   usdfgPrice,
   usdfgToUsd,
-  userGamerTag
+  userGamerTag,
+  currentWallet
 }) => {
   const [formData, setFormData] = useState({
     game: 'NBA 2K25',
@@ -173,11 +176,23 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     if (step === 2) {
       if (!formData.mode) errors.push('Please select a challenge mode');
       const entryFee = typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) : formData.entryFee;
-      if (!formData.entryFee || (typeof formData.entryFee === 'string' && formData.entryFee === '') || isNaN(entryFee) || entryFee < 0.000000001) {
+      
+      // Check if user is admin (allow 0 entry fee for Founder Challenges)
+      const isAdmin = currentWallet && currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+      
+      if (isNaN(entryFee)) {
+        errors.push('Entry fee must be a valid number');
+      } else if (!isAdmin && (entryFee < 0.000000001 || entryFee === 0)) {
         errors.push('Minimum entry fee is 0.000000001 USDFG (1 lamport - smallest unit)');
-      }
-      if (entryFee > 1000) {
+      } else if (isAdmin && entryFee < 0) {
+        errors.push('Entry fee cannot be negative');
+      } else if (entryFee > 1000) {
         errors.push('Maximum entry fee is 1000 USDFG');
+      }
+      
+      // Allow 0 entry fee for admin (Founder Challenges)
+      if (isAdmin && entryFee === 0) {
+        // Valid - no error for Founder Challenges
       }
     }
     
@@ -224,21 +239,21 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Progress Bar */}
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-1.5">
         {Array.from({ length: totalSteps }, (_, i) => (
           <div key={i} className="flex items-center">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
               i + 1 <= currentStep 
-                ? 'bg-gradient-to-r from-amber-300 to-yellow-200 text-zinc-900 shadow-[0_0_10px_rgba(255,215,130,0.3)]' 
-                : 'bg-zinc-800 text-zinc-400'
+                ? 'bg-gradient-to-r from-amber-300/90 to-yellow-200/90 text-zinc-900 shadow-[0_0_8px_rgba(255,215,130,0.2)] border border-amber-400/30' 
+                : 'bg-zinc-800/60 text-zinc-400 border border-zinc-700/50'
             }`}>
               {i + 1}
             </div>
             {i < totalSteps - 1 && (
-              <div className={`w-8 h-0.5 ${
-                i + 1 < currentStep ? 'bg-gradient-to-r from-amber-300 to-yellow-200 shadow-[0_0_5px_rgba(255,215,130,0.3)]' : 'bg-zinc-800'
+              <div className={`w-6 h-0.5 ${
+                i + 1 < currentStep ? 'bg-gradient-to-r from-amber-300/90 to-yellow-200/90 shadow-[0_0_4px_rgba(255,215,130,0.2)]' : 'bg-zinc-800/60'
               }`} />
             )}
           </div>
@@ -247,19 +262,19 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
 
       {/* Step 1: Game Selection */}
       {currentStep === 1 && (
-        <div className="space-y-6">
+        <div className="space-y-3">
           <div>
-            <h3 className="text-xl font-semibold text-white mb-4">Choose Your Game</h3>
+            <h3 className="text-base font-semibold text-white mb-3">Choose Your Game</h3>
             
-            <div className="grid grid-cols-2 gap-3 mb-6">
+            <div className="grid grid-cols-2 gap-2 mb-3">
               {availableGames.map((game) => (
                 <button
                   key={game}
                   onClick={() => handleInputChange('game', game)}
-                  className={`p-3 rounded-2xl border-2 transition-all duration-300 ${
+                  className={`px-3 py-2 rounded-lg border transition-all duration-300 text-sm ${
                     formData.game === game
-                      ? 'border-amber-300 bg-amber-300/10 text-amber-300 shadow-[0_0_15px_rgba(255,215,130,0.2)]'
-                      : 'border-zinc-800 bg-[#0B0C12]/90 text-zinc-300 hover:border-amber-300/50 hover:shadow-[0_0_10px_rgba(255,215,130,0.1)]'
+                      ? 'border-amber-400/50 bg-amber-300/10 text-amber-300 shadow-[0_0_10px_rgba(255,215,130,0.15)]'
+                      : 'border-zinc-700/50 bg-zinc-800/60 text-zinc-300 hover:border-amber-300/30 hover:shadow-[0_0_6px_rgba(255,215,130,0.08)]'
                   }`}
                 >
                   {game}
@@ -269,11 +284,11 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Platform</label>
+            <label className="block text-xs font-medium text-gray-300 mb-1.5">Platform</label>
             <select
               value={formData.platform}
               onChange={(e) => handleInputChange('platform', e.target.value)}
-              className="w-full p-3 bg-[#0B0C12]/90 border border-zinc-800 rounded-2xl text-white hover:border-amber-300/50 focus:border-amber-300/70 focus:outline-none transition-all shadow-[0_0_20px_rgba(255,215,130,0.03)]"
+              className="w-full px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white hover:border-amber-300/30 focus:border-amber-400/50 focus:outline-none transition-all"
             >
               {platforms.map(platform => (
                 <option key={platform} value={platform}>{platform}</option>
@@ -282,13 +297,13 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Your Username</label>
+            <label className="block text-xs font-medium text-gray-300 mb-1.5">Your Username</label>
             <input
               type="text"
               value={formData.username}
               onChange={(e) => handleInputChange('username', e.target.value)}
               placeholder="Enter your gaming username"
-              className="w-full p-3 bg-[#0B0C12]/90 border border-zinc-800 rounded-2xl text-white placeholder-zinc-400 hover:border-amber-300/50 focus:border-amber-300/70 focus:outline-none transition-all shadow-[0_0_20px_rgba(255,215,130,0.03)]"
+              className="w-full px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white placeholder-zinc-500 hover:border-amber-300/30 focus:border-amber-400/50 focus:outline-none transition-all"
             />
           </div>
         </div>
@@ -296,16 +311,16 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
 
       {/* Step 2: Challenge Setup */}
       {currentStep === 2 && (
-        <div className="space-y-6">
+        <div className="space-y-3">
           <div>
-            <h3 className="text-xl font-semibold text-white mb-4">Challenge Configuration</h3>
+            <h3 className="text-base font-semibold text-white mb-3">Challenge Configuration</h3>
             
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-300 mb-2">Challenge Mode</label>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-300 mb-1.5">Challenge Mode</label>
               <select
                 value={formData.mode}
                 onChange={(e) => handleInputChange('mode', e.target.value)}
-                className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+                className="w-full px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white focus:border-amber-400/50 focus:outline-none transition-all"
               >
                 {gameModes[formData.game as keyof typeof gameModes]?.map(mode => (
                   <option key={mode} value={mode}>{mode}</option>
@@ -313,16 +328,16 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
               </select>
               
               {/* Mode explanation */}
-              <div className="mt-3 p-3 bg-gray-800/50 rounded-lg border border-gray-600">
-                <p className="text-sm text-gray-300 whitespace-pre-line">
+              <div className="mt-2 p-2 bg-zinc-800/40 rounded-lg border border-zinc-700/50">
+                <p className="text-xs text-gray-300 whitespace-pre-line">
                   {getModeExplanation(formData.mode)}
                 </p>
-                <div className="mt-2 pt-2 border-t border-gray-600">
+                <div className="mt-1.5 pt-1.5 border-t border-zinc-700/50">
                   <ElegantButton
                     onClick={handleAutoRules}
                     variant="secondary"
                     size="sm"
-                    className="text-xs"
+                    className="text-xs px-2 py-1"
                   >
                     Auto-Generate Rules
                   </ElegantButton>
@@ -331,10 +346,14 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className="block text-xs font-medium text-gray-300 mb-1.5">
                 Entry Fee (USDFG)
+                {currentWallet && (() => {
+                  const isAdmin = currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+                  return isAdmin ? <span className="text-purple-400 ml-1.5 text-xs">🏆 (Founder: Enter 0 for free entry)</span> : null;
+                })()}
               </label>
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2">
                 <input
                   type="text"
                   value={formData.entryFee || ''}
@@ -343,14 +362,25 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                     // Always store as string to preserve decimal input
                     handleInputChange('entryFee', value);
                   }}
-                  className="flex-1 p-3 bg-gray-800 border border-gray-600 rounded-lg text-white focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+                  placeholder={currentWallet && (() => {
+                    const isAdmin = currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+                    return isAdmin ? '0 for Founder Challenge' : '';
+                  })()}
+                  className="flex-1 px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white placeholder-zinc-500 focus:border-amber-400/50 focus:outline-none transition-all"
                 />
-                <div className="text-sm text-gray-400">
+                <div className="text-xs text-gray-400">
                   ≈ ${usdfgToUsd(typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) || 0 : formData.entryFee || 0).toFixed(2)} USD
                 </div>
               </div>
-              <div className="mt-2 text-sm text-gray-400">
-                Prize Pool: {(typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) || 0 : formData.entryFee || 0) * 2} USDFG (2x entry fee)
+              <div className="mt-1.5 text-xs text-gray-400">
+                {(() => {
+                  const isAdmin = currentWallet && currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+                  const entryFee = typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) || 0 : formData.entryFee || 0;
+                  if (isAdmin && entryFee === 0) {
+                    return <span className="text-purple-300">🏆 Founder Challenge - Set prize pool manually when transferring USDFG</span>;
+                  }
+                  return <>Prize Pool: {(typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) || 0 : formData.entryFee || 0) * 2} USDFG (2x entry fee)</>;
+                })()}
               </div>
             </div>
           </div>
@@ -359,22 +389,22 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
 
       {/* Step 3: Rules */}
       {currentStep === 3 && (
-        <div className="space-y-6">
+        <div className="space-y-3">
           <div>
-            <h3 className="text-xl font-semibold text-white mb-4">Challenge Rules</h3>
+            <h3 className="text-base font-semibold text-white mb-3">Challenge Rules</h3>
             
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className="block text-xs font-medium text-gray-300 mb-1.5">
                 Rules & Conditions
               </label>
               <textarea
                 value={formData.rules}
                 onChange={(e) => handleInputChange('rules', e.target.value)}
                 placeholder="Enter detailed rules for your challenge..."
-                rows={6}
-                className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 resize-none"
+                rows={5}
+                className="w-full px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white placeholder-zinc-500 focus:border-amber-400/50 focus:outline-none resize-none transition-all"
               />
-              <div className="mt-2 text-sm text-gray-400">
+              <div className="mt-1.5 text-xs text-gray-400">
                 Be specific about game settings, time limits, and winning conditions.
               </div>
             </div>
@@ -384,9 +414,9 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
 
       {/* Validation Errors */}
       {validationErrors.length > 0 && (
-        <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
-          <div className="text-red-400 font-medium mb-2">Please fix the following errors:</div>
-          <ul className="text-red-300 text-sm space-y-1">
+        <div className="p-2 bg-red-500/10 border border-red-500/30 rounded-lg">
+          <div className="text-red-400 font-medium mb-1.5 text-xs">Please fix the following errors:</div>
+          <ul className="text-red-300 text-xs space-y-0.5">
             {validationErrors.map((error, index) => (
               <li key={index}>• {error}</li>
             ))}
@@ -395,20 +425,22 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
       )}
 
       {/* Action Buttons */}
-      <div className="flex justify-between pt-6 border-t border-gray-700">
+      <div className="flex justify-between pt-3 border-t border-zinc-700/50">
         <ElegantButton
           onClick={handlePrev}
           variant="secondary"
           disabled={currentStep === 1}
+          className="text-sm px-3 py-1.5"
         >
           Previous
         </ElegantButton>
 
-        <div className="flex space-x-3">
+        <div className="flex space-x-2">
           {currentStep < totalSteps ? (
             <ElegantButton
               onClick={handleNext}
               variant="primary"
+              className="text-sm px-3 py-1.5"
             >
               Next
             </ElegantButton>
@@ -417,6 +449,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
               onClick={handleSubmit}
               variant="success"
               disabled={!isConnected}
+              className="text-sm px-3 py-1.5"
             >
               Create Challenge
             </ElegantButton>
@@ -426,14 +459,15 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
 
       {/* Connection Status */}
       {!isConnected && (
-        <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-          <p className="text-yellow-400 text-sm mb-3">
+        <div className="mt-3 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+          <p className="text-yellow-400 text-xs mb-2">
             Connect your wallet to create challenges and compete for rewards!
           </p>
           <ElegantButton
             onClick={handleConnect}
             variant="warning"
             disabled={connecting}
+            className="text-xs px-3 py-1.5"
           >
             {connecting ? "Connecting..." : "Connect Wallet"}
           </ElegantButton>

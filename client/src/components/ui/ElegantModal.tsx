@@ -45,23 +45,23 @@ const ElegantModal: React.FC<ElegantModalProps> = ({
       >
         {/* Header */}
         {title && (
-          <div className="p-4 border-b border-amber-400/20">
+          <div className="p-3 border-b border-amber-400/20">
             <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">
+              <h2 className="text-lg font-bold bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">
                 {title}
               </h2>
               <button
                 onClick={onClose}
-                className="p-2 rounded-lg bg-gray-800/50 hover:bg-gray-700/50 transition-colors duration-300"
+                className="p-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors duration-300"
               >
-                <X className="w-5 h-5 text-gray-400" />
+                <X className="w-4 h-4 text-gray-400" />
               </button>
             </div>
           </div>
         )}
         
         {/* Content */}
-        <div className="p-4 overflow-y-auto max-h-[calc(90vh-100px)]">
+        <div className="p-3 overflow-y-auto max-h-[calc(90vh-80px)]">
           {children}
         </div>
       </div>

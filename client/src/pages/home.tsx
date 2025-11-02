@@ -81,7 +81,7 @@ const Home: React.FC = () => {
       </Helmet>
 
       <Navbar />
-      <main id="main-content" role="main" aria-label="Homepage Main Content" className="min-h-screen bg-background flex-1">
+      <main id="main-content" role="main" aria-label="Homepage Main Content" className="min-h-screen bg-[#07080C] flex-1">
         <section aria-label="Hero Section">
           <HeroSection />
         </section>

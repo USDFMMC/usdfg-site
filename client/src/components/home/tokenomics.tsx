@@ -61,43 +61,43 @@ const Tokenomics: React.FC = () => {
   };
 
   return (
-    <section id="tokenomics" className="py-20 text-center" ref={sectionRef}>
+    <section id="tokenomics" className="py-12 text-center bg-[#07080C]" ref={sectionRef}>
       {/* Why Tokenomics Matters Intro */}
-      <div className="max-w-2xl mx-auto mb-8 px-6 py-4 rounded-xl bg-gradient-to-br from-white/10 to-[#a78bfa22] border border-purple-700/40 shadow-lg backdrop-blur-md animate-fade-in" style={{ textAlign: 'center' }}>
-        <p className="text-lg md:text-xl font-bold text-purple-300 mb-2 drop-shadow-glow">Why Tokenomics Matters</p>
-        <p className="text-base md:text-lg text-white/90 font-medium">Transparent tokenomics ensures every USDFG token is allocated for platform access and utility, with no hidden distributions. Our structure is designed for platform integrity and fair access—so you always know exactly how tokens are used within the ecosystem.</p>
+      <div className="max-w-2xl mx-auto mb-6 px-4 py-3 rounded-xl bg-[#07080C]/98 border border-purple-700/30 shadow-lg backdrop-blur-md animate-fade-in" style={{ textAlign: 'center' }}>
+          <p className="text-base md:text-lg font-bold text-purple-300 mb-2 drop-shadow-glow">Why Tokenomics Matters</p>
+        <p className="text-sm md:text-base text-white/90 font-medium">Transparent tokenomics ensures every USDFG token is allocated for platform access and utility, with no hidden distributions. Our structure is designed for platform integrity and fair access—so you always know exactly how tokens are used within the ecosystem.</p>
       </div>
-      <h2 className="text-3xl md:text-5xl font-bold mb-4 text-white" style={{ textShadow: 'var(--primary-glow)' }}>
+      <h2 className="text-2xl md:text-3xl font-bold mb-4 text-white" style={{ textShadow: 'var(--primary-glow)' }}>
         TOKENOMICS
       </h2>
-      <p className="text-lg text-muted-foreground mb-12 max-w-xl mx-auto">
+      <p className="text-sm md:text-base text-muted-foreground mb-8 max-w-xl mx-auto">
         USDFG Token allocation structure for platform access and utility.
       </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 max-w-5xl mx-auto mb-8">
-        <div className="rounded-xl border border-purple-500/40 bg-gradient-to-br from-[#a78bfa11] to-[#a78bfa22] p-6 text-center shadow-lg animate-float-soft"
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 max-w-5xl mx-auto mb-6">
+        <div className="rounded-lg border border-purple-500/30 bg-[#07080C]/98 p-3 text-center shadow-lg animate-float-soft"
           onMouseEnter={handleHover(65, setVal1, 0)}
           onMouseLeave={handleMouseLeave}>
-          <p className="text-4xl md:text-5xl font-extrabold text-purple-300 mb-2 animate-pulse-soft">{val1}%</p>
-          <p className="text-lg font-bold text-white/90">Public Trading</p>
+          <p className="text-3xl md:text-4xl font-extrabold text-purple-300 mb-2 animate-pulse-soft">{val1}%</p>
+          <p className="text-base font-bold text-white/90">Public Trading</p>
         </div>
-        <div className="rounded-xl border border-purple-500/40 bg-gradient-to-br from-[#a78bfa11] to-[#a78bfa22] p-6 text-center shadow-lg animate-float-soft"
+        <div className="rounded-lg border border-purple-500/30 bg-[#07080C]/98 p-4 text-center shadow-lg animate-float-soft"
           onMouseEnter={handleHover(15, setVal2, 1)}
           onMouseLeave={handleMouseLeave}>
-          <p className="text-4xl md:text-5xl font-extrabold text-purple-300 mb-2 animate-pulse-soft">{val2}%</p>
-          <p className="text-lg font-bold text-white/90">Core Reserve</p>
+          <p className="text-3xl md:text-4xl font-extrabold text-purple-300 mb-2 animate-pulse-soft">{val2}%</p>
+          <p className="text-base font-bold text-white/90">Core Reserve</p>
         </div>
-        <div className="rounded-xl border border-purple-500/40 bg-gradient-to-br from-[#a78bfa11] to-[#a78bfa22] p-6 text-center shadow-lg animate-float-soft"
+        <div className="rounded-lg border border-purple-500/30 bg-[#07080C]/98 p-4 text-center shadow-lg animate-float-soft"
           onMouseEnter={handleHover(10, setVal3, 2)}
           onMouseLeave={handleMouseLeave}>
-          <p className="text-4xl md:text-5xl font-extrabold text-purple-300 mb-2 animate-pulse-soft">{val3}%</p>
-          <p className="text-lg font-bold text-white/90">Development & Operations</p>
+          <p className="text-3xl md:text-4xl font-extrabold text-purple-300 mb-2 animate-pulse-soft">{val3}%</p>
+          <p className="text-base font-bold text-white/90">Development & Operations</p>
         </div>
-        <div className="rounded-xl border border-purple-500/40 bg-gradient-to-br from-[#a78bfa11] to-[#a78bfa22] p-6 text-center shadow-lg animate-float-soft"
+        <div className="rounded-lg border border-purple-500/30 bg-[#07080C]/98 p-4 text-center shadow-lg animate-float-soft"
           onMouseEnter={handleHover(10, setVal4, 3)}
           onMouseLeave={handleMouseLeave}>
-          <p className="text-4xl md:text-5xl font-extrabold text-purple-300 mb-2 animate-pulse-soft">{val4}%</p>
-          <p className="text-lg font-bold text-white/90">Player Rewards & Challenges</p>
+          <p className="text-3xl md:text-4xl font-extrabold text-purple-300 mb-2 animate-pulse-soft">{val4}%</p>
+          <p className="text-base font-bold text-white/90">Player Rewards & Challenges</p>
         </div>
       </div>
       <div className="text-center mt-6">

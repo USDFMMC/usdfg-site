@@ -12,9 +12,6 @@ import PlayerProfile from "@/pages/app/profile/[address]";
 import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
 import Whitepaper from "@/pages/whitepaper";
-// import TrustReviewDemo from "@/components/arena/TrustReviewDemo";
-// import StarBackground from "@/components/effects/star-background";
-import Crosshair from "@/components/effects/Crosshair";
 import { Helmet } from "react-helmet";
 import { startVersionMonitoring } from "@/lib/version";
 import UpdateBanner from "@/components/ui/UpdateBanner";
@@ -30,7 +27,6 @@ function AppRouter() {
         <Route path="/app" element={<ArenaRoute />} />
         <Route path="/app/challenge/new" element={<CreateChallenge />} />
         <Route path="/app/profile/:address" element={<PlayerProfile />} />
-        {/* <Route path="/trust-demo" element={<TrustReviewDemo />} /> */}
         <Route path="/login" element={<Home />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
@@ -110,8 +106,6 @@ function App() {
           <UpdateBanner onDismiss={() => setShowUpdateBanner(false)} />
         )}
         
-        {/* <StarBackground /> */}
-        {/* <Crosshair color="#00ffff" /> */}
         <AppRouter />
         <Toaster />
       </div>

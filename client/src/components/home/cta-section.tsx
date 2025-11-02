@@ -1,41 +1,19 @@
-import React, { useRef, useEffect, useState } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { useScrollFadeIn } from "@/hooks/useScrollFadeIn";
 
 const CTASection: React.FC = () => {
-  const ctaRef = useScrollFadeIn<HTMLDivElement>();
-  const founderRef = useRef<HTMLParagraphElement>(null);
-  const [founderVisible, setFounderVisible] = useState(false);
-
-  useEffect(() => {
-    const node = founderRef.current;
-    if (!node) return;
-    const observer = new window.IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setFounderVisible(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.2 }
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
-
   return (
-    <section className="py-20 bg-gradient-to-r from-card to-background">
-      <div className="container mx-auto px-4">
+    <section className="py-12 bg-[#07080C]">
+      <div className="container mx-auto px-3">
         <div className="max-w-4xl mx-auto text-center">
           {/* Enter the Challenge Image - Pro-level polish */}
-          <section className="flex flex-col items-center py-14 px-4">
-            <div className="flex justify-center mb-8 relative w-full" style={{ alignItems: 'center', minHeight: '340px' }}>
-              <div className="relative rounded-xl overflow-hidden flex items-center justify-center" style={{ minHeight: '300px' }}>
+          <section className="flex flex-col items-center py-8 px-3">
+            <div className="flex justify-center mb-4 relative w-full" style={{ alignItems: 'center', minHeight: '280px' }}>
+              <div className="relative rounded-xl overflow-hidden flex items-center justify-center" style={{ minHeight: '260px' }}>
                 <img
                   src="/assets/usdfg-enter-the-challenge-arcade.webp"
                   alt="USDFG Mascot Entering the Challenge Arena"
-                  className="w-full max-w-3xl rounded-xl"
+                  className="w-full max-w-2xl rounded-xl"
                   style={{ display: 'block', margin: '0 auto' }}
                   loading="lazy" decoding="async"
                 />
@@ -45,21 +23,20 @@ const CTASection: React.FC = () => {
               Step in. Only the skilled walk out.
             </p>
           </section>
-          <p className="text-center text-lg text-white font-semibold mt-12">
+          <p className="text-center text-base md:text-lg text-white font-semibold mt-8">
             Ready to <span className="text-purple-400">Game</span>, <span className="text-blue-400">Earn</span>, and <span className="text-purple-400">Conquer</span>?
           </p>
           <Link to="/app" className="flex justify-center">
-            <button className="mt-4 px-5 py-2 text-sm font-semibold bg-gradient-to-r from-amber-400 to-orange-500 text-black rounded-full shadow-[0_0_15px_rgba(255,215,130,0.2)] transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_rgba(255,215,130,0.3)] focus:outline-none focus:ring-2 focus:ring-amber-400/50">
+            <button className="mt-4 px-5 py-2.5 text-sm md:text-base font-semibold bg-gradient-to-r from-amber-400/90 to-orange-500/90 text-black rounded-full shadow-[0_0_12px_rgba(255,215,130,0.15)] transition-all duration-200 hover:scale-105 hover:shadow-[0_0_15px_rgba(255,215,130,0.2)] focus:outline-none focus:ring-2 focus:ring-amber-400/50 border border-amber-400/30">
               Enter the Arena →
             </button>
           </Link>
           <div className="flex justify-center mt-8">
             <div className="relative max-w-2xl w-full">
-              <div className="absolute inset-0 rounded-xl blur-2xl bg-gradient-to-r from-cyan-400/10 via-purple-500/10 to-cyan-400/10 z-0" style={{ filter: 'blur(24px)' }} />
-              <blockquote className="relative z-10 text-center text-neutral-300 italic font-medium px-4 py-6">
+              <blockquote className="text-center text-neutral-300 italic font-medium px-4 py-4 text-base">
                 "I built USDFG to reward the ones who never begged for a seat. No mercy. No reruns. If you're waiting for permission, you already lost."
                 <br />
-                <span className="block mt-2 text-xs text-neutral-500">— Hussein A.</span>
+                <span className="block mt-1.5 text-xs text-neutral-500">— Hussein A.</span>
               </blockquote>
             </div>
           </div>

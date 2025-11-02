@@ -111,31 +111,31 @@ const ChallengeSystem: React.FC = () => {
   // Render
   // -----------------------------
   return (
-    <section className="py-20 bg-card">
-      <div className="container mx-auto px-4">
+    <section className="py-12 bg-[#07080C]">
+      <div className="container mx-auto px-3">
         {/* Heading */}
-        <div className="text-center mb-16">
+        <div className="text-center mb-8">
           <h2
-            className="text-3xl md:text-4xl font-extrabold mb-4 shimmer text-center"
+            className="text-2xl md:text-3xl font-extrabold mb-3 shimmer text-center"
             style={{
               fontWeight: 800,
-              fontSize: "2.25rem",
+              fontSize: "2rem",
               letterSpacing: "0.04em",
               background: "linear-gradient(90deg, #f5d06f 0%, #a78bfa 100%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
-              textShadow: "0 0 32px #f5d06f88, 0 2px 8px #000",
+              textShadow: "0 0 24px #f5d06f66, 0 2px 6px #000",
             }}
           >
             Create a Challenge. Prove it.
           </h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-muted-foreground max-w-2xl mx-auto text-sm md:text-base">
             Real challenges. Real outcomes. Every result is based on skill — not chance.
           </p>
         </div>
 
         {/* Leaderboard + mascot visual (now visible) */}
-        <section className="flex justify-center py-12">
+        <section className="flex justify-center py-6">
           <div ref={visualRef} className="relative opacity-0 translate-y-3 transition-all duration-700" id="challenge-leaderboard-visual">
             <img
               src={imageSrcWebp}
@@ -148,23 +148,23 @@ const ChallengeSystem: React.FC = () => {
               }}
               loading="lazy"
               alt="USDFG mascot in front of glowing leaderboard - skill gaming competition"
-              className="w-full max-w-2xl rounded-lg relative z-10 select-none"
+              className="w-full max-w-xl rounded-lg relative z-10 select-none"
             />
           </div>
         </section>
 
         {/* Rules / Explainer */}
-        <Card className="relative bg-gradient-to-br from-[#0a0f1aee] to-[#0a1f2aee] border border-amber-400/30 max-w-4xl mx-auto shadow-[0_0_40px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all duration-300 hover:scale-[1.01] hover:shadow-[0_0_50px_rgba(255,215,130,0.15)]">
-          <CardContent className="relative z-10 p-4 md:p-6">
-            <div className="mb-10">
+        <Card className="relative bg-[#07080C]/98 border border-amber-400/20 max-w-4xl mx-auto shadow-[0_0_20px_rgba(0,0,0,0.3)] backdrop-blur-md transition-all duration-300 hover:scale-[1.01] hover:shadow-[0_0_30px_rgba(255,215,130,0.12)]">
+          <CardContent className="relative z-10 p-3 md:p-4">
+            <div className="mb-6">
               <motion.h3
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6 }}
-                className="text-2xl md:text-3xl font-extrabold mb-2 flex items-center justify-center text-white drop-shadow-glow tracking-wide"
+                className="text-xl md:text-2xl font-extrabold mb-3 flex items-center justify-center text-white drop-shadow-glow tracking-wide"
               >
-                <span className="mr-3 text-cyan-300"><FaBalanceScale className="inline-block w-8 h-8 md:w-10 md:h-10" /></span>
+                <span className="mr-3 text-cyan-300"><FaBalanceScale className="inline-block w-5 h-5 md:w-6 md:h-6" /></span>
                 Challenge Rules & Result Verification
               </motion.h3>
 
@@ -173,7 +173,7 @@ const ChallengeSystem: React.FC = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: 0.1 }}
-                className="text-base text-cyan-300 mb-4 text-center font-medium"
+                className="text-sm md:text-base text-cyan-300 mb-4 text-center font-medium"
               >
                 This system protects fairness by locking funds and verifying skill-based outcomes.
               </motion.p>
@@ -183,40 +183,40 @@ const ChallengeSystem: React.FC = () => {
                 whileInView="visible"
                 viewport={{ once: true }}
                 variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.12 } } }}
-                className="space-y-4"
+                className="space-y-3"
               >
-                <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-lg">
-                  <FaCheckCircle className="text-green-400 mt-1 mr-3" />
+                <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
+                  <FaCheckCircle className="text-green-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
                   <span>
                     <span className="font-bold text-white">If both players confirm the result</span>, rewards are released automatically —{" "}
                     <span className="text-cyan-300 font-semibold">no uploads needed</span>.
                   </span>
                 </motion.li>
 
-                <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-lg">
-                  <FaLock className="text-cyan-400 mt-1 mr-3" />
+                <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
+                  <FaLock className="text-cyan-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
                   <span>
                     <span className="font-bold text-white">Funds stay locked</span> until both players confirm or a dispute is reviewed.
                   </span>
                 </motion.li>
 
-                <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-lg">
-                  <FaExclamationTriangle className="text-yellow-400 mt-1 mr-3" />
+                <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
+                  <FaExclamationTriangle className="text-yellow-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
                   <span>
                     <span className="font-bold text-white">If there's a dispute</span>, players must provide{" "}
                     <span className="text-cyan-300 font-semibold">video or screenshot proof</span> for review.
                   </span>
                 </motion.li>
 
-                <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-lg">
-                  <FaGavel className="text-purple-400 mt-1 mr-3" />
+                <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
+                  <FaGavel className="text-purple-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
                   <span>
-                    <span className="font-bold text-white">Admins review disputes and make the final call.</span> Verified winners receive the reward.
+                    <span className="font-bold text-white">The founder reviews disputes and makes the final call.</span> Verified winners receive the reward.
                   </span>
                 </motion.li>
 
-                <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-lg">
-                  <FaUserShield className="text-pink-400 mt-1 mr-3" />
+                <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
+                  <FaUserShield className="text-pink-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
                   <span>
                     <span className="font-bold text-white">Attempts to falsify results</span> may lead to{" "}
                     <span className="text-yellow-300 font-bold">deactivation</span>.
@@ -233,10 +233,10 @@ const ChallengeSystem: React.FC = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="mb-8"
+              className="mb-4"
             >
-              <div className="bg-gradient-to-br from-amber-900/30 to-orange-900/20 border border-amber-400/30 rounded-lg p-3 text-sm text-center shadow-[0_0_15px_rgba(255,215,130,0.15)] backdrop-blur-md flex items-center justify-center gap-3">
-                <FaExclamationTriangle className="text-yellow-300 w-5 h-5" />
+              <div className="bg-gradient-to-br from-amber-900/20 to-orange-900/10 border border-amber-400/20 rounded-lg p-3 text-sm text-center shadow-[0_0_10px_rgba(255,215,130,0.08)] backdrop-blur-md flex items-center justify-center gap-2">
+                <FaExclamationTriangle className="text-yellow-300 w-4 h-4" />
                 <span className="font-semibold text-amber-100">
                   Make sure your challenge description clearly defines all win conditions and game settings.
                 </span>
@@ -251,16 +251,16 @@ const ChallengeSystem: React.FC = () => {
               transition={{ duration: 0.5, delay: 0.3 }}
               className="flex justify-center mt-4"
             >
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-700/80 to-orange-700/80 border border-amber-400/30 shadow-[0_0_12px_rgba(255,215,130,0.15)] text-amber-100 text-xs font-semibold">
-                <FaUserShield className="text-amber-300 w-5 h-5 mr-1" />
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-700/60 to-orange-700/60 border border-amber-400/20 shadow-[0_0_8px_rgba(255,215,130,0.08)] text-amber-100 text-sm font-semibold">
+                <FaUserShield className="text-amber-300 w-4 h-4 mr-1" />
                 Fair Play Guaranteed
               </div>
             </motion.div>
 
             {/* --- Challenge creator (mock) --- */}
-            <div className="space-y-4 mt-12">
+            <div className="space-y-3 mt-6">
               <div className="text-center mb-6">
-                <h3 className="text-2xl md:text-3xl font-bold text-white tracking-wide underline decoration-cyan-500 underline-offset-4">
+                <h3 className="text-lg md:text-xl font-bold text-white tracking-wide underline decoration-cyan-500 underline-offset-2">
                   Ready to walk away with the token?
                 </h3>
               </div>
@@ -268,12 +268,12 @@ const ChallengeSystem: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Category */}
                 <div>
-                  <Label htmlFor="category" className="text-sm font-medium text-muted-foreground mb-1">
+                  <Label htmlFor="category" className="text-sm font-medium text-muted-foreground mb-2">
                     Category
                   </Label>
                   <select
                     id="category"
-                    className="w-full px-4 py-3 bg-white text-black rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                    className="w-full px-3 py-2 bg-zinc-800/60 text-white border border-zinc-700/50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-cyan-400/50 focus:border-cyan-400/50"
                     value={selectedCategory}
                     onChange={(e) => {
                       const val = e.target.value as "Sports" | "Racing" | "Fighting" | "Shooting" | "";
@@ -294,7 +294,7 @@ const ChallengeSystem: React.FC = () => {
 
                 {/* Game */}
                 <div>
-                  <Label htmlFor="game" className="text-sm font-medium text-muted-foreground mb-1">
+                  <Label htmlFor="game" className="text-sm font-medium text-muted-foreground mb-2">
                     Game
                   </Label>
                   <div
@@ -304,7 +304,7 @@ const ChallengeSystem: React.FC = () => {
                   >
                     <select
                       id="game"
-                      className="w-full px-4 py-3 bg-white text-black rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                      className="w-full px-3 py-2 bg-zinc-800/60 text-white border border-zinc-700/50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-cyan-400/50 focus:border-cyan-400/50"
                       value={selectedGame}
                       onChange={(e) => {
                         setSelectedGame(e.target.value);
@@ -325,7 +325,7 @@ const ChallengeSystem: React.FC = () => {
                     {selectedGame === "Custom" && (
                       <input
                         type="text"
-                        className="w-full mt-2 px-4 py-3 bg-white text-black rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                        className="w-full mt-2 px-3 py-2 bg-zinc-800/60 text-white border border-zinc-700/50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-cyan-400/50 focus:border-cyan-400/50"
                         placeholder="Enter custom game…"
                         value={customGame}
                         onChange={(e) => setCustomGame(e.target.value)}
@@ -336,7 +336,7 @@ const ChallengeSystem: React.FC = () => {
 
                 {/* Challenge mode */}
                 <div className="md:col-span-2">
-                  <Label htmlFor="challenge-mode" className="text-sm font-medium text-muted-foreground mb-1">
+                  <Label htmlFor="challenge-mode" className="text-sm font-medium text-muted-foreground mb-2">
                     Challenge Mode
                   </Label>
                   <div
@@ -346,7 +346,7 @@ const ChallengeSystem: React.FC = () => {
                   >
                     <select
                       id="challenge-mode"
-                      className="w-full px-4 py-3 bg-white text-black rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                      className="w-full px-3 py-2 bg-zinc-800/60 text-white border border-zinc-700/50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-cyan-400/50 focus:border-cyan-400/50"
                       value={selectedChallengeMode}
                       onChange={(e) => setSelectedChallengeMode(e.target.value)}
                       disabled={!selectedGame}
@@ -363,7 +363,7 @@ const ChallengeSystem: React.FC = () => {
                     {/* Tooltip for Custom Challenge */}
                     {selectedCategory &&
                       challengeModes[selectedCategory]?.find((m) => m.label === selectedChallengeMode && m.tooltip) && (
-                        <div className="absolute left-0 mt-2 w-full bg-gray-900 text-xs text-yellow-300 rounded shadow-lg p-2 z-10 border border-yellow-500">
+                        <div className="absolute left-0 mt-2 w-full bg-gray-900/95 text-sm text-yellow-300 rounded shadow-lg p-2 z-10 border border-yellow-500/50">
                           {challengeModes[selectedCategory].find((m) => m.label === selectedChallengeMode)?.tooltip}
                         </div>
                       )}
@@ -372,12 +372,12 @@ const ChallengeSystem: React.FC = () => {
 
                 {/* System */}
                 <div>
-                  <Label htmlFor="system" className="text-sm font-medium text-muted-foreground mb-1">
+                  <Label htmlFor="system" className="text-sm font-medium text-muted-foreground mb-2">
                     System
                   </Label>
                   <select
                     id="system"
-                    className="w-full px-4 py-3 bg-white text-black rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                    className="w-full px-3 py-2 bg-zinc-800/60 text-white border border-zinc-700/50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-cyan-400/50 focus:border-cyan-400/50"
                     value={selectedSystem}
                     onChange={(e) => setSelectedSystem(e.target.value)}
                     disabled={!selectedGame}
@@ -394,7 +394,7 @@ const ChallengeSystem: React.FC = () => {
                   {selectedSystem === "Other" && (
                     <input
                       type="text"
-                      className="w-full mt-2 px-4 py-3 bg-white text-black rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                      className="w-full mt-2 px-3 py-2 bg-zinc-800/60 text-white border border-zinc-700/50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-cyan-400/50 focus:border-cyan-400/50"
                       placeholder="Enter system…"
                       value={customSystem}
                       onChange={(e) => setCustomSystem(e.target.value)}
@@ -404,14 +404,14 @@ const ChallengeSystem: React.FC = () => {
 
                 {/* Amount */}
                 <div>
-                  <Label htmlFor="entry-amount" className="text-sm font-medium text-muted-foreground mb-1">
+                  <Label htmlFor="entry-amount" className="text-sm font-medium text-muted-foreground mb-2">
                     Entry Amount (USDFG)
                   </Label>
                   <Input
                     id="entry-amount"
                     type="number"
                     placeholder="Enter amount (e.g., 10.00)"
-                    className="w-full"
+                    className="w-full px-3 py-2 bg-zinc-800/60 text-white border border-zinc-700/50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-cyan-400/50 focus:border-cyan-400/50"
                     min="0.01"
                     step="0.01"
                   />
@@ -419,7 +419,7 @@ const ChallengeSystem: React.FC = () => {
 
                 {/* Rules text */}
                 <div className="md:col-span-2">
-                  <Label htmlFor="challenge-rules" className="text-sm font-medium text-muted-foreground mb-1">
+                  <Label htmlFor="challenge-rules" className="text-sm font-medium text-muted-foreground mb-2">
                     Challenge Rules & Details
                   </Label>
                   <Textarea
@@ -429,7 +429,7 @@ const ChallengeSystem: React.FC = () => {
 If you selected Custom Challenge, make sure your rules are clear, fair, and not outrageous.
 
 Unclear or unfair custom rules may be rejected.`}
-                    className="w-full px-4 py-3 bg-background border border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                    className="w-full px-3 py-2 bg-zinc-800/60 text-white border border-zinc-700/50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-cyan-400/50 focus:border-cyan-400/50 resize-none"
                   />
                 </div>
               </div>
@@ -437,11 +437,11 @@ Unclear or unfair custom rules may be rejected.`}
               {/* CTA (disabled placeholder) */}
               <div className="text-center">
                 <a
-                  className="inline-block px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-full font-semibold shadow-[0_0_6px_#a78bfa33] flex items-center gap-2 transition-all duration-200 text-base"
+                  className="inline-block px-5 py-2 bg-gradient-to-r from-purple-600/90 to-pink-500/90 text-white rounded-full font-semibold shadow-[0_0_4px_#a78bfa22] flex items-center gap-2 transition-all duration-200 text-sm border border-purple-400/30"
                   title="Launch real challenges from the full platform"
                   style={{ pointerEvents: "none", opacity: 0.6, cursor: "not-allowed" }}
                 >
-                  Open in App <span className="ml-2 animate-bounce-x" aria-hidden="true">→</span>
+                  Open in App <span className="ml-1.5 animate-bounce-x" aria-hidden="true">→</span>
                 </a>
               </div>
             </div>

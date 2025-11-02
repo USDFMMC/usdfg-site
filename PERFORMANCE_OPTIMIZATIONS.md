@@ -71,3 +71,4 @@ const HomePage = React.lazy(() => import("@/pages/home"));
 4. **Medium Priority**: Optimize images (faster page loads)
 5. **Low Priority**: Virtual scrolling (only if needed for >50 challenges)
 
+

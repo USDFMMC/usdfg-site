@@ -1,7 +1,7 @@
 # Quick Start: Deploy New Smart Contract
 
 ## Problem
-The frontend is pointing to an old smart contract (`2KL4BKvUtDmABvuvRopkCEb33myWM1W9BGodAZ82RWDT`) that has the oracle dependency issue. You have an updated smart contract (`updated_smart_contract.rs`) that fixes this.
+The frontend needs to point to the correct deployed smart contract. Use `COPY_THIS_TO_PLAYGROUND.rs` as the source for deployment.
 
 ## Solution
 Deploy the new smart contract and update your frontend. Everything is ready to go!

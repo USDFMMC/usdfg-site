@@ -44,7 +44,7 @@ const ArenaHome: React.FC = () => {
   const extractGameFromTitle = (title: string) => {
     const gameKeywords = [
       'FIFA 24', 'Madden NFL 24', 'NBA 2K25',
-      'Street Fighter 6', 'Tekken 8',
+      'Street Fighter 6', 'Tekken 8', 'Mortal Kombat',
       'Call of Duty', 'Valorant',
       'Forza Horizon'
     ];
@@ -61,6 +61,7 @@ const ArenaHome: React.FC = () => {
     if (title.toLowerCase().includes('nba') || title.toLowerCase().includes('2k')) return 'NBA 2K25';
     if (title.toLowerCase().includes('street fighter')) return 'Street Fighter 6';
     if (title.toLowerCase().includes('tekken')) return 'Tekken 8';
+    if (title.toLowerCase().includes('mortal kombat')) return 'Mortal Kombat';
     if (title.toLowerCase().includes('call of duty') || title.toLowerCase().includes('cod')) return 'Call of Duty';
     if (title.toLowerCase().includes('valorant')) return 'Valorant';
     if (title.toLowerCase().includes('forza')) return 'Forza Horizon';
@@ -78,14 +79,14 @@ const ArenaHome: React.FC = () => {
     const normalizedGame = game.trim();
     
     if (['NBA 2K25', 'FIFA 24', 'Madden NFL 24'].includes(normalizedGame)) return 'Sports';
-    if (['Street Fighter 6', 'Tekken 8'].includes(normalizedGame)) return 'Fighting';
+    if (['Street Fighter 6', 'Tekken 8', 'Mortal Kombat', 'Mortal Kombat 1', 'Mortal Kombat 11'].includes(normalizedGame)) return 'Fighting';
     if (['Call of Duty', 'Valorant'].includes(normalizedGame)) return 'Shooting';
     if (['Forza Horizon', 'Gran Turismo 7', 'Forza Motorsport'].includes(normalizedGame)) return 'Racing';
     
     // Fallback: try case-insensitive matching
     const lowerGame = normalizedGame.toLowerCase();
     if (lowerGame.includes('nba') || lowerGame.includes('fifa') || lowerGame.includes('madden') || lowerGame.includes('sports')) return 'Sports';
-    if (lowerGame.includes('street fighter') || lowerGame.includes('tekken') || lowerGame.includes('fighting')) return 'Fighting';
+    if (lowerGame.includes('street fighter') || lowerGame.includes('tekken') || lowerGame.includes('mortal kombat') || lowerGame.includes('guilty gear') || lowerGame.includes('fighting')) return 'Fighting';
     if (lowerGame.includes('call of duty') || lowerGame.includes('cod') || lowerGame.includes('valorant') || lowerGame.includes('shooting')) return 'Shooting';
     if (lowerGame.includes('forza') || lowerGame.includes('gran turismo') || lowerGame.includes('f1') || lowerGame.includes('mario kart') || lowerGame.includes('racing')) return 'Racing';
     
@@ -99,7 +100,6 @@ const ArenaHome: React.FC = () => {
     }
     
     const category = getGameCategory(game);
-    console.log(`🎮 Game: ${game}, Category: ${category}`); // Debug log
     
     switch (category) {
       case 'Sports':
@@ -109,7 +109,7 @@ const ArenaHome: React.FC = () => {
       case 'Shooting':
         return '/assets/categories/shooting.png';
       case 'Fighting':
-        return '/assets/categories/shooting.png'; // Fighting games can use shooting image or we can create a fighting image
+        return '/assets/categories/fighting.png';
       default:
         return '/assets/categories/sports.png'; // Default to sports category image
     }
@@ -123,10 +123,7 @@ const ArenaHome: React.FC = () => {
   const [showMyChallenges, setShowMyChallenges] = useState<boolean>(false);
   const [claimingPrize, setClaimingPrize] = useState<string | null>(null);
   const [usdfgPrice, setUsdfgPrice] = useState<number>(0.15); // Mock price: $0.15 per USDFG
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-  const [isLive, setIsLive] = useState<boolean>(true);
   const [userUsdfgBalance, setUserUsdfgBalance] = useState<number | null>(null);
-  const [lastLocalChallenge, setLastLocalChallenge] = useState<number>(0);
   const [isCreatingChallenge, setIsCreatingChallenge] = useState<boolean>(false);
   const [topPlayers, setTopPlayers] = useState<PlayerStats[]>([]);
   const [showPlayerProfile, setShowPlayerProfile] = useState(false);
@@ -170,14 +167,7 @@ const ArenaHome: React.FC = () => {
     }
   }, []);
 
-  // Debug: Log wallet info
-  useEffect(() => {
-    if (connected && publicKey) {
-      console.log('🔍 Current wallet:', publicKey.toString());
-      console.log('🔍 Admin wallet:', ADMIN_WALLET.toString());
-      console.log('🔍 Is admin?', publicKey.toString() === ADMIN_WALLET.toString());
-    }
-  }, [connected, publicKey]);
+  // Wallet info available via useWallet hook
 
   // Load user profile data from localStorage
   useEffect(() => {
@@ -246,11 +236,8 @@ const ArenaHome: React.FC = () => {
 
   // Test Firestore connection on component mount
   useEffect(() => {
-    console.log("🔥 Testing Firestore connection...");
     testFirestoreConnection().then((connected) => {
-      if (connected) {
-        console.log("✅ Firebase Firestore is ready for real-time challenges!");
-      } else {
+      if (!connected) {
         console.error("❌ Firebase connection failed - check your config");
       }
     });
@@ -280,7 +267,6 @@ const ArenaHome: React.FC = () => {
 
     // If we found a newly completed challenge, refresh leaderboard
     if (newlyCompleted.length > 0) {
-      console.log('🏆 Challenge completed - refreshing leaderboard...');
       
       // Update tracked completed challenges
       const newCompletedIds = new Set(completedChallengeIds);
@@ -293,7 +279,6 @@ const ArenaHome: React.FC = () => {
           const limit = showAllPlayers ? 50 : 5;
           const players = await getTopPlayers(limit, 'totalEarned');
           setTopPlayers(players);
-          console.log('✅ Leaderboard refreshed with updated stats');
         } catch (error) {
           console.error('Failed to refresh leaderboard:', error);
         }
@@ -338,11 +323,9 @@ const ArenaHome: React.FC = () => {
       const hasSubmitted = currentWallet && results[currentWallet];
       
       if (hasSubmitted) {
-        console.log("✅ You already submitted your result. Lobby stays closed.");
         return; // Don't auto-open if you already submitted
       }
       
-      console.log("🎮 Auto-opening Submit Result Room for in-progress challenge:", challenge.id);
       setSelectedChallenge({
         id: challenge.id,
         title: (challenge as any).title || extractGameFromTitle((challenge as any).title || '') || "Challenge",
@@ -459,12 +442,9 @@ const ArenaHome: React.FC = () => {
       return;
     }
     
-    console.log('🎮 Challenge Data Received:', challengeData);
-    console.log('🎮 Game from challengeData:', challengeData.game);
     if (challengeData.game) {
       const category = getGameCategory(challengeData.game);
       const image = getGameImage(challengeData.game);
-      console.log(`🎮 Game: ${challengeData.game}, Category: ${category}, Image: ${image}`);
     }
     
     setIsCreatingChallenge(true);
@@ -477,26 +457,55 @@ const ArenaHome: React.FC = () => {
       }
 
       // 🔍 Check if the user already has an active challenge (as creator OR participant)
-      const existingActive = challenges.find(c => {
+      // EXCLUDE completed, cancelled, disputed, and expired challenges
+      
+      // Debug: Log all user's challenges
+      const allUserChallenges = challenges.filter(c => {
         const isCreator = c.creator === currentWallet;
         const isParticipant = firestoreChallenges.some(fc => 
           fc.id === c.id && 
           fc.players?.includes(currentWallet)
         );
-        const isActive = c.status === 'active' || c.status === 'pending' || c.status === 'in-progress';
-        return (isCreator || isParticipant) && isActive;
+        return isCreator || isParticipant;
+      });
+      // Debug: All user challenges (uncomment for debugging)
+      // console.log("🔍 All user challenges:", allUserChallenges.map(c => ({ id: c.id, status: c.status, isCreator: c.creator === currentWallet, title: c.title || 'N/A' })));
+      
+      const existingActive = firestoreChallenges.find((fc: any) => {
+        const isCreator = fc.creator === currentWallet;
+        const isParticipant = fc.players?.includes(currentWallet);
+        
+        // Get status from Firestore data directly (most reliable)
+        const status = fc.status || fc.rawData?.status || 'unknown';
+        
+        // Only block if status is active, pending, or in-progress (NOT completed, cancelled, disputed, expired)
+        const isActive = status === 'active' || status === 'pending' || status === 'in-progress';
+        const isCompleted = status === 'completed' || status === 'cancelled' || status === 'disputed' || status === 'expired';
+        
+        const shouldBlock = (isCreator || isParticipant) && isActive && !isCompleted;
+        
+        // Debug: Challenge found but not blocking (uncomment for debugging)
+        // if ((isCreator || isParticipant) && !shouldBlock) {
+        //   console.log("✅ Challenge found but not blocking:", { id: fc.id, status, isCreator, isParticipant, isActive, isCompleted });
+        // }
+        
+        if (shouldBlock) {
+          // Debug: Found blocking challenge (uncomment for debugging)
+          // console.log("🚫 Found blocking challenge:", { id: fc.id, status, isCreator, isParticipant, isActive, isCompleted });
+        }
+        
+        return shouldBlock;
       });
 
       if (existingActive) {
-        alert("You already have an active challenge (created or joined). Complete it before creating a new one.");
-        console.log("❌ Blocked: User already has active challenge:", existingActive.id);
+        const status = existingActive.status || existingActive.rawData?.status || 'unknown';
+        // Debug: Blocked by active challenge
+        // console.log("❌ Blocked: User already has active challenge:", existingActive.id, "Status:", status);
+        alert(`You already have an active challenge (${existingActive.title || existingActive.id || existingActive.id}). Status: ${status}. Complete it before creating a new one.`);
         return;
       }
 
-      console.log("✅ No active challenges found, proceeding with creation...");
-
-      // Import real smart contract functions
-      console.log("📦 Importing smart contract functions...");
+      // Proceeding with challenge creation
       const { createChallenge } = await import("@/lib/chain/contract");
       const { Connection, clusterApiUrl } = await import("@solana/web3.js");
       
@@ -524,30 +533,43 @@ const ArenaHome: React.FC = () => {
       };
 
       const maxPlayers = getMaxPlayersForMode(challengeData.mode);
-      console.log(`🎯 Setting maxPlayers to ${maxPlayers} for mode: ${challengeData.mode}`);
 
-      // Create connection to devnet
-      const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
+      // Check if this is a Founder Challenge (admin with 0 entry fee)
+      const isAdmin = currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+      const entryFee = challengeData.entryFee || 0;
+      const isFounderChallenge = isAdmin && (entryFee === 0 || entryFee < 0.000000001);
       
-      // Small delay for mobile Phantom to fully initialize
-      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        console.log('📱 Mobile detected - adding small delay for Phantom...');
-        await new Promise(resolve => setTimeout(resolve, 500));
+      let challengeId: string;
+      
+      if (isFounderChallenge) {
+        // Founder Challenge - skip on-chain creation, just create in Firestore
+        // Generate a fake PDA for Founder Challenges (won't be used on-chain)
+        // We'll just use a Firestore-generated ID
+        challengeId = 'founder_' + Date.now().toString();
+      } else {
+        // Regular challenge - create on-chain
+        // Create connection to devnet
+        const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
+        
+        // Small delay for mobile Phantom to fully initialize
+        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+        challengeId = await createChallenge(
+          wallet,
+          connection,
+          challengeData.entryFee // Entry fee in USDFG
+        );
+        
       }
       
-      console.log("🚀 Creating challenge on smart contract with escrow...");
-      const challengeId = await createChallenge(
-        wallet,
-        connection,
-        challengeData.entryFee // Entry fee in USDFG
-      );
-      
-      console.log("✅ Challenge created on smart contract! PDA:", challengeId);
-      
-      // Calculate prize pool
+      // Calculate prize pool (for Founder Challenges, admin sets prize pool manually)
+      // For regular challenges: 2x entry fee minus 5% platform fee
+      // For Founder Challenges: prize pool is set separately by admin
       const platformFee = 0.05; // 5% platform fee
-      const totalPrize = challengeData.entryFee * 2; // Challenger matches entry fee
-      const prizePool = totalPrize - (totalPrize * platformFee); // Minus platform fee
+      const totalPrize = isFounderChallenge ? (challengeData.prizePool || 0) : challengeData.entryFee * 2;
+      const prizePool = isFounderChallenge ? (challengeData.prizePool || 0) : totalPrize - (totalPrize * platformFee);
       
       
       // Create Firestore challenge data
@@ -571,8 +593,8 @@ const ArenaHome: React.FC = () => {
         players: [currentWallet], // Creator is first player
         maxPlayers: challengeData.maxPlayers || 2, // Use provided maxPlayers or default to 2 for Head-to-Head
         // Prize claim fields
-        pda: challengeId, // Store the challenge PDA from smart contract
-        prizePool: challengeData.entryFee * 2 * 0.95, // Total prize pool (2x entry fee minus 5% platform fee)
+        pda: isFounderChallenge ? null : challengeId, // Store the challenge PDA from smart contract (null for Founder Challenges)
+        prizePool: prizePool, // Prize pool (for Founder Challenges, admin sets this)
         // Store only the title which contains game info - saves storage costs
         title: challengeTitle, // Generated title with game info
         // Store game name for display - players need to know which game
@@ -582,21 +604,14 @@ const ArenaHome: React.FC = () => {
         // These are not needed for leaderboards and increase storage costs unnecessarily
       };
       
-      console.log("🔥 Adding challenge to Firestore...");
-      console.log("🔥 Firestore Challenge Data:", {
-        game: firestoreChallengeData.game,
-        category: firestoreChallengeData.category,
-        title: firestoreChallengeData.title
-      });
+      // Debug: Firestore challenge data (uncomment for debugging)
+      // console.log("🔥 Adding challenge to Firestore...");
+      // console.log("🔥 Firestore Challenge Data:", { game: firestoreChallengeData.game, category: firestoreChallengeData.category, title: firestoreChallengeData.title });
       const firestoreId = await addChallenge(firestoreChallengeData);
-      console.log("✅ Challenge added to Firestore with ID:", firestoreId);
-      
       // The real-time listener will automatically update the UI
-      console.log("📡 Real-time listener will update UI automatically");
       
       // Close the modal after successful creation
       setShowCreateModal(false);
-      console.log("✅ Modal closed automatically after challenge creation");
       
     } catch (error) {
       console.error("❌ Failed to create challenge:", error);
@@ -607,16 +622,12 @@ const ArenaHome: React.FC = () => {
   };
 
   const handleDeleteChallenge = async (challengeId: string) => {
-    console.log("🗑️ Attempting to delete challenge:", challengeId);
     
     if (window.confirm("Are you sure you want to delete this challenge? This action cannot be undone.")) {
       try {
         const { deleteChallenge } = await import("@/lib/firebase/firestore");
         await deleteChallenge(challengeId);
-        console.log("✅ Challenge deleted from Firestore");
-        
-        // The real-time listener will automatically update the UI
-        console.log("📡 Real-time listener will update UI automatically");
+        // Challenge deleted - real-time listener will automatically update the UI
       } catch (error) {
         console.error("❌ Failed to delete challenge:", error);
         alert("Failed to delete challenge: " + (error instanceof Error ? error.message : "Unknown error"));
@@ -661,7 +672,6 @@ const ArenaHome: React.FC = () => {
     }
 
     try {
-      console.log("📝 Submitting result:", { challengeId: selectedChallenge.id, didWin, hasProof: !!proofFile });
       
       // Store the match result for later submission with trust review
       const matchResult = { 
@@ -670,7 +680,6 @@ const ArenaHome: React.FC = () => {
         challengeId: selectedChallenge.id 
       };
       setPendingMatchResult(matchResult);
-      console.log("💾 Stored pending match result:", matchResult);
       
       // Get opponent name for trust review - check rawData.players array first
       const playersArray = selectedChallenge.rawData?.players || (Array.isArray(selectedChallenge.players) ? selectedChallenge.players : []);
@@ -697,12 +706,9 @@ const ArenaHome: React.FC = () => {
     trustScore10: number;
     comment?: string;
   }) => {
-    console.log("🏆 Trust review submitted:", payload);
-    console.log("🔍 Debug state:", {
-      selectedChallenge: selectedChallenge?.id,
-      publicKey: publicKey?.toBase58(),
-      pendingMatchResult
-    });
+    // Debug: Trust review submission (uncomment for debugging)
+    // console.log("🏆 Trust review submitted:", payload);
+    // console.log("🔍 Debug state:", { selectedChallenge: selectedChallenge?.id, publicKey: publicKey?.toBase58(), pendingMatchResult });
     
     if (!publicKey || !pendingMatchResult) {
       console.error("❌ Missing wallet or pending match result");
@@ -745,7 +751,6 @@ const ArenaHome: React.FC = () => {
       existingReviews.push(trustData);
       localStorage.setItem('trustReviews', JSON.stringify(existingReviews));
       
-      console.log("✅ Match result and trust review submitted successfully");
       
       // Close modals and clear state
       setShowTrustReview(false);
@@ -772,29 +777,22 @@ const ArenaHome: React.FC = () => {
 
     // Prevent double-clicks
     if (claimingPrize === challenge.id) {
-      console.log("⏳ Already processing claim for this challenge");
       return;
     }
 
     setClaimingPrize(challenge.id);
 
     try {
-      console.log("🏆 Claiming prize for challenge:", challenge.id);
-      
       // Pre-check: Verify challenge is actually claimable on-chain
       if (challenge.pda) {
-        console.log("🔍 Checking on-chain status before claiming...");
         try {
           const { PublicKey } = await import('@solana/web3.js');
           const accountInfo = await connection.getAccountInfo(new PublicKey(challenge.pda));
           if (accountInfo && accountInfo.data) {
             const data = accountInfo.data;
             const statusByte = data[8 + 32 + 33 + 8]; // Skip discriminator, creator, challenger, entry_fee, then status
-            console.log("🔍 On-chain challenge status:", statusByte);
-            
             // Status 2 = Completed (already resolved)
             if (statusByte === 2) {
-              console.log("⚠️ Challenge already completed on-chain - prize already claimed");
               alert("This prize has already been claimed. Please refresh the page to see the latest status.");
               setClaimingPrize(null);
               // Force refresh the page to sync with on-chain state
@@ -807,7 +805,6 @@ const ArenaHome: React.FC = () => {
             // The dispute_timer only prevents joining expired challenges, not claiming prizes.
           }
         } catch (onChainError) {
-          console.log("⚠️ Could not check on-chain status, proceeding with claim attempt");
         }
       }
       
@@ -817,7 +814,6 @@ const ArenaHome: React.FC = () => {
       // Call the claim function
       await claimChallengePrize(challenge.id, wallet, connection);
       
-      console.log("✅ Prize claimed successfully!");
       alert("🏆 Prize claimed! Check your wallet for the USDFG tokens.");
       
       // The real-time listener will update the UI automatically
@@ -889,21 +885,33 @@ const ArenaHome: React.FC = () => {
   const categories = useMemo(() => ['All', 'Fighting', 'Sports', 'Shooting', 'Racing'], []);
 
   // Check if user has active challenge (for button disable logic)
+  // EXCLUDE completed, cancelled, disputed, and expired challenges
+  // Use Firestore data directly for most reliable status check
   const currentWallet = publicKey?.toString() || null;
-  const hasActiveChallenge = currentWallet && challenges.some(c => {
+  const hasActiveChallenge = currentWallet && firestoreChallenges.some((fc: any) => {
     // Check if user created this challenge
-    const isCreator = c.creator === currentWallet;
+    const isCreator = fc.creator === currentWallet;
     
     // Check if user is a participant in this challenge
-    const isParticipant = firestoreChallenges.some(fc => 
-      fc.id === c.id && 
-      fc.players?.includes(currentWallet)
-    );
+    const isParticipant = fc.players?.includes(currentWallet);
     
-    // User has active challenge if they created OR joined one that's active/pending/in-progress
-    const isActive = c.status === 'active' || c.status === 'pending' || c.status === 'in-progress';
+    if (!isCreator && !isParticipant) return false; // Not relevant to this user
     
-    return (isCreator || isParticipant) && isActive;
+    // Get status from Firestore data directly (most reliable)
+    const status = fc.status || fc.rawData?.status || 'unknown';
+    
+    // EXCLUDE completed, cancelled, disputed, and expired challenges
+    const isActive = status === 'active' || status === 'pending' || status === 'in-progress';
+    const isCompleted = status === 'completed' || status === 'cancelled' || status === 'disputed' || status === 'expired';
+    
+    const shouldBlock = (isCreator || isParticipant) && isActive && !isCompleted;
+    
+    if ((isCreator || isParticipant)) {
+      // Debug: Navbar challenge check (uncomment for debugging)
+      // console.log(`🔍 Navbar check - Challenge: ${fc.id}, Status: ${status}, IsActive: ${isActive}, IsCompleted: ${isCompleted}, ShouldBlock: ${shouldBlock}`);
+    }
+    
+    return shouldBlock;
   });
 
   // Add arena-page class to body for mobile CSS
@@ -936,10 +944,8 @@ const ArenaHome: React.FC = () => {
                   return;
                 }
                 if (isCreatingChallenge) {
-                  console.log("⏳ Challenge creation in progress, please wait...");
                   return;
                 }
-                console.log("🔥 CREATE CHALLENGE BUTTON CLICKED!");
                 setShowCreateModal(true);
               }}
               disabled={hasActiveChallenge || isCreatingChallenge}
@@ -1236,7 +1242,6 @@ const ArenaHome: React.FC = () => {
                         onClick={() => {
                           // Don't open join modal for completed challenges
                           if (challenge.status === "completed" || challenge.rawData?.payoutTriggered) {
-                            console.log("Challenge already completed - not opening join modal");
                             return;
                           }
                           setSelectedChallenge(challenge);
@@ -1251,8 +1256,6 @@ const ArenaHome: React.FC = () => {
                             const imagePath = getGameImage(gameName);
                             // Debug log for first challenge only to avoid spam
                             if (challenge === challenges[0]) {
-                              console.log(`🖼️ Challenge Card - Game: ${gameName}, Category: ${category}, Image: ${imagePath}`);
-                              console.log(`🖼️ Challenge object:`, { game: challenge.game, title: challenge.title });
                             }
                             return (
                               <img
@@ -1518,15 +1521,8 @@ const ArenaHome: React.FC = () => {
 
                           // Debug logging for submit result button
                           if (challenge.status === "in-progress") {
-                            console.log("🔍 In-Progress Challenge Debug:", {
-                              challengeId: challenge.id,
-                              status: challenge.status,
-                              currentWallet,
-                              players: challenge.rawData?.players,
-                              isParticipant,
-                              hasSubmittedResult,
-                              results: challenge.rawData?.results
-                            });
+                            // Debug: In-Progress Challenge Debug (uncomment for debugging)
+                            // console.log("🔍 In-Progress Challenge Debug:", { challengeId: challenge.id, status: challenge.status, currentWallet, players: challenge.rawData?.players, isParticipant, hasSubmittedResult, results: challenge.rawData?.results });
                           }
 
                           // Owner buttons (but only if NOT in-progress)
@@ -1661,9 +1657,10 @@ const ArenaHome: React.FC = () => {
                                     const data = accountInfo.data;
                                     const statusByte = data[8 + 32 + 33 + 8]; // Skip discriminator (8), creator (32), challenger Option (33), entry_fee (8), then status
                                     
-                                    console.log('🔍 On-chain challenge status:', statusByte);
-                                    console.log('🔍 Challenge data length:', data.length);
-                                    console.log('🔍 First 50 bytes:', Array.from(data.slice(0, 50)).map(b => b.toString(16).padStart(2, '0')).join(' '));
+                                    // Debug: On-chain challenge status (uncomment for debugging)
+                                    // console.log('🔍 On-chain challenge status:', statusByte);
+                                    // console.log('🔍 Challenge data length:', data.length);
+                                    // console.log('🔍 First 50 bytes:', Array.from(data.slice(0, 50)).map(b => b.toString(16).padStart(2, '0')).join(' '));
                                     
                                     if (statusByte > 1) { // Only block if status is > 1 (Completed, Cancelled, Disputed)
                                       const statusNames = ['Open', 'InProgress', 'Completed', 'Cancelled', 'Disputed'];
@@ -1719,10 +1716,11 @@ const ArenaHome: React.FC = () => {
                             
                             // Debug logging for claim button
                             if (isWinner) {
-                              console.log('🏆 Winner detected for challenge:', challenge.id);
-                              console.log('   canClaim:', challenge.rawData?.canClaim);
-                              console.log('   payoutTriggered:', challenge.rawData?.payoutTriggered);
-                              console.log('   Should show button?:', canClaim);
+                              // Debug: Winner detected (uncomment for debugging)
+                              // console.log('🏆 Winner detected for challenge:', challenge.id);
+                              // console.log('   canClaim:', challenge.rawData?.canClaim);
+                              // console.log('   payoutTriggered:', challenge.rawData?.payoutTriggered);
+                              // console.log('   Should show button?:', canClaim);
                             }
                             
                             if (canClaim) {
@@ -2242,7 +2240,6 @@ const ArenaHome: React.FC = () => {
         <ElegantModal
           isOpen={showCreateModal}
           onClose={() => {
-            console.log("🔥 MODAL CLOSING!");
             setShowCreateModal(false);
           }}
           title="Create New Challenge"
@@ -2254,6 +2251,7 @@ const ArenaHome: React.FC = () => {
             usdfgPrice={usdfgPrice}
             usdfgToUsd={usdfgToUsd}
             userGamerTag={userGamerTag}
+            currentWallet={publicKey?.toString()}
           />
         </ElegantModal>
 
@@ -2763,8 +2761,23 @@ const CreateChallengeModal: React.FC<{
     
     const entryFeeNum = typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) : (typeof formData.entryFee === 'number' ? formData.entryFee : 0);
     const entryFeeStr = typeof formData.entryFee === 'string' ? formData.entryFee : String(formData.entryFee || '');
-    if (!formData.entryFee || entryFeeStr === '' || isNaN(entryFeeNum) || entryFeeNum < 0.000000001 || entryFeeNum > 1000) {
+    
+    // Check if user is admin (allow 0 entry fee for Founder Challenges)
+    const isAdmin = publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+    
+    if (isNaN(entryFeeNum)) {
+      errors.push('Entry fee must be a valid number');
+    } else if (!isAdmin && (entryFeeNum < 0.000000001 || entryFeeNum === 0)) {
       errors.push('Entry fee must be between 0.000000001 and 1000 USDFG');
+    } else if (isAdmin && entryFeeNum < 0) {
+      errors.push('Entry fee cannot be negative');
+    } else if (entryFeeNum > 1000) {
+      errors.push('Maximum entry fee is 1000 USDFG');
+    }
+    
+    // Allow 0 entry fee for admin (Founder Challenges)
+    if (isAdmin && entryFeeNum === 0) {
+      // Valid - no error for Founder Challenges
     }
     
     return errors;
@@ -2785,7 +2798,6 @@ const CreateChallengeModal: React.FC<{
   }, [formData.rules]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
-    console.log("🔥 MODAL: handleSubmit called!");
     e.preventDefault();
     setAttemptedNext(true);
     
@@ -2797,11 +2809,9 @@ const CreateChallengeModal: React.FC<{
     setValidationErrors(allErrors);
 
     if (allErrors.length > 0) {
-      console.log("❌ MODAL: Validation errors found:", allErrors);
       return; // Don't submit if there are errors
     }
     
-    console.log("✅ MODAL: Validation passed, calling onCreateChallenge with:", formData);
     // Create the challenge
     onCreateChallenge(formData);
     onClose();
@@ -2862,7 +2872,6 @@ const CreateChallengeModal: React.FC<{
     // Close the modal and let the user connect via the main wallet button
     onClose();
     // The user should connect their wallet using the main "Connect Wallet" button first
-    console.log('🔗 Please connect your wallet using the main "Connect Wallet" button first');
   };
 
   return (
@@ -3021,7 +3030,14 @@ const CreateChallengeModal: React.FC<{
                   />
                 </Field>
 
-                <Field label={<span className="flex items-center"><span className="mr-2">💰</span>Entry Fee <span className="text-red-400 ml-1">*</span></span>}>
+                <Field label={
+                  <span className="flex items-center">
+                    <span className="mr-2">💰</span>Entry Fee <span className="text-red-400 ml-1">*</span>
+                    {publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase() && (
+                      <span className="text-purple-400 ml-2 text-xs">🏆 (Enter 0 for Founder Challenge)</span>
+                    )}
+                  </span>
+                }>
                   <div className="relative">
                     <input
                       type="text"
@@ -3048,7 +3064,7 @@ const CreateChallengeModal: React.FC<{
                       className={`w-full rounded-xl bg-white/5 border px-3 py-2 text-white mt-4 mb-1 ${
                         hasFieldError('entry fee') ? 'border-red-500/50 bg-red-500/5' : 'border-white/10'
                       }`}
-                      placeholder="0.1"
+                      placeholder={publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase() ? "0 for Founder Challenge" : "0.1"}
                       required
                       autoComplete="off"
                       inputMode="numeric"
@@ -3073,7 +3089,14 @@ const CreateChallengeModal: React.FC<{
                       </div>
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
-Prize pool: {(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5% platform fee)
+                      {(() => {
+                        const isAdmin = publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+                        const entryFee = formData.entryFee || 0;
+                        if (isAdmin && entryFee === 0) {
+                          return <span className="text-purple-300">🏆 Founder Challenge - Prize pool set manually</span>;
+                        }
+                        return <>Prize pool: {(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5% platform fee)</>;
+                      })()}
                     </div>
                   </div>
                 </Field>
@@ -3179,8 +3202,24 @@ Prize pool: {(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5
                     <div className="flex justify-between items-center py-2 border-b border-white/10">
                       <span className="text-gray-400">💰 Entry Fee:</span>
                       <div className="text-right">
-                        <span className="text-amber-400 font-bold">{formData.entryFee} USDFG</span>
-                        <div className="text-xs text-gray-400">{usdfgToUsd(formData.entryFee).toFixed(2)} USD</div>
+                        {(() => {
+                          const isAdmin = publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+                          const entryFee = formData.entryFee || 0;
+                          if (isAdmin && entryFee === 0) {
+                            return (
+                              <>
+                                <span className="text-green-400 font-bold">FREE</span>
+                                <div className="text-xs text-purple-300">🏆 Founder Challenge</div>
+                              </>
+                            );
+                          }
+                          return (
+                            <>
+                              <span className="text-amber-400 font-bold">{formData.entryFee} USDFG</span>
+                              <div className="text-xs text-gray-400">{usdfgToUsd(formData.entryFee).toFixed(2)} USD</div>
+                            </>
+                          );
+                        })()}
                       </div>
                       </div>
                     <div className="flex justify-between items-center py-2 border-b border-white/10">
@@ -3255,7 +3294,6 @@ const JoinChallengeModal: React.FC<{
         throw new Error('Wallet not connected');
       }
 
-      console.log("🚀 Joining challenge:", challenge.id);
       
       // Check if this is a Founder Challenge (admin-created with 0 entry fee)
       const { ADMIN_WALLET } = await import('@/lib/chain/config');
@@ -3266,7 +3304,6 @@ const JoinChallengeModal: React.FC<{
       const isFounderChallenge = isAdmin && isFree;
       
       if (isFounderChallenge) {
-        console.log("🏆 Founder Challenge detected - skipping on-chain transaction");
         // Just add player to challenge in Firestore
         // USDFG transfer tracking happens separately when actual token transfer occurs
         // (via recordFounderChallengeReward function called after token transfer)
@@ -3293,7 +3330,6 @@ const JoinChallengeModal: React.FC<{
         await joinChallenge(challenge.id, walletAddress);
       }
       
-      console.log("✅ Successfully joined challenge!");
       setState('success');
       
       setTimeout(() => {
@@ -3350,7 +3386,6 @@ const JoinChallengeModal: React.FC<{
                 <span className="text-gray-400">Entry Fee:</span>
                 <span className={`font-medium ${
                   (() => {
-                    const { ADMIN_WALLET } = require('@/lib/chain/config');
                     const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
                     const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
                     const isAdmin = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
@@ -3359,7 +3394,6 @@ const JoinChallengeModal: React.FC<{
                   })() ? 'text-green-400' : 'text-white'
                 }`}>
                   {(() => {
-                    const { ADMIN_WALLET } = require('@/lib/chain/config');
                     const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
                     const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
                     const isAdmin = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
@@ -3402,7 +3436,6 @@ const JoinChallengeModal: React.FC<{
             
             <p className="text-xs text-gray-400">
               {(() => {
-                const { ADMIN_WALLET } = require('@/lib/chain/config');
                 const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
                 const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
                 const isAdmin = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();

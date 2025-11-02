@@ -339,9 +339,9 @@ export default function PlayerProfileModal({
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-20 p-2 rounded-full bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors"
+          className="absolute top-3 right-3 z-20 p-1.5 rounded-full bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors"
         >
-          <X className="h-5 w-5 text-zinc-400" />
+          <X className="h-4 w-4 text-zinc-400" />
         </button>
 
         {/* Ambient Glow */}
@@ -349,7 +349,7 @@ export default function PlayerProfileModal({
         <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
 
         {/* Header / Avatar */}
-        <div className="relative z-10 flex flex-col items-center gap-3 pt-10">
+        <div className="relative z-10 flex flex-col items-center gap-2 pt-6">
           {isCurrentUser ? (
             <ProfileImageUpload
               currentImage={player.profileImage}
@@ -357,7 +357,7 @@ export default function PlayerProfileModal({
               size="lg"
             />
           ) : (
-            <div className="relative h-28 w-28 rounded-full bg-zinc-900 grid place-items-center ring-2 ring-amber-300/60 overflow-hidden shadow-[0_0_40px_rgba(255,215,130,0.25)]">
+            <div className="relative h-24 w-24 rounded-full bg-zinc-900 grid place-items-center ring-2 ring-amber-300/60 overflow-hidden shadow-[0_0_30px_rgba(255,215,130,0.2)]">
               {player.profileImage ? (
                 <img
                   src={player.profileImage}
@@ -365,7 +365,7 @@ export default function PlayerProfileModal({
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <Gamepad2 className="h-10 w-10 text-amber-300" />
+                <Gamepad2 className="h-8 w-8 text-amber-300" />
               )}
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,235,170,.2),transparent_70%)]" />
             </div>
@@ -379,7 +379,7 @@ export default function PlayerProfileModal({
                 onChange={(e) => setEditedName(e.target.value)}
                 onKeyDown={handleKeyPress}
                 onBlur={handleSaveName}
-                className="text-4xl font-bold tracking-tight text-white bg-transparent border-b-2 border-amber-300 focus:outline-none uppercase text-center"
+                className="text-2xl font-bold tracking-tight text-white bg-transparent border-b-2 border-amber-300 focus:outline-none uppercase text-center"
                 maxLength={20}
                 autoFocus
               />
@@ -387,27 +387,27 @@ export default function PlayerProfileModal({
                 onClick={handleSaveName}
                 className="p-1 text-amber-300 hover:text-white transition-colors"
               >
-                <Edit3 className="h-4 w-4" />
+                <Edit3 className="h-3.5 w-3.5" />
               </button>
             </div>
           ) : (
             <div 
-              className={`text-4xl font-bold tracking-tight text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.25)] uppercase ${isCurrentUser ? 'cursor-pointer hover:text-amber-300 transition-colors' : ''}`}
+              className={`text-2xl font-bold tracking-tight text-white drop-shadow-[0_0_8px_rgba(255,215,130,0.2)] uppercase ${isCurrentUser ? 'cursor-pointer hover:text-amber-300 transition-colors' : ''}`}
               onClick={isCurrentUser ? () => setIsEditingName(true) : undefined}
             >
               {isCurrentUser && (
-                <span className="inline-block mr-2 text-amber-300">
-                  <Edit3 className="h-6 w-6" />
+                <span className="inline-block mr-1.5 text-amber-300">
+                  <Edit3 className="h-4 w-4" />
                 </span>
               )}
               {player.displayName || player.name || 'Player'}
             </div>
           )}
-          <p className="text-sm text-zinc-400">{player.wallet?.slice(0, 8)}...{player.wallet?.slice(-4)} • {rankTitle}</p>
+          <p className="text-xs text-zinc-400">{player.wallet?.slice(0, 8)}...{player.wallet?.slice(-4)} • {rankTitle}</p>
           
           {/* Country Flag */}
           {isCurrentUser ? (
-            <div className="mt-2">
+            <div className="mt-1.5">
               <CountryFlagPicker
                 selectedCountry={player.country}
                 onCountrySelect={(country) => onCountryChange?.(country?.code || null)}
@@ -416,8 +416,8 @@ export default function PlayerProfileModal({
               />
             </div>
           ) : player.country ? (
-            <div className="flex items-center gap-2 mt-2 text-sm text-amber-300">
-              <span className="text-2xl">
+            <div className="flex items-center gap-1.5 mt-1.5 text-xs text-amber-300">
+              <span className="text-lg">
                 {(() => {
                   const country = countries.find(c => c.code === player.country);
                   return country?.flag || '🏳️';
@@ -432,13 +432,13 @@ export default function PlayerProfileModal({
             </div>
           ) : null}
           
-          <div className="flex items-center gap-2 mt-2 text-xs text-amber-300">
-            <Crown className="h-4 w-4" /> Rank #{rank}
+          <div className="flex items-center gap-1.5 mt-1.5 text-xs text-amber-300">
+            <Crown className="h-3.5 w-3.5" /> Rank #{rank}
           </div>
         </div>
 
         {/* Stats Section */}
-        <div className="relative z-10 mt-10 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 px-8">
+        <div className="relative z-10 mt-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 px-6">
           {[{
             icon: Trophy,
             label: "Wins",
@@ -464,28 +464,28 @@ export default function PlayerProfileModal({
             label: "Win Rate",
             value: `${player.winRate || 0}%`
           }].map((s, i) => (
-            <div key={i} className="border border-zinc-800 bg-[#0B0C12]/90 hover:border-amber-300/50 transition rounded-2xl overflow-hidden text-center shadow-[0_0_20px_rgba(255,215,130,0.03)]">
-              <div className="p-5 flex flex-col items-center gap-2">
-                {React.createElement(s.icon, { className: "h-6 w-6 text-amber-300" })}
-                <div className="text-xs text-zinc-400">{s.label}</div>
-                <div className="text-lg font-semibold text-zinc-50 tracking-tight">{s.value}</div>
+            <div key={i} className="border border-zinc-800/50 bg-[#0B0C12]/90 hover:border-amber-300/30 transition rounded-lg overflow-hidden text-center shadow-[0_0_15px_rgba(255,215,130,0.02)]">
+              <div className="p-3 flex flex-col items-center gap-1.5">
+                {React.createElement(s.icon, { className: "h-4 w-4 text-amber-300" })}
+                <div className="text-[10px] text-zinc-400">{s.label}</div>
+                <div className="text-sm font-semibold text-zinc-50 tracking-tight">{s.value}</div>
               </div>
             </div>
           ))}
         </div>
 
         {/* Trophy Showcase */}
-        <div className="relative z-10 mt-8 px-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-amber-400 to-orange-500 rounded-lg flex items-center justify-center">
-                <Trophy className="h-4 w-4 text-white" />
+        <div className="relative z-10 mt-6 px-6">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 bg-gradient-to-r from-amber-400/90 to-orange-500/90 rounded-lg flex items-center justify-center">
+                <Trophy className="h-3.5 w-3.5 text-white" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">
+                <h3 className="text-base font-semibold text-white">
                   Trophy Collection
                 </h3>
-                <div className="text-sm text-zinc-400">
+                <div className="text-xs text-zinc-400">
                   {isCurrentUser && selectedTrophies.length > 0 ? (
                     <span className="text-amber-300">
                       {selectedTrophies.length}/3 selected
@@ -499,29 +499,29 @@ export default function PlayerProfileModal({
             {isCurrentUser && !isEditingTrophies && (
               <button
                 onClick={startTrophyEditing}
-                className="px-3 py-1.5 bg-amber-500/20 border border-amber-400/40 rounded-lg text-amber-300 hover:text-amber-200 hover:border-amber-300/60 transition-all text-sm font-medium"
+                className="px-2 py-1 bg-amber-500/20 border border-amber-400/40 rounded-lg text-amber-300 hover:text-amber-200 hover:border-amber-300/60 transition-all text-xs font-medium"
               >
                 Select 3
               </button>
             )}
             {isCurrentUser && isEditingTrophies && (
-              <div className="flex gap-2">
+              <div className="flex gap-1.5">
                 <button
                   onClick={handleSaveTrophySelection}
-                  className="px-3 py-1.5 bg-green-500/20 border border-green-400/40 rounded-lg text-green-300 hover:text-green-200 transition-all text-sm font-medium"
+                  className="px-2 py-1 bg-green-500/20 border border-green-400/40 rounded-lg text-green-300 hover:text-green-200 transition-all text-xs font-medium"
                 >
                   Done
                 </button>
                 <button
                   onClick={handleCancelTrophySelection}
-                  className="px-3 py-1.5 bg-zinc-500/20 border border-zinc-400/40 rounded-lg text-zinc-300 hover:text-zinc-200 transition-all text-sm font-medium"
+                  className="px-2 py-1 bg-zinc-500/20 border border-zinc-400/40 rounded-lg text-zinc-300 hover:text-zinc-200 transition-all text-xs font-medium"
                 >
                   Cancel
                 </button>
               </div>
             )}
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2">
             {USDFG_RELICS.map((trophy) => {
               const gamesPlayed = (player.wins || 0) + (player.losses || 0);
               // Check if unlocked: games-based OR special condition
@@ -564,10 +564,10 @@ export default function PlayerProfileModal({
                   )}
                   
                   <div 
-                    className={`p-3 rounded-lg border transition-all hover:scale-105 cursor-pointer ${
+                    className={`p-2 rounded-lg border transition-all hover:scale-105 cursor-pointer ${
                       isVisible 
-                        ? 'border-zinc-700 hover:border-amber-400/50 bg-zinc-900/30 hover:bg-zinc-900/50' 
-                        : 'border-zinc-800 opacity-50'
+                        ? 'border-zinc-700/50 hover:border-amber-400/30 bg-zinc-900/30 hover:bg-zinc-900/50' 
+                        : 'border-zinc-800/50 opacity-50'
                     } ${
                       isCurrentUser && selectedTrophies.includes(trophy.id) 
                         ? 'ring-1 ring-amber-400/50' 
@@ -579,11 +579,11 @@ export default function PlayerProfileModal({
                     }`}
                     onClick={() => handleTrophyClick(trophy)}
                   >
-                    <div className="flex justify-center mb-2">
+                    <div className="flex justify-center mb-1.5">
                       <img
                         src={trophy.icon}
                         alt={trophy.name}
-                        className={`w-12 h-12 object-contain transition-all ${
+                        className={`w-10 h-10 object-contain transition-all ${
                           isVisible 
                             ? isUnlocked 
                               ? 'opacity-100 group-hover:brightness-110' 
@@ -608,20 +608,20 @@ export default function PlayerProfileModal({
                           target.style.display = 'none';
                           const fallback = document.createElement('div');
                           fallback.textContent = '🏆';
-                          fallback.className = 'text-2xl';
+                          fallback.className = 'text-lg';
                           target.parentNode?.appendChild(fallback);
                         }}
                       />
                     </div>
                     <div className="text-center">
-                      <div className={`text-xs font-medium ${
+                      <div className={`text-[10px] font-medium ${
                         isVisible ? (isUnlocked ? 'text-white' : 'text-zinc-400') : 'text-zinc-500'
                       }`}>
                         {trophy.name}
                       </div>
                       {/* Show description for OG trophy */}
                       {isOgTrophy && !isUnlocked && (
-                        <div className="text-[10px] text-amber-400/70 mt-1 line-clamp-2">
+                        <div className="text-[9px] text-amber-400/70 mt-0.5 line-clamp-2">
                           {trophy.description}
                         </div>
                       )}
@@ -634,8 +634,8 @@ export default function PlayerProfileModal({
         </div>
 
         {/* Challenge CTA */}
-        <div className="relative z-10 flex flex-col items-center gap-4 mt-12 pb-12">
-          <p className="text-sm text-zinc-400">
+        <div className="relative z-10 flex flex-col items-center gap-2 mt-6 pb-6">
+          <p className="text-xs text-zinc-400">
             Total Earned: <span className="font-bold text-amber-300">{(player.totalEarned || 0).toFixed(0)} USDFG</span> • Last Active: {player.lastActive ? new Date(player.lastActive.seconds * 1000).toLocaleString() : 'Recently'}
           </p>
           {!isCurrentUser && (
@@ -645,12 +645,12 @@ export default function PlayerProfileModal({
                   onChallengePlayer(player);
                 }
               }}
-              className="bg-gradient-to-r from-amber-300 to-yellow-200 text-zinc-900 text-sm hover:opacity-90 px-10 py-3 rounded-full shadow-[0_0_30px_rgba(255,215,130,0.25)] transition-all"
+              className="bg-gradient-to-r from-amber-300/90 to-yellow-200/90 text-zinc-900 text-xs hover:opacity-90 px-6 py-2 rounded-full shadow-[0_0_20px_rgba(255,215,130,0.2)] transition-all border border-amber-400/30"
             >
               {hasActiveChallenge ? 'Send Challenge' : 'Challenge Player'}
             </button>
           )}
-          <p className="text-[11px] text-zinc-500 tracking-wide uppercase">Non-custodial • Skill-Based • Competitive Mode</p>
+          <p className="text-[10px] text-zinc-500 tracking-wide uppercase">Non-custodial • Skill-Based • Competitive Mode</p>
         </div>
       </motion.div>
 
@@ -668,15 +668,15 @@ export default function PlayerProfileModal({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="bg-[#07080C]/95 border border-amber-500/30 rounded-xl p-6 max-w-sm w-full shadow-2xl shadow-amber-500/20"
+            className="bg-[#07080C]/95 border border-amber-500/30 rounded-xl p-3 max-w-sm w-full shadow-2xl shadow-amber-500/20"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="text-center space-y-6">
+            <div className="text-center space-y-3">
               <div className="relative">
                 <img
                   src={selectedTrophyForPopup.icon}
                   alt={selectedTrophyForPopup.name}
-                  className="w-32 h-32 mx-auto animate-bounce-slow drop-shadow-[0_0_20px_rgba(255,215,130,0.6)]"
+                  className="w-24 h-24 mx-auto animate-bounce-slow drop-shadow-[0_0_15px_rgba(255,215,130,0.5)]"
                   loading="lazy"
                   decoding="async"
                   onError={(e) => {
@@ -695,30 +695,30 @@ export default function PlayerProfileModal({
                     target.style.display = 'none';
                     const fallback = document.createElement('div');
                     fallback.textContent = '🏆';
-                    fallback.className = 'text-6xl';
+                    fallback.className = 'text-4xl';
                     target.parentNode?.appendChild(fallback);
                   }}
                 />
-                <div className="absolute inset-0 w-32 h-32 mx-auto rounded-full bg-gradient-to-r from-amber-400/20 to-yellow-300/20 animate-pulse"></div>
+                <div className="absolute inset-0 w-24 h-24 mx-auto rounded-full bg-gradient-to-r from-amber-400/20 to-yellow-300/20 animate-pulse"></div>
               </div>
-              <h3 className="text-2xl font-bold text-white mb-2">
+              <h3 className="text-lg font-bold text-white mb-1.5">
                 {selectedTrophyForPopup.name}
               </h3>
-              <p className="text-amber-200 text-lg leading-relaxed">
+              <p className="text-amber-200 text-sm leading-relaxed">
                 [Hidden Description - Unlock to reveal]
               </p>
-              <div className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-400/30 rounded-xl p-6">
-                <h3 className="text-amber-400 font-bold text-lg mb-3">Mystery Requirement</h3>
-                <p className="text-amber-200 font-bold text-2xl">
+              <div className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-400/30 rounded-xl p-3">
+                <h3 className="text-amber-400 font-bold text-sm mb-2">Mystery Requirement</h3>
+                <p className="text-amber-200 font-bold text-lg">
                   ??? games played
                 </p>
-                <p className="text-amber-300 text-sm mt-2 italic">
+                <p className="text-amber-300 text-xs mt-1.5 italic">
                   Keep playing to discover the secret!
                 </p>
               </div>
               <button
                 onClick={() => setSelectedTrophyForPopup(null)}
-                className="px-4 py-2 bg-amber-500/20 border border-amber-400/40 rounded-lg text-amber-300 hover:text-amber-200 hover:border-amber-300/60 transition-all text-sm font-medium"
+                className="px-3 py-1.5 bg-amber-500/20 border border-amber-400/40 rounded-lg text-amber-300 hover:text-amber-200 hover:border-amber-300/60 transition-all text-xs font-medium"
               >
                 Close
               </button>

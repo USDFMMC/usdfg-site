@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useScrollFadeIn } from "@/hooks/useScrollFadeIn";
@@ -9,8 +9,6 @@ const MASCOT_PNG  = "/assets/usdfg-mascot-trophy-illustration.png";
 const MASCOT_ABS  = "https://tangerine-valkyrie-b2552f.netlify.app/assets/usdfg-mascot-trophy-illustration.webp";
 
 const HeroSection: React.FC = () => {
-  // Removed redundant hero particles - using StarBackground instead
-
   const mascotRef = useScrollFadeIn<HTMLDivElement>();
   const imgRef = useRef<HTMLImageElement | null>(null);
 
@@ -27,12 +25,11 @@ const HeroSection: React.FC = () => {
   };
 
   return (
-    <section className="hero relative py-12 lg:py-20 overflow-hidden">
-      {/* Removed particles-container - using StarBackground */}
-        <div className="container mx-auto px-2 relative z-10">
+    <section className="hero relative py-8 lg:py-12 overflow-hidden bg-[#07080C]">
+      <div className="container mx-auto px-3">
         <div className="flex flex-col lg:flex-row items-center">
           {/* Left copy */}
-          <div className="lg:w-1/2 mb-6 lg:mb-0 text-center lg:text-left">
+          <div className="lg:w-1/2 mb-4 lg:mb-0 text-center lg:text-left">
             <div
               className="text-2xl md:text-3xl lg:text-4xl font-bold mb-2"
               style={{ color: "var(--secondary-color)", textShadow: "var(--neon-glow)" }}
@@ -56,7 +53,7 @@ USDFG
             <div className="flex flex-col sm:flex-row justify-center lg:justify-start gap-2">
               <a href="#platform">
                 <Button
-                  className="w-full sm:w-auto px-4 py-2 transition-all btn-animation"
+                  className="w-full sm:w-auto px-4 py-2 text-sm md:text-base transition-all btn-animation"
                   style={{
                     background: "var(--primary-color)",
                     color: "var(--text-light)",
@@ -69,8 +66,8 @@ USDFG
 
               <Link to="/whitepaper">
                 <Button
-                  className="w-full sm:w-auto px-4 py-2 transition-all btn-animation border border-amber-400/50 text-white font-bold bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 hover:brightness-125 hover:scale-105"
-                  style={{ boxShadow: "0 0 16px #00e8fc99, 0 0 4px #fff1", fontWeight: 700 }}
+                  className="w-full sm:w-auto px-4 py-2 text-sm md:text-base transition-all btn-animation border border-amber-400/50 text-white font-bold bg-gradient-to-r from-amber-400/90 via-amber-500/90 to-orange-500/90 hover:brightness-125 hover:scale-105"
+                  style={{ boxShadow: "0 0 12px #00e8fc99, 0 0 3px #fff1", fontWeight: 700 }}
                 >
                   WHITEPAPER
                 </Button>
@@ -80,7 +77,7 @@ USDFG
 
           {/* Right mascot */}
           <div className="lg:w-1/2 flex justify-center lg:justify-end">
-            <div ref={mascotRef} className="relative w-48 h-48 md:w-64 md:h-64 lg:w-80 lg:h-80">
+            <div ref={mascotRef} className="relative w-44 h-44 md:w-64 md:h-64 lg:w-80 lg:h-80">
               <picture>
                 <source srcSet={MASCOT_WEBP} type="image/webp" />
                 <img
@@ -90,7 +87,7 @@ USDFG
                   loading="eager"
                   decoding="async"
                   onError={handleImgError}
-                  className="w-48 h-48 md:w-64 md:h-64 lg:w-80 lg:h-80 max-w-full object-contain"
+                  className="w-44 h-44 md:w-64 md:h-64 lg:w-80 lg:h-80 max-w-full object-contain"
                 />
               </picture>
             </div>

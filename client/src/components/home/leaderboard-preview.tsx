@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Trophy, Copy, Crown } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { getTopPlayers, PlayerStats } from "@/lib/firebase/firestore";
 
 interface Player {
@@ -106,31 +106,20 @@ const LeaderboardPreview: React.FC = () => {
   }, [activeTab]);
   
   return (
-    <section className="py-20 bg-card">
-      <div className="container mx-auto px-4">
-        {/* Leaderboard Visual Glow - Add if/when you have a main image */}
-        {/* <div className="flex justify-center mb-12">
-          <div className="relative fade-in-up" id="leaderboard-visual">
-            <div className="glow-behind pulse-glow"></div>
-            <img
-              src="/assets/your-leaderboard-image.png"
-              alt="USDFG leaderboard - top players and winners"
-              className="w-full max-w-2xl rounded-xl relative z-10"
-            />
-          </div>
-        </div> */}
+    <section className="py-12 bg-[#07080C]">
+      <div className="container mx-auto px-3">
         <div className="text-center mb-6">
-          <h2 className="text-3xl md:text-4xl font-extrabold mb-2 drop-shadow-glow">
+          <h2 className="text-2xl md:text-3xl font-extrabold mb-3 drop-shadow-glow">
             USDFG <span className="text-primary">LEADERBOARD</span>
           </h2>
           {/* Neon-glow underline/divider */}
-          <div className="mx-auto mb-4 h-1 w-40 rounded-full bg-gradient-to-r from-cyan-400 via-purple-500 to-cyan-400 animate-pulse shadow-[0_0_32px_#22d3ee99] shimmer-underline" />
-          <p className="text-cyan-200 max-w-2xl mx-auto text-lg font-semibold mb-2">
+          <div className="mx-auto mb-4 h-0.5 w-40 rounded-full bg-gradient-to-r from-cyan-400/80 via-purple-500/80 to-cyan-400/80 animate-pulse shadow-[0_0_20px_#22d3ee66] shimmer-underline" />
+          <p className="text-cyan-200 max-w-2xl mx-auto text-base md:text-lg font-semibold mb-2">
             No usernames. No profiles. Just your wallet, your skill, your record.
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="ml-2 cursor-pointer text-cyan-400">ⓘ</span>
+                  <span className="ml-1.5 cursor-pointer text-cyan-400">ⓘ</span>
                 </TooltipTrigger>
                 <TooltipContent className="bg-black/80 text-cyan-100 border-cyan-400/40">
                   Your wallet is your identity. No personal data, no registration, no tracking.
@@ -138,25 +127,21 @@ const LeaderboardPreview: React.FC = () => {
               </Tooltip>
             </TooltipProvider>
           </p>
-          <p className="text-cyan-400 max-w-2xl mx-auto text-base font-medium">
+          <p className="text-cyan-400 max-w-2xl mx-auto text-sm md:text-base font-medium">
             Only skill matters. No bots. No aliases. Every win is on-chain.
           </p>
         </div>
 
         <div className="max-w-5xl mx-auto relative">
-          {/* Glass reflection overlay */}
-          <div className="pointer-events-none absolute inset-0 z-10 rounded-lg overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1/3 bg-gradient-to-b from-white/30 to-transparent opacity-30 animate-glass-reflection" />
-          </div>
           {/* Leaderboard Tabs */}
-          <div className="flex flex-wrap justify-center mb-6 border-b border-amber-800/60">
+          <div className="flex flex-wrap justify-center mb-4 border-b border-amber-800/40">
             {tabs.map((tab) => (
               <Button
                 key={tab.id}
                 variant={activeTab === tab.id ? "default" : "ghost"}
-                className={`rounded-none rounded-t-md font-bold tracking-wide px-6 py-2 text-lg ${
+                className={`rounded-none rounded-t-md font-bold tracking-wide px-4 py-1.5 text-sm ${
                   activeTab === tab.id 
-                    ? "bg-gradient-to-r from-amber-400 to-orange-500 text-black shadow-[0_0_15px_rgba(255,215,130,0.3)]" 
+                    ? "bg-gradient-to-r from-amber-400/90 to-orange-500/90 text-black shadow-[0_0_12px_rgba(255,215,130,0.2)] border border-amber-400/30" 
                     : "text-amber-300 hover:text-white"
                 }`}
                 onClick={() => setActiveTab(tab.id)}
@@ -167,41 +152,41 @@ const LeaderboardPreview: React.FC = () => {
           </div>
 
           {/* Leaderboard Table */}
-          <div className="overflow-x-auto rounded-lg bg-gradient-to-br from-white/10 to-amber-900/20 border border-amber-400/30 shadow-[0_0_40px_rgba(0,0,0,0.5)] backdrop-blur-md p-2 relative neon-outline">
+          <div className="overflow-x-auto rounded-lg bg-[#07080C]/98 border border-amber-400/20 shadow-[0_0_20px_rgba(0,0,0,0.3)] backdrop-blur-md p-2 relative neon-outline">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12 text-center">Rank</TableHead>
-                  <TableHead className="text-left">Wallet</TableHead>
-                  <TableHead className="text-center">Wins</TableHead>
-                  <TableHead className="text-center">Losses</TableHead>
-                  <TableHead className="text-center">Win Rate</TableHead>
-                  <TableHead className="text-center">Streak</TableHead>
-                  <TableHead className="w-36 text-center" style={{ overflow: 'visible', position: 'relative' }}>
+                  <TableHead className="w-12 text-center text-sm">Rank</TableHead>
+                  <TableHead className="text-left text-sm">Wallet</TableHead>
+                  <TableHead className="text-center text-sm">Wins</TableHead>
+                  <TableHead className="text-center text-sm">Losses</TableHead>
+                  <TableHead className="text-center text-sm">Win Rate</TableHead>
+                  <TableHead className="text-center text-sm">Streak</TableHead>
+                  <TableHead className="w-36 text-center text-sm" style={{ overflow: 'visible', position: 'relative' }}>
                     <div className="flex items-center justify-center gap-1 relative">
                       Skill Rewards (USDFG)
                     </div>
                   </TableHead>
-                  <TableHead className="w-24 text-center">Tier</TableHead>
+                  <TableHead className="w-24 text-center text-sm">Tier</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-12">
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400"></div>
-                        <p className="text-cyan-300">Loading leaderboard...</p>
+                    <TableCell colSpan={8} className="text-center py-8">
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
+                        <p className="text-cyan-300 text-sm">Loading leaderboard...</p>
                       </div>
                     </TableCell>
                   </TableRow>
                 ) : players.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-12">
-                      <div className="flex flex-col items-center gap-3">
-                        <Trophy className="w-16 h-16 text-cyan-400/50" />
-                        <p className="text-cyan-300 text-lg font-semibold">No players yet!</p>
-                        <p className="text-gray-400">Be the first to complete a challenge and claim the top spot.</p>
+                    <TableCell colSpan={8} className="text-center py-8">
+                      <div className="flex flex-col items-center gap-2">
+                        <Trophy className="w-12 h-12 text-cyan-400/50" />
+                        <p className="text-cyan-300 text-sm font-semibold">No players yet!</p>
+                        <p className="text-gray-400 text-xs">Be the first to complete a challenge and claim the top spot.</p>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -215,7 +200,7 @@ const LeaderboardPreview: React.FC = () => {
                       className={`relative group transition-transform duration-200 ${i < 3 ? "z-10 animate-glow-row" : ""}`}
                       style={i < 3 ? { boxShadow: "0 0 32px 8px var(--tier-glow-" + player.rankTitle.toLowerCase() + ")" } : {}}
                     >
-                      <TableCell className="text-center font-bold text-lg">{player.rank}</TableCell>
+                      <TableCell className="text-center font-bold text-base">{player.rank}</TableCell>
                       <TableCell className="font-mono text-sm flex items-center gap-2">
                         <span>{masked}</span>
                         <TooltipProvider>
@@ -229,36 +214,36 @@ const LeaderboardPreview: React.FC = () => {
                           </Tooltip>
                         </TooltipProvider>
                       </TableCell>
-                      <TableCell className="text-center">{player.wins}</TableCell>
-                      <TableCell className="text-center">{player.losses}</TableCell>
-                      <TableCell className="text-center">{player.winRate}</TableCell>
-                      <TableCell className="text-center">{player.winStreak}</TableCell>
-                      <TableCell className="text-center font-bold text-amber-300">{formatUSDFG(player.gains)}</TableCell>
+                      <TableCell className="text-center text-sm">{player.wins}</TableCell>
+                      <TableCell className="text-center text-sm">{player.losses}</TableCell>
+                      <TableCell className="text-center text-sm">{player.winRate}</TableCell>
+                      <TableCell className="text-center text-sm">{player.winStreak}</TableCell>
+                      <TableCell className="text-center font-bold text-amber-300 text-sm">{formatUSDFG(player.gains)}</TableCell>
                       <TableCell className="text-center">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-semibold text-white shadow-[0_0_8px_rgba(255,215,130,0.15)] border ${
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-semibold text-white shadow-[0_0_6px_rgba(255,215,130,0.12)] border text-sm ${
                                 player.rankTitle === "Gold"
-                                  ? "bg-gradient-to-r from-yellow-400 to-yellow-600 border-yellow-400"
+                                  ? "bg-gradient-to-r from-yellow-400/90 to-yellow-600/90 border-yellow-400/50"
                                   : player.rankTitle === "Silver"
-                                  ? "bg-gradient-to-r from-gray-300 to-gray-500 border-gray-300"
+                                  ? "bg-gradient-to-r from-gray-300/90 to-gray-500/90 border-gray-300/50"
                                   : player.rankTitle === "Bronze"
-                                  ? "bg-gradient-to-r from-amber-700 to-yellow-500 border-amber-700"
-                                  : "bg-gradient-to-r from-cyan-400 to-blue-600 border-cyan-400"
+                                  ? "bg-gradient-to-r from-amber-700/90 to-yellow-500/90 border-amber-700/50"
+                                  : "bg-gradient-to-r from-cyan-400/90 to-blue-600/90 border-cyan-400/50"
                               } animate-fade-in-up`}
                               >
                                 {/* Crown/medal icon */}
-                                {player.rankTitle === "Gold" && <Crown className="w-5 h-5 text-yellow-300 drop-shadow-glow animate-bounce" />}
-                                {player.rankTitle === "Silver" && <Crown className="w-5 h-5 text-gray-200 drop-shadow-glow animate-bounce" />}
-                                {player.rankTitle === "Bronze" && <Crown className="w-5 h-5 text-amber-400 drop-shadow-glow animate-bounce" />}
-                                {player.rankTitle === "Platinum" && <Crown className="w-5 h-5 text-cyan-200 drop-shadow-glow animate-bounce" />}
-                                {player.rankTitle === "Ghostly" && <Crown className="w-5 h-5 text-purple-400 drop-shadow-glow animate-bounce" style={{ filter: 'drop-shadow(0 0 8px #a78bfa) drop-shadow(0 0 16px #fff)' }} />}
+                                {player.rankTitle === "Gold" && <Crown className="w-4 h-4 text-yellow-300 drop-shadow-glow animate-bounce" />}
+                                {player.rankTitle === "Silver" && <Crown className="w-4 h-4 text-gray-200 drop-shadow-glow animate-bounce" />}
+                                {player.rankTitle === "Bronze" && <Crown className="w-4 h-4 text-amber-400 drop-shadow-glow animate-bounce" />}
+                                {player.rankTitle === "Platinum" && <Crown className="w-4 h-4 text-cyan-200 drop-shadow-glow animate-bounce" />}
+                                {player.rankTitle === "Ghostly" && <Crown className="w-4 h-4 text-purple-400 drop-shadow-glow animate-bounce" style={{ filter: 'drop-shadow(0 0 6px #a78bfa) drop-shadow(0 0 12px #fff)' }} />}
                                 <span className="ml-1">{player.rankTitle}</span>
                               </span>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <span>
+                              <span className="text-sm">
                                 {player.rankTitle} Tier: {player.rankTitle === "Gold"
                                   ? "Top 1% - Legendary performance"
                                   : player.rankTitle === "Silver"
@@ -279,12 +264,12 @@ const LeaderboardPreview: React.FC = () => {
           </div>
 
           {/* Pagination */}
-          <div className="flex justify-center mt-6">
-            <div className="flex space-x-2">
-              <span className="w-8 h-8 flex items-center justify-center bg-primary text-background rounded-md">1</span>
-              <span className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-white transition-colors rounded-md cursor-pointer">2</span>
-              <span className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-white transition-colors rounded-md cursor-pointer">3</span>
-              <span className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-white transition-colors rounded-md cursor-pointer">Next ›</span>
+          <div className="flex justify-center mt-4">
+            <div className="flex space-x-1.5">
+              <span className="w-6 h-6 flex items-center justify-center bg-primary text-background rounded-md text-xs">1</span>
+              <span className="w-6 h-6 flex items-center justify-center text-muted-foreground hover:text-white transition-colors rounded-md cursor-pointer text-xs">2</span>
+              <span className="w-6 h-6 flex items-center justify-center text-muted-foreground hover:text-white transition-colors rounded-md cursor-pointer text-xs">3</span>
+              <span className="w-6 h-6 flex items-center justify-center text-muted-foreground hover:text-white transition-colors rounded-md cursor-pointer text-xs">Next ›</span>
             </div>
           </div>
         </div>

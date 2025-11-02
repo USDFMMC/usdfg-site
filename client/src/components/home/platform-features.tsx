@@ -31,39 +31,30 @@ const PlatformFeatures: React.FC = () => {
   ];
 
   return (
-    <section id="platform" className="py-12 px-2 text-white text-center relative overflow-hidden">
-      <h2 className="text-2xl md:text-3xl font-bold text-center mb-2 text-white animate-fade-in" style={{ textShadow: 'var(--primary-glow)' }}>
+    <section id="platform" className="py-8 px-3 text-white text-center relative overflow-hidden bg-[#07080C]">
+      <h2 className="text-2xl md:text-3xl font-bold text-center mb-3 text-white animate-fade-in" style={{ textShadow: 'var(--primary-glow)' }}>
         USDFG – The Bitcoin of Gaming
       </h2>
-      <p className="text-center text-sm text-muted-foreground mb-6 animate-fade-in" style={{ textShadow: 'var(--neon-glow)' }}>
+      <p className="text-center text-sm md:text-base text-muted-foreground mb-6 animate-fade-in" style={{ textShadow: 'var(--neon-glow)' }}>
         A decentralized arena where skill is the only currency.
       </p>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-7xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 max-w-7xl mx-auto">
         {features.map((feature, idx) => (
           <div
             key={feature.title}
-            className="feature-card group bg-[#111]/90 border border-amber-400/30 rounded-lg shadow-[0_0_15px_rgba(255,215,130,0.15)] backdrop-blur-md p-3 transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_20px_rgba(255,215,130,0.25)] hover:border-amber-400/50 relative overflow-hidden animate-fade-in-up"
+            className="feature-card group bg-[#07080C]/98 border border-amber-400/20 rounded-lg shadow-[0_0_10px_rgba(255,215,130,0.08)] backdrop-blur-md p-3 transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_15px_rgba(255,215,130,0.15)] hover:border-amber-400/30 relative overflow-hidden animate-fade-in-up"
             tabIndex={0}
-            style={{ boxShadow: '0 0 12px rgba(255,215,130,0.12), 0 0 3px rgba(255,215,130,0.06)' }}
           >
             <span className="block text-2xl mb-2 drop-shadow-glow animate-bounce-slow">{feature.icon}</span>
-            <h3 className="text-base font-semibold tracking-wide text-amber-300 mb-1 drop-shadow-glow">{feature.title}</h3>
+            <h3 className="text-base font-semibold tracking-wide text-amber-300 mb-2 drop-shadow-glow">{feature.title}</h3>
             <p className="text-amber-100 text-sm leading-relaxed font-medium">{feature.description}</p>
           </div>
         ))}
       </div>
-      {/* Custom Animations & Neon Glow */}
+      {/* Custom Animations */}
       <style>{`
         .drop-shadow-glow {
           filter: drop-shadow(0 0 3px rgba(255,215,130,0.5));
-        }
-        .neon-glow {
-          box-shadow: 0 0 16px #00ffff44, 0 0 32px #00ffff22;
-          animation: neonPulse 4s ease-in-out infinite alternate;
-        }
-        @keyframes neonPulse {
-          0% { box-shadow: 0 0 16px #00ffff44, 0 0 32px #00ffff22; }
-          100% { box-shadow: 0 0 24px #00ffff66, 0 0 48px #00ffff33; }
         }
         .animate-bounce-slow {
           animation: bounceSlow 4s ease-in-out infinite;
@@ -82,10 +73,6 @@ const PlatformFeatures: React.FC = () => {
             opacity: 1;
             transform: none;
           }
-        }
-        .feature-card {
-          outline: 2px solid #00ffff;
-          outline-offset: 0px;
         }
       `}</style>
     </section>
