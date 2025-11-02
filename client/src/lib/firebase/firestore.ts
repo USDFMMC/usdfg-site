@@ -70,11 +70,52 @@ export interface ChallengeData {
 // Challenge operations
 export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'createdAt'>) => {
   try {
+    // Check if creator is eligible for OG First 2.1K trophy (only when creating their first challenge)
+    const creatorWallet = challengeData.creator;
+    const playerRef = doc(db, 'player_stats', creatorWallet);
+    const playerSnap = await getDoc(playerRef);
+    
+    let shouldAwardOgFirst1k = false;
+    
+    // Only award if player doesn't exist yet (first challenge creation)
+    if (!playerSnap.exists()) {
+      // Count total users BEFORE adding this one
+      const statsCollection = collection(db, 'player_stats');
+      const allUsersSnapshot = await getDocs(statsCollection);
+      const totalUsersBefore = allUsersSnapshot.size;
+      shouldAwardOgFirst1k = totalUsersBefore < 2100; // Represents USDFG's 21M token supply
+      
+      if (shouldAwardOgFirst1k) {
+        console.log(`🏆 OG First 2.1K Trophy eligible for ${creatorWallet.slice(0, 8)}... (Total users: ${totalUsersBefore})`);
+      }
+    }
+    
     const docRef = await addDoc(collection(db, "challenges"), {
       ...challengeData,
       createdAt: Timestamp.now(),
       players: [challengeData.creator], // Creator is first player
     });
+    
+    // If eligible, create/update player stats with trophy flag
+    if (shouldAwardOgFirst1k) {
+      const newStats: any = {
+        wallet: creatorWallet,
+        wins: 0,
+        losses: 0,
+        winRate: 0,
+        totalEarned: 0,
+        gamesPlayed: 0,
+        lastActive: Timestamp.now(),
+        ogFirst1k: true, // Award the trophy!
+        gameStats: {},
+        categoryStats: {}
+      };
+      // Note: displayName will be set on first challenge completion (only include if it exists)
+      
+      await setDoc(playerRef, newStats);
+      console.log(`🏆 OG First 2.1K Trophy awarded to ${creatorWallet.slice(0, 8)}... for creating their first challenge!`);
+    }
+    
     console.log('✅ Challenge created with ID:', docRef.id);
     return docRef.id;
   } catch (error) {
@@ -97,11 +138,29 @@ export const updateChallenge = async (challengeId: string, updates: Partial<Chal
 export const updateChallengeStatus = async (challengeId: string, status: 'active' | 'pending' | 'completed' | 'cancelled' | 'disputed' | 'expired') => {
   try {
     const challengeRef = doc(db, 'challenges', challengeId);
+    
+    // Get current status to check if dispute is being resolved
+    const currentSnap = await getDoc(challengeRef);
+    const wasDisputed = currentSnap.exists() && currentSnap.data()?.status === 'disputed';
+    const isResolvingDispute = wasDisputed && (status === 'completed' || status === 'cancelled');
+    
     await updateDoc(challengeRef, { 
       status,
       updatedAt: Timestamp.now()
     });
     console.log('✅ Challenge status updated:', challengeId, 'to', status);
+    
+    // If resolving a dispute, clean up chat messages (no longer needed for evidence)
+    if (isResolvingDispute) {
+      console.log('🔧 Dispute resolved - cleaning up chat messages for:', challengeId);
+      try {
+        await cleanupChatMessages(challengeId);
+        console.log('✅ Chat messages cleaned up after dispute resolution');
+      } catch (error) {
+        console.error('⚠️ Failed to cleanup chat after dispute resolution (non-critical):', error);
+        // Don't throw - status update succeeded, cleanup is secondary
+      }
+    }
   } catch (error) {
     console.error('❌ Error updating challenge status:', error);
     throw error;
@@ -389,6 +448,80 @@ export const submitChallengeResult = async (
 };
 
 /**
+ * Clean up chat messages for a challenge
+ * Exported so it can be called when admin resolves disputes
+ */
+export async function cleanupChatMessages(challengeId: string): Promise<void> {
+  try {
+    console.log('🗑️ Cleaning up chat messages for resolved challenge:', challengeId);
+    
+    const chatQuery = query(
+      collection(db, 'challenge_chats'),
+      where('challengeId', '==', challengeId)
+    );
+    const chatSnapshot = await getDocs(chatQuery);
+    
+    const chatDeletePromises = chatSnapshot.docs.map(docSnapshot => 
+      deleteDoc(doc(db, 'challenge_chats', docSnapshot.id))
+    );
+    await Promise.all(chatDeletePromises);
+    console.log(`🗑️ Deleted ${chatSnapshot.size} chat messages after dispute resolution:`, challengeId);
+  } catch (error) {
+    console.error('❌ Error cleaning up chat messages:', error);
+    throw error;
+  }
+}
+
+/**
+ * Clean up chat messages and voice signals for a challenge
+ * Only deletes for normal completions - keeps chat for disputes (needed for evidence)
+ * This balances data minimization with dispute resolution needs
+ * 
+ * Legal compliance: Chat kept temporarily for dispute resolution (legitimate business purpose),
+ * then deleted after resolution to minimize data retention
+ */
+async function cleanupChallengeData(challengeId: string, isDispute: boolean = false): Promise<void> {
+  try {
+    console.log('🗑️ Cleaning up challenge data for:', challengeId, isDispute ? '(DISPUTE - keeping chat)' : '(Normal completion - deleting chat)');
+    
+    // Always delete voice signals (not needed after challenge ends)
+    try {
+      const voiceSignalRef = doc(db, 'voice_signals', challengeId);
+      await deleteDoc(voiceSignalRef);
+      console.log('🗑️ Deleted voice signals for challenge:', challengeId);
+    } catch (error: any) {
+      // Voice signal may not exist, ignore error
+      if (error.code !== 'not-found') {
+        console.log('⚠️ Could not delete voice signals (may not exist):', error);
+      }
+    }
+    
+    // Only delete chat messages if NOT a dispute (need chat for dispute resolution)
+    if (!isDispute) {
+      const chatQuery = query(
+        collection(db, 'challenge_chats'),
+        where('challengeId', '==', challengeId)
+      );
+      const chatSnapshot = await getDocs(chatQuery);
+      
+      const chatDeletePromises = chatSnapshot.docs.map(docSnapshot => 
+        deleteDoc(doc(db, 'challenge_chats', docSnapshot.id))
+      );
+      await Promise.all(chatDeletePromises);
+      console.log(`🗑️ Deleted ${chatSnapshot.size} chat messages for challenge:`, challengeId);
+    } else {
+      console.log('📋 Keeping chat messages for dispute resolution:', challengeId);
+      console.log('   Note: Chat will be auto-deleted after dispute is resolved by admin');
+    }
+    
+    console.log('✅ Challenge data cleaned up successfully');
+  } catch (error) {
+    console.error('❌ Error cleaning up challenge data:', error);
+    // Don't throw - cleanup failure shouldn't block winner determination
+  }
+}
+
+/**
  * Determine winner based on submitted results
  * Logic:
  * - One YES, One NO → YES player wins (clear winner)
@@ -419,7 +552,7 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
 
     const challengeRef = doc(db, "challenges", challengeId);
 
-    // Case 1: Both claim they won → Dispute
+    // Case 1: Both claim they won → Dispute (KEEP CHAT for evidence)
     if (player1Won && player2Won) {
       await updateDoc(challengeRef, {
         status: 'disputed',
@@ -427,10 +560,12 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
         updatedAt: Timestamp.now(),
       });
       console.log('🔴 DISPUTE: Both players claim they won');
+      // Keep chat messages for dispute resolution - admin may need them
+      await cleanupChallengeData(challengeId, true); // true = isDispute
       return;
     }
 
-    // Case 2: Both claim they lost → FORFEIT (both lose entry fees as penalty)
+    // Case 2: Both claim they lost → FORFEIT (delete chat - no dispute)
     if (!player1Won && !player2Won) {
       await updateDoc(challengeRef, {
         status: 'completed',
@@ -438,10 +573,12 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
         updatedAt: Timestamp.now(),
       });
       console.log('⚠️ FORFEIT: Both players claim they lost - Suspicious collusion detected, both lose entry fees');
+      // Delete chat - no dispute, no need to keep
+      await cleanupChallengeData(challengeId, false); // false = not dispute
       return;
     }
 
-    // Case 3: Clear winner (one YES, one NO)
+    // Case 3: Clear winner (one YES, one NO) - DELETE CHAT (no dispute)
     const winner = player1Won ? player1 : player2;
     const loser = player1Won ? player2 : player1;
     
@@ -451,6 +588,8 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
       updatedAt: Timestamp.now(),
     });
     console.log('🏆 WINNER DETERMINED:', winner);
+    // Delete chat messages - clear winner, no dispute resolution needed
+    await cleanupChallengeData(challengeId, false); // false = not dispute
     console.log('📊 Updating player stats...');
     console.log('   Game:', data.game, 'Category:', data.category, 'Prize:', data.prizePool);
     
@@ -795,6 +934,8 @@ export interface PlayerStats {
   // Trust score fields
   trustScore?: number; // Average trust score (0-10)
   trustReviews?: number; // Number of trust reviews received
+  // Special trophies
+  ogFirst1k?: boolean; // OG First 2.1K Members trophy - automatically awarded if joined before 2100 users (represents 21M token supply)
   gameStats: {
     [game: string]: {
       wins: number;
@@ -864,9 +1005,9 @@ async function updatePlayerStats(
 
     if (!playerSnap.exists()) {
       // Create new player stats
-      const newStats: PlayerStats = {
+      // Note: OG First 1k trophy is awarded when creating first challenge, not here
+      const newStats: any = {
         wallet,
-        displayName: displayName || undefined, // Store display name if provided
         wins: result === 'win' ? 1 : 0,
         losses: result === 'loss' ? 1 : 0,
         winRate: result === 'win' ? 100 : 0,
@@ -875,6 +1016,7 @@ async function updatePlayerStats(
         lastActive: Timestamp.now(),
         trustScore,
         trustReviews,
+        ogFirst1k: false, // Trophy is awarded at challenge creation, not completion
         gameStats: {
           [game]: {
             wins: result === 'win' ? 1 : 0,
@@ -890,6 +1032,11 @@ async function updatePlayerStats(
           }
         }
       };
+      
+      // Only include displayName if it exists (Firestore doesn't allow undefined)
+      if (displayName) {
+        newStats.displayName = displayName;
+      }
       
       await setDoc(playerRef, newStats);
       console.log(`✅ Created new player stats: ${wallet} - ${result} (+${amountEarned} USDFG) - Trust: ${trustScore}/10 (${trustReviews} reviews) - ${displayName || 'Anonymous'}`);
@@ -1080,32 +1227,286 @@ export async function claimChallengePrize(
     console.log('   Prize Pool:', data.prizePool, 'USDFG');
     console.log('   Challenge PDA:', challengePDA);
     
+    // ✅ REMOVED: Expiration check for prize claims
+    // Winners can claim prizes ANYTIME after challenge completion (no expiration).
+    // Once both players submit results and challenge is completed in Firestore,
+    // the winner should be able to claim their prize whenever they want.
+    // The dispute_timer only prevents joining expired challenges, not claiming prizes.
+    
     // Import the resolveChallenge function
     const { resolveChallenge } = await import('../chain/contract');
     
     // Call smart contract (winner pays gas!)
     console.log('🚀 Winner calling smart contract to release escrow...');
-    const signature = await resolveChallenge(
-      winnerWallet,
-      connection,
-      challengePDA,
-      data.winner
-    );
+    console.log('   Note: Prize claims have NO expiration - winners can claim anytime!');
     
-    // Update Firestore to mark prize as claimed
-    await updateDoc(challengeRef, {
-      payoutTriggered: true,
-      payoutSignature: signature,
-      payoutTimestamp: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    });
+    try {
+      const signature = await resolveChallenge(
+        winnerWallet,
+        connection,
+        challengePDA,
+        data.winner
+      );
     
-    console.log('✅ PRIZE CLAIMED!');
-    console.log('   Transaction:', signature);
-    console.log('   Winner received:', data.prizePool, 'USDFG');
+      // Update Firestore to mark prize as claimed
+      await updateDoc(challengeRef, {
+        payoutTriggered: true,
+        payoutSignature: signature,
+        payoutTimestamp: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      });
+      
+      console.log('✅ PRIZE CLAIMED!');
+      console.log('   Transaction:', signature);
+      console.log('   Winner received:', data.prizePool, 'USDFG');
+    } catch (contractError: any) {
+      // Handle specific smart contract errors
+      // Note: ChallengeExpired should no longer occur for prize claims since we removed the check
+      // But keep this handler for backwards compatibility with old deployed contracts
+      if (contractError.message?.includes('ChallengeExpired') || 
+          contractError.message?.includes('6005') ||
+          contractError.logs?.some((log: string) => log.includes('ChallengeExpired') || log.includes('Challenge has expired'))) {
+        console.error('⚠️ Old contract version detected - still has expiration check. Please redeploy with updated contract.');
+        const expiredError = new Error('❌ Old contract version detected. Please contact support to redeploy the contract without expiration check for prize claims.');
+        expiredError.name = 'ChallengeExpired';
+        throw expiredError;
+      }
+      throw contractError;
+    }
     
   } catch (error) {
     console.error('❌ Error claiming prize:', error);
     throw error;
+  }
+}
+
+// ============================================
+// FREE USDFG CLAIM SYSTEM
+// ============================================
+
+export interface FreeClaimEvent {
+  id: string;
+  isActive: boolean;
+  totalAmount: number;        // Total USDFG available to distribute
+  amountPerClaim: number;      // Amount each user gets
+  maxClaims: number;            // Maximum number of people who can claim
+  currentClaims: number;        // Number of claims made so far
+  claimedBy: string[];          // Array of wallet addresses who claimed
+  activatedAt: Timestamp | null;
+  expiresAt: Timestamp | null;
+  createdAt: Timestamp;
+}
+
+/**
+ * Get the current active free claim event
+ */
+export async function getActiveFreeClaimEvent(): Promise<FreeClaimEvent | null> {
+  try {
+    const claimsCollection = collection(db, 'free_claims');
+    
+    // Try simple query first (no index required)
+    const simpleQ = query(
+      claimsCollection,
+      where('isActive', '==', true),
+      limit(10) // Get up to 10 active events
+    );
+    
+    const snapshot = await getDocs(simpleQ);
+    
+    if (snapshot.empty) {
+      console.log('ℹ️ No active claim events found');
+      return null;
+    }
+    
+    // Find most recent by checking all active events
+    const docs = snapshot.docs;
+    let mostRecent = docs[0];
+    let mostRecentTime = mostRecent.data().activatedAt?.toMillis() || 0;
+    
+    docs.forEach(doc => {
+      const time = doc.data().activatedAt?.toMillis() || 0;
+      if (time > mostRecentTime) {
+        mostRecentTime = time;
+        mostRecent = doc;
+      }
+    });
+    
+    const event: FreeClaimEvent = {
+      id: mostRecent.id,
+      ...mostRecent.data()
+    } as FreeClaimEvent;
+    
+    console.log('✅ Found active claim event:', {
+      id: event.id,
+      amountPerClaim: event.amountPerClaim,
+      maxClaims: event.maxClaims,
+      currentClaims: event.currentClaims
+    });
+    
+    return event;
+  } catch (error) {
+    console.error('❌ Error getting active free claim event:', error);
+    return null;
+  }
+}
+
+/**
+ * Check if a wallet has already claimed from the current event
+ */
+export async function hasWalletClaimed(walletAddress: string, claimEventId: string): Promise<boolean> {
+  try {
+    const claimRef = doc(db, 'free_claims', claimEventId);
+    const claimDoc = await getDoc(claimRef);
+    
+    if (!claimDoc.exists()) {
+      return false;
+    }
+    
+    const data = claimDoc.data();
+    const claimedBy = data.claimedBy || [];
+    
+    return claimedBy.some((addr: string) => addr.toLowerCase() === walletAddress.toLowerCase());
+  } catch (error) {
+    console.error('❌ Error checking if wallet has claimed:', error);
+    return false;
+  }
+}
+
+/**
+ * Claim free USDFG for a wallet
+ * Returns the claim amount if successful
+ */
+export async function claimFreeUSDFG(
+  walletAddress: string,
+  claimEventId: string,
+  amount: number
+): Promise<string> {
+  try {
+    const claimRef = doc(db, 'free_claims', claimEventId);
+    const claimDoc = await getDoc(claimRef);
+    
+    if (!claimDoc.exists()) {
+      throw new Error('Claim event not found');
+    }
+    
+    const data = claimDoc.data() as FreeClaimEvent;
+    
+    // Validate claim event is active
+    if (!data.isActive) {
+      throw new Error('Claim event is not active');
+    }
+    
+    // Check if expired
+    if (data.expiresAt && data.expiresAt.toMillis() < Date.now()) {
+      throw new Error('Claim event has expired');
+    }
+    
+    // Check if all claims are taken
+    if (data.currentClaims >= data.maxClaims) {
+      throw new Error('All claims have been taken');
+    }
+    
+    // Check if wallet has already claimed
+    const hasClaimed = data.claimedBy?.some(
+      (addr: string) => addr.toLowerCase() === walletAddress.toLowerCase()
+    );
+    
+    if (hasClaimed) {
+      throw new Error('You have already claimed from this event');
+    }
+    
+    // Update claim event
+    await updateDoc(claimRef, {
+      currentClaims: increment(1),
+      claimedBy: arrayUnion(walletAddress),
+      updatedAt: serverTimestamp()
+    });
+    
+    // Note: Actual token transfer would be handled by backend/cloud function
+    // or client-side using SPL token transfer
+    // For now, we just track the claim in Firestore
+    
+    console.log('✅ Free USDFG claimed:', {
+      wallet: walletAddress,
+      amount,
+      claimEventId,
+      remaining: data.maxClaims - data.currentClaims - 1
+    });
+    
+    return `Claimed ${amount} USDFG successfully!`;
+  } catch (error) {
+    console.error('❌ Error claiming free USDFG:', error);
+    throw error;
+  }
+}
+
+/**
+ * Listen to active free claim events (for real-time updates)
+ */
+export function subscribeToActiveFreeClaim(
+  callback: (claimEvent: FreeClaimEvent | null) => void
+): () => void {
+  try {
+    const claimsCollection = collection(db, 'free_claims');
+    
+    // Use simple query (no index required) - we'll find most recent manually
+    const q = query(
+      claimsCollection,
+      where('isActive', '==', true),
+      limit(10) // Get up to 10 active events
+    );
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      console.log('📊 Free claim event snapshot:', {
+        empty: snapshot.empty,
+        size: snapshot.size,
+        docs: snapshot.docs.length
+      });
+      
+      if (snapshot.empty) {
+        console.log('ℹ️ No active claim events found');
+        callback(null);
+        return;
+      }
+      
+      // Find most recent by checking all active events
+      const docs = snapshot.docs;
+      let mostRecent = docs[0];
+      let mostRecentTime = mostRecent.data().activatedAt?.toMillis() || 0;
+      
+      docs.forEach(doc => {
+        const time = doc.data().activatedAt?.toMillis() || 0;
+        if (time > mostRecentTime) {
+          mostRecentTime = time;
+          mostRecent = doc;
+        }
+      });
+      
+      const data = mostRecent.data();
+      console.log('✅ Found active claim event:', {
+        id: mostRecent.id,
+        amountPerClaim: data.amountPerClaim,
+        maxClaims: data.maxClaims,
+        currentClaims: data.currentClaims,
+        isActive: data.isActive
+      });
+      
+      const claimEvent: FreeClaimEvent = {
+        id: mostRecent.id,
+        ...data
+      } as FreeClaimEvent;
+      
+      callback(claimEvent);
+    }, (error) => {
+      console.error('❌ Error subscribing to free claim events:', error);
+      console.error('   Error code:', error.code);
+      console.error('   Error message:', error.message);
+      callback(null);
+    });
+    
+    return unsubscribe;
+  } catch (error) {
+    console.error('❌ Error setting up free claim subscription:', error);
+    return () => {}; // Return no-op unsubscribe function
   }
 }

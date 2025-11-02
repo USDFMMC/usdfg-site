@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Trophy, Gamepad2, Swords, Flame, Shield, Crown, X, Edit3 } from "lucide-react";
 import ProfileImageUpload from "../ui/ProfileImageUpload";
 import CountryFlagPicker from "../ui/CountryFlagPicker";
-import { USDFG_RELICS, getUnlockedTrophies, getNextTrophy, getTrophyProgress, getTrophyColorClass } from "@/lib/trophies";
+import { USDFG_RELICS, getUnlockedTrophies, getNextTrophy, getTrophyProgress, getTrophyColorClass, checkPlayerHasOgFirst1k } from "@/lib/trophies";
 
 // Countries list for flag display - matches CountryFlagPicker
 const countries = [
@@ -239,10 +239,29 @@ export default function PlayerProfileModal({
   const [tempSelectedTrophies, setTempSelectedTrophies] = useState<string[]>([]);
   const [isEditingTrophies, setIsEditingTrophies] = useState(false);
   const [selectedTrophyForPopup, setSelectedTrophyForPopup] = useState<any>(null);
+  const [specialTrophiesUnlocked, setSpecialTrophiesUnlocked] = useState<Set<string>>(new Set());
   
   // Stable mock values that don't change on re-render
   const [mockStreak] = useState(() => Math.floor(Math.random() * 10) + 1);
   const [mockIntegrity] = useState(() => (9.0 + Math.random()).toFixed(1));
+
+  // Check special trophies when modal opens
+  useEffect(() => {
+    if (isOpen && player.wallet) {
+      const checkTrophies = async () => {
+        const unlocked = new Set<string>();
+        // Check OG First 1k trophy from player stats
+        if (player.wallet) {
+          const hasOgFirst1k = await checkPlayerHasOgFirst1k(player.wallet);
+          if (hasOgFirst1k) {
+            unlocked.add('og-1k');
+          }
+        }
+        setSpecialTrophiesUnlocked(unlocked);
+      };
+      checkTrophies();
+    }
+  }, [isOpen, player.wallet]);
   
   
   if (!isOpen) return null;
@@ -505,8 +524,15 @@ export default function PlayerProfileModal({
           <div className="grid grid-cols-3 gap-3">
             {USDFG_RELICS.map((trophy) => {
               const gamesPlayed = (player.wins || 0) + (player.losses || 0);
-              const isUnlocked = gamesPlayed >= trophy.requiredGames;
-              const progress = getTrophyProgress(gamesPlayed, trophy);
+              // Check if unlocked: games-based OR special condition
+              const isGamesUnlocked = gamesPlayed >= trophy.requiredGames;
+              const isSpecialUnlocked = trophy.specialCondition && specialTrophiesUnlocked.has(trophy.id);
+              // Special trophies show for all users if they have it, not just current user
+              const isUnlocked = isGamesUnlocked || isSpecialUnlocked;
+              // OG First 2.1K trophy is always visible (not hidden like others)
+              const isOgTrophy = trophy.id === 'og-1k';
+              const isVisible = isUnlocked || isOgTrophy; // Always show OG trophy
+              const progress = trophy.specialCondition ? (isSpecialUnlocked ? 100 : 0) : getTrophyProgress(gamesPlayed, trophy);
               
               return (
                 <div
@@ -539,12 +565,16 @@ export default function PlayerProfileModal({
                   
                   <div 
                     className={`p-3 rounded-lg border transition-all hover:scale-105 cursor-pointer ${
-                      isUnlocked 
+                      isVisible 
                         ? 'border-zinc-700 hover:border-amber-400/50 bg-zinc-900/30 hover:bg-zinc-900/50' 
                         : 'border-zinc-800 opacity-50'
                     } ${
                       isCurrentUser && selectedTrophies.includes(trophy.id) 
                         ? 'ring-1 ring-amber-400/50' 
+                        : ''
+                    } ${
+                      isOgTrophy && !isUnlocked 
+                        ? 'border-amber-500/30 bg-amber-900/10' 
                         : ''
                     }`}
                     onClick={() => handleTrophyClick(trophy)}
@@ -554,12 +584,27 @@ export default function PlayerProfileModal({
                         src={trophy.icon}
                         alt={trophy.name}
                         className={`w-12 h-12 object-contain transition-all ${
-                          isUnlocked 
-                            ? 'opacity-100 group-hover:brightness-110' 
+                          isVisible 
+                            ? isUnlocked 
+                              ? 'opacity-100 group-hover:brightness-110' 
+                              : 'opacity-80 grayscale' // OG trophy visible but grayscale if not unlocked
                             : 'opacity-40 grayscale'
                         }`}
+                        loading="lazy"
+                        decoding="async"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
+                          console.error(`❌ Failed to load trophy image: ${trophy.icon} for trophy: ${trophy.name}`);
+                          // Try alternative paths for 21k trophy
+                          if (trophy.id === 'og-1k') {
+                            if (trophy.icon.includes('/assets/trophies/')) {
+                              target.src = '/assets/categories/usdfg-21k.png';
+                              return;
+                            } else if (trophy.icon.includes('/assets/categories/')) {
+                              target.src = '/assets/trophies/usdfg-21k.png';
+                              return;
+                            }
+                          }
                           target.style.display = 'none';
                           const fallback = document.createElement('div');
                           fallback.textContent = '🏆';
@@ -570,10 +615,16 @@ export default function PlayerProfileModal({
                     </div>
                     <div className="text-center">
                       <div className={`text-xs font-medium ${
-                        isUnlocked ? 'text-white' : 'text-zinc-500'
+                        isVisible ? (isUnlocked ? 'text-white' : 'text-zinc-400') : 'text-zinc-500'
                       }`}>
                         {trophy.name}
                       </div>
+                      {/* Show description for OG trophy */}
+                      {isOgTrophy && !isUnlocked && (
+                        <div className="text-[10px] text-amber-400/70 mt-1 line-clamp-2">
+                          {trophy.description}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -626,8 +677,21 @@ export default function PlayerProfileModal({
                   src={selectedTrophyForPopup.icon}
                   alt={selectedTrophyForPopup.name}
                   className="w-32 h-32 mx-auto animate-bounce-slow drop-shadow-[0_0_20px_rgba(255,215,130,0.6)]"
+                  loading="lazy"
+                  decoding="async"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
+                    console.error(`❌ Failed to load trophy image in popup: ${selectedTrophyForPopup.icon} for trophy: ${selectedTrophyForPopup.name}`);
+                    // Try alternative paths for 21k trophy
+                    if (selectedTrophyForPopup.id === 'og-1k') {
+                      if (selectedTrophyForPopup.icon.includes('/assets/trophies/')) {
+                        target.src = '/assets/categories/usdfg-21k.png';
+                        return;
+                      } else if (selectedTrophyForPopup.icon.includes('/assets/categories/')) {
+                        target.src = '/assets/trophies/usdfg-21k.png';
+                        return;
+                      }
+                    }
                     target.style.display = 'none';
                     const fallback = document.createElement('div');
                     fallback.textContent = '🏆';

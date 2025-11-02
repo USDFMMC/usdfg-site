@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo, Suspense, lazy } from "react";
 import { Helmet } from "react-helmet";
 import { Link } from "react-router-dom";
 import WalletConnectSimple from "@/components/arena/WalletConnectSimple";
@@ -8,20 +8,23 @@ import { joinChallengeOnChain } from "@/lib/chain/events";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
-import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, PlayerStats } from "@/lib/firebase/firestore";
+import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, PlayerStats, FreeClaimEvent, subscribeToActiveFreeClaim, claimFreeUSDFG, hasWalletClaimed } from "@/lib/firebase/firestore";
+import { Timestamp } from "firebase/firestore";
 import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
-import { ADMIN_WALLET, USDFG_MINT } from '@/lib/chain/config';
+import { ADMIN_WALLET, USDFG_MINT, PROGRAM_ID, SEEDS } from '@/lib/chain/config';
+import { PublicKey } from '@solana/web3.js';
 import { getAssociatedTokenAddress } from '@solana/spl-token';
 import { testFirestoreConnection } from "@/lib/firebase/firestore";
 import ElegantButton from "@/components/ui/ElegantButton";
 import ElegantModal from "@/components/ui/ElegantModal";
 import CreateChallengeForm from "@/components/arena/CreateChallengeForm";
 import ElegantNavbar from "@/components/layout/ElegantNavbar";
-import { SubmitResultRoom } from "@/components/arena/SubmitResultRoom";
-import PlayerProfileModal from "@/components/arena/PlayerProfileModal";
-import { ChallengeChatModal } from "@/components/arena/ChallengeChatModal";
-import TrustReviewModal from "@/components/arena/TrustReviewModal";
+// Lazy load heavy modals for better performance on all devices
+const SubmitResultRoom = lazy(() => import("@/components/arena/SubmitResultRoom").then(module => ({ default: module.SubmitResultRoom })));
+const PlayerProfileModal = lazy(() => import("@/components/arena/PlayerProfileModal"));
+const ChallengeChatModal = lazy(() => import("@/components/arena/ChallengeChatModal").then(module => ({ default: module.ChallengeChatModal })));
+const TrustReviewModal = lazy(() => import("@/components/arena/TrustReviewModal"));
 
 const ArenaHome: React.FC = () => {
   const wallet = useWallet();
@@ -31,6 +34,13 @@ const ArenaHome: React.FC = () => {
   const isConnected = connected;
 
   // Smart function to extract game name from challenge title (saves storage costs)
+  // Helper to extract mode from title (e.g., "NBA 2K25 - Head-to-Head by Player" -> "Head-to-Head")
+  const extractModeFromTitle = (title: string): string => {
+    if (!title) return 'Head-to-Head';
+    const match = title.match(/\s-\s(.+?)(?:\sby\s|$)/i);
+    return match ? match[1].trim() : 'Head-to-Head';
+  };
+
   const extractGameFromTitle = (title: string) => {
     const gameKeywords = [
       'FIFA 24', 'Madden NFL 24', 'NBA 2K25',
@@ -144,6 +154,11 @@ const ArenaHome: React.FC = () => {
   const [showChatModal, setShowChatModal] = useState<boolean>(false);
   const [selectedChatChallenge, setSelectedChatChallenge] = useState<any>(null);
   
+  // Free USDFG Claim state
+  const [activeClaimEvent, setActiveClaimEvent] = useState<FreeClaimEvent | null>(null);
+  const [claimingFreeUSDFG, setClaimingFreeUSDFG] = useState<boolean>(false);
+  const [hasUserClaimed, setHasUserClaimed] = useState<boolean>(false);
+  
   // Mock price API - simulates real-time price updates
   const fetchUsdfgPrice = useCallback(async () => {
     try {
@@ -212,7 +227,10 @@ const ArenaHome: React.FC = () => {
     }
   }, [isConnected, publicKey, connection]);
 
-  // Fetch top players for sidebar
+  // Track completed challenge IDs to detect new completions
+  const [completedChallengeIds, setCompletedChallengeIds] = useState<Set<string>>(new Set());
+
+  // Fetch top players for sidebar (with real-time refresh when challenges complete)
   useEffect(() => {
     const fetchTopPlayersData = async () => {
       try {
@@ -246,14 +264,104 @@ const ArenaHome: React.FC = () => {
   const usdfgToUsd = useCallback((usdfgAmount: number) => {
     return usdfgAmount * usdfgPrice;
   }, [usdfgPrice]);
+  
   // Use Firestore real-time challenges
   const { challenges: firestoreChallenges, loading: challengesLoading, error: challengesError } = useChallenges();
+
+  // Refresh leaderboard when a challenge completes (new completion detected)
+  // MUST be after firestoreChallenges is defined
+  useEffect(() => {
+    if (!firestoreChallenges || firestoreChallenges.length === 0) return;
+
+    // Find newly completed challenges (with winner)
+    const newlyCompleted = firestoreChallenges.filter((c: any) => 
+      c.status === 'completed' && 
+      c.winner && 
+      c.winner !== 'forfeit' && 
+      c.winner !== 'tie' &&
+      !completedChallengeIds.has(c.id)
+    );
+
+    // If we found a newly completed challenge, refresh leaderboard
+    if (newlyCompleted.length > 0) {
+      console.log('🏆 Challenge completed - refreshing leaderboard...');
+      
+      // Update tracked completed challenges
+      const newCompletedIds = new Set(completedChallengeIds);
+      newlyCompleted.forEach((c: any) => newCompletedIds.add(c.id));
+      setCompletedChallengeIds(newCompletedIds);
+
+      // Debounce refresh to avoid too many calls (wait for stats to be updated)
+      const timeoutId = setTimeout(async () => {
+        try {
+          const limit = showAllPlayers ? 50 : 5;
+          const players = await getTopPlayers(limit, 'totalEarned');
+          setTopPlayers(players);
+          console.log('✅ Leaderboard refreshed with updated stats');
+        } catch (error) {
+          console.error('Failed to refresh leaderboard:', error);
+        }
+      }, 2000); // Wait 2 seconds for stats to be updated in Firestore
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [firestoreChallenges, completedChallengeIds, showAllPlayers]);
   
   // Auto-expire challenges after 2 hours
   useChallengeExpiry(firestoreChallenges);
   
   // Monitor result submission deadlines
   useResultDeadlines(firestoreChallenges);
+  
+  // Subscribe to active free claim events
+  useEffect(() => {
+    console.log('🎁 Setting up free claim event subscription...');
+    
+    // First, try to fetch the active event immediately (in case subscription fails)
+    const fetchActiveEvent = async () => {
+      try {
+        const { getActiveFreeClaimEvent } = await import("@/lib/firebase/firestore");
+        const event = await getActiveFreeClaimEvent();
+        if (event) {
+          console.log('🎁 Found active claim event on mount:', event.id);
+          setActiveClaimEvent(event);
+          
+          // Check if current user has already claimed
+          if (publicKey) {
+            const walletAddress = publicKey.toString().toLowerCase();
+            const hasClaimed = event.claimedBy?.some(
+              (addr: string) => addr.toLowerCase() === walletAddress
+            ) || false;
+            setHasUserClaimed(hasClaimed);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error fetching active claim event:', error);
+      }
+    };
+    
+    fetchActiveEvent();
+    
+    // Then set up real-time subscription
+    const unsubscribe = subscribeToActiveFreeClaim((claimEvent) => {
+      console.log('🎁 Free claim event update:', claimEvent ? 'Active event found' : 'No active event');
+      setActiveClaimEvent(claimEvent);
+      
+      // Check if current user has already claimed
+      if (claimEvent && publicKey) {
+        const walletAddress = publicKey.toString().toLowerCase();
+        const hasClaimed = claimEvent.claimedBy?.some(
+          (addr: string) => addr.toLowerCase() === walletAddress
+        ) || false;
+        console.log('🎁 User claim status:', hasClaimed ? 'Already claimed' : 'Can claim');
+        setHasUserClaimed(hasClaimed);
+      } else {
+        setHasUserClaimed(false);
+      }
+    });
+    
+    return unsubscribe;
+  }, [publicKey]);
   
   // Auto-open Submit Result Room when user's challenge becomes "in-progress"
   useEffect(() => {
@@ -278,7 +386,8 @@ const ArenaHome: React.FC = () => {
       const challenge = myInProgressChallenges[0];
       
       // Check if current player has already submitted - if so, don't auto-open
-      const results = challenge.rawData?.results || challenge.results || {};
+      // challenge is ChallengeData at this point, not the transformed UI challenge
+      const results = (challenge as any).results || {};
       const hasSubmitted = currentWallet && results[currentWallet];
       
       if (hasSubmitted) {
@@ -289,7 +398,7 @@ const ArenaHome: React.FC = () => {
       console.log("🎮 Auto-opening Submit Result Room for in-progress challenge:", challenge.id);
       setSelectedChallenge({
         id: challenge.id,
-        title: challenge.title || challenge.game || "Challenge",
+        title: (challenge as any).title || extractGameFromTitle((challenge as any).title || '') || "Challenge",
         ...challenge
       });
       setShowSubmitResultModal(true);
@@ -298,14 +407,17 @@ const ArenaHome: React.FC = () => {
   
   // Convert Firestore challenges to the format expected by the UI
   const challenges = firestoreChallenges.map(challenge => {
-    // Provide default values for optimized data structure
-    const mode = challenge.mode || 'Head-to-Head';
-    const game = challenge.game || 'USDFG Arena';
-    const platform = challenge.platform || 'All Platforms';
-    const creatorTag = challenge.creatorTag || challenge.creator?.slice(0, 8) + '...' || 'Unknown';
+    // Generate values from stored data (mode, platform, etc. were removed to keep data light)
+    // Cast to any to access optional fields that may be stored but aren't in type definition
+    const challengeAny = challenge as any;
+    const title = challengeAny.title || '';
+    const game = challengeAny.game || extractGameFromTitle(title) || 'USDFG Arena';
+    const category = challengeAny.category || getGameCategory(game) || 'Gaming';
+    const mode = extractModeFromTitle(title) || 'Head-to-Head'; // Extract from title
+    const platform = 'All Platforms'; // Default since not stored
+    const creatorTag = challenge.creator?.slice(0, 8) + '...' || 'Unknown'; // Generate from creator wallet
     const prizePool = challenge.prizePool || (challenge.entryFee * 2);
-    const category = challenge.category || 'Gaming';
-    const rules = challenge.rules || 'Standard USDFG Arena rules apply';
+    const rules = 'Standard USDFG Arena rules apply'; // Default since not stored
     
     // Determine max players based on mode
     const getMaxPlayers = (mode: string) => {
@@ -726,6 +838,7 @@ const ArenaHome: React.FC = () => {
       if (challenge.pda) {
         console.log("🔍 Checking on-chain status before claiming...");
         try {
+          const { PublicKey } = await import('@solana/web3.js');
           const accountInfo = await connection.getAccountInfo(new PublicKey(challenge.pda));
           if (accountInfo && accountInfo.data) {
             const data = accountInfo.data;
@@ -741,6 +854,10 @@ const ArenaHome: React.FC = () => {
               window.location.reload();
               return;
             }
+            
+            // ✅ REMOVED: Expiration check for prize claims
+            // Winners can claim prizes ANYTIME after challenge completion (no expiration).
+            // The dispute_timer only prevents joining expired challenges, not claiming prizes.
           }
         } catch (onChainError) {
           console.log("⚠️ Could not check on-chain status, proceeding with claim attempt");
@@ -759,7 +876,26 @@ const ArenaHome: React.FC = () => {
       // The real-time listener will update the UI automatically
     } catch (error) {
       console.error("❌ Failed to claim prize:", error);
-      alert("Failed to claim prize: " + (error instanceof Error ? error.message : "Unknown error"));
+      
+      // Check for expired challenge error
+      let errorMessage = error instanceof Error ? error.message : "Unknown error";
+      
+      if (errorMessage.includes("ChallengeExpired") || 
+          errorMessage.includes("6005") || 
+          errorMessage.includes("challenge has expired") ||
+          errorMessage.includes("Challenge has expired")) {
+        errorMessage = "⚠️ Old contract version detected. The contract needs to be redeployed to remove the expiration check for prize claims. Please contact support.";
+      } else if (errorMessage.includes("already been processed") || 
+                 errorMessage.includes("already processed")) {
+        errorMessage = "✅ This prize has already been claimed. Please refresh the page to see the latest status.";
+        // Force refresh after a delay
+        setTimeout(() => window.location.reload(), 2000);
+      } else if (errorMessage.includes("NotInProgress") || 
+                 errorMessage.includes("not in progress")) {
+        errorMessage = "❌ Challenge is not in progress. It may have already been completed or cancelled.";
+      }
+      
+      alert("Failed to claim prize: " + errorMessage);
     } finally {
       setClaimingPrize(null);
     }
@@ -777,17 +913,89 @@ const ArenaHome: React.FC = () => {
     return currentWallet === challengeCreator;
   };
 
-  // Filter challenges based on selected filters
-  const filteredChallenges = challenges.filter(challenge => {
+  // Handle free USDFG claim
+  const handleClaimFreeUSDFG = async () => {
+    if (!publicKey || !connection) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    if (!activeClaimEvent) {
+      alert('No active claim event');
+      return;
+    }
+
+    if (hasUserClaimed) {
+      alert('You have already claimed from this event');
+      return;
+    }
+
+    if (claimingFreeUSDFG) {
+      return; // Already processing
+    }
+
+    setClaimingFreeUSDFG(true);
+
+    try {
+      // Check if all claims are taken
+      if (activeClaimEvent.currentClaims >= activeClaimEvent.maxClaims) {
+        alert('All claims have been taken');
+        setClaimingFreeUSDFG(false);
+        return;
+      }
+
+      // Check if expired
+      if (activeClaimEvent.expiresAt && activeClaimEvent.expiresAt.toMillis() < Date.now()) {
+        alert('This claim event has expired');
+        setClaimingFreeUSDFG(false);
+        return;
+      }
+
+      // Update Firestore to record the claim
+      await claimFreeUSDFG(
+        publicKey.toString(),
+        activeClaimEvent.id,
+        activeClaimEvent.amountPerClaim
+      );
+
+      // TODO: Implement actual token transfer here
+      // Option 1: Backend Cloud Function handles transfer (recommended)
+      // Option 2: Client-side transfer from faucet wallet
+      // For now, we just track the claim in Firestore
+      console.log('✅ Claim recorded in Firestore');
+      console.log('⚠️ Token transfer needs to be implemented');
+      console.log(`   Amount: ${activeClaimEvent.amountPerClaim} USDFG`);
+      console.log(`   Recipient: ${publicKey.toString()}`);
+
+      alert(`✅ Claimed ${activeClaimEvent.amountPerClaim} USDFG! Tokens will be transferred shortly.`);
+      
+    } catch (error) {
+      console.error('❌ Error claiming free USDFG:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to claim: ${errorMessage}`);
+    } finally {
+      setClaimingFreeUSDFG(false);
+    }
+  };
+
+  // Memoize helper functions to prevent recalculation
+  const getGameCategoryMemo = useCallback((game: string) => getGameCategory(game), []);
+  const getGameImageMemo = useCallback((game: string) => getGameImage(game), []);
+  const extractGameFromTitleMemo = useCallback((title: string) => extractGameFromTitle(title), []);
+
+  // Memoize filtered challenges to prevent unnecessary re-renders
+  const filteredChallenges = useMemo(() => {
+    return challenges.filter(challenge => {
     const categoryMatch = filterCategory === 'All' || challenge.category === filterCategory;
     const gameMatch = filterGame === 'All' || challenge.game === filterGame;
     const myChallengesMatch = !showMyChallenges || challenge.creator === (publicKey?.toString() || null);
     return categoryMatch && gameMatch && myChallengesMatch;
   });
+  }, [challenges, filterCategory, filterGame, showMyChallenges, publicKey]);
 
-  // Get unique games for filter dropdown
-  const uniqueGames = ['All', ...Array.from(new Set(challenges.map(c => c.game)))];
-  const categories = ['All', 'Fighting', 'Sports', 'Shooting', 'Racing'];
+  // Memoize unique games and categories
+  const uniqueGames = useMemo(() => ['All', ...Array.from(new Set(challenges.map(c => c.game)))], [challenges]);
+  const categories = useMemo(() => ['All', 'Fighting', 'Sports', 'Shooting', 'Racing'], []);
 
   // Check if user has active challenge (for button disable logic)
   const currentWallet = publicKey?.toString() || null;
@@ -856,15 +1064,18 @@ const ArenaHome: React.FC = () => {
             {publicKey && (
               <button
                 onClick={() => {
-                  // Create a mock player object for the current user
-                  const currentUserPlayer = {
+                  // Create proper PlayerStats object for current user
+                  const currentUserPlayer: PlayerStats = {
                     wallet: publicKey.toString(),
-                    displayName: userGamerTag || 'Player',
-                    name: userGamerTag || 'Player',
-                    wins: 0, // You can get these from Firestore later
+                    displayName: userGamerTag || undefined,
+                    wins: 0,
                     losses: 0,
                     winRate: 0,
-                    rank: 1
+                    totalEarned: 0,
+                    gamesPlayed: 0,
+                    lastActive: Timestamp.now(),
+                    gameStats: {},
+                    categoryStats: {}
                   };
                   setSelectedPlayer(currentUserPlayer);
                   setShowPlayerProfile(true);
@@ -894,15 +1105,18 @@ const ArenaHome: React.FC = () => {
             {publicKey && isConnected && (
               <button
                 onClick={() => {
-                  // Create a mock player object for the current user
-                  const currentUserPlayer = {
+                  // Create proper PlayerStats object for current user
+                  const currentUserPlayer: PlayerStats = {
                     wallet: publicKey.toString(),
-                    displayName: userGamerTag || 'Player',
-                    name: userGamerTag || 'Player',
-                    wins: 0, // You can get these from Firestore later
+                    displayName: userGamerTag || undefined,
+                    wins: 0,
                     losses: 0,
                     winRate: 0,
-                    rank: 1
+                    totalEarned: 0,
+                    gamesPlayed: 0,
+                    lastActive: Timestamp.now(),
+                    gameStats: {},
+                    categoryStats: {}
                   };
                   setSelectedPlayer(currentUserPlayer);
                   setShowPlayerProfile(true);
@@ -952,7 +1166,7 @@ const ArenaHome: React.FC = () => {
               <div className="w-2 h-2 bg-amber-400 rounded-full mr-2 animate-pulse"></div>
               <span className="text-sm text-amber-300 mr-2">USDFG Price:</span>
               <span className="text-amber-400 font-semibold">{usdfgPrice.toFixed(4)} USDFG</span>
-              <span className="text-xs text-amber-300 ml-2">Live</span>
+              <span className="text-xs font-semibold ml-2 animate-pulse-live">Live</span>
             </div>
             
             <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white drop-shadow-[0_0_20px_rgba(255,215,130,0.3)]">
@@ -1018,15 +1232,40 @@ const ArenaHome: React.FC = () => {
               </div>
             </div>
             
-            <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
-              <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
-              <div className="relative z-10">
-                <div className="text-lg mb-1">📈</div>
-                <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">+12.5%</div>
-                <div className="text-sm text-amber-400 mt-1 font-semibold">Win Rate</div>
+            {/* Claim Free USDFG Box - Replaces Win Rate when active */}
+            {activeClaimEvent ? (
+              <div className="relative rounded-lg bg-gradient-to-br from-amber-600/20 to-orange-500/20 border-2 border-amber-400/60 p-2 text-center hover:border-amber-300/80 shadow-[0_0_40px_rgba(255,215,130,0.2)] hover:shadow-[0_0_60px_rgba(255,215,130,0.3)] transition-all overflow-hidden cursor-pointer animate-pulse-subtle"
+                onClick={handleClaimFreeUSDFG}
+              >
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.15),transparent_70%)] opacity-80" />
+                <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/80 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
+                <div className="relative z-10">
+                  <div className="text-lg mb-1">🎁</div>
+                  <div className="text-lg font-bold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.5)]">
+                    {activeClaimEvent.amountPerClaim} USDFG
+                  </div>
+                  <div className="text-xs text-amber-200 mt-1 font-semibold">
+                    {hasUserClaimed ? '✅ Claimed' : activeClaimEvent.currentClaims < activeClaimEvent.maxClaims ? 'Click to Claim!' : 'All Taken'}
+                  </div>
+                  <div className="text-[10px] text-amber-300/70 mt-0.5">
+                    {activeClaimEvent.maxClaims - activeClaimEvent.currentClaims} left
+                  </div>
+                  {claimingFreeUSDFG && (
+                    <div className="mt-1 text-xs text-amber-300 animate-pulse">Processing...</div>
+                  )}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
+                <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
+                <div className="relative z-10">
+                  <div className="text-lg mb-1">📈</div>
+                  <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">+12.5%</div>
+                  <div className="text-sm text-amber-400 mt-1 font-semibold">Win Rate</div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Available Challenges Section */}
@@ -1126,7 +1365,7 @@ const ArenaHome: React.FC = () => {
                     return (
                       <div 
                         key={challenge.id} 
-                        className={`relative bg-[#07080C]/95 border border-amber-500/30 rounded-xl p-4 cursor-pointer hover:border-amber-400/50 shadow-[0_0_20px_rgba(255,215,130,0.05)] hover:shadow-[0_0_30px_rgba(255,215,130,0.08)] transition-all overflow-hidden ${challenge.status === "expired" ? "challenge-expired" : ""}`}
+                        className={`relative bg-[#07080C]/95 border border-amber-500/30 rounded-xl p-4 cursor-pointer hover:border-amber-400/50 shadow-[0_0_20px_rgba(255,215,130,0.05)] hover:shadow-[0_0_30px_rgba(255,215,130,0.08)] transition-all overflow-hidden`}
                         onClick={() => {
                           // Don't open join modal for completed challenges
                           if (challenge.status === "completed" || challenge.rawData?.payoutTriggered) {
@@ -1249,7 +1488,7 @@ const ArenaHome: React.FC = () => {
                               In Progress
                             </span>
                           )}
-                          {challenge.status === "expired" && (
+                          {(challenge.status === "cancelled" || (challenge.expiresAt && challenge.expiresAt < Date.now())) && (
                             <span className="px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs animate-pulse">
                               Expired
                             </span>
@@ -1283,71 +1522,49 @@ const ArenaHome: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* View on Solana Explorer */}
-                        {challenge.solanaAccountId && (
-                          <div className="mb-4">
-                            <a
-                              href={`https://explorer.solana.com/address/${challenge.solanaAccountId}?cluster=devnet`}
+                        {/* View Escrow Token Account on Solana Explorer */}
+                        {challenge.rawData?.pda && (() => {
+                          try {
+                            const challengePDA = new PublicKey(challenge.rawData.pda);
+                            const [escrowTokenAccountPDA] = PublicKey.findProgramAddressSync(
+                              [SEEDS.ESCROW_WALLET, challengePDA.toBuffer(), USDFG_MINT.toBuffer()],
+                              PROGRAM_ID
+                            );
+                            return (
+                              <div className="mb-4 relative z-20">
+                                <a
+                                  href={`https://explorer.solana.com/address/${escrowTokenAccountPDA.toString()}?cluster=devnet`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center justify-center gap-2 px-3 py-2 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-lg hover:bg-amber-600/30 transition-all text-sm"
-                              onClick={(e) => e.stopPropagation()}
+                                  className="flex items-center justify-center gap-2 px-3 py-2 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-lg hover:bg-amber-600/30 transition-all text-sm cursor-pointer relative z-20"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    e.nativeEvent.stopImmediatePropagation();
+                                    window.open(`https://explorer.solana.com/address/${escrowTokenAccountPDA.toString()}?cluster=devnet`, '_blank', 'noopener,noreferrer');
+                                  }}
+                                  onMouseDown={(e) => {
+                                    e.stopPropagation();
+                                    e.nativeEvent.stopImmediatePropagation();
+                                  }}
                             >
                               <span>🔗</span>
                               <span>View Escrow on Solana Explorer</span>
                               <span className="text-xs">↗</span>
                             </a>
                           </div>
-                        )}
+                            );
+                          } catch (error) {
+                            console.error('Error deriving escrow token account:', error);
+                            return null;
+                          }
+                        })()}
 
-                        {/* Challenge Details - Collapsible */}
-                        {(challenge.description || challenge.rules || challenge.requirements) && (
-                          <div className="mb-4">
-                            <details className="group">
-                              <summary className="cursor-pointer text-sm text-amber-400 hover:text-amber-300 flex items-center">
-                                <span className="mr-2">📋</span>
-                                Challenge Details
-                                <span className="ml-auto group-open:rotate-180 transition-transform">▼</span>
-                              </summary>
-                              <div className="mt-3 space-y-3 text-sm">
-                                {challenge.description && (
-                                  <div>
-                                    <span className="text-gray-400 font-medium">Description:</span>
-                                    <p className="text-gray-300 mt-1">{challenge.description}</p>
-                                  </div>
-                                )}
-                                {challenge.rules && (
-                                  <div>
-                                    <span className="text-gray-400 font-medium">Rules:</span>
-                                    <p className="text-gray-300 mt-1">{challenge.rules}</p>
-                                  </div>
-                                )}
-                                {challenge.requirements && (
-                                  <div>
-                                    <span className="text-gray-400 font-medium">Requirements:</span>
-                                    <p className="text-gray-300 mt-1">{challenge.requirements}</p>
-                                  </div>
-                                )}
-                                {challenge.matchFormat && (
-                                  <div>
-                                    <span className="text-gray-400 font-medium">Format:</span>
-                                    <p className="text-gray-300 mt-1">{challenge.matchFormat}</p>
-                                  </div>
-                                )}
-                                {challenge.restrictions && (
-                                  <div>
-                                    <span className="text-gray-400 font-medium">Restrictions:</span>
-                                    <p className="text-gray-300 mt-1">{challenge.restrictions}</p>
-                                  </div>
-                                )}
-                              </div>
-                            </details>
-                          </div>
-                        )}
+                        {/* Challenge Details - Removed (fields not stored to keep data light) */}
 
                         {/* Winner Display for Completed/Disputed Challenges */}
                         {(challenge.status === "completed" || challenge.status === "disputed") && challenge.rawData?.winner && (
-                          <div className="mb-3 p-3 rounded-lg border border-amber-400/30 bg-gradient-to-r from-amber-500/10 to-orange-500/10 backdrop-blur-sm">
+                          <div className="mb-3 p-4 rounded-lg border border-amber-400/30 bg-gradient-to-r from-amber-500/10 to-orange-500/10 backdrop-blur-sm">
                             <div className="text-center">
                               {challenge.rawData.winner === "tie" ? (
                                 <>
@@ -1357,8 +1574,18 @@ const ArenaHome: React.FC = () => {
                                 </>
                               ) : (
                                 <>
-                                  <div className="flex items-center justify-center gap-2 mb-2">
-                                    <span className="text-xl">🏆</span>
+                                  <div className="flex items-center justify-center gap-3 mb-3">
+                                    <img 
+                                      src="/assets/usdfg-trophy.png" 
+                                      alt="USDFG Trophy" 
+                                      className="w-12 h-12 object-contain"
+                                      onError={(e) => {
+                                        const target = e.currentTarget as HTMLImageElement;
+                                        target.style.display = 'none';
+                                        target.nextElementSibling?.classList.remove('hidden');
+                                      }}
+                                    />
+                                    <span className="text-2xl hidden">🏆</span>
                                     <div className="text-base font-semibold text-amber-300">Winner</div>
                                   </div>
                                   <div className="bg-black/40 rounded-md px-3 py-1.5 border border-amber-400/20">
@@ -1435,7 +1662,9 @@ const ArenaHome: React.FC = () => {
                                     e.preventDefault();
                                     e.stopPropagation();
                                     e.nativeEvent.stopImmediatePropagation();
+                                    if (challenge.id) {
                                     handleDeleteChallenge(challenge.id);
+                                    }
                                   }}
                                   onMouseDown={(e) => {
                                     e.preventDefault();
@@ -1465,6 +1694,10 @@ const ArenaHome: React.FC = () => {
                           }
 
                           // Show "Submit Result" button for participants in "in-progress" challenges
+                          // Only the main challengers can submit results:
+                          // - Creator (players[0]) - who created the challenge
+                          // - First challenger who accepted (players[1]) - the other main challenger
+                          // Spectators (players[2+]) cannot submit results
                           if (challenge.status === "in-progress") {
                             // If wallet not connected, show connect prompt
                             if (!currentWallet || !isConnected) {
@@ -1481,8 +1714,17 @@ const ArenaHome: React.FC = () => {
                               );
                             }
 
-                            // If wallet connected and is participant
-                            if (isParticipant) {
+                            // Check if user is one of the first 2 challengers (creator or first challenger who accepted)
+                            // players[0] = creator (who created the challenge)
+                            // players[1] = first challenger who accepted/joined the challenge (the other main challenger)
+                            // players[2+] = spectators (not eligible to submit results)
+                            const players = challenge.rawData?.players || [];
+                            const isMainChallenger = players.length >= 2 && 
+                              currentWallet && 
+                              (players[0]?.toLowerCase() === currentWallet || players[1]?.toLowerCase() === currentWallet);
+
+                            // If wallet connected and is a main challenger (creator or first challenger who accepted)
+                            if (isMainChallenger) {
                               if (hasSubmittedResult) {
                                 return (
                                   <div className="w-full px-4 py-2 bg-amber-600/20 text-amber-300 border border-amber-500/30 font-semibold rounded-lg text-center">
@@ -1520,7 +1762,7 @@ const ArenaHome: React.FC = () => {
                                 onClick={async () => {
                                   // Check on-chain status before allowing join
                                   try {
-                                    const challengePDA = challenge.rawData?.pda || challenge.pda;
+                                    const challengePDA = challenge.rawData?.pda || (challenge as any).pda;
                                     if (!challengePDA) {
                                       alert('Challenge has no on-chain PDA. Cannot join this challenge.');
                                       return;
@@ -1562,10 +1804,18 @@ const ArenaHome: React.FC = () => {
                                     alert('Failed to verify challenge status. Please try again.');
                                   }
                                 }}
-                                className="w-full px-4 py-2 bg-zinc-800/90 hover:bg-zinc-700/90 text-amber-300 border border-amber-400/30 hover:border-amber-400/50 font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
+                                className="relative w-full px-4 py-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-200 border border-amber-400/40 hover:border-amber-400/60 font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm overflow-hidden group animate-pulse-subtle"
                                 disabled={!isConnected}
                               >
+                                {/* Shimmer effect */}
+                                <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000 ease-in-out"></span>
+                                {/* Glow effect */}
+                                <span className="absolute inset-0 bg-gradient-to-r from-amber-400/20 via-orange-400/20 to-amber-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm"></span>
+                                <span className="relative z-10 flex items-center justify-center gap-2">
+                                  <span className="animate-bounce-subtle">⚡</span>
                                 {!isConnected ? "Connect to Join" : "Join Challenge"}
+                                  <span className="hidden group-hover:inline animate-pulse">→</span>
+                                </span>
                               </button>
                             );
                           }
@@ -1578,7 +1828,7 @@ const ArenaHome: React.FC = () => {
                             );
                           }
 
-                          if (challenge.status === "expired") {
+                          if (challenge.status === "cancelled" || (challenge.expiresAt && challenge.expiresAt < Date.now())) {
                             return (
                               <div className="w-full px-4 py-2 bg-red-600/20 text-red-400 border border-red-600/30 font-semibold rounded-lg text-center">
                                 ⏰ Expired
@@ -1660,10 +1910,10 @@ const ArenaHome: React.FC = () => {
                               setSelectedChatChallenge(challenge);
                               setShowChatModal(true);
                             }}
-                            className="w-full mt-2 px-4 py-2 bg-gradient-to-r from-amber-600/40 to-amber-700/40 text-amber-200 border border-amber-400/40 font-semibold rounded-lg hover:bg-gradient-to-r hover:from-amber-600/60 hover:to-amber-700/60 hover:border-amber-400/60 hover:text-amber-100 transition-all flex items-center justify-center space-x-2 shadow-[0_0_15px_rgba(255,215,130,0.15)] hover:shadow-[0_0_20px_rgba(255,215,130,0.25)]"
+                            className="relative w-full mt-2 px-3 py-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-200 border border-amber-400/40 hover:border-amber-400/60 font-semibold rounded-lg transition-all flex items-center justify-center gap-2 shadow-[0_0_10px_rgba(255,215,130,0.15)] hover:shadow-[0_0_15px_rgba(255,215,130,0.25)] z-20 backdrop-blur-sm"
                           >
-                            <span>💬</span>
-                            <span>Join Chat</span>
+                            <span className="text-sm">💬</span>
+                            <span className="text-sm">Join Chat</span>
                           </button>
                         )}
 
@@ -1807,7 +2057,7 @@ const ArenaHome: React.FC = () => {
                             winRate: Math.round((player.wins / (player.wins + Math.floor(player.wins * 0.3))) * 100 * 10) / 10,
                             totalEarned: player.wins * 10, // Estimate earnings
                             gamesPlayed: player.wins + Math.floor(player.wins * 0.3),
-                            lastActive: new Date(),
+                            lastActive: Timestamp.now(),
                             trustScore: player.trust,
                             trustReviews: Math.floor(player.wins * 0.8),
                             gameStats: {},
@@ -1899,6 +2149,8 @@ const ArenaHome: React.FC = () => {
                                         ? 'opacity-100 drop-shadow-[0_0_8px_rgba(255,215,130,0.6)] hover:drop-shadow-[0_0_12px_rgba(255,215,130,0.8)] hover:scale-110' 
                                         : 'opacity-40 grayscale'
                                     }`}
+                                    loading="lazy"
+                                    decoding="async"
                                     onClick={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
@@ -1969,6 +2221,8 @@ const ArenaHome: React.FC = () => {
                                         ? 'opacity-100 drop-shadow-[0_0_8px_rgba(255,215,130,0.6)] hover:drop-shadow-[0_0_12px_rgba(255,215,130,0.8)] hover:scale-110' 
                                         : 'opacity-40 grayscale'
                                     }`}
+                                    loading="lazy"
+                                    decoding="async"
                                     onClick={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
@@ -2139,21 +2393,40 @@ const ArenaHome: React.FC = () => {
           />
         )}
 
-        {/* Submit Result Room - Only render when we have a valid challenge */}
-        {selectedChallenge?.id && (
+        {/* Submit Result Room - Only render for main challengers (creator and first challenger who accepted) */}
+        {selectedChallenge?.id && (() => {
+          const currentWallet = publicKey?.toString()?.toLowerCase();
+          const players = selectedChallenge.rawData?.players || [];
+          // Only main challengers can see submit result (not spectators)
+          // players[0] = creator (who created the challenge)
+          // players[1] = first challenger who accepted/joined the challenge (the other main challenger)
+          // players[2+] = spectators (not eligible to submit results)
+          const isMainChallenger = players.length >= 2 && 
+            currentWallet && 
+            (players[0]?.toLowerCase() === currentWallet || players[1]?.toLowerCase() === currentWallet);
+          
+          // Only show if user is a main challenger (creator or first challenger who accepted)
+          if (!isMainChallenger) {
+            return null;
+          }
+          
+          return (
+            <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div></div>}>
         <SubmitResultRoom
           isOpen={showSubmitResultModal}
           onClose={() => {
             setShowSubmitResultModal(false);
-              // Delay clearing selectedChallenge to allow components to cleanup
-              setTimeout(() => setSelectedChallenge(null), 100);
+                  // Delay clearing selectedChallenge to allow components to cleanup
+                  setTimeout(() => setSelectedChallenge(null), 100);
           }}
-            challengeId={selectedChallenge.id}
-            challengeTitle={selectedChallenge.title || ""}
+                challengeId={selectedChallenge.id}
+                challengeTitle={selectedChallenge.title || ""}
           currentWallet={publicKey?.toString() || ""}
           onSubmit={handleSubmitResult}
         />
-        )}
+            </Suspense>
+          );
+        })()}
 
         {/* Mobile FAB - Create Challenge - Smaller and positioned to not block content */}
         <button
@@ -2178,6 +2451,7 @@ const ArenaHome: React.FC = () => {
 
       {/* Player Profile Modal */}
       {selectedPlayer && (
+        <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div></div>}>
         <PlayerProfileModal
           isOpen={showPlayerProfile}
           onClose={() => {
@@ -2185,12 +2459,14 @@ const ArenaHome: React.FC = () => {
             setSelectedPlayer(null);
           }}
           player={{
+            name: selectedPlayer.displayName || selectedPlayer.wallet || 'Player',
+            address: selectedPlayer.wallet,
             ...selectedPlayer,
-            country: userCountry,
-            profileImage: userProfileImage,
-            lastActive: selectedPlayer.lastActive
+            ...(userCountry ? { country: userCountry } : {}),
+            ...(userProfileImage ? { profileImage: userProfileImage } : {}),
+            lastActive: selectedPlayer.lastActive?.seconds ? { seconds: selectedPlayer.lastActive.seconds } : undefined
           }}
-          isCurrentUser={publicKey && selectedPlayer.wallet === publicKey.toString()}
+          isCurrentUser={!!(publicKey && selectedPlayer.wallet === publicKey.toString())}
           onEditProfile={(newName) => {
             setUserGamerTag(newName);
             localStorage.setItem('user_gamer_tag', newName);
@@ -2217,6 +2493,7 @@ const ArenaHome: React.FC = () => {
             (c.status === 'active' || c.status === 'pending')
           ) : false}
         />
+        </Suspense>
       )}
 
       {/* Profile Settings Modal */}
@@ -2233,6 +2510,7 @@ const ArenaHome: React.FC = () => {
 
       {/* Challenge Chat Modal - Only render when we have a valid challenge */}
       {showChatModal && selectedChatChallenge?.id && (
+        <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div></div>}>
         <ChallengeChatModal
           isOpen={showChatModal}
           onClose={() => {
@@ -2249,9 +2527,11 @@ const ArenaHome: React.FC = () => {
             return currentWallet && selectedChatChallenge.rawData?.players?.some((p: string) => p.toLowerCase() === currentWallet);
           })()}
         />
+        </Suspense>
       )}
 
       {/* Trust Review Modal */}
+      <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div></div>}>
       <TrustReviewModal
         isOpen={showTrustReview}
         opponentName={trustReviewOpponent}
@@ -2262,6 +2542,7 @@ const ArenaHome: React.FC = () => {
         }}
         onSubmit={handleTrustReviewSubmit}
       />
+      </Suspense>
 
       {/* Trophy Modal */}
       {showTrophyModal && selectedTrophy && (
@@ -2548,7 +2829,7 @@ const CreateChallengeModal: React.FC<{
   // Auto-fill preset based on game + mode selection
   const applyPreset = useCallback(() => {
     if (!formData.customRules && formData.game !== 'Other/Custom') {
-      const preset = challengePresets[formData.game as keyof typeof challengePresets]?.[formData.mode as keyof any];
+      const preset = (challengePresets as any)[formData.game]?.[formData.mode];
       if (preset) {
         updateFormData({
           rules: preset.rules.join('\n• ')
@@ -2604,9 +2885,10 @@ const CreateChallengeModal: React.FC<{
       errors.push('Please enter your username/gamertag');
     }
     
-    const entryFee = typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) : formData.entryFee;
-    if (!formData.entryFee || formData.entryFee === '' || isNaN(entryFee) || entryFee < 0.001 || entryFee > 999999999) {
-      errors.push('Entry fee must be between 0.001 and 999,999,999 USDFG');
+    const entryFeeNum = typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) : (typeof formData.entryFee === 'number' ? formData.entryFee : 0);
+    const entryFeeStr = typeof formData.entryFee === 'string' ? formData.entryFee : String(formData.entryFee || '');
+    if (!formData.entryFee || entryFeeStr === '' || isNaN(entryFeeNum) || entryFeeNum < 0.000000001 || entryFeeNum > 1000) {
+      errors.push('Entry fee must be between 0.000000001 and 1000 USDFG');
     }
     
     return errors;
@@ -2872,18 +3154,18 @@ const CreateChallengeModal: React.FC<{
                         const value = e.target.value;
                         // Allow typing freely, including decimals
                         if (value === '') {
-                          updateFormData({entryFee: ''});
+                          updateFormData({entryFee: '' as any});
                         } else if (value === '.') {
-                          updateFormData({entryFee: '.'});
+                          updateFormData({entryFee: '.' as any});
                         } else if (value.endsWith('.')) {
-                          updateFormData({entryFee: value});
+                          updateFormData({entryFee: value as any});
                         } else {
                           const numValue = parseFloat(value);
                           if (!isNaN(numValue)) {
-                            updateFormData({entryFee: numValue});
+                            updateFormData({entryFee: numValue as any});
                           } else if (value.match(/^\d*\.?\d*$/)) {
                             // Allow partial decimal input like "0." or "0.0"
-                            updateFormData({entryFee: value});
+                            updateFormData({entryFee: value as any});
                           }
                         }
                       }}
@@ -3216,9 +3498,17 @@ const JoinChallengeModal: React.FC<{
               </button>
               <button
                 onClick={handleJoin}
-                className="bg-gradient-to-r from-amber-400 to-orange-500 text-black px-6 py-2 rounded-lg font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(255,215,130,0.35)]"
+                className="relative bg-gradient-to-r from-amber-400 to-orange-500 text-black px-6 py-2 rounded-lg font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(255,215,130,0.35)] overflow-hidden group animate-pulse-subtle"
               >
+                {/* Shimmer effect */}
+                <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent transition-transform duration-1000 ease-in-out"></span>
+                {/* Glow pulse */}
+                <span className="absolute inset-0 bg-gradient-to-r from-amber-300/40 via-orange-300/40 to-amber-300/40 opacity-0 group-hover:opacity-100 animate-pulse-blur transition-opacity duration-300"></span>
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  <span className="animate-bounce-subtle">⚡</span>
                 Join Challenge
+                  <span className="hidden group-hover:inline animate-pulse">→</span>
+                </span>
               </button>
             </div>
           </div>

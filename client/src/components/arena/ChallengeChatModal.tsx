@@ -68,14 +68,14 @@ export const ChallengeChatModal: React.FC<ChallengeChatModalProps> = ({
 
           {/* Content - Chat and Voice */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* Voice Chat */}
-            {isParticipant && challengeId && challengeId.trim() !== '' && (
+            {/* Voice Chat - Available to ALL players (up to 24), not just first 2 challengers */}
+            {allowSpectators && challengeId && challengeId.trim() !== '' && (
               <div className="mb-4">
                 <VoiceChat challengeId={challengeId} currentWallet={currentWallet} />
               </div>
             )}
 
-            {/* Text Chat */}
+            {/* Text Chat - Available to ALL players (up to 24) */}
             {challengeId && challengeId.trim() !== '' && (
               <ChatBox challengeId={challengeId} currentWallet={currentWallet} />
             )}

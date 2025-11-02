@@ -8,10 +8,26 @@ export interface Trophy {
   requiredGames: number;
   color: string;
   icon: string;
+  specialCondition?: {
+    type: 'totalUsers';
+    maxUsers: number; // Unlock only if total users < this number
+  };
 }
 
-// 7-Tier Trophy System with Mystery Requirements
+// Trophy System with Mystery Requirements + Special Trophies
 export const USDFG_RELICS: Trophy[] = [
+  {
+    id: 'og-1k',
+    name: 'OG FIRST 2.1K MEMBERS',
+    description: 'Pioneer of the Arena. You joined when we were just getting started. Exclusive to the first 2,100 members - representing USDFG\'s 21M token supply.',
+    requiredGames: 0, // Not games-based
+    color: 'gold',
+    icon: '/assets/categories/usdfg-21k.png', // Updated to correct path
+    specialCondition: {
+      type: 'totalUsers',
+      maxUsers: 2100 // Unlock only if total unique users < 2100 (represents 21M token supply)
+    }
+  },
   {
     id: 'initiate',
     name: 'USDFG INITIATE',
@@ -95,6 +111,7 @@ export function getTrophyProgress(gamesPlayed: number, trophy: Trophy): number {
 // Get CSS color class for trophy border/text
 export function getTrophyColorClass(color: string): string {
   const colorMap: { [key: string]: string } = {
+    'gold': 'text-yellow-400',
     'brown': 'text-amber-700',
     'gray': 'text-gray-400',
     'amber': 'text-amber-400',
@@ -104,6 +121,88 @@ export function getTrophyColorClass(color: string): string {
     'yellow': 'text-yellow-400'
   };
   return colorMap[color] || 'text-zinc-400';
+}
+
+/**
+ * Get total unique wallet users from player_stats collection
+ * This is used for special trophies like OG First 2.1K Members
+ */
+export async function getTotalUniqueUsers(): Promise<number> {
+  try {
+    const { collection, getDocs } = await import('firebase/firestore');
+    const { db } = await import('./firebase/firestore');
+    
+    const statsCollection = collection(db, 'player_stats');
+    const snapshot = await getDocs(statsCollection);
+    
+    return snapshot.size; // Each document is a unique wallet
+  } catch (error) {
+    console.error('❌ Error getting total unique users:', error);
+    return 0; // Return 0 on error to be safe
+  }
+}
+
+/**
+ * Check if a special trophy should be unlocked
+ */
+export async function checkSpecialTrophy(trophy: Trophy): Promise<boolean> {
+  if (!trophy.specialCondition) return false;
+  
+  if (trophy.specialCondition.type === 'totalUsers') {
+    const totalUsers = await getTotalUniqueUsers();
+    return totalUsers < trophy.specialCondition.maxUsers;
+  }
+  
+  return false;
+}
+
+/**
+ * Check if player has OG First 2.1K trophy from their stats
+ */
+export async function checkPlayerHasOgFirst1k(wallet: string): Promise<boolean> {
+  try {
+    const { getPlayerStats } = await import('./firebase/firestore');
+    const playerStats = await getPlayerStats(wallet);
+    return playerStats?.ogFirst1k === true;
+  } catch (error) {
+    console.error('❌ Error checking OG First 2.1K trophy:', error);
+    return false;
+  }
+}
+
+/**
+ * Get all unlocked trophies for a player (including special trophies)
+ */
+export async function getUnlockedTrophiesAdvanced(
+  gamesPlayed: number,
+  wallet?: string
+): Promise<Trophy[]> {
+  const unlocked: Trophy[] = [];
+  
+  for (const trophy of USDFG_RELICS) {
+    // Check games-based trophies
+    if (!trophy.specialCondition && gamesPlayed >= trophy.requiredGames) {
+      unlocked.push(trophy);
+    }
+    // Check special condition trophies
+    if (trophy.specialCondition && wallet) {
+      if (trophy.id === 'og-1k') {
+        // Check if player has it stored in their stats
+        const hasTrophy = await checkPlayerHasOgFirst1k(wallet);
+        if (hasTrophy) {
+          unlocked.push(trophy);
+        }
+      } else {
+        // For other special trophies, check the condition
+        const isUnlocked = await checkSpecialTrophy(trophy);
+        if (isUnlocked) {
+          unlocked.push(trophy);
+        }
+      }
+    }
+  }
+  
+  return unlocked;
 }
 
 

@@ -299,12 +299,12 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = memo(({
                   </motion.div>
                 )}
 
-                {/* Voice Chat - Only render when modal is open and challengeId is valid */}
+                {/* Voice Chat - Available to all players (up to 24) in Submit Result Room */}
                 {challengeId && challengeId.trim() !== '' && (
                   <VoiceChat challengeId={challengeId} currentWallet={currentWallet} />
                 )}
 
-                {/* Text Chat - Only render when modal is open and challengeId is valid */}
+                {/* Text Chat - Available to all players (up to 24) in Submit Result Room */}
                 {challengeId && challengeId.trim() !== '' && (
                   <ChatBox challengeId={challengeId} currentWallet={currentWallet} />
                 )}

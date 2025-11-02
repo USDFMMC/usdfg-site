@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 interface Country {
   code: string;
@@ -212,12 +213,51 @@ export default function CountryFlagPicker({
   className = ""
 }: CountryFlagPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const selectedCountryObj = commonCountries.find(c => c.code === selectedCountry);
+
+  // Filter countries based on search query
+  const filteredCountries = commonCountries.filter(country =>
+    country.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    country.code.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Focus search input when dropdown opens
+  useEffect(() => {
+    if (isOpen && searchInputRef.current) {
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 100);
+    }
+  }, [isOpen]);
+
+  // Reset search when dropdown closes
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchQuery("");
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width
+      });
+    }
+  }, [isOpen]);
 
   return (
     <div className={`relative ${className}`}>
       <button
+        ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         className="w-full px-3 py-2 bg-zinc-800 border border-amber-400/30 rounded-lg text-white flex items-center justify-between hover:border-amber-400/60 transition-colors"
       >
@@ -234,28 +274,61 @@ export default function CountryFlagPicker({
         <span className="text-gray-400">▼</span>
       </button>
       
-      {isOpen && (
+      {isOpen && typeof document !== 'undefined' && createPortal(
         <>
           <div
-            className="fixed inset-0 z-10"
+            className="fixed inset-0 z-[10000]"
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute z-20 mt-1 w-full bg-zinc-900 border border-amber-400/30 rounded-lg max-h-80 overflow-y-auto">
-            {commonCountries.map((country) => (
-              <button
-                key={country.code}
-                onClick={() => {
-                  onCountrySelect?.(country);
-                  setIsOpen(false);
-                }}
-                className="w-full px-3 py-2 text-left text-white hover:bg-zinc-800 flex items-center gap-2 transition-colors"
-              >
-                <span>{country.flag}</span>
-                <span>{country.name}</span>
-              </button>
-            ))}
+          <div 
+            ref={dropdownRef}
+            className="fixed z-[10001] bg-zinc-900 border border-amber-400/30 rounded-lg max-h-80 overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.8)] flex flex-col"
+            style={{
+              top: `${dropdownPosition.top}px`,
+              left: `${dropdownPosition.left}px`,
+              width: `${dropdownPosition.width}px`,
+              maxWidth: '90vw'
+            }}
+          >
+            {/* Search Input */}
+            <div className="p-2 border-b border-amber-400/20">
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search country..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-3 py-2 bg-zinc-800 border border-amber-400/30 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-amber-400/60 transition-colors text-sm"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+            
+            {/* Countries List */}
+            <div className="overflow-y-auto max-h-[280px]">
+              {filteredCountries.length > 0 ? (
+                filteredCountries.map((country) => (
+                  <button
+                    key={country.code}
+                    onClick={() => {
+                      onCountrySelect?.(country);
+                      setIsOpen(false);
+                      setSearchQuery("");
+                    }}
+                    className="w-full px-3 py-2 text-left text-white hover:bg-zinc-800 flex items-center gap-2 transition-colors"
+                  >
+                    <span>{country.flag}</span>
+                    <span>{country.name}</span>
+                  </button>
+                ))
+              ) : (
+                <div className="px-3 py-4 text-center text-gray-400 text-sm">
+                  No countries found
+                </div>
+              )}
+            </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );

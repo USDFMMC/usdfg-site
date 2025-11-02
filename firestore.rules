@@ -39,6 +39,14 @@ service cloud.firestore {
       allow read: if true;
       allow write: if request.auth != null && request.auth.uid == userId;
     }
+    
+    // Free USDFG Claim Events - anyone can read, system can write
+    match /free_claims/{claimId} {
+      allow read: if true; // Anyone can view active claim events
+      allow create: if true; // Allow creation (admin/system will create these)
+      allow update: if true; // Allow updates when users claim (system updates)
+      allow delete: if false; // Don't allow deletion (archive instead)
+    }
   }
 }
 

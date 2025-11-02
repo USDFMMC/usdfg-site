@@ -11,7 +11,7 @@ pub const PLATFORM_FEE_BPS: u16 = 500; // 5% = 500 basis points
 pub const PLATFORM_WALLET: &str = "AcEV5t9TJdZP91ttbgKieWoWUxwUb4PT4MxvggDjjkkq";
 
 // Entry fee limits
-const MIN_ENTRY_FEE_LAMPORTS: u64 = 1_000_000_000; // 1 USDFG
+const MIN_ENTRY_FEE_LAMPORTS: u64 = 1; // 0.000000001 USDFG (1 lamport - smallest unit, like 1 satoshi in Bitcoin)
 const MAX_ENTRY_FEE_LAMPORTS: u64 = 1_000_000_000_000; // 1000 USDFG
 
 #[program]
@@ -30,7 +30,7 @@ pub mod usdfg_smart_contract {
         );
 
         let now = Clock::get()?.unix_timestamp;
-        let dispute_timer = now + 900; // 15 minutes
+        let dispute_timer = now + 7200; // 2 hours (matches UI expiration)
 
         let challenge = &mut ctx.accounts.challenge;
 
@@ -179,11 +179,11 @@ pub mod usdfg_smart_contract {
             ChallengeError::InvalidWinner
         );
 
-        // Validate not expired
-        require!(
-            Clock::get()?.unix_timestamp < challenge.dispute_timer,
-            ChallengeError::ChallengeExpired
-        );
+        // ✅ REMOVED: Expiration check for prize claims
+        // Once both players have submitted results and challenge is completed,
+        // winners should be able to claim prizes ANYTIME (no time limit).
+        // The dispute_timer only applies to preventing NEW disputes, not claiming prizes.
+        // Players can claim their prizes whenever they want - no expiration!
 
         // CONSENSUS CHECK: Smart logic with "concede to win"
         let creator_won = challenge.creator_result.unwrap_or(false);

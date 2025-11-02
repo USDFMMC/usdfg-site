@@ -10,8 +10,9 @@ import { PublicKey } from '@solana/web3.js';
 // Smart Contract Program ID (deployed on devnet) - DEPLOYED VIA PLAYGROUND
 // Old contract: 2KL4BKvUtDmABvuvRopkCEb33myWM1W9BGodAZ82RWDT
 // Previous: 9NBcMx3x8EotQi63fukhXpYbcBRgyWj6PcEFyEaL9oqo (had authority bug)
-// LATEST with per-challenge authority fix: DX4C2FyAKSiycDVSoYgm7WyDgmPNTdBKbvVDyKGGH6wK
-export const PROGRAM_ID = new PublicKey('DX4C2FyAKSiycDVSoYgm7WyDgmPNTdBKbvVDyKGGH6wK');
+// Previous: DX4C2FyAKSiycDVSoYgm7WyDgmPNTdBKbvVDyKGGH6wK (had per-challenge authority fix but prize claim expiration)
+// LATEST: Prize claims have NO expiration - winners can claim anytime after completion
+export const PROGRAM_ID = new PublicKey('3UCz8aURYFXUqNWgHDfbiRziVKjPB8G7BYrgj93MyHUp');
 
 // Admin wallet address
 export const ADMIN_WALLET = new PublicKey('3SeLoDGsajuQUt2pzSkZV7LmB7gKtckmrD693U69kcUd');
@@ -28,9 +29,9 @@ export const SEEDS = {
 
 // Challenge configuration
 export const CHALLENGE_CONFIG = {
-  MIN_ENTRY_FEE: 0.001, // 0.001 USDFG minimum (supports high-value tokens)
-  MAX_ENTRY_FEE: 999999999, // 999,999,999 USDFG maximum
-  DISPUTE_TIMER: 900, // 15 minutes in seconds
+  MIN_ENTRY_FEE: 0.000000001, // 0.000000001 USDFG minimum (1 lamport - smallest unit, like 1 satoshi in Bitcoin)
+  MAX_ENTRY_FEE: 1000, // 1000 USDFG maximum (matches contract: 1_000_000_000_000 lamports)
+  DISPUTE_TIMER: 7200, // 2 hours in seconds (matches contract)
   MAX_PLAYERS: 8,
 } as const;
 

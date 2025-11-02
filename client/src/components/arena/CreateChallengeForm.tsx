@@ -173,11 +173,11 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     if (step === 2) {
       if (!formData.mode) errors.push('Please select a challenge mode');
       const entryFee = typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) : formData.entryFee;
-      if (!formData.entryFee || (typeof formData.entryFee === 'string' && formData.entryFee === '') || isNaN(entryFee) || entryFee < 0.001) {
-        errors.push('Minimum entry fee is 0.001 USDFG');
+      if (!formData.entryFee || (typeof formData.entryFee === 'string' && formData.entryFee === '') || isNaN(entryFee) || entryFee < 0.000000001) {
+        errors.push('Minimum entry fee is 0.000000001 USDFG (1 lamport - smallest unit)');
       }
-      if (entryFee > 999999999) {
-        errors.push('Maximum entry fee is 999,999,999 USDFG');
+      if (entryFee > 1000) {
+        errors.push('Maximum entry fee is 1000 USDFG');
       }
     }
     

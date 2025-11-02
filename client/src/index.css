@@ -113,6 +113,23 @@ body {
   animation: bounce-slow 3s ease-in-out infinite;
 }
 
+
+/* Live price indicator animation - lightweight pulsing red/green */
+@keyframes pulseLive {
+  0%, 100% {
+    color: rgb(34, 197, 94); /* green-500 */
+    opacity: 1;
+  }
+  50% {
+    color: rgb(239, 68, 68); /* red-500 */
+    opacity: 0.85;
+  }
+}
+
+.animate-pulse-live {
+  animation: pulseLive 2.5s ease-in-out infinite;
+  will-change: color, opacity; /* GPU hint for better performance */
+}
 @layer base {
   :root {
     /* Original Site Colors */
@@ -602,4 +619,48 @@ button.wallet-adapter-button:not(.wallet-adapter-button-connected):hover {
 .wallet-adapter-button:not(.wallet-adapter-button-connected) .wallet-adapter-button-start-icon,
 .wallet-adapter-button:not(.wallet-adapter-button-connected) .wallet-adapter-button-end-icon {
   color: rgba(251, 191, 36, 1) !important; /* amber-300 to match text */
+}
+
+/* Join Challenge Button Animations - Optimized for performance */
+@keyframes pulseSubtle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.02);
+  }
+}
+@keyframes bounceSubtle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes pulseBlur {
+  0%, 100% {
+    opacity: 0;
+    filter: blur(8px);
+  }
+  50% {
+    opacity: 1;
+    filter: blur(12px);
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulseSubtle 1.5s ease-in-out infinite;
+  will-change: transform, opacity; /* GPU hint - only transform and opacity for best performance */
+}
+
+.animate-bounce-subtle {
+  animation: bounceSubtle 1.5s ease-in-out infinite;
+}
+
+.animate-pulse-blur {
+  animation: pulseBlur 2s ease-in-out infinite;
 }
