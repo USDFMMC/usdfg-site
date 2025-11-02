@@ -257,7 +257,7 @@ export const fetchChallengeById = async (challengeId: string): Promise<Challenge
 };
 
 // Join challenge with proper Firestore operations
-export const joinChallenge = async (challengeId: string, wallet: string) => {
+export const joinChallenge = async (challengeId: string, wallet: string, isFounderChallenge: boolean = false) => {
   try {
     const challengeRef = doc(db, "challenges", challengeId);
     const snap = await getDoc(challengeRef);
@@ -295,13 +295,76 @@ export const joinChallenge = async (challengeId: string, wallet: string) => {
 
     await updateDoc(challengeRef, updates);
 
-    console.log('✅ Player joined challenge:', challengeId);
+    // Note: For Founder Challenges, USDFG transfer tracking happens separately
+    // when the actual token transfer occurs (via recordFounderChallengeReward)
+    // We don't track calculated amounts here - only actual transfers
+
+    console.log('✅ Player joined challenge:', challengeId, isFounderChallenge ? '(Founder Challenge - USDFG will be tracked when transferred)' : '');
     return true;
   } catch (error) {
     console.error('❌ Error joining challenge:', error);
     throw error;
   }
 };
+
+/**
+ * Record actual USDFG transfer given to player from Founder Challenge
+ * This should be called when the actual token transfer happens (from admin/backend)
+ * 
+ * @param wallet - Player wallet address
+ * @param challengeId - Challenge ID
+ * @param amount - Actual USDFG amount transferred (from on-chain transaction)
+ * @param txSignature - Solana transaction signature (optional, for verification)
+ */
+export async function recordFounderChallengeReward(
+  wallet: string,
+  challengeId: string,
+  amount: number,
+  txSignature?: string
+): Promise<void> {
+  try {
+    // Record in founder_rewards collection (tracks actual USDFG given)
+    await addDoc(collection(db, 'founder_rewards'), {
+      wallet,
+      challengeId,
+      amount, // Actual USDFG transferred
+      txSignature: txSignature || null, // Optional: Solana transaction signature
+      timestamp: Timestamp.now(),
+    });
+
+    // Update player stats (totalEarned) with actual amount
+    const playerRef = doc(db, 'player_stats', wallet);
+    const playerSnap = await getDoc(playerRef);
+    
+    if (playerSnap.exists()) {
+      const currentStats = playerSnap.data() as PlayerStats;
+      await updateDoc(playerRef, {
+        totalEarned: (currentStats.totalEarned || 0) + amount,
+        lastActive: Timestamp.now(),
+      });
+    } else {
+      // Create new player stats
+      await setDoc(playerRef, {
+        wallet,
+        wins: 0,
+        losses: 0,
+        winRate: 0,
+        totalEarned: amount,
+        gamesPlayed: 0,
+        lastActive: Timestamp.now(),
+        trustScore: 0,
+        trustReviews: 0,
+        gameStats: {},
+        categoryStats: {},
+      });
+    }
+
+    console.log(`✅ Recorded Founder Challenge reward: ${wallet.slice(0,8)}... received ${amount} USDFG from challenge ${challengeId}${txSignature ? ` (tx: ${txSignature.slice(0,8)}...)` : ''}`);
+  } catch (error) {
+    console.error('❌ Error recording Founder Challenge reward:', error);
+    throw error; // Throw so caller knows if tracking failed
+  }
+}
 
 // Real-time active challenge functions
 export function listenActiveForCreator(creator: string, cb: (active: any[]) => void) {

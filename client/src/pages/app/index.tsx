@@ -8,7 +8,7 @@ import { joinChallengeOnChain } from "@/lib/chain/events";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
-import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, PlayerStats, FreeClaimEvent, subscribeToActiveFreeClaim, claimFreeUSDFG, hasWalletClaimed } from "@/lib/firebase/firestore";
+import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, PlayerStats } from "@/lib/firebase/firestore";
 import { Timestamp } from "firebase/firestore";
 import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
@@ -154,10 +154,6 @@ const ArenaHome: React.FC = () => {
   const [showChatModal, setShowChatModal] = useState<boolean>(false);
   const [selectedChatChallenge, setSelectedChatChallenge] = useState<any>(null);
   
-  // Free USDFG Claim state
-  const [activeClaimEvent, setActiveClaimEvent] = useState<FreeClaimEvent | null>(null);
-  const [claimingFreeUSDFG, setClaimingFreeUSDFG] = useState<boolean>(false);
-  const [hasUserClaimed, setHasUserClaimed] = useState<boolean>(false);
   
   // Mock price API - simulates real-time price updates
   const fetchUsdfgPrice = useCallback(async () => {
@@ -313,55 +309,6 @@ const ArenaHome: React.FC = () => {
   // Monitor result submission deadlines
   useResultDeadlines(firestoreChallenges);
   
-  // Subscribe to active free claim events
-  useEffect(() => {
-    console.log('🎁 Setting up free claim event subscription...');
-    
-    // First, try to fetch the active event immediately (in case subscription fails)
-    const fetchActiveEvent = async () => {
-      try {
-        const { getActiveFreeClaimEvent } = await import("@/lib/firebase/firestore");
-        const event = await getActiveFreeClaimEvent();
-        if (event) {
-          console.log('🎁 Found active claim event on mount:', event.id);
-          setActiveClaimEvent(event);
-          
-          // Check if current user has already claimed
-          if (publicKey) {
-            const walletAddress = publicKey.toString().toLowerCase();
-            const hasClaimed = event.claimedBy?.some(
-              (addr: string) => addr.toLowerCase() === walletAddress
-            ) || false;
-            setHasUserClaimed(hasClaimed);
-          }
-        }
-      } catch (error) {
-        console.error('❌ Error fetching active claim event:', error);
-      }
-    };
-    
-    fetchActiveEvent();
-    
-    // Then set up real-time subscription
-    const unsubscribe = subscribeToActiveFreeClaim((claimEvent) => {
-      console.log('🎁 Free claim event update:', claimEvent ? 'Active event found' : 'No active event');
-      setActiveClaimEvent(claimEvent);
-      
-      // Check if current user has already claimed
-      if (claimEvent && publicKey) {
-        const walletAddress = publicKey.toString().toLowerCase();
-        const hasClaimed = claimEvent.claimedBy?.some(
-          (addr: string) => addr.toLowerCase() === walletAddress
-        ) || false;
-        console.log('🎁 User claim status:', hasClaimed ? 'Already claimed' : 'Can claim');
-        setHasUserClaimed(hasClaimed);
-      } else {
-        setHasUserClaimed(false);
-      }
-    });
-    
-    return unsubscribe;
-  }, [publicKey]);
   
   // Auto-open Submit Result Room when user's challenge becomes "in-progress"
   useEffect(() => {
@@ -913,69 +860,13 @@ const ArenaHome: React.FC = () => {
     return currentWallet === challengeCreator;
   };
 
-  // Handle free USDFG claim
-  const handleClaimFreeUSDFG = async () => {
-    if (!publicKey || !connection) {
-      alert('Please connect your wallet first');
-      return;
-    }
-
-    if (!activeClaimEvent) {
-      alert('No active claim event');
-      return;
-    }
-
-    if (hasUserClaimed) {
-      alert('You have already claimed from this event');
-      return;
-    }
-
-    if (claimingFreeUSDFG) {
-      return; // Already processing
-    }
-
-    setClaimingFreeUSDFG(true);
-
-    try {
-      // Check if all claims are taken
-      if (activeClaimEvent.currentClaims >= activeClaimEvent.maxClaims) {
-        alert('All claims have been taken');
-        setClaimingFreeUSDFG(false);
-        return;
-      }
-
-      // Check if expired
-      if (activeClaimEvent.expiresAt && activeClaimEvent.expiresAt.toMillis() < Date.now()) {
-        alert('This claim event has expired');
-        setClaimingFreeUSDFG(false);
-        return;
-      }
-
-      // Update Firestore to record the claim
-      await claimFreeUSDFG(
-        publicKey.toString(),
-        activeClaimEvent.id,
-        activeClaimEvent.amountPerClaim
-      );
-
-      // TODO: Implement actual token transfer here
-      // Option 1: Backend Cloud Function handles transfer (recommended)
-      // Option 2: Client-side transfer from faucet wallet
-      // For now, we just track the claim in Firestore
-      console.log('✅ Claim recorded in Firestore');
-      console.log('⚠️ Token transfer needs to be implemented');
-      console.log(`   Amount: ${activeClaimEvent.amountPerClaim} USDFG`);
-      console.log(`   Recipient: ${publicKey.toString()}`);
-
-      alert(`✅ Claimed ${activeClaimEvent.amountPerClaim} USDFG! Tokens will be transferred shortly.`);
-      
-    } catch (error) {
-      console.error('❌ Error claiming free USDFG:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      alert(`Failed to claim: ${errorMessage}`);
-    } finally {
-      setClaimingFreeUSDFG(false);
-    }
+  // Check if a challenge is a Founder Challenge (admin-created with 0 entry fee)
+  const isFounderChallenge = (challenge: any) => {
+    const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
+    const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
+    const isAdmin = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+    const isFree = entryFee === 0 || entryFee < 0.000000001;
+    return isAdmin && isFree;
   };
 
   // Memoize helper functions to prevent recalculation
@@ -1232,40 +1123,16 @@ const ArenaHome: React.FC = () => {
               </div>
             </div>
             
-            {/* Claim Free USDFG Box - Replaces Win Rate when active */}
-            {activeClaimEvent ? (
-              <div className="relative rounded-lg bg-gradient-to-br from-amber-600/20 to-orange-500/20 border-2 border-amber-400/60 p-2 text-center hover:border-amber-300/80 shadow-[0_0_40px_rgba(255,215,130,0.2)] hover:shadow-[0_0_60px_rgba(255,215,130,0.3)] transition-all overflow-hidden cursor-pointer animate-pulse-subtle"
-                onClick={handleClaimFreeUSDFG}
-              >
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.15),transparent_70%)] opacity-80" />
-                <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/80 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
-                <div className="relative z-10">
-                  <div className="text-lg mb-1">🎁</div>
-                  <div className="text-lg font-bold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.5)]">
-                    {activeClaimEvent.amountPerClaim} USDFG
-                  </div>
-                  <div className="text-xs text-amber-200 mt-1 font-semibold">
-                    {hasUserClaimed ? '✅ Claimed' : activeClaimEvent.currentClaims < activeClaimEvent.maxClaims ? 'Click to Claim!' : 'All Taken'}
-                  </div>
-                  <div className="text-[10px] text-amber-300/70 mt-0.5">
-                    {activeClaimEvent.maxClaims - activeClaimEvent.currentClaims} left
-                  </div>
-                  {claimingFreeUSDFG && (
-                    <div className="mt-1 text-xs text-amber-300 animate-pulse">Processing...</div>
-                  )}
-                </div>
+            {/* Win Rate Stat Box */}
+            <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
+              <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
+              <div className="relative z-10">
+                <div className="text-lg mb-1">📈</div>
+                <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">+12.5%</div>
+                <div className="text-sm text-amber-400 mt-1 font-semibold">Win Rate</div>
               </div>
-            ) : (
-              <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
-                <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
-                <div className="relative z-10">
-                  <div className="text-lg mb-1">📈</div>
-                  <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">+12.5%</div>
-                  <div className="text-sm text-amber-400 mt-1 font-semibold">Win Rate</div>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
 
           {/* Available Challenges Section */}
@@ -1465,6 +1332,11 @@ const ArenaHome: React.FC = () => {
                                 Your Challenge
                               </span>
                             )}
+                            {isFounderChallenge(challenge) && (
+                              <span className="inline-block px-2 py-1 bg-gradient-to-r from-purple-600/30 to-pink-600/30 text-purple-300 border border-purple-400/50 rounded text-xs mt-1 font-bold neocore-body animate-pulse-subtle">
+                                🏆 Founder Challenge - Free Entry!
+                              </span>
+                            )}
                           </div>
                           {challenge.status === "active" && (
                             <div className="flex items-center gap-2">
@@ -1507,8 +1379,12 @@ const ArenaHome: React.FC = () => {
                         
                         <div className="relative z-10 grid grid-cols-3 gap-4 mb-4">
                           <div className="text-center">
-                            <div className="text-white font-bold text-lg drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">{challenge.entryFee} USDFG</div>
-                            <div className="text-amber-200 text-xs">Entry Fee</div>
+                            <div className={`font-bold text-lg drop-shadow-[0_0_10px_rgba(255,215,130,0.3)] ${
+                              isFounderChallenge(challenge) ? 'text-green-400' : 'text-white'
+                            }`}>
+                              {isFounderChallenge(challenge) ? 'FREE' : `${challenge.entryFee} USDFG`}
+                            </div>
+                            <div className={`text-xs ${isFounderChallenge(challenge) ? 'text-green-300' : 'text-amber-200'}`}>Entry Fee</div>
                           </div>
                           <div className="text-center">
                             <div className="text-white font-bold text-lg drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">{challenge.prizePool} USDFG</div>
@@ -3365,7 +3241,7 @@ const JoinChallengeModal: React.FC<{
   };
 
   const handleJoin = async () => {
-    if (!isConnected || !publicKey || !signTransaction) {
+    if (!isConnected || !publicKey) {
       setError('Please connect your wallet first');
       setState('error');
       return;
@@ -3381,20 +3257,41 @@ const JoinChallengeModal: React.FC<{
 
       console.log("🚀 Joining challenge:", challenge.id);
       
-      // Step 1: Join on-chain (Solana transaction)
-      // Use the PDA from the challenge data, not the Firestore ID
-      const challengePDA = challenge.rawData?.pda || challenge.pda;
-      if (!challengePDA) {
-        throw new Error('Challenge has no on-chain PDA. Cannot join this challenge.');
+      // Check if this is a Founder Challenge (admin-created with 0 entry fee)
+      const { ADMIN_WALLET } = await import('@/lib/chain/config');
+      const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
+      const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
+      const isAdmin = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+      const isFree = entryFee === 0 || entryFee < 0.000000001;
+      const isFounderChallenge = isAdmin && isFree;
+      
+      if (isFounderChallenge) {
+        console.log("🏆 Founder Challenge detected - skipping on-chain transaction");
+        // Just add player to challenge in Firestore
+        // USDFG transfer tracking happens separately when actual token transfer occurs
+        // (via recordFounderChallengeReward function called after token transfer)
+        await joinChallenge(challenge.id, walletAddress, true);
+      } else {
+        // Regular challenge - require on-chain transaction
+        if (!signTransaction) {
+          throw new Error('Wallet does not support transaction signing');
+        }
+        
+        // Step 1: Join on-chain (Solana transaction)
+        // Use the PDA from the challenge data, not the Firestore ID
+        const challengePDA = challenge.rawData?.pda || challenge.pda;
+        if (!challengePDA) {
+          throw new Error('Challenge has no on-chain PDA. Cannot join this challenge.');
+        }
+        
+        await joinChallengeOnChain(challengePDA, challenge.entryFee, walletAddress, {
+          signTransaction: signTransaction,
+          publicKey: publicKey
+        });
+        
+        // Step 2: Update Firestore
+        await joinChallenge(challenge.id, walletAddress);
       }
-      
-      await joinChallengeOnChain(challengePDA, challenge.entryFee, walletAddress, {
-        signTransaction: signTransaction,
-        publicKey: publicKey
-      });
-      
-      // Step 2: Update Firestore
-      await joinChallenge(challenge.id, walletAddress);
       
       console.log("✅ Successfully joined challenge!");
       setState('success');
@@ -3451,7 +3348,25 @@ const JoinChallengeModal: React.FC<{
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-400">Entry Fee:</span>
-                <span className="text-white font-medium">{challenge.entryFee} USDFG</span>
+                <span className={`font-medium ${
+                  (() => {
+                    const { ADMIN_WALLET } = require('@/lib/chain/config');
+                    const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
+                    const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
+                    const isAdmin = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+                    const isFree = entryFee === 0 || entryFee < 0.000000001;
+                    return isAdmin && isFree;
+                  })() ? 'text-green-400' : 'text-white'
+                }`}>
+                  {(() => {
+                    const { ADMIN_WALLET } = require('@/lib/chain/config');
+                    const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
+                    const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
+                    const isAdmin = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+                    const isFree = entryFee === 0 || entryFee < 0.000000001;
+                    return isAdmin && isFree ? 'FREE' : `${challenge.entryFee} USDFG`;
+                  })()}
+                </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-400">Prize Pool:</span>
@@ -3486,7 +3401,17 @@ const JoinChallengeModal: React.FC<{
             </div>
             
             <p className="text-xs text-gray-400">
-              You will need to approve a transaction in your wallet. Make sure you have enough USDFG and SOL for fees.
+              {(() => {
+                const { ADMIN_WALLET } = require('@/lib/chain/config');
+                const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
+                const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
+                const isAdmin = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+                const isFree = entryFee === 0 || entryFee < 0.000000001;
+                const isFounderChallenge = isAdmin && isFree;
+                return isFounderChallenge 
+                  ? '🏆 Founder Challenge - Free entry! No transaction needed.' 
+                  : 'You will need to approve a transaction in your wallet. Make sure you have enough USDFG and SOL for fees.';
+              })()}
             </p>
 
             <div className="flex items-center justify-between pt-4">

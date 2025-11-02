@@ -47,6 +47,14 @@ service cloud.firestore {
       allow update: if true; // Allow updates when users claim (system updates)
       allow delete: if false; // Don't allow deletion (archive instead)
     }
+    
+    // Founder Challenge Rewards - tracks actual USDFG transferred to players
+    match /founder_rewards/{rewardId} {
+      allow read: if true; // Anyone can view rewards
+      allow create: if true; // Allow creation (admin/system records actual transfers)
+      allow update: if false; // Don't allow updates (immutable record)
+      allow delete: if false; // Don't allow deletion (keep permanent record)
+    }
   }
 }
 
