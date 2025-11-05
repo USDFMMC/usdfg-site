@@ -2784,7 +2784,18 @@ const ArenaHome: React.FC = () => {
         >
           <CreateChallengeForm
             isConnected={isConnected}
-            onConnect={() => connect()}
+            onConnect={async () => {
+              // Select and connect Phantom wallet
+              const phantomWallet = wallet.wallets.find(w => w.adapter.name === 'Phantom');
+              if (phantomWallet) {
+                wallet.select(phantomWallet.adapter.name);
+                try {
+                  await phantomWallet.adapter.connect();
+                } catch (error) {
+                  console.error('Connection error:', error);
+                }
+              }
+            }}
             onCreateChallenge={handleCreateChallenge}
             usdfgPrice={usdfgPrice}
             usdfgToUsd={usdfgToUsd}
@@ -2801,7 +2812,18 @@ const ArenaHome: React.FC = () => {
             challenge={selectedChallenge}
             onClose={() => setShowJoinModal(false)}
             isConnected={isConnected}
-            onConnect={() => connect()}
+            onConnect={async () => {
+              // Select and connect Phantom wallet
+              const phantomWallet = wallet.wallets.find(w => w.adapter.name === 'Phantom');
+              if (phantomWallet) {
+                wallet.select(phantomWallet.adapter.name);
+                try {
+                  await phantomWallet.adapter.connect();
+                } catch (error) {
+                  console.error('Connection error:', error);
+                }
+              }
+            }}
             onBalanceRefresh={refreshUSDFGBalance}
           />
         )}

@@ -4,7 +4,7 @@ import { ADMIN_WALLET } from '@/lib/chain/config';
 
 interface CreateChallengeFormProps {
   isConnected: boolean;
-  onConnect: () => void;
+  onConnect: () => Promise<void> | void;
   onCreateChallenge: (data: any) => void;
   usdfgPrice: number;
   usdfgToUsd: (amount: number) => number;
@@ -266,12 +266,15 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     }
   };
 
-  const handleConnect = () => {
+  const handleConnect = async () => {
     setConnecting(true);
-    setTimeout(() => {
-      onConnect();
+    try {
+      await onConnect();
+    } catch (error) {
+      console.error('Connection error:', error);
+    } finally {
       setConnecting(false);
-    }, 1000);
+    }
   };
 
   return (
