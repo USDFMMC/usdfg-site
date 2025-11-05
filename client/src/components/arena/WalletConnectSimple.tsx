@@ -360,9 +360,6 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     console.log('   connected:', connected);
     console.log('   connecting:', connecting);
     
-    // Show alert to confirm click is working
-    alert('Button clicked! Check console for details.');
-    
     // If already connected, don't do anything
     if (connected) {
       console.log('✅ Already connected');
@@ -375,93 +372,64 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       return;
     }
     
-    // Always try to connect if we detect Phantom OR if we're on mobile
-    // This is more aggressive - will try even if detection isn't perfect
-    if (isPhantomInjectedAtClick || isMobileDevice) {
+    // For iOS Phantom app or mobile - try to connect directly
+    // Be very aggressive - try to connect if we're on mobile OR if Phantom might be available
+    if (isPhantomInjectedAtClick || isMobileDevice || wallets.length > 0) {
       try {
-        // Check if Phantom is injected (in-app browser)
-        if (isPhantomInjectedAtClick) {
-          // Phantom is injected (in-app browser) - connect directly
-          console.log('👻 Phantom in-app browser detected - connecting directly...');
-          console.log('   Available wallets:', wallets.map(w => w.adapter.name));
-          
-          // Try to find Phantom wallet
-          let phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
-          
-          // If not found, wait a bit for wallets to load (up to 2 seconds)
-          if (!phantomWallet && wallets.length === 0) {
-            console.log('   Waiting for wallets to load...');
-            for (let i = 0; i < 4; i++) {
-              await new Promise(resolve => setTimeout(resolve, 500));
-              phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
-              if (phantomWallet) break;
+        // Try to find Phantom wallet - check multiple times if needed
+        let phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
+        
+        // If not found, wait for wallets to load (iOS Phantom app can be slow)
+        if (!phantomWallet) {
+          console.log('⏳ Waiting for wallets to load...');
+          for (let i = 0; i < 6; i++) { // Wait up to 3 seconds
+            await new Promise(resolve => setTimeout(resolve, 500));
+            phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
+            if (phantomWallet) {
+              console.log('✅ Found Phantom wallet after wait');
+              break;
             }
           }
-          
-          if (phantomWallet) {
-            try {
-              console.log('   Selecting Phantom wallet...');
-              select(phantomWallet.adapter.name);
-              console.log('   Connecting to Phantom...');
-              await phantomWallet.adapter.connect();
-              console.log('✅ Connected via Phantom in-app browser');
-              if (onConnect) {
-                await onConnect();
-              }
-            } catch (error: any) {
-              console.error('❌ Connection error:', error);
-              console.error('   Error details:', error?.message, error?.code);
-              // Try connecting again after a short delay
-              setTimeout(async () => {
-                try {
-                  console.log('🔄 Retrying connection...');
-                  await phantomWallet.adapter.connect();
-                  if (onConnect) {
-                    await onConnect();
-                  }
-                } catch (retryError) {
-                  console.error('❌ Retry connection error:', retryError);
-                  alert('Failed to connect wallet. Please try again.');
-                }
-              }, 1000);
-              return;
+        }
+        
+        if (phantomWallet) {
+          try {
+            console.log('🔗 Connecting to Phantom...');
+            select(phantomWallet.adapter.name);
+            await phantomWallet.adapter.connect();
+            console.log('✅ Connected successfully!');
+            if (onConnect) {
+              await onConnect();
             }
-          } else {
-            console.error('❌ Phantom wallet not found in wallets list');
-            console.error('   Wallets available:', wallets.map(w => w.adapter.name));
-            alert('Phantom wallet not detected. Please make sure Phantom is installed and open.');
+          } catch (error: any) {
+            console.error('❌ Connection error:', error);
+            // Try one more time after a delay
+            setTimeout(async () => {
+              try {
+                console.log('🔄 Retrying connection...');
+                await phantomWallet.adapter.connect();
+                if (onConnect) {
+                  await onConnect();
+                }
+              } catch (retryError) {
+                console.error('❌ Retry failed:', retryError);
+                alert('Failed to connect. Please try again or restart the app.');
+              }
+            }, 1500);
           }
         } else {
-          // Not in Phantom in-app browser - try wallet adapter first, then redirect
-          console.log('📱 Regular mobile browser - trying wallet adapter...');
-          const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
-          
-          if (phantomWallet) {
-            try {
-              select(phantomWallet.adapter.name);
-              await phantomWallet.adapter.connect();
-              console.log('✅ Connected via wallet adapter');
-              if (onConnect) {
-                await onConnect();
-              }
-              return; // Success - no redirect needed
-            } catch (error) {
-              console.log('⚠️ Wallet adapter connection failed, redirecting to Phantom app:', error);
-            }
-          }
-          
-          // If wallet adapter doesn't work, redirect to Phantom browser
-          console.log('🔄 Redirecting to Phantom app...');
-          const currentUrl = window.location.href;
-          window.location.href = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}`;
+          // No Phantom wallet found - show helpful message
+          console.error('❌ Phantom wallet not found');
+          console.error('   Available wallets:', wallets.map(w => w.adapter.name));
+          alert('Phantom wallet not detected. Make sure you\'re using the Phantom app browser.');
         }
       } catch (error) {
-        console.error('❌ Unexpected error in handleMobileConnect:', error);
-        alert('Error connecting wallet. Please try again.');
+        console.error('❌ Unexpected error:', error);
+        alert('Error connecting. Please try again.');
       }
     } else {
-      console.log('⚠️ Not mobile and Phantom not detected - cannot connect');
-      alert('Please open this site in Phantom browser or use a mobile device.');
+      // Not mobile and no Phantom detected
+      alert('Please open this site in the Phantom app browser.');
     }
   };
   
