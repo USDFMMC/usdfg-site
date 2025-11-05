@@ -400,9 +400,40 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
             console.log('🔗 Connecting to Phantom...');
             select(phantomWallet.adapter.name);
             await phantomWallet.adapter.connect();
-            console.log('✅ Connected successfully!');
+            console.log('✅ Connect() call completed');
+            
+            // Wait for wallet adapter state to update (iOS can be slow)
+            let attempts = 0;
+            const maxAttempts = 20; // Wait up to 2 seconds
+            while (attempts < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+              // Check if connection succeeded by checking the adapter's state
+              const isActuallyConnected = phantomWallet.adapter.connected || phantomWallet.adapter.publicKey !== null;
+              if (isActuallyConnected || (connected && publicKey)) {
+                console.log('✅ Wallet adapter state updated!');
+                break;
+              }
+              attempts++;
+              console.log(`   Waiting for state update... (${attempts}/${maxAttempts})`);
+            }
+            
+            // Force a re-check of connection state
+            console.log('🔍 Final connection state check...');
+            console.log('   adapter.connected:', phantomWallet.adapter.connected);
+            console.log('   adapter.publicKey:', phantomWallet.adapter.publicKey?.toString());
+            console.log('   hook.connected:', connected);
+            console.log('   hook.publicKey:', publicKey?.toString());
+            
             if (onConnect) {
-              await onConnect();
+              onConnect();
+            }
+            
+            // If still not connected after waiting, show a message
+            if (!connected && !phantomWallet.adapter.connected) {
+              console.error('⚠️ Connection completed but state not updated');
+              alert('Connection successful but state not updating. Please refresh the page.');
+            } else {
+              console.log('✅ Connection successful and state updated!');
             }
           } catch (error: any) {
             console.error('❌ Connection error:', error);
