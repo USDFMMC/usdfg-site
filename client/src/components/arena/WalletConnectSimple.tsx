@@ -315,6 +315,16 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     );
   }
 
+  // Check if we're on mobile (for render logic)
+  const isMobile = typeof window !== 'undefined' && /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
+  // Check if Phantom is already injected (in-app browser) - for render logic
+  const isPhantomInjected = typeof window !== 'undefined' && (
+    (window as any).phantom?.solana?.isPhantom ||
+    (window as any).solana?.isPhantom ||
+    (window as any).solflare?.isSolflare
+  );
+  
   // Custom click handler for mobile - handles both Phantom in-app browser and regular mobile browser
   const handleMobileConnect = async (e?: React.MouseEvent) => {
     if (e) {
@@ -329,7 +339,8 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       'ontouchstart' in window // Check for touch support
     );
     
-    const isPhantomInjected = typeof window !== 'undefined' && (
+    // Re-check Phantom injection at click time (more reliable)
+    const isPhantomInjectedAtClick = typeof window !== 'undefined' && (
       (window as any).phantom?.solana?.isPhantom ||
       (window as any).solana?.isPhantom ||
       (window as any).solflare?.isSolflare ||
@@ -340,7 +351,8 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     console.log('   User Agent:', navigator.userAgent);
     console.log('   Screen width:', typeof window !== 'undefined' ? window.innerWidth : 'N/A');
     console.log('   isMobileDevice:', isMobileDevice);
-    console.log('   isPhantomInjected:', isPhantomInjected);
+    console.log('   isPhantomInjected (render):', isPhantomInjected);
+    console.log('   isPhantomInjected (click):', isPhantomInjectedAtClick);
     console.log('   window.solana exists:', typeof (window as any).solana !== 'undefined');
     console.log('   window.phantom exists:', typeof (window as any).phantom !== 'undefined');
     console.log('   wallets count:', wallets.length);
@@ -365,10 +377,10 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     
     // Always try to connect if we detect Phantom OR if we're on mobile
     // This is more aggressive - will try even if detection isn't perfect
-    if (isPhantomInjected || isMobileDevice) {
+    if (isPhantomInjectedAtClick || isMobileDevice) {
       try {
         // Check if Phantom is injected (in-app browser)
-        if (isPhantomInjected) {
+        if (isPhantomInjectedAtClick) {
           // Phantom is injected (in-app browser) - connect directly
           console.log('👻 Phantom in-app browser detected - connecting directly...');
           console.log('   Available wallets:', wallets.map(w => w.adapter.name));
