@@ -24,7 +24,7 @@ const CTASection: React.FC = () => {
             </p>
           </section>
           <p className="text-center text-base md:text-lg text-white font-semibold mt-8">
-            Ready to <span className="text-purple-400">Game</span>, <span className="text-blue-400">Earn</span>, and <span className="text-purple-400">Conquer</span>?
+            Ready to enter the arena?
           </p>
           <Link to="/app" className="flex justify-center">
             <button className="mt-4 px-5 py-2.5 text-sm md:text-base font-semibold bg-gradient-to-r from-amber-400/90 to-orange-500/90 text-black rounded-full shadow-[0_0_12px_rgba(255,215,130,0.15)] transition-all duration-200 hover:scale-105 hover:shadow-[0_0_15px_rgba(255,215,130,0.2)] focus:outline-none focus:ring-2 focus:ring-amber-400/50 border border-amber-400/30">

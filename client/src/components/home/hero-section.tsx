@@ -46,8 +46,7 @@ USDFG
 
             <p className="text-sm md:text-base mb-4 max-w-xl" style={{ color: "var(--text-light)" }}>
               USDFG wasn't built for everyone.<br />
-              It was built for the ones who don't blink.<br />
-              Compete. Earn. Walk away with the token — if you can.
+              It was built for the ones who don't blink.
             </p>
 
             <div className="flex flex-col sm:flex-row justify-center lg:justify-start gap-2">

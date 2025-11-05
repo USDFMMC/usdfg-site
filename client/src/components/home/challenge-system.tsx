@@ -130,7 +130,7 @@ const ChallengeSystem: React.FC = () => {
             Create a Challenge. Prove it.
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto text-sm md:text-base">
-            Real challenges. Real outcomes. Every result is based on skill — not chance.
+            Real challenges. Real outcomes. Verified by players, enforced by smart contracts.
           </p>
         </div>
 
@@ -175,7 +175,7 @@ const ChallengeSystem: React.FC = () => {
                 transition={{ duration: 0.5, delay: 0.1 }}
                 className="text-sm md:text-base text-cyan-300 mb-4 text-center font-medium"
               >
-                This system protects fairness by locking funds and verifying skill-based outcomes.
+                This system protects fairness by locking funds and verifying outcomes through player consensus.
               </motion.p>
 
               <motion.ul

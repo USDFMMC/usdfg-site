@@ -206,6 +206,11 @@ const commonCountries: Country[] = [
   { code: "MH", name: "Marshall Islands", flag: "🇲🇭" },
 ];
 
+// Sort countries alphabetically by name (A to Z)
+const sortedCountries = [...commonCountries].sort((a, b) => 
+  a.name.localeCompare(b.name)
+);
+
 export default function CountryFlagPicker({
   selectedCountry,
   onCountrySelect,
@@ -219,10 +224,10 @@ export default function CountryFlagPicker({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const selectedCountryObj = commonCountries.find(c => c.code === selectedCountry);
+  const selectedCountryObj = sortedCountries.find(c => c.code === selectedCountry);
 
-  // Filter countries based on search query
-  const filteredCountries = commonCountries.filter(country =>
+  // Filter countries based on search query (already sorted alphabetically)
+  const filteredCountries = sortedCountries.filter(country =>
     country.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     country.code.toLowerCase().includes(searchQuery.toLowerCase())
   );

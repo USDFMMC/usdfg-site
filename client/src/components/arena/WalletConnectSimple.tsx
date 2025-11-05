@@ -24,9 +24,16 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const [balance, setBalance] = useState<number | null>(null);
   const [usdfgBalance, setUsdfgBalance] = useState<number | null>(null);
 
-  // Auto-connect Phantom if in mobile browser
+  // Auto-connect Phantom if in mobile browser (only if user hasn't explicitly disconnected)
   useEffect(() => {
     const isPhantomInjected = typeof window !== 'undefined' && (window as any).phantom?.solana?.isPhantom;
+    const userDisconnected = localStorage.getItem('wallet_disconnected') === 'true';
+    
+    // Don't auto-connect if user explicitly disconnected
+    if (userDisconnected) {
+      console.log('🚫 User has disconnected - skipping auto-connect');
+      return;
+    }
     
     if (isPhantomInjected && !connected && !connecting) {
       console.log('👻 Phantom detected in mobile browser - auto-connecting...');
@@ -43,32 +50,66 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   // Handle connection state changes
   useEffect(() => {
     if (connected && publicKey) {
+      // Clear disconnect flag when user successfully connects
+      // This allows auto-connect to work again on refresh
+      localStorage.removeItem('wallet_disconnected');
       onConnect();
       
-      // Fetch SOL balance
-      connection.getBalance(publicKey)
-        .then(balanceLamports => {
+      // Fetch SOL balance (non-blocking, fail gracefully)
+      const fetchSOLBalance = async (): Promise<void> => {
+        try {
+          const balanceLamports = await Promise.race([
+            connection.getBalance(publicKey, 'confirmed'),
+            new Promise<never>((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout')), 5000) // 5s timeout
+            )
+          ]);
           const balance = balanceLamports / LAMPORTS_PER_SOL;
           setBalance(balance);
-        })
-        .catch(err => {
-          console.error("❌ SOL balance fetch failed:", err);
+        } catch (err: any) {
+          // Silently fail - don't show errors or retry
+          // Just set to null and let UI show "Loading..." or nothing
           setBalance(null);
-        });
+        }
+      };
       
+      // Fetch balance in background (don't block UI)
+      fetchSOLBalance().catch(() => {
+        // Silently handle any uncaught errors
+        setBalance(null);
+      });
 
-        getAssociatedTokenAddress(USDFG_MINT, publicKey)
-        .then(tokenAccount => {
-          return connection.getTokenAccountBalance(tokenAccount);
-        })
-        .then(tokenBalance => {
+      // Fetch USDFG balance (non-blocking, fail gracefully)
+      const fetchUSDFGBalance = async (): Promise<void> => {
+        try {
+          const tokenAccount = await getAssociatedTokenAddress(USDFG_MINT, publicKey);
+          const tokenBalance = await Promise.race([
+            connection.getTokenAccountBalance(tokenAccount, 'confirmed'),
+            new Promise<never>((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout')), 5000) // 5s timeout
+            )
+          ]);
           const usdfg = tokenBalance.value.uiAmount || 0;
           setUsdfgBalance(usdfg);
-        })
-        .catch(err => {
-          console.error("❌ USDFG balance fetch failed:", err);
-          setUsdfgBalance(0); // Default to 0 if no token account exists yet
-        });
+        } catch (err: any) {
+          // If token account doesn't exist, that's fine - just set to 0
+          if (err.message?.includes('Invalid param: could not find account') || 
+              err.message?.includes('could not find account')) {
+            setUsdfgBalance(0);
+            return;
+          }
+          
+          // Silently fail - don't show errors or retry
+          // Just set to 0 and let UI show "0" or nothing
+          setUsdfgBalance(0);
+        }
+      };
+      
+      // Fetch balance in background (don't block UI)
+      fetchUSDFGBalance().catch(() => {
+        // Silently handle any uncaught errors
+        setUsdfgBalance(0);
+      });
     } else if (!connected) {
       setBalance(null);
       setUsdfgBalance(null);
@@ -87,14 +128,78 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
               {usdfgBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDFG
             </div>
           )}
-          <button
-            onClick={() => disconnect()}
-            className="px-2 py-1.5 bg-green-500/20 text-green-400 border border-green-500/30 rounded-md text-xs font-medium hover:bg-green-500/30 transition-colors flex items-center gap-1"
-          >
-            <span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
-            <span className="hidden sm:inline">{publicKey.toString().slice(0, 4)}...</span>
-            <span className="sm:hidden">Connected</span>
-          </button>
+        <button
+          onClick={async () => {
+            try {
+              console.log('🔌 Disconnect button clicked (compact mode)');
+              
+              // Call disconnect from wallet adapter FIRST
+              if (disconnect) {
+                try {
+                  await disconnect();
+                  console.log('✅ Wallet adapter disconnect called');
+                } catch (disconnectError) {
+                  console.error('⚠️ Disconnect error:', disconnectError);
+                }
+              }
+              
+              // Clear wallet adapter keys AFTER disconnect
+              if (typeof window !== 'undefined') {
+                const allKeys = Object.keys(localStorage);
+                const keysToClear = allKeys.filter(k => {
+                  // Explicitly exclude our disconnect flag
+                  if (k === 'wallet_disconnected') return false;
+                  
+                  // Only clear wallet adapter specific keys
+                  return (
+                    k.startsWith('walletName') || 
+                    k.includes('@solana/wallet-adapter') || 
+                    k.includes('wallet-adapter-react')
+                  );
+                });
+                console.log('🗑️ Clearing localStorage keys:', keysToClear);
+                
+                keysToClear.forEach(key => {
+                  localStorage.removeItem(key);
+                });
+              }
+              
+              // Set disconnect flag AFTER everything (so it persists)
+              localStorage.setItem('wallet_disconnected', 'true');
+              console.log('✅ Disconnect flag set:', localStorage.getItem('wallet_disconnected'));
+              
+              // Dispatch custom event to notify wallet provider
+              window.dispatchEvent(new Event('walletDisconnected'));
+              
+              // Small delay to ensure everything is saved, then reload
+              setTimeout(() => {
+                // Set flag again RIGHT BEFORE reload to ensure it persists
+                localStorage.setItem('wallet_disconnected', 'true');
+                const finalCheck = localStorage.getItem('wallet_disconnected');
+                console.log('🔍 Final disconnect flag check:', finalCheck);
+                console.log('🔄 Reloading page...');
+                if (finalCheck !== 'true') {
+                  console.error('❌ CRITICAL: Disconnect flag is not set! Setting again...');
+                  localStorage.setItem('wallet_disconnected', 'true');
+                }
+                window.location.reload();
+              }, 200);
+            } catch (error) {
+              console.error('❌ Disconnect error:', error);
+              // Force disconnect by setting flag and reloading
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('wallet_disconnected', 'true');
+                window.dispatchEvent(new Event('walletDisconnected'));
+                window.location.reload();
+              }
+            }
+          }}
+          className="px-2 py-1.5 bg-green-500/20 text-green-400 border border-green-500/30 rounded-md text-xs font-medium hover:bg-green-500/30 transition-colors flex items-center gap-1"
+        >
+          <span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
+          <span className="hidden sm:inline">{publicKey.toString().slice(0, 4)}...</span>
+          <span className="sm:hidden">Connected</span>
+        </button>
         </div>
       );
     }
@@ -120,7 +225,76 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
           🟢 Connected
         </span>
-        <WalletDisconnectButton className="px-3 py-1 border border-gray-600 text-white rounded hover:bg-gray-800 transition-colors" />
+        <button
+          onClick={async () => {
+            try {
+              console.log('🔌 Disconnect button clicked (full mode)');
+              
+              // Call disconnect from wallet adapter FIRST
+              if (disconnect) {
+                try {
+                  await disconnect();
+                  console.log('✅ Wallet adapter disconnect called');
+                } catch (disconnectError) {
+                  console.error('⚠️ Disconnect error:', disconnectError);
+                }
+              }
+              
+              // Clear wallet adapter keys AFTER disconnect
+              if (typeof window !== 'undefined') {
+                const allKeys = Object.keys(localStorage);
+                const keysToClear = allKeys.filter(k => {
+                  // Explicitly exclude our disconnect flag
+                  if (k === 'wallet_disconnected') return false;
+                  
+                  // Only clear wallet adapter specific keys
+                  return (
+                    k.startsWith('walletName') || 
+                    k.includes('@solana/wallet-adapter') || 
+                    k.includes('wallet-adapter-react')
+                  );
+                });
+                console.log('🗑️ Clearing localStorage keys:', keysToClear);
+                
+                keysToClear.forEach(key => {
+                  localStorage.removeItem(key);
+                });
+              }
+              
+              // Set disconnect flag AFTER everything (so it persists)
+              localStorage.setItem('wallet_disconnected', 'true');
+              console.log('✅ Disconnect flag set:', localStorage.getItem('wallet_disconnected'));
+              
+              // Dispatch custom event to notify wallet provider
+              window.dispatchEvent(new Event('walletDisconnected'));
+              
+              // Small delay to ensure everything is saved, then reload
+              setTimeout(() => {
+                // Set flag again RIGHT BEFORE reload to ensure it persists
+                localStorage.setItem('wallet_disconnected', 'true');
+                const finalCheck = localStorage.getItem('wallet_disconnected');
+                console.log('🔍 Final disconnect flag check:', finalCheck);
+                console.log('🔄 Reloading page...');
+                if (finalCheck !== 'true') {
+                  console.error('❌ CRITICAL: Disconnect flag is not set! Setting again...');
+                  localStorage.setItem('wallet_disconnected', 'true');
+                }
+                window.location.reload();
+              }, 200);
+            } catch (error) {
+              console.error('❌ Disconnect error:', error);
+              // Force disconnect by setting flag and reloading
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('wallet_disconnected', 'true');
+                window.dispatchEvent(new Event('walletDisconnected'));
+                window.location.reload();
+              }
+            }
+          }}
+          className="px-3 py-1 border border-gray-600 text-white rounded hover:bg-gray-800 transition-colors"
+        >
+          Disconnect
+        </button>
       </div>
     );
   }
@@ -154,13 +328,24 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
             Connect Wallet
           </button>
         ) : (
-          <div className="wallet-adapter-button-trigger-wrapper">
-            <WalletMultiButton 
-              className="!px-2.5 !py-1.5 !bg-amber-600/20 !text-amber-300 !border !border-amber-500/30 !rounded-md !text-xs !font-medium hover:!bg-amber-600/30 !transition-colors !min-w-0"
-            >
-              Connect Wallet
-            </WalletMultiButton>
-          </div>
+          <button
+            onClick={async () => {
+              // Directly connect to Phantom without modal
+              const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
+              if (phantomWallet) {
+                select(phantomWallet.adapter.name);
+                // The wallet adapter will automatically connect after selection
+                try {
+                  await phantomWallet.adapter.connect();
+                } catch (error) {
+                  console.error('Connection error:', error);
+                }
+              }
+            }}
+            className="px-2.5 py-1.5 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-md text-xs font-medium hover:bg-amber-600/30 transition-colors"
+          >
+            Connect Wallet
+          </button>
         )
       ) : (
         <>
@@ -179,9 +364,25 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
             </button>
           ) : (
             <>
-              <WalletMultiButton className="px-3 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50 border border-amber-400/50 shadow-lg shadow-amber-500/20 text-sm">
-                Connect Wallet
-              </WalletMultiButton>
+              <button
+                onClick={async () => {
+                  // Directly connect to Phantom without modal
+                  const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
+                  if (phantomWallet) {
+                    select(phantomWallet.adapter.name);
+                    // The wallet adapter will automatically connect after selection
+                    try {
+                      await phantomWallet.adapter.connect();
+                    } catch (error) {
+                      console.error('Connection error:', error);
+                    }
+                  }
+                }}
+                disabled={connecting}
+                className="px-3 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50 border border-amber-400/50 shadow-lg shadow-amber-500/20 text-sm"
+              >
+                {connecting ? 'Connecting...' : 'Connect Wallet'}
+              </button>
               
               {connecting && (
                 <div className="text-sm text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded p-2">

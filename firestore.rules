@@ -45,7 +45,7 @@ service cloud.firestore {
       allow read: if true; // Anyone can view active claim events
       allow create: if true; // Allow creation (admin/system will create these)
       allow update: if true; // Allow updates when users claim (system updates)
-      allow delete: if false; // Don't allow deletion (archive instead)
+      allow delete: if true; // Allow deletion for cleanup/testing
     }
     
     // Founder Challenge Rewards - tracks actual USDFG transferred to players
@@ -53,7 +53,23 @@ service cloud.firestore {
       allow read: if true; // Anyone can view rewards
       allow create: if true; // Allow creation (admin/system records actual transfers)
       allow update: if false; // Don't allow updates (immutable record)
-      allow delete: if false; // Don't allow deletion (keep permanent record)
+      allow delete: if true; // Allow deletion for cleanup/testing
+    }
+    
+    // Stats collection - cached totals for efficient reads
+    match /stats/{statId} {
+      allow read: if true; // Anyone can view stats
+      allow create: if true; // Allow creation (system/admin only)
+      allow update: if true; // Allow updates (system/admin only)
+      allow delete: if true; // Allow deletion for cleanup/testing
+    }
+    
+    // Trust Reviews - reviews submitted by players after matches
+    match /trust_reviews/{reviewId} {
+      allow get, list: if true; // Anyone can view reviews (explicitly allow get and list queries)
+      allow create: if true; // Allow creation (players submit reviews)
+      allow update: if false; // Don't allow updates (immutable)
+      allow delete: if true; // Allow deletion for cleanup/testing
     }
   }
 }

@@ -1,7 +1,7 @@
 # Quick Start: Deploy New Smart Contract
 
 ## Problem
-The frontend needs to point to the correct deployed smart contract. Use `COPY_THIS_TO_PLAYGROUND.rs` as the source for deployment.
+The frontend needs to point to the correct deployed smart contract. Use the contract in `programs/usdfg_smart_contract/src/lib.rs` as the source for deployment.
 
 ## Solution
 Deploy the new smart contract and update your frontend. Everything is ready to go!

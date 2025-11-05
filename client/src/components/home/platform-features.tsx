@@ -11,22 +11,22 @@ const PlatformFeatures: React.FC = () => {
     {
       title: "Fuel Your Wallet with USDFG",
       icon: "🪙",
-      description: "Buy, earn, or claim USDFG directly into your wallet. Use tokens to access skill-based challenges — not for speculation or staking."
+      description: "Buy, earn, or claim USDFG directly into your wallet. Use tokens to access challenges — not for speculation or staking."
     },
     {
       title: "Create Skill Challenges",
       icon: "🎮",
-      description: "Choose your game. Set the rules. Launch skill-based challenges directly from your wallet — no middlemen, no chance elements."
+      description: "Choose your game. Set the rules. Launch challenges directly from your wallet — no middlemen."
     },
     {
       title: "Earn Verified Results",
       icon: "🏆",
-      description: "USDFG is unlocked through proof of performance — not by chance, not by hype."
+      description: "USDFG is unlocked through verified results — not by chance, not by hype."
     },
     {
       title: "Track Wallet Stats",
       icon: "📊",
-      description: "See your performance in real time — verified wins, challenge history, and skill progression, all tied to your wallet, not an account."
+      description: "See your performance in real time — verified wins, challenge history, and progression, all tied to your wallet, not an account."
     }
   ];
 
@@ -36,7 +36,7 @@ const PlatformFeatures: React.FC = () => {
         USDFG – The Bitcoin of Gaming
       </h2>
       <p className="text-center text-sm md:text-base text-muted-foreground mb-6 animate-fade-in" style={{ textShadow: 'var(--neon-glow)' }}>
-        A decentralized arena where skill is the only currency.
+        A decentralized arena for competitive gaming.
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 max-w-7xl mx-auto">
         {features.map((feature, idx) => (

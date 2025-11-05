@@ -1,1 +1,4 @@
 temp-contract/
+dist/
+*.log
+.DS_Store

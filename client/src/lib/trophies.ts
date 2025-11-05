@@ -9,8 +9,9 @@ export interface Trophy {
   color: string;
   icon: string;
   specialCondition?: {
-    type: 'totalUsers';
-    maxUsers: number; // Unlock only if total users < this number
+    type: 'totalUsers' | 'founderChallenge';
+    maxUsers?: number; // Unlock only if total users < this number (for totalUsers type)
+    requires?: string; // Special requirement (for founderChallenge type)
   };
 }
 
@@ -83,6 +84,18 @@ export const USDFG_RELICS: Trophy[] = [
     requiredGames: 120,
     color: 'yellow',
     icon: '/assets/trophies/usdfg-immortal.png'
+  },
+  {
+    id: 'founder-challenge',
+    name: '🏆 FOUNDER CHALLENGE',
+    description: 'You participated in a Founder Challenge. Earned free USDFG through skill-based competition.',
+    requiredGames: 0, // Not games-based - special trophy
+    color: 'purple',
+    icon: '/assets/trophies/usdfg-founder-challenge.png',
+    specialCondition: {
+      type: 'founderChallenge',
+      requires: 'participation' // Unlocked by participating in Founder Challenges
+    }
   }
 ];
 
@@ -171,6 +184,20 @@ export async function checkPlayerHasOgFirst1k(wallet: string): Promise<boolean> 
 }
 
 /**
+ * Check if player has Founder Challenge trophy from their stats
+ */
+export async function checkPlayerHasFounderChallenge(wallet: string): Promise<boolean> {
+  try {
+    const { getPlayerStats } = await import('./firebase/firestore');
+    const playerStats = await getPlayerStats(wallet);
+    return playerStats?.founderChallenge === true;
+  } catch (error) {
+    console.error('❌ Error checking Founder Challenge trophy:', error);
+    return false;
+  }
+}
+
+/**
  * Get all unlocked trophies for a player (including special trophies)
  */
 export async function getUnlockedTrophiesAdvanced(
@@ -189,6 +216,12 @@ export async function getUnlockedTrophiesAdvanced(
       if (trophy.id === 'og-1k') {
         // Check if player has it stored in their stats
         const hasTrophy = await checkPlayerHasOgFirst1k(wallet);
+        if (hasTrophy) {
+          unlocked.push(trophy);
+        }
+      } else if (trophy.id === 'founder-challenge') {
+        // Check if player has participated in Founder Challenge
+        const hasTrophy = await checkPlayerHasFounderChallenge(wallet);
         if (hasTrophy) {
           unlocked.push(trophy);
         }

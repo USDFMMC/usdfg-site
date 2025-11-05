@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ElegantButton from '@/components/ui/ElegantButton';
 import { ADMIN_WALLET } from '@/lib/chain/config';
 
@@ -28,9 +28,19 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     entryFee: 50,
     mode: 'Head-to-Head',
     customMode: '',
+    customGame: '', // Custom game name when "Custom" is selected
+    customPlatform: '', // Custom platform name when "Other/Custom" is selected
     rules: '',
     customRules: false
   });
+
+  // Update username when userGamerTag changes (e.g., when wallet switches)
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      username: userGamerTag || ''
+    }));
+  }, [userGamerTag]);
 
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 3;
@@ -50,7 +60,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
   const availableGames = [...Object.values(gameCategories).flat(), "Custom"];
 
   // Platform options
-  const platforms = ['PS5', 'Xbox', 'PC', 'Switch', 'Other/Custom'];
+  const platforms = ['PS5', 'Xbox', 'PC', 'Switch', 'Mobile', 'Other/Custom'];
 
   // Challenge modes by category
   const challengeModes = {
@@ -169,7 +179,13 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     
     if (step === 1) {
       if (!formData.game) errors.push('Please select a game');
+      if (formData.game === 'Custom' && !formData.customGame?.trim()) {
+        errors.push('Please enter a custom game name');
+      }
       if (!formData.platform) errors.push('Please select a platform');
+      if (formData.platform === 'Other/Custom' && !formData.customPlatform?.trim()) {
+        errors.push('Please enter a custom platform name');
+      }
       if (!formData.username.trim()) errors.push('Username is required');
     }
     
@@ -215,15 +231,35 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     setCurrentStep(prev => Math.max(prev - 1, 1));
   };
 
+  // Helper function to get game category
+  const getGameCategory = (game: string) => {
+    if (!game) return 'Sports';
+    
+    const lowerGame = game.toLowerCase();
+    if (lowerGame.includes('street fighter') || lowerGame.includes('tekken') || lowerGame.includes('mortal kombat') || lowerGame.includes('guilty gear') || lowerGame.includes('fighting')) return 'Fighting';
+    if (lowerGame.includes('forza') || lowerGame.includes('gran turismo') || lowerGame.includes('f1') || lowerGame.includes('mario kart') || lowerGame.includes('racing')) return 'Racing';
+    if (lowerGame.includes('call of duty') || lowerGame.includes('cod') || lowerGame.includes('valorant') || lowerGame.includes('shooting')) return 'Shooting';
+    if (lowerGame.includes('nba') || lowerGame.includes('fifa') || lowerGame.includes('madden') || lowerGame.includes('sports') || lowerGame.includes('ufc')) return 'Sports';
+    
+    return 'Sports'; // Default fallback
+  };
+
   const handleSubmit = () => {
     if (validateStep(currentStep)) {
+      // Use custom game name if "Custom" is selected, otherwise use the selected game
+      const gameName = formData.game === 'Custom' ? formData.customGame : formData.game;
+      // Use custom platform name if "Other/Custom" is selected, otherwise use the selected platform
+      const platformName = formData.platform === 'Other/Custom' ? formData.customPlatform : formData.platform;
+      
       const challengeData = {
         ...formData,
+        game: gameName, // Use custom game name or selected game
+        platform: platformName, // Use custom platform name or selected platform
         maxPlayers: formData.mode.includes('2v2') ? 2 : formData.mode.includes('3v3') ? 3 : formData.mode.includes('5v5') ? 5 : 2,
-        prizePool: formData.entryFee * 2, // 2x entry fee as prize pool
-        category: formData.game,
-        creatorTag: formData.username,
-        platform: formData.platform
+        // Don't set prizePool here - it will be calculated in handleCreateChallenge
+        // prizePool: formData.entryFee * 2, // REMOVED - calculated in handleCreateChallenge with platform fee
+        category: getGameCategory(gameName), // Get category from game name
+        creatorTag: formData.username
       };
       
       onCreateChallenge(challengeData);
@@ -270,7 +306,13 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
               {availableGames.map((game) => (
                 <button
                   key={game}
-                  onClick={() => handleInputChange('game', game)}
+                  onClick={() => {
+                    handleInputChange('game', game);
+                    // Clear custom game name if not selecting Custom
+                    if (game !== 'Custom') {
+                      handleInputChange('customGame', '');
+                    }
+                  }}
                   className={`px-3 py-2 rounded-lg border transition-all duration-300 text-sm ${
                     formData.game === game
                       ? 'border-amber-400/50 bg-amber-300/10 text-amber-300 shadow-[0_0_10px_rgba(255,215,130,0.15)]'
@@ -281,19 +323,55 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                 </button>
               ))}
             </div>
+            
+            {/* Custom Game Name Input - Show only when Custom is selected */}
+            {formData.game === 'Custom' && (
+              <div className="mb-3">
+                <label className="block text-xs font-medium text-gray-300 mb-1.5">Custom Game Name</label>
+                <input
+                  type="text"
+                  value={formData.customGame}
+                  onChange={(e) => handleInputChange('customGame', e.target.value)}
+                  placeholder="Enter your custom game name"
+                  className="w-full px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white placeholder-zinc-500 hover:border-amber-300/30 focus:border-amber-400/50 focus:outline-none transition-all"
+                />
+                <p className="text-xs text-zinc-500 mt-1">Please enter the name of your custom game</p>
+              </div>
+            )}
           </div>
 
           <div>
             <label className="block text-xs font-medium text-gray-300 mb-1.5">Platform</label>
             <select
               value={formData.platform}
-              onChange={(e) => handleInputChange('platform', e.target.value)}
+              onChange={(e) => {
+                handleInputChange('platform', e.target.value);
+                // Clear custom platform name if not selecting Other/Custom
+                if (e.target.value !== 'Other/Custom') {
+                  handleInputChange('customPlatform', '');
+                }
+              }}
               className="w-full px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white hover:border-amber-300/30 focus:border-amber-400/50 focus:outline-none transition-all"
             >
               {platforms.map(platform => (
                 <option key={platform} value={platform}>{platform}</option>
               ))}
             </select>
+            
+            {/* Custom Platform Name Input - Show only when Other/Custom is selected */}
+            {formData.platform === 'Other/Custom' && (
+              <div className="mt-3">
+                <label className="block text-xs font-medium text-gray-300 mb-1.5">Custom Platform Name</label>
+                <input
+                  type="text"
+                  value={formData.customPlatform}
+                  onChange={(e) => handleInputChange('customPlatform', e.target.value)}
+                  placeholder="Enter your custom platform name"
+                  className="w-full px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white placeholder-zinc-500 hover:border-amber-300/30 focus:border-amber-400/50 focus:outline-none transition-all"
+                />
+                <p className="text-xs text-zinc-500 mt-1">Please enter the name of your custom platform</p>
+              </div>
+            )}
           </div>
 
           <div>

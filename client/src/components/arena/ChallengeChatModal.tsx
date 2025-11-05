@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { ChatBox } from "./ChatBox";
 import { VoiceChat } from "./VoiceChat";
-import { X, Minimize2, Maximize2 } from "lucide-react";
+import { X, Minimize2, Maximize2, LogOut } from "lucide-react";
 
 interface ChallengeChatModalProps {
   isOpen: boolean;
@@ -79,6 +79,17 @@ export const ChallengeChatModal: React.FC<ChallengeChatModalProps> = ({
             {challengeId && challengeId.trim() !== '' && (
               <ChatBox challengeId={challengeId} currentWallet={currentWallet} />
             )}
+          </div>
+
+          {/* Leave Chat Button - Desktop visible */}
+          <div className="border-t border-amber-400/20 bg-[#07080C]/95 p-3">
+            <button
+              onClick={onClose}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-600/20 to-red-700/20 hover:from-red-600/30 hover:to-red-700/30 text-red-300 border border-red-500/40 hover:border-red-500/60 rounded-lg transition-all font-medium text-sm shadow-[0_0_10px_rgba(239,68,68,0.15)] hover:shadow-[0_0_15px_rgba(239,68,68,0.25)]"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Leave Chat</span>
+            </button>
           </div>
         </div>
       )}

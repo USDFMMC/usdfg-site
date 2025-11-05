@@ -3,7 +3,8 @@ import { motion } from "framer-motion";
 import { Trophy, Gamepad2, Swords, Flame, Shield, Crown, X, Edit3 } from "lucide-react";
 import ProfileImageUpload from "../ui/ProfileImageUpload";
 import CountryFlagPicker from "../ui/CountryFlagPicker";
-import { USDFG_RELICS, getUnlockedTrophies, getNextTrophy, getTrophyProgress, getTrophyColorClass, checkPlayerHasOgFirst1k } from "@/lib/trophies";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "../ui/tooltip";
+import { USDFG_RELICS, getUnlockedTrophies, getNextTrophy, getTrophyProgress, getTrophyColorClass, checkPlayerHasOgFirst1k, checkPlayerHasFounderChallenge } from "@/lib/trophies";
 
 // Countries list for flag display - matches CountryFlagPicker
 const countries = [
@@ -241,9 +242,7 @@ export default function PlayerProfileModal({
   const [selectedTrophyForPopup, setSelectedTrophyForPopup] = useState<any>(null);
   const [specialTrophiesUnlocked, setSpecialTrophiesUnlocked] = useState<Set<string>>(new Set());
   
-  // Stable mock values that don't change on re-render
-  const [mockStreak] = useState(() => Math.floor(Math.random() * 10) + 1);
-  const [mockIntegrity] = useState(() => (9.0 + Math.random()).toFixed(1));
+  // No mock data - use real data from Firestore
 
   // Check special trophies when modal opens
   useEffect(() => {
@@ -255,6 +254,11 @@ export default function PlayerProfileModal({
           const hasOgFirst1k = await checkPlayerHasOgFirst1k(player.wallet);
           if (hasOgFirst1k) {
             unlocked.add('og-1k');
+          }
+          // Check Founder Challenge trophy from player stats
+          const hasFounderChallenge = await checkPlayerHasFounderChallenge(player.wallet);
+          if (hasFounderChallenge) {
+            unlocked.add('founder-challenge');
           }
         }
         setSpecialTrophiesUnlocked(unlocked);
@@ -312,11 +316,11 @@ export default function PlayerProfileModal({
     }
   };
 
-        // Calculate additional stats
+        // Calculate additional stats from real data
         const totalGames = (player.wins || 0) + (player.losses || 0);
-        const streak = mockStreak; // Stable mock streak
-        const integrity = mockIntegrity; // Stable mock integrity rating
-        const favoriteGame = "Valorant"; // Mock favorite game
+        const streak = 0; // TODO: Track actual win streak in Firestore
+        const integrity = typeof player.trustScore === 'number' ? player.trustScore : 0; // Use real trust score from Firestore (0 if no data)
+        const favoriteGame = null; // TODO: Calculate from gameStats
         const rank = player.rank || 1;
         const rankTitle = rank === 1 ? "Mythic Prime" : rank <= 3 ? "Diamond Elite" : rank <= 10 ? "Platinum Pro" : "Gold Warrior";
 
@@ -438,41 +442,56 @@ export default function PlayerProfileModal({
         </div>
 
         {/* Stats Section */}
-        <div className="relative z-10 mt-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 px-6">
-          {[{
-            icon: Trophy,
-            label: "Wins",
-            value: player.wins || 0
-          }, {
-            icon: Swords,
-            label: "Losses",
-            value: player.losses || 0
-          }, {
-            icon: Flame,
-            label: "Streak",
-            value: `${streak} Wins`
-          }, {
-            icon: Shield,
-            label: "Integrity Rating",
-            value: `${integrity} / 10`
-          }, {
-            icon: Gamepad2,
-            label: "Fav Game",
-            value: favoriteGame
-          }, {
-            icon: Crown,
-            label: "Win Rate",
-            value: `${player.winRate || 0}%`
-          }].map((s, i) => (
-            <div key={i} className="border border-zinc-800/50 bg-[#0B0C12]/90 hover:border-amber-300/30 transition rounded-lg overflow-hidden text-center shadow-[0_0_15px_rgba(255,215,130,0.02)]">
-              <div className="p-3 flex flex-col items-center gap-1.5">
-                {React.createElement(s.icon, { className: "h-4 w-4 text-amber-300" })}
-                <div className="text-[10px] text-zinc-400">{s.label}</div>
-                <div className="text-sm font-semibold text-zinc-50 tracking-tight">{s.value}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <TooltipProvider>
+          <div className="relative z-10 mt-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 px-6">
+            {[{
+              icon: Trophy,
+              label: "Wins",
+              value: player.wins || 0,
+              tooltip: "Total number of challenges won. Earned by defeating opponents in competitive matches."
+            }, {
+              icon: Swords,
+              label: "Losses",
+              value: player.losses || 0,
+              tooltip: "Total number of challenges lost. Every match is a learning opportunity to improve your skills."
+            }, {
+              icon: Flame,
+              label: "Streak",
+              value: streak > 0 ? `${streak} Wins` : '0 Wins',
+              tooltip: "Current consecutive win streak. Build momentum by winning multiple matches in a row."
+            }, {
+              icon: Shield,
+              label: "Integrity Rating",
+              value: integrity > 0 ? `${integrity.toFixed(1)} / 10` : '0 / 10',
+              tooltip: "Trust score based on reviews from opponents. Rated 0-10 based on honesty, fairness, and sportsmanship. Higher ratings show you're a reliable and respected player."
+            }, {
+              icon: Gamepad2,
+              label: "Fav Game",
+              value: favoriteGame,
+              tooltip: "Your most played game category. Shows where you've competed the most in the Arena."
+            }, {
+              icon: Crown,
+              label: "Win Rate",
+              value: `${player.winRate || 0}%`,
+              tooltip: "Percentage of matches won. Calculated as (Wins / Total Matches) × 100. Higher win rates show consistent competitive performance."
+            }].map((s, i) => (
+              <Tooltip key={i}>
+                <TooltipTrigger asChild>
+                  <div className="border border-zinc-800/50 bg-[#0B0C12]/90 hover:border-amber-300/30 transition rounded-lg overflow-hidden text-center shadow-[0_0_15px_rgba(255,215,130,0.02)] cursor-help">
+                    <div className="p-3 flex flex-col items-center gap-1.5">
+                      {React.createElement(s.icon, { className: "h-4 w-4 text-amber-300" })}
+                      <div className="text-[10px] text-zinc-400">{s.label}</div>
+                      <div className="text-sm font-semibold text-zinc-50 tracking-tight">{s.value}</div>
+                    </div>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs bg-[#0B0C12] border border-amber-400/30 text-amber-100 text-xs px-3 py-2 shadow-lg">
+                  <p>{s.tooltip}</p>
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
+        </TooltipProvider>
 
         {/* Trophy Showcase */}
         <div className="relative z-10 mt-6 px-6">
@@ -524,14 +543,16 @@ export default function PlayerProfileModal({
           <div className="grid grid-cols-3 gap-2">
             {USDFG_RELICS.map((trophy) => {
               const gamesPlayed = (player.wins || 0) + (player.losses || 0);
-              // Check if unlocked: games-based OR special condition
+              // Check if unlocked by the viewed player: games-based OR special condition
               const isGamesUnlocked = gamesPlayed >= trophy.requiredGames;
               const isSpecialUnlocked = trophy.specialCondition && specialTrophiesUnlocked.has(trophy.id);
-              // Special trophies show for all users if they have it, not just current user
               const isUnlocked = isGamesUnlocked || isSpecialUnlocked;
-              // OG First 2.1K trophy is always visible (not hidden like others)
-              const isOgTrophy = trophy.id === 'og-1k';
-              const isVisible = isUnlocked || isOgTrophy; // Always show OG trophy
+              
+              // Showcase concept: When viewing another player's profile, show trophies they've unlocked
+              // This creates inspiration - you can see what they've achieved
+              // When viewing your own profile, only show unlocked trophies
+              const isVisible = isUnlocked || trophy.id === 'og-1k'; // Show if unlocked by the viewed player (or OG trophy)
+              
               const progress = trophy.specialCondition ? (isSpecialUnlocked ? 100 : 0) : getTrophyProgress(gamesPlayed, trophy);
               
               return (
@@ -566,14 +587,16 @@ export default function PlayerProfileModal({
                   <div 
                     className={`p-2 rounded-lg border transition-all hover:scale-105 cursor-pointer ${
                       isVisible 
-                        ? 'border-zinc-700/50 hover:border-amber-400/30 bg-zinc-900/30 hover:bg-zinc-900/50' 
+                        ? isUnlocked
+                          ? 'border-zinc-700/50 hover:border-amber-400/30 bg-zinc-900/30 hover:bg-zinc-900/50'
+                          : 'border-zinc-700/30 hover:border-amber-400/20 bg-zinc-900/20 hover:bg-zinc-900/30' // Lighter when not unlocked but visible (showcase)
                         : 'border-zinc-800/50 opacity-50'
                     } ${
                       isCurrentUser && selectedTrophies.includes(trophy.id) 
                         ? 'ring-1 ring-amber-400/50' 
                         : ''
                     } ${
-                      isOgTrophy && !isUnlocked 
+                      trophy.id === 'og-1k' && !isUnlocked 
                         ? 'border-amber-500/30 bg-amber-900/10' 
                         : ''
                     }`}
@@ -587,7 +610,7 @@ export default function PlayerProfileModal({
                           isVisible 
                             ? isUnlocked 
                               ? 'opacity-100 group-hover:brightness-110' 
-                              : 'opacity-80 grayscale' // OG trophy visible but grayscale if not unlocked
+                              : 'opacity-70 grayscale hover:opacity-80' // Visible but grayscale when not unlocked (showcase concept)
                             : 'opacity-40 grayscale'
                         }`}
                         loading="lazy"
@@ -619,8 +642,8 @@ export default function PlayerProfileModal({
                       }`}>
                         {trophy.name}
                       </div>
-                      {/* Show description for OG trophy */}
-                      {isOgTrophy && !isUnlocked && (
+                      {/* Show description for OG trophy when not unlocked */}
+                      {trophy.id === 'og-1k' && !isUnlocked && (
                         <div className="text-[9px] text-amber-400/70 mt-0.5 line-clamp-2">
                           {trophy.description}
                         </div>
@@ -655,77 +678,129 @@ export default function PlayerProfileModal({
       </motion.div>
 
       {/* Trophy Popup Modal */}
-      {selectedTrophyForPopup && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setSelectedTrophyForPopup(null)}
-        >
+      {selectedTrophyForPopup && (() => {
+        const gamesPlayed = (player.wins || 0) + (player.losses || 0);
+        const isGamesUnlocked = gamesPlayed >= selectedTrophyForPopup.requiredGames;
+        const isSpecialUnlocked = selectedTrophyForPopup.specialCondition && specialTrophiesUnlocked.has(selectedTrophyForPopup.id);
+        const isUnlocked = isGamesUnlocked || isSpecialUnlocked;
+        const progress = selectedTrophyForPopup.specialCondition ? (isSpecialUnlocked ? 100 : 0) : getTrophyProgress(gamesPlayed, selectedTrophyForPopup);
+        
+        return (
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className="bg-[#07080C]/95 border border-amber-500/30 rounded-xl p-3 max-w-sm w-full shadow-2xl shadow-amber-500/20"
-            onClick={(e) => e.stopPropagation()}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setSelectedTrophyForPopup(null)}
           >
-            <div className="text-center space-y-3">
-              <div className="relative">
-                <img
-                  src={selectedTrophyForPopup.icon}
-                  alt={selectedTrophyForPopup.name}
-                  className="w-24 h-24 mx-auto animate-bounce-slow drop-shadow-[0_0_15px_rgba(255,215,130,0.5)]"
-                  loading="lazy"
-                  decoding="async"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    console.error(`❌ Failed to load trophy image in popup: ${selectedTrophyForPopup.icon} for trophy: ${selectedTrophyForPopup.name}`);
-                    // Try alternative paths for 21k trophy
-                    if (selectedTrophyForPopup.id === 'og-1k') {
-                      if (selectedTrophyForPopup.icon.includes('/assets/trophies/')) {
-                        target.src = '/assets/categories/usdfg-21k.png';
-                        return;
-                      } else if (selectedTrophyForPopup.icon.includes('/assets/categories/')) {
-                        target.src = '/assets/trophies/usdfg-21k.png';
-                        return;
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              className="bg-[#07080C]/95 border border-amber-500/30 rounded-xl p-3 max-w-sm w-full shadow-2xl shadow-amber-500/20"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center space-y-3">
+                <div className="relative">
+                  <img
+                    src={selectedTrophyForPopup.icon}
+                    alt={selectedTrophyForPopup.name}
+                    className={`w-24 h-24 mx-auto animate-bounce-slow drop-shadow-[0_0_15px_rgba(255,215,130,0.5)] ${
+                      isUnlocked ? 'opacity-100' : 'opacity-50 grayscale'
+                    }`}
+                    loading="lazy"
+                    decoding="async"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      console.error(`❌ Failed to load trophy image in popup: ${selectedTrophyForPopup.icon} for trophy: ${selectedTrophyForPopup.name}`);
+                      // Try alternative paths for 21k trophy
+                      if (selectedTrophyForPopup.id === 'og-1k') {
+                        if (selectedTrophyForPopup.icon.includes('/assets/trophies/')) {
+                          target.src = '/assets/categories/usdfg-21k.png';
+                          return;
+                        } else if (selectedTrophyForPopup.icon.includes('/assets/categories/')) {
+                          target.src = '/assets/trophies/usdfg-21k.png';
+                          return;
+                        }
                       }
-                    }
-                    target.style.display = 'none';
-                    const fallback = document.createElement('div');
-                    fallback.textContent = '🏆';
-                    fallback.className = 'text-4xl';
-                    target.parentNode?.appendChild(fallback);
-                  }}
-                />
-                <div className="absolute inset-0 w-24 h-24 mx-auto rounded-full bg-gradient-to-r from-amber-400/20 to-yellow-300/20 animate-pulse"></div>
+                      target.style.display = 'none';
+                      const fallback = document.createElement('div');
+                      fallback.textContent = '🏆';
+                      fallback.className = 'text-4xl';
+                      target.parentNode?.appendChild(fallback);
+                    }}
+                  />
+                  <div className={`absolute inset-0 w-24 h-24 mx-auto rounded-full bg-gradient-to-r from-amber-400/20 to-yellow-300/20 ${isUnlocked ? 'animate-pulse' : ''}`}></div>
+                </div>
+                <h3 className="text-lg font-bold text-white mb-1.5">
+                  {selectedTrophyForPopup.name}
+                </h3>
+                {isUnlocked ? (
+                  <>
+                    <p className="text-amber-200 text-sm leading-relaxed">
+                      {selectedTrophyForPopup.description}
+                    </p>
+                    {selectedTrophyForPopup.specialCondition ? (
+                      <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-400/30 rounded-xl p-3">
+                        <h3 className="text-green-400 font-bold text-sm mb-1">✅ Unlocked</h3>
+                        <p className="text-green-200 text-xs">
+                          {selectedTrophyForPopup.id === 'founder-challenge' 
+                            ? 'Participated in a Founder Challenge' 
+                            : 'Special achievement unlocked'}
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-400/30 rounded-xl p-3">
+                        <h3 className="text-amber-400 font-bold text-sm mb-2">Requirement</h3>
+                        <p className="text-amber-200 font-bold text-lg">
+                          {selectedTrophyForPopup.requiredGames} games played
+                        </p>
+                        <p className="text-green-300 text-xs mt-1.5">
+                          ✅ You've completed this!
+                        </p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="text-amber-200 text-sm leading-relaxed">
+                      [Hidden Description - Unlock to reveal]
+                    </p>
+                    {selectedTrophyForPopup.specialCondition ? (
+                      <div className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-400/30 rounded-xl p-3">
+                        <h3 className="text-amber-400 font-bold text-sm mb-2">Mystery Requirement</h3>
+                        <p className="text-amber-200 font-bold text-lg">
+                          ??? special condition
+                        </p>
+                        <p className="text-amber-300 text-xs mt-1.5 italic">
+                          Keep playing to discover the secret!
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-400/30 rounded-xl p-3">
+                        <h3 className="text-amber-400 font-bold text-sm mb-2">Mystery Requirement</h3>
+                        <p className="text-amber-200 font-bold text-lg">
+                          ??? games played
+                        </p>
+                        <p className="text-amber-300 text-xs mt-1.5 italic">
+                          Keep playing to discover the secret!
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+                <button
+                  onClick={() => setSelectedTrophyForPopup(null)}
+                  className="px-3 py-1.5 bg-amber-500/20 border border-amber-400/40 rounded-lg text-amber-300 hover:text-amber-200 hover:border-amber-300/60 transition-all text-xs font-medium"
+                >
+                  Close
+                </button>
               </div>
-              <h3 className="text-lg font-bold text-white mb-1.5">
-                {selectedTrophyForPopup.name}
-              </h3>
-              <p className="text-amber-200 text-sm leading-relaxed">
-                [Hidden Description - Unlock to reveal]
-              </p>
-              <div className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-400/30 rounded-xl p-3">
-                <h3 className="text-amber-400 font-bold text-sm mb-2">Mystery Requirement</h3>
-                <p className="text-amber-200 font-bold text-lg">
-                  ??? games played
-                </p>
-                <p className="text-amber-300 text-xs mt-1.5 italic">
-                  Keep playing to discover the secret!
-                </p>
-              </div>
-              <button
-                onClick={() => setSelectedTrophyForPopup(null)}
-                className="px-3 py-1.5 bg-amber-500/20 border border-amber-400/40 rounded-lg text-amber-300 hover:text-amber-200 hover:border-amber-300/60 transition-all text-xs font-medium"
-              >
-                Close
-              </button>
-            </div>
+            </motion.div>
           </motion.div>
-        </motion.div>
-      )}
+        );
+      })()}
     </motion.div>
   );
 }

@@ -15,18 +15,10 @@ const AboutSection: React.FC = () => {
                 <strong>No gambling. No randomness. Only verified performance.</strong>
               </p>
               <p className="text-sm md:text-base text-center mb-4">
-                Every challenge is <span className="text-amber-400 font-medium">merit-based</span>, and every reward is <span className="text-amber-400 font-medium">earned</span>.<br/>
-                USDFG exists to reward skill—not speculation.
-              </p>
-              <p className="text-sm md:text-base text-center mb-4">
                 This isn't a passive asset. It's a <strong>competitive layer for digital performance</strong>, tied to strategy, execution, and outcome.
               </p>
               <p className="text-sm md:text-base text-center mb-4">
-                <strong>Fixed supply.</strong> No inflation. No hidden mechanics. Just a clean contract and a clear goal: <span className="text-amber-400 font-medium">reward performance</span>.
-              </p>
-              <p className="text-sm md:text-base text-center mt-4 font-bold">
-                USDFG is for players who win on skill—nothing else.<br/>
-                If that's you, step forward. The next challenge awaits.
+                <strong>Fixed supply.</strong> No inflation. No hidden mechanics. Just a clean contract and a clear goal.
               </p>
             </div>
           </div>

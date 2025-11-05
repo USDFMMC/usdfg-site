@@ -63,7 +63,12 @@ export interface ChallengeData {
   payoutTimestamp?: Timestamp;        // When prize was claimed
   pda?: string;                       // Challenge PDA for smart contract
   prizePool?: number;                 // Total prize pool amount
-  // REMOVED: game, rules, platform, mode, category, creatorTag, solanaAccountId, cancelRequests
+  // UI display fields
+  title?: string;                     // Challenge title (contains game info)
+  game?: string;                      // Game name for display
+  category?: string;                  // Game category for filtering
+  platform?: string;                  // Platform (PS5, PC, Xbox, etc.) for display
+  // REMOVED: rules, mode, creatorTag, solanaAccountId, cancelRequests
   // These are not needed for leaderboard and increase storage costs unnecessarily
 }
 
@@ -295,6 +300,36 @@ export const joinChallenge = async (challengeId: string, wallet: string, isFound
 
     await updateDoc(challengeRef, updates);
 
+    // If this is a Founder Challenge, mark player as having participated
+    if (isFounderChallenge) {
+      const playerRef = doc(db, 'player_stats', wallet);
+      const playerSnap = await getDoc(playerRef);
+      
+      if (playerSnap.exists()) {
+        // Update existing stats to mark Founder Challenge participation
+        await updateDoc(playerRef, {
+          founderChallenge: true,
+          lastActive: serverTimestamp(),
+        });
+      } else {
+        // Create new player stats with Founder Challenge flag
+        await setDoc(playerRef, {
+          wallet,
+          wins: 0,
+          losses: 0,
+          winRate: 0,
+          totalEarned: 0,
+          gamesPlayed: 0,
+          lastActive: serverTimestamp(),
+          trustScore: 0,
+          trustReviews: 0,
+          founderChallenge: true, // Mark Founder Challenge participation
+          gameStats: {},
+          categoryStats: {},
+        });
+      }
+    }
+
     // Note: For Founder Challenges, USDFG transfer tracking happens separately
     // when the actual token transfer occurs (via recordFounderChallengeReward)
     // We don't track calculated amounts here - only actual transfers
@@ -331,6 +366,24 @@ export async function recordFounderChallengeReward(
       txSignature: txSignature || null, // Optional: Solana transaction signature
       timestamp: Timestamp.now(),
     });
+    
+    // Update cached total stats (increment by amount)
+    const statsRef = doc(db, 'stats', 'total_rewarded');
+    const statsSnap = await getDoc(statsRef);
+    
+    if (statsSnap.exists()) {
+      const currentData = statsSnap.data();
+      await updateDoc(statsRef, {
+        total: (currentData.total || 0) + amount,
+        lastUpdated: Timestamp.now(),
+      });
+    } else {
+      // Create stats document if it doesn't exist
+      await setDoc(statsRef, {
+        total: amount,
+        lastUpdated: Timestamp.now(),
+      });
+    }
 
     // Update player stats (totalEarned) with actual amount
     const playerRef = doc(db, 'player_stats', wallet);
@@ -358,6 +411,15 @@ export async function recordFounderChallengeReward(
         categoryStats: {},
       });
     }
+
+    // Update challenge to mark prize as transferred and set actual prize pool
+    const challengeRef = doc(db, 'challenges', challengeId);
+    await updateDoc(challengeRef, {
+      payoutTriggered: true,
+      prizePool: amount, // Update with actual amount transferred
+      payoutTimestamp: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    });
 
     console.log(`✅ Recorded Founder Challenge reward: ${wallet.slice(0,8)}... received ${amount} USDFG from challenge ${challengeId}${txSignature ? ` (tx: ${txSignature.slice(0,8)}...)` : ''}`);
   } catch (error) {
@@ -495,6 +557,36 @@ export const submitChallengeResult = async (
     });
 
     console.log('✅ Result submitted:', { challengeId, wallet, didWin });
+
+    // NEW: If player submitted "I lost", automatically mark opponent as winner
+    if (!didWin && data.players && data.players.length === 2) {
+      const opponentWallet = data.players.find((p: string) => p !== wallet);
+      
+      if (opponentWallet && !results[opponentWallet]) {
+        // Opponent hasn't submitted yet - automatically mark them as winner
+        console.log(`🎯 Player ${wallet.slice(0, 8)}... submitted loss - automatically marking ${opponentWallet.slice(0, 8)}... as winner`);
+        
+        // Add automatic win result for opponent
+        results[opponentWallet] = {
+          didWin: true,
+          submittedAt: Timestamp.now(),
+          autoDetermined: true // Flag to indicate this was auto-determined
+        };
+        
+        await updateDoc(challengeRef, {
+          results,
+          updatedAt: Timestamp.now(),
+        });
+        
+        console.log('✅ Auto-marked opponent as winner');
+        
+        // Now both players have "submitted" (one manually, one auto), determine winner
+        const updatedSnap = await getDoc(challengeRef);
+        const updatedData = updatedSnap.data() as ChallengeData;
+        await determineWinner(challengeId, updatedData);
+        return; // Exit early since we've already determined winner
+      }
+    }
 
     // Check if both players have submitted
     if (Object.keys(results).length === data.maxPlayers) {
@@ -654,7 +746,19 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     // Delete chat messages - clear winner, no dispute resolution needed
     await cleanupChallengeData(challengeId, false); // false = not dispute
     console.log('📊 Updating player stats...');
-    console.log('   Game:', data.game, 'Category:', data.category, 'Prize:', data.prizePool);
+    
+    // Calculate prize pool if not stored (for backward compatibility with old challenges)
+    let prizePool = data.prizePool;
+    if (!prizePool || prizePool === 0) {
+      // Calculate from entry fee: 2x entry fee minus 5% platform fee
+      const entryFee = data.entryFee || 0;
+      const totalPrize = entryFee * 2;
+      const platformFee = totalPrize * 0.05; // 5% platform fee
+      prizePool = totalPrize - platformFee;
+      console.log(`⚠️ Prize pool not found in challenge data, calculated from entry fee: ${entryFee} USDFG → ${prizePool} USDFG`);
+    }
+    
+    console.log('   Game:', data.game, 'Category:', data.category, 'Prize:', prizePool);
     
     // Get display names from challenge data and sanitize
     const rawWinnerName = winner === data.creator ? data.creatorTag : undefined;
@@ -665,7 +769,7 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     
     // Update player stats
     console.log('   Updating winner stats:', winner, 'as', winnerDisplayName || 'Anonymous');
-    await updatePlayerStats(winner, 'win', data.prizePool, data.game, data.category, winnerDisplayName);
+    await updatePlayerStats(winner, 'win', prizePool, data.game, data.category, winnerDisplayName);
     console.log('   Updating loser stats:', loser, 'as', loserDisplayName || 'Anonymous');
     await updatePlayerStats(loser, 'loss', 0, data.game, data.category, loserDisplayName);
     
@@ -678,7 +782,7 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
       updatedAt: Timestamp.now(),
     });
     
-    console.log('💰 Prize pool ready for claim:', data.prizePool, 'USDFG to', winner);
+    console.log('💰 Prize pool ready for claim:', prizePool, 'USDFG to', winner);
     console.log('✅ Winner can now claim their prize (they pay gas, not you!)');
     
   } catch (error) {
@@ -988,6 +1092,7 @@ function sanitizeDisplayName(name: string | undefined): string | undefined {
 export interface PlayerStats {
   wallet: string;
   displayName?: string; // Player's chosen username (from creatorTag)
+  country?: string; // Player's country code (e.g., "US", "GB", "CA")
   wins: number;
   losses: number;
   winRate: number;
@@ -999,6 +1104,7 @@ export interface PlayerStats {
   trustReviews?: number; // Number of trust reviews received
   // Special trophies
   ogFirst1k?: boolean; // OG First 2.1K Members trophy - automatically awarded if joined before 2100 users (represents 21M token supply)
+  founderChallenge?: boolean; // Founder Challenge trophy - awarded when player participates in a Founder Challenge
   gameStats: {
     [game: string]: {
       wins: number;
@@ -1016,10 +1122,61 @@ export interface PlayerStats {
 }
 
 /**
- * Calculate trust score for a player from localStorage data
+ * Calculate trust score for a player from Firestore
  */
-function calculateTrustScore(wallet: string): { trustScore: number; trustReviews: number } {
+async function calculateTrustScore(wallet: string): Promise<{ trustScore: number; trustReviews: number }> {
   try {
+    const walletLower = wallet.toLowerCase();
+    const reviewsRef = collection(db, 'trust_reviews');
+    const q = query(
+      reviewsRef,
+      where('opponent', '==', walletLower)
+    );
+    
+    const snapshot = await getDocs(q);
+    
+    if (snapshot.empty) {
+      console.log(`   📊 No trust reviews found for ${wallet.slice(0, 8)}... (searched for: ${walletLower})`);
+      return { trustScore: 0, trustReviews: 0 };
+    }
+    
+    let totalScore = 0;
+    let reviewCount = 0;
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      const score = data.review?.trustScore10 || 0;
+      totalScore += score;
+      reviewCount++;
+      console.log(`   📊 Found review ${reviewCount}: score ${score}/10 from ${data.reviewer?.slice(0, 8)}...`);
+    });
+    
+    const averageScore = totalScore / reviewCount;
+    const trustScore = Math.round(averageScore * 10) / 10; // Round to 1 decimal
+    
+    console.log(`   ✅ Calculated trust score for ${wallet.slice(0, 8)}...: ${trustScore}/10 from ${reviewCount} reviews`);
+    
+    return {
+      trustScore,
+      trustReviews: reviewCount
+    };
+  } catch (error: any) {
+    // If it's a permission error, log it but don't fail - just return 0
+    if (error?.code === 'permission-denied' || error?.message?.includes('permissions')) {
+      console.warn(`   ⚠️ Permission denied when calculating trust score for ${wallet.slice(0, 8)}... - Firestore rules may need to be updated`);
+      console.warn(`   ⚠️ This is non-fatal - player stats will be updated without trust score`);
+    } else {
+      console.error(`❌ Error calculating trust score for ${wallet.slice(0, 8)}...:`, error);
+    }
+    return { trustScore: 0, trustReviews: 0 };
+  }
+}
+
+/**
+ * Calculate trust score from Firestore (synchronous fallback for backward compatibility)
+ */
+function calculateTrustScoreSync(wallet: string): { trustScore: number; trustReviews: number } {
+  try {
+    // Try localStorage as fallback (for backward compatibility)
     const trustReviews = JSON.parse(localStorage.getItem('trustReviews') || '[]');
     
     // Filter reviews for this specific player
@@ -1063,8 +1220,19 @@ async function updatePlayerStats(
     const playerRef = doc(db, 'player_stats', wallet);
     const playerSnap = await getDoc(playerRef);
 
-    // Calculate trust score for this player
-    const { trustScore, trustReviews } = calculateTrustScore(wallet);
+    // Calculate trust score for this player from Firestore
+    // If calculation fails due to permissions, use 0 as fallback
+    let trustScore = 0;
+    let trustReviews = 0;
+    try {
+      const result = await calculateTrustScore(wallet);
+      trustScore = result.trustScore;
+      trustReviews = result.trustReviews;
+    } catch (error) {
+      // If trust score calculation fails, continue with 0
+      // This prevents the entire stats update from failing
+      console.warn(`   ⚠️ Trust score calculation failed for ${wallet.slice(0, 8)}..., using 0 as fallback`);
+    }
 
     if (!playerSnap.exists()) {
       // Create new player stats
@@ -1179,6 +1347,308 @@ export async function getPlayerStats(wallet: string): Promise<PlayerStats | null
 }
 
 /**
+ * Update player's lastActive timestamp when they connect/view the page
+ * This ensures they show as "online" in the stats
+ */
+export async function updatePlayerLastActive(wallet: string): Promise<void> {
+  try {
+    const playerRef = doc(db, 'player_stats', wallet);
+    const playerSnap = await getDoc(playerRef);
+    
+    if (playerSnap.exists()) {
+      // Update existing player's lastActive
+      await updateDoc(playerRef, {
+        lastActive: Timestamp.now(),
+      });
+    } else {
+      // Create new player stats with current timestamp
+      await setDoc(playerRef, {
+        wallet,
+        wins: 0,
+        losses: 0,
+        winRate: 0,
+        totalEarned: 0,
+        gamesPlayed: 0,
+        lastActive: Timestamp.now(),
+        trustScore: 0,
+        trustReviews: 0,
+        gameStats: {},
+        categoryStats: {},
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error updating player lastActive:', error);
+    // Don't throw - this is a background update, shouldn't block the app
+  }
+}
+
+/**
+ * Get total USDFG rewarded from cached stats document
+ * Uses a single document to avoid querying all founder_rewards records
+ */
+export async function getTotalUSDFGRewarded(): Promise<number> {
+  try {
+    const statsRef = doc(db, 'stats', 'total_rewarded');
+    const statsSnap = await getDoc(statsRef);
+    
+    if (statsSnap.exists()) {
+      const data = statsSnap.data();
+      return data.total || 0;
+    }
+    
+    // If stats document doesn't exist yet, calculate from founder_rewards and create it
+    const rewardsCollection = collection(db, 'founder_rewards');
+    const snapshot = await getDocs(rewardsCollection);
+    
+    let total = 0;
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      total += data.amount || 0;
+    });
+    
+    // Create cached stats document for future reads
+    await setDoc(statsRef, {
+      total,
+      lastUpdated: Timestamp.now(),
+    });
+    
+    return total;
+  } catch (error) {
+    console.error('❌ Error getting total USDFG rewarded:', error);
+    return 0; // Return 0 on error
+  }
+}
+
+/**
+ * Get count of players who are currently online (active in last 10 minutes)
+ */
+export async function getPlayersOnlineCount(): Promise<number> {
+  try {
+    const tenMinutesAgo = Timestamp.fromDate(new Date(Date.now() - 10 * 60 * 1000));
+    const statsCollection = collection(db, 'player_stats');
+    const q = query(
+      statsCollection,
+      where('lastActive', '>=', tenMinutesAgo)
+    );
+    
+    const snapshot = await getDocs(q);
+    return snapshot.size;
+  } catch (error) {
+    console.error('❌ Error getting players online count:', error);
+    return 0;
+  }
+}
+
+/**
+ * Update player display name in Firestore
+ */
+/**
+ * Store a trust review in Firestore and update the reviewed player's trust score
+ */
+export async function storeTrustReview(
+  reviewer: string,
+  opponent: string,
+  challengeId: string,
+  review: {
+    honesty: number;
+    fairness: number;
+    sportsmanship: number;
+    tags: string[];
+    trustScore10: number;
+    comment?: string;
+  }
+): Promise<void> {
+  try {
+    const reviewerLower = reviewer.toLowerCase();
+    const opponentLower = opponent.toLowerCase();
+    
+    // Check if a review already exists for this reviewer + opponent + challenge combination
+    const reviewsRef = collection(db, 'trust_reviews');
+    const existingReviewQuery = query(
+      reviewsRef,
+      where('reviewer', '==', reviewerLower),
+      where('opponent', '==', opponentLower),
+      where('challengeId', '==', challengeId)
+    );
+    
+    const existingSnapshot = await getDocs(existingReviewQuery);
+    
+    if (!existingSnapshot.empty) {
+      console.warn(`⚠️ Trust review already exists for challenge ${challengeId.slice(0, 8)}... by ${reviewer.slice(0, 8)}... for ${opponent.slice(0, 8)}...`);
+      console.warn(`   Skipping duplicate review. Reviews are one per challenge.`);
+      return; // Skip duplicate review - one review per challenge
+    }
+    
+    // Clean review object - remove undefined fields (Firestore doesn't allow undefined)
+    const cleanReview: any = {
+      honesty: review.honesty,
+      fairness: review.fairness,
+      sportsmanship: review.sportsmanship,
+      tags: review.tags,
+      trustScore10: review.trustScore10
+    };
+    
+    // Only include comment if it exists and is not empty
+    if (review.comment && review.comment.trim()) {
+      cleanReview.comment = review.comment.trim();
+    }
+    
+    // Store the review in Firestore
+    await addDoc(collection(db, 'trust_reviews'), {
+      reviewer: reviewerLower,
+      opponent: opponentLower,
+      challengeId,
+      review: cleanReview,
+      timestamp: Timestamp.now()
+    });
+    
+    console.log(`✅ Trust review stored for ${opponent.slice(0, 8)}... by ${reviewer.slice(0, 8)}... (challenge: ${challengeId.slice(0, 8)}...)`);
+    
+    // Update the opponent's trust score in player_stats
+    await updatePlayerTrustScore(opponent);
+  } catch (error) {
+    console.error('❌ Error storing trust review:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update a player's trust score in Firestore based on all their reviews
+ */
+export async function updatePlayerTrustScore(wallet: string): Promise<void> {
+  try {
+    console.log(`🔄 Recalculating trust score for ${wallet.slice(0, 8)}...`);
+    const { trustScore, trustReviews } = await calculateTrustScore(wallet);
+    
+    const playerRef = doc(db, 'player_stats', wallet);
+    const playerSnap = await getDoc(playerRef);
+    
+    if (playerSnap.exists()) {
+      const currentData = playerSnap.data() as PlayerStats;
+      const currentTrustScore = currentData.trustScore || 0;
+      const currentTrustReviews = currentData.trustReviews || 0;
+      
+      // Only update if the score has changed
+      if (currentTrustScore !== trustScore || currentTrustReviews !== trustReviews) {
+        await updateDoc(playerRef, {
+          trustScore,
+          trustReviews
+        });
+        console.log(`✅ Updated trust score for ${wallet.slice(0, 8)}...: ${currentTrustScore} → ${trustScore}/10 (${currentTrustReviews} → ${trustReviews} reviews)`);
+      } else {
+        console.log(`   ℹ️ Trust score unchanged for ${wallet.slice(0, 8)}...: ${trustScore}/10 (${trustReviews} reviews)`);
+      }
+    } else {
+      // Player doesn't exist yet, create with trust score
+      await setDoc(playerRef, {
+        wallet,
+        wins: 0,
+        losses: 0,
+        winRate: 0,
+        totalEarned: 0,
+        gamesPlayed: 0,
+        lastActive: Timestamp.now(),
+        trustScore,
+        trustReviews,
+        gameStats: {},
+        categoryStats: {}
+      });
+      console.log(`✅ Created player stats with trust score for ${wallet.slice(0, 8)}...: ${trustScore}/10 (${trustReviews} reviews)`);
+    }
+  } catch (error) {
+    console.error(`❌ Error updating player trust score for ${wallet.slice(0, 8)}...:`, error);
+    throw error;
+  }
+}
+
+export async function updatePlayerDisplayName(wallet: string, displayName: string): Promise<void> {
+  try {
+    const sanitized = sanitizeDisplayName(displayName);
+    if (!sanitized) {
+      console.warn('⚠️ Display name failed sanitization:', displayName);
+      return;
+    }
+    
+    const playerRef = doc(db, 'player_stats', wallet);
+    const playerSnap = await getDoc(playerRef);
+    
+    if (playerSnap.exists()) {
+      await updateDoc(playerRef, {
+        displayName: sanitized
+      });
+      console.log(`✅ Updated display name for ${wallet}: "${sanitized}"`);
+    } else {
+      // Player doesn't exist yet, create with display name
+      await setDoc(playerRef, {
+        wallet,
+        displayName: sanitized,
+        wins: 0,
+        losses: 0,
+        winRate: 0,
+        totalEarned: 0,
+        gamesPlayed: 0,
+        lastActive: Timestamp.now(),
+        trustScore: 0,
+        trustReviews: 0,
+        gameStats: {},
+        categoryStats: {}
+      });
+      console.log(`✅ Created player stats with display name for ${wallet}: "${sanitized}"`);
+    }
+  } catch (error) {
+    console.error('❌ Error updating display name:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update player's country in Firestore
+ */
+export async function updatePlayerCountry(wallet: string, countryCode: string | null): Promise<void> {
+  try {
+    const playerRef = doc(db, 'player_stats', wallet);
+    const playerSnap = await getDoc(playerRef);
+    
+    if (playerSnap.exists()) {
+      if (countryCode) {
+        await updateDoc(playerRef, {
+          country: countryCode
+        });
+        console.log(`✅ Updated country for ${wallet}: ${countryCode}`);
+      } else {
+        // Remove country if null
+        await updateDoc(playerRef, {
+          country: null
+        });
+        console.log(`✅ Removed country for ${wallet}`);
+      }
+    } else {
+      // Player doesn't exist yet, create with country
+      if (countryCode) {
+        await setDoc(playerRef, {
+          wallet,
+          country: countryCode,
+          wins: 0,
+          losses: 0,
+          winRate: 0,
+          totalEarned: 0,
+          gamesPlayed: 0,
+          lastActive: Timestamp.now(),
+          trustScore: 0,
+          trustReviews: 0,
+          gameStats: {},
+          categoryStats: {}
+        });
+        console.log(`✅ Created player stats with country for ${wallet}: ${countryCode}`);
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error updating country:', error);
+    throw error;
+  }
+}
+
+/**
  * Get top players for leaderboard
  */
 export async function getTopPlayers(limitCount: number = 10, sortBy: 'wins' | 'winRate' | 'totalEarned' = 'totalEarned'): Promise<PlayerStats[]> {
@@ -1198,7 +1668,19 @@ export async function getTopPlayers(limitCount: number = 10, sortBy: 'wins' | 'w
     
     snapshot.forEach((doc) => {
       const data = doc.data() as PlayerStats;
-      console.log(`   Player: ${data.wallet.slice(0, 8)}... - ${data.totalEarned} USDFG - ${data.winRate}% WR`);
+      const displayName = data.displayName ? `"${data.displayName}"` : '(no display name)';
+      const trustScore = data.trustScore !== undefined ? data.trustScore : 0;
+      const trustReviews = data.trustReviews || 0;
+      console.log(`   Player: ${data.wallet.slice(0, 8)}... - Name: ${displayName} - ${data.totalEarned} USDFG - ${data.winRate}% WR - Trust: ${trustScore}/10 (${trustReviews} reviews)`);
+      
+      // Ensure trustScore is always a number (default to 0 if undefined)
+      if (data.trustScore === undefined) {
+        data.trustScore = 0;
+      }
+      if (data.trustReviews === undefined) {
+        data.trustReviews = 0;
+      }
+      
       players.push(data);
     });
     
@@ -1208,6 +1690,57 @@ export async function getTopPlayers(limitCount: number = 10, sortBy: 'wins' | 'w
     console.error('❌ Error fetching top players:', error);
     console.error('   Error details:', error);
     return [];
+  }
+}
+
+/**
+ * Check if a user has already submitted a trust review for a specific challenge
+ */
+export async function hasUserReviewedChallenge(reviewer: string, challengeId: string): Promise<boolean> {
+  try {
+    const reviewsRef = collection(db, 'trust_reviews');
+    const reviewQuery = query(
+      reviewsRef,
+      where('reviewer', '==', reviewer.toLowerCase()),
+      where('challengeId', '==', challengeId)
+    );
+    
+    const snapshot = await getDocs(reviewQuery);
+    return !snapshot.empty;
+  } catch (error) {
+    console.error('❌ Error checking if user has reviewed challenge:', error);
+    return false; // On error, assume not reviewed (allows review to be submitted)
+  }
+}
+
+/**
+ * Recalculate trust scores for all players (useful for fixing integrity stats)
+ * This will update all players' trust scores based on their reviews in Firestore
+ */
+export async function recalculateAllTrustScores(): Promise<void> {
+  try {
+    console.log('🔄 Recalculating trust scores for all players...');
+    const statsCollection = collection(db, 'player_stats');
+    const snapshot = await getDocs(statsCollection);
+    
+    let updated = 0;
+    let skipped = 0;
+    
+    for (const doc of snapshot.docs) {
+      const wallet = doc.id;
+      try {
+        await updatePlayerTrustScore(wallet);
+        updated++;
+      } catch (error) {
+        console.error(`❌ Failed to update trust score for ${wallet.slice(0, 8)}...:`, error);
+        skipped++;
+      }
+    }
+    
+    console.log(`✅ Recalculated trust scores: ${updated} updated, ${skipped} skipped`);
+  } catch (error) {
+    console.error('❌ Error recalculating all trust scores:', error);
+    throw error;
   }
 }
 
@@ -1250,6 +1783,21 @@ export async function claimChallengePrize(
     
     if (!data.winner || data.winner === 'forfeit' || data.winner === 'tie') {
       throw new Error('❌ No valid winner to pay out');
+    }
+    
+    // Check if this is a Founder Challenge (no PDA, entryFee is 0, creator is ADMIN_WALLET)
+    const entryFee = data.entryFee || 0;
+    const creatorWallet = data.creator || '';
+    const isFree = entryFee === 0 || entryFee < 0.000000001;
+    
+    // Import ADMIN_WALLET to check if creator is admin
+    const { ADMIN_WALLET } = await import('../chain/config');
+    const isAdmin = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+    const isFounderChallenge = !data.pda && (isFree || isAdmin);
+    
+    if (isFounderChallenge) {
+      // Founder Challenge prizes are transferred manually by the founder, not via smart contract
+      throw new Error('🏆 This is a Founder Challenge. Prizes are transferred manually by the founder after the challenge completes. Please contact the founder to receive your prize.');
     }
     
     // If no PDA, try to derive it from the challenge data

@@ -92,8 +92,7 @@ const GameCategories: React.FC = () => {
             Dominate in the games you know. Rise through the ones they don't expect.<br />
             USDFG supports verified competitive play across all major genres — sports, fighting, racing, and more.<br />
             If it can be played with skill, it can be challenged.<br />
-            <span className="text-amber-300 font-semibold">Custom rules. Public results. Smart contract enforcement.</span><br />
-            <span className="text-white font-bold">No odds. No bets. Just performance.</span>
+            <span className="text-amber-300 font-semibold">Custom rules. Public results. Smart contract enforcement.</span>
           </p>
         </motion.div>
 
