@@ -26,7 +26,12 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
 
   // Auto-connect Phantom if in mobile browser (only if user hasn't explicitly disconnected)
   useEffect(() => {
-    const isPhantomInjected = typeof window !== 'undefined' && (window as any).phantom?.solana?.isPhantom;
+    // Check multiple ways to detect Phantom
+    const isPhantomInjected = typeof window !== 'undefined' && (
+      (window as any).phantom?.solana?.isPhantom ||
+      (window as any).solana?.isPhantom ||
+      (window as any).solflare?.isSolflare
+    );
     const userDisconnected = localStorage.getItem('wallet_disconnected') === 'true';
     
     // Don't auto-connect if user explicitly disconnected
@@ -38,8 +43,19 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     if (isPhantomInjected && !connected && !connecting) {
       console.log('👻 Phantom detected in mobile browser - auto-connecting...');
       
-      // Find Phantom wallet
-      const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
+      // Find Phantom wallet - wait for wallets to load if needed
+      let phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
+      
+      if (!phantomWallet && wallets.length === 0) {
+        // Wait a bit for wallets to load
+        const timeoutId = setTimeout(() => {
+          phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
+          if (phantomWallet) {
+            select(phantomWallet.adapter.name);
+          }
+        }, 500);
+        return () => clearTimeout(timeoutId);
+      }
       
       if (phantomWallet) {
         select(phantomWallet.adapter.name);
@@ -303,18 +319,65 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const isMobile = typeof window !== 'undefined' && /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   
   // Check if Phantom is already injected (in-app browser)
-  const isPhantomInjected = typeof window !== 'undefined' && (window as any).phantom?.solana?.isPhantom;
+  // Check multiple ways to detect Phantom
+  const isPhantomInjected = typeof window !== 'undefined' && (
+    (window as any).phantom?.solana?.isPhantom ||
+    (window as any).solana?.isPhantom ||
+    (window as any).solflare?.isSolflare
+  );
   
-  // Custom click handler for mobile - try wallet adapter first, then redirect to Phantom browser
+  // Custom click handler for mobile - handles both Phantom in-app browser and regular mobile browser
   const handleMobileConnect = async () => {
-    if (isMobile && !isPhantomInjected) {
-      // First, try to connect via wallet adapter (in case Phantom extension is available)
+    if (!isMobile) return; // Only handle mobile
+    
+    // Check if Phantom is injected (in-app browser)
+    if (isPhantomInjected) {
+      // Phantom is injected (in-app browser) - connect directly
+      console.log('👻 Phantom in-app browser detected - connecting directly...');
+      console.log('   Available wallets:', wallets.map(w => w.adapter.name));
+      
+      // Try to find Phantom wallet
+      let phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
+      
+      // If not found, wait a bit for wallets to load
+      if (!phantomWallet && wallets.length === 0) {
+        console.log('   Waiting for wallets to load...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
+      }
+      
+      if (phantomWallet) {
+        try {
+          console.log('   Selecting Phantom wallet...');
+          select(phantomWallet.adapter.name);
+          console.log('   Connecting to Phantom...');
+          await phantomWallet.adapter.connect();
+          console.log('✅ Connected via Phantom in-app browser');
+        } catch (error) {
+          console.error('❌ Connection error:', error);
+          // Try connecting again after a short delay
+          setTimeout(async () => {
+            try {
+              await phantomWallet.adapter.connect();
+            } catch (retryError) {
+              console.error('❌ Retry connection error:', retryError);
+            }
+          }, 1000);
+        }
+      } else {
+        console.error('❌ Phantom wallet not found in wallets list');
+        console.error('   Wallets available:', wallets.map(w => w.adapter.name));
+      }
+    } else {
+      // Not in Phantom in-app browser - try wallet adapter first, then redirect
+      console.log('📱 Regular mobile browser - trying wallet adapter...');
       const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
       
       if (phantomWallet) {
         try {
           select(phantomWallet.adapter.name);
           await phantomWallet.adapter.connect();
+          console.log('✅ Connected via wallet adapter');
           return; // Success - no redirect needed
         } catch (error) {
           console.log('⚠️ Wallet adapter connection failed, redirecting to Phantom app:', error);
@@ -322,19 +385,9 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       }
       
       // If wallet adapter doesn't work, redirect to Phantom browser
+      console.log('🔄 Redirecting to Phantom app...');
       const currentUrl = window.location.href;
       window.location.href = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}`;
-    } else if (isMobile && isPhantomInjected) {
-      // Phantom is injected (in-app browser) - connect directly
-      const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
-      if (phantomWallet) {
-        try {
-          select(phantomWallet.adapter.name);
-          await phantomWallet.adapter.connect();
-        } catch (error) {
-          console.error('Connection error:', error);
-        }
-      }
     }
   };
   
@@ -376,7 +429,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       ) : (
         <>
           {/* Mobile and Desktop connection button */}
-          {isMobile && !isPhantomInjected ? (
+          {isMobile ? (
             <button
               onClick={handleMobileConnect}
               disabled={connecting}
@@ -422,7 +475,12 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           {/* Help text for mobile */}
           {isMobile && !isPhantomInjected && (
             <div className="text-xs text-gray-400 text-center mt-2">
-              Opens in Phantom browser
+              Opens in Phantom app
+            </div>
+          )}
+          {isMobile && isPhantomInjected && (
+            <div className="text-xs text-amber-400 text-center mt-2">
+              Tap to connect in Phantom browser
             </div>
           )}
         </>
