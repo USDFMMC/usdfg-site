@@ -376,60 +376,73 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     // Be very aggressive - try to connect if we're on mobile OR if Phantom might be available
     if (isPhantomInjectedAtClick || isMobileDevice || wallets.length > 0) {
       try {
+        // Show what we're working with
+        alert(`Wallets found: ${wallets.length}\nPhantom detected: ${isPhantomInjectedAtClick}\nMobile: ${isMobileDevice}`);
+        
         // Try to find Phantom wallet - check multiple times if needed
         let phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
         
         // If not found, wait for wallets to load (iOS Phantom app can be slow)
         if (!phantomWallet) {
           console.log('⏳ Waiting for wallets to load...');
-          for (let i = 0; i < 6; i++) { // Wait up to 3 seconds
+          alert('Waiting for wallets to load...');
+          
+          // Wait longer and check more frequently
+          for (let i = 0; i < 10; i++) { // Wait up to 5 seconds
             await new Promise(resolve => setTimeout(resolve, 500));
             phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
             if (phantomWallet) {
               console.log('✅ Found Phantom wallet after wait');
+              alert('Found Phantom wallet!');
               break;
             }
+            console.log(`   Check ${i + 1}/10: wallets=${wallets.length}, names=${wallets.map(w => w.adapter.name).join(', ')}`);
           }
         }
         
         if (phantomWallet) {
           try {
             console.log('🔗 Connecting to Phantom...');
+            alert('Connecting to Phantom...');
             select(phantomWallet.adapter.name);
             await phantomWallet.adapter.connect();
             console.log('✅ Connected successfully!');
+            alert('✅ Connected successfully!');
             if (onConnect) {
               await onConnect();
             }
           } catch (error: any) {
             console.error('❌ Connection error:', error);
+            alert(`Connection error: ${error?.message || error}`);
             // Try one more time after a delay
             setTimeout(async () => {
               try {
                 console.log('🔄 Retrying connection...');
+                alert('Retrying connection...');
                 await phantomWallet.adapter.connect();
                 if (onConnect) {
                   await onConnect();
                 }
-              } catch (retryError) {
+                alert('✅ Connected on retry!');
+              } catch (retryError: any) {
                 console.error('❌ Retry failed:', retryError);
-                alert('Failed to connect. Please try again or restart the app.');
+                alert(`Retry failed: ${retryError?.message || retryError}\n\nPlease try:\n1. Restart the Phantom app\n2. Reload the page\n3. Make sure you approve the connection`);
               }
-            }, 1500);
+            }, 2000);
           }
         } else {
           // No Phantom wallet found - show helpful message
           console.error('❌ Phantom wallet not found');
           console.error('   Available wallets:', wallets.map(w => w.adapter.name));
-          alert('Phantom wallet not detected. Make sure you\'re using the Phantom app browser.');
+          alert(`Phantom wallet not found.\n\nWallets available: ${wallets.length}\nWallet names: ${wallets.map(w => w.adapter.name).join(', ') || 'none'}\n\nPlease make sure:\n1. You're using the Phantom app browser\n2. Phantom is installed and open\n3. Try refreshing the page`);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('❌ Unexpected error:', error);
-        alert('Error connecting. Please try again.');
+        alert(`Unexpected error: ${error?.message || error}`);
       }
     } else {
       // Not mobile and no Phantom detected
-      alert('Please open this site in the Phantom app browser.');
+      alert('Please open this site in the Phantom app browser.\n\nDetection:\n- Mobile: ' + isMobileDevice + '\n- Phantom: ' + isPhantomInjectedAtClick + '\n- Wallets: ' + wallets.length);
     }
   };
   
