@@ -109,7 +109,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       fetchUSDFGBalance().catch(() => {
         // Silently handle any uncaught errors
         setUsdfgBalance(0);
-      });
+        });
     } else if (!connected) {
       setBalance(null);
       setUsdfgBalance(null);
@@ -305,12 +305,36 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   // Check if Phantom is already injected (in-app browser)
   const isPhantomInjected = typeof window !== 'undefined' && (window as any).phantom?.solana?.isPhantom;
   
-  // Custom click handler for mobile - redirect to Phantom browser
-  const handleMobileConnect = () => {
+  // Custom click handler for mobile - try wallet adapter first, then redirect to Phantom browser
+  const handleMobileConnect = async () => {
     if (isMobile && !isPhantomInjected) {
-      // Simple: Just redirect to Phantom browser
+      // First, try to connect via wallet adapter (in case Phantom extension is available)
+      const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
+      
+      if (phantomWallet) {
+        try {
+          select(phantomWallet.adapter.name);
+          await phantomWallet.adapter.connect();
+          return; // Success - no redirect needed
+        } catch (error) {
+          console.log('⚠️ Wallet adapter connection failed, redirecting to Phantom app:', error);
+        }
+      }
+      
+      // If wallet adapter doesn't work, redirect to Phantom browser
       const currentUrl = window.location.href;
-      window.location.href = `https://phantom.app/ul/browse/${currentUrl}`;
+      window.location.href = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}`;
+    } else if (isMobile && isPhantomInjected) {
+      // Phantom is injected (in-app browser) - connect directly
+      const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
+      if (phantomWallet) {
+        try {
+          select(phantomWallet.adapter.name);
+          await phantomWallet.adapter.connect();
+        } catch (error) {
+          console.error('Connection error:', error);
+        }
+      }
     }
   };
   
@@ -319,18 +343,19 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     <div className="flex flex-col space-y-2">
       {/* Compact mode for mobile navbar */}
       {compact ? (
-        // Custom button for mobile, standard for desktop
-        isMobile && !isPhantomInjected ? (
+        // Mobile and desktop connection button
+        isMobile ? (
           <button
             onClick={handleMobileConnect}
-            className="px-2.5 py-1.5 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-md text-xs font-medium hover:bg-amber-600/30 transition-colors"
+            disabled={connecting}
+            className="px-2.5 py-1.5 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-md text-xs font-medium hover:bg-amber-600/30 transition-colors disabled:opacity-50"
           >
-            Connect Wallet
+            {connecting ? 'Connecting...' : 'Connect Wallet'}
           </button>
         ) : (
           <button
             onClick={async () => {
-              // Directly connect to Phantom without modal
+              // Desktop: Directly connect to Phantom without modal
               const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
               if (phantomWallet) {
                 select(phantomWallet.adapter.name);
@@ -342,31 +367,33 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
                 }
               }
             }}
-            className="px-2.5 py-1.5 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-md text-xs font-medium hover:bg-amber-600/30 transition-colors"
-          >
-            Connect Wallet
+            disabled={connecting}
+            className="px-2.5 py-1.5 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-md text-xs font-medium hover:bg-amber-600/30 transition-colors disabled:opacity-50"
+            >
+            {connecting ? 'Connecting...' : 'Connect Wallet'}
           </button>
         )
       ) : (
         <>
-          {/* Mobile: Direct "Connect Wallet" button that opens Phantom */}
+          {/* Mobile and Desktop connection button */}
           {isMobile && !isPhantomInjected ? (
             <button
               onClick={handleMobileConnect}
-              className="w-full px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold rounded-lg hover:brightness-110 transition-all flex items-center justify-center space-x-2 border border-amber-400/50 shadow-[0_0_15px_rgba(255,215,130,0.2)]"
+              disabled={connecting}
+              className="w-full px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold rounded-lg hover:brightness-110 transition-all flex items-center justify-center space-x-2 border border-amber-400/50 shadow-[0_0_15px_rgba(255,215,130,0.2)] disabled:opacity-50"
               style={{ 
                 minHeight: '40px',
                 fontSize: '14px'
               }}
             >
               <span style={{ fontSize: '18px' }}>👻</span>
-              <span>Connect Wallet</span>
+              <span>{connecting ? 'Connecting...' : 'Connect Wallet'}</span>
             </button>
           ) : (
             <>
               <button
                 onClick={async () => {
-                  // Directly connect to Phantom without modal
+                  // Desktop: Directly connect to Phantom without modal
                   const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
                   if (phantomWallet) {
                     select(phantomWallet.adapter.name);

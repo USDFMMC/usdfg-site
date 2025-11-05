@@ -45,11 +45,9 @@ const AdRotationBox: React.FC = () => {
   // If your image has a different aspect ratio, there will be empty space.
   // To verify exact dimensions: Open browser DevTools → Inspect element → Check computed width/height
   const adImages = [
-    '/assets/ads/test-ad.webp', // TEST IMAGE - Crop/resize to exactly 300×95px (or 600×190px for retina)
-    // '/assets/ads/ad-1.webp', // Uncomment when ready
-    // '/assets/ads/ad-2.webp',
-    // '/assets/ads/ad-3.webp',
-    // Add more ad images as needed
+    '/assets/ads/ad-1.webp',
+    '/assets/ads/ad-2.webp',
+    '/assets/ads/ad-3.webp',
   ];
   
   const [currentAdIndex, setCurrentAdIndex] = useState(0);
@@ -580,8 +578,8 @@ const ArenaHome: React.FC = () => {
           autoWon: true
         });
         
-        setSelectedChallenge({
-          id: challenge.id,
+      setSelectedChallenge({
+        id: challenge.id,
           title: (challenge as any).title || extractGameFromTitle((challenge as any).title || '') || "Challenge",
           ...challenge
         });
@@ -1012,7 +1010,7 @@ const ArenaHome: React.FC = () => {
       // If autoWon is true, the result was already auto-determined when opponent submitted loss
       if (!pendingMatchResult.autoWon) {
         try {
-          await submitChallengeResult(challengeId, publicKey.toBase58(), pendingMatchResult.didWin);
+      await submitChallengeResult(challengeId, publicKey.toBase58(), pendingMatchResult.didWin);
           console.log('✅ Match result submitted');
         } catch (resultError: any) {
           // If result is already submitted, that's okay - we can still store the trust review
@@ -1079,7 +1077,7 @@ const ArenaHome: React.FC = () => {
       // Clear pending match result but keep challenge if needs claim
       setPendingMatchResult(null);
       if (!needsClaim) {
-        setSelectedChallenge(null);
+      setSelectedChallenge(null);
       }
       
       // Show success message
@@ -1110,7 +1108,7 @@ const ArenaHome: React.FC = () => {
           error?.message?.includes('already been processed')) {
         alert("✅ Your result was already submitted. Trust review may not have been recorded.");
       } else {
-        alert("Failed to submit result and trust review. Please try again.");
+      alert("Failed to submit result and trust review. Please try again.");
       }
     }
   };
