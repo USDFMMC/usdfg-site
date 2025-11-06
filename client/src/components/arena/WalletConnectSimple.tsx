@@ -24,7 +24,6 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const [balance, setBalance] = useState<number | null>(null);
   const [usdfgBalance, setUsdfgBalance] = useState<number | null>(null);
   const [forceUpdate, setForceUpdate] = useState(0); // Force re-render trigger
-  const [forceUpdate, setForceUpdate] = useState(0); // Force re-render trigger
 
   // Auto-connect Phantom if in mobile browser (only if user hasn't explicitly disconnected)
   useEffect(() => {
