@@ -66,7 +66,14 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
 
   // Handle connection state changes
   useEffect(() => {
-    if (connected && publicKey) {
+    // Check adapter state as well (iOS fix)
+    const adapterConnected = wallets.length > 0 && wallets.some(w => 
+      w.adapter.name === 'Phantom' && (w.adapter.connected || w.adapter.publicKey !== null)
+    );
+    const adapterPublicKey = wallets.find(w => w.adapter.name === 'Phantom')?.adapter.publicKey || null;
+    
+    if ((connected && publicKey) || (adapterConnected && adapterPublicKey)) {
+      const activePublicKey = publicKey || adapterPublicKey;
       // Clear disconnect flag when user successfully connects
       // This allows auto-connect to work again on refresh
       localStorage.removeItem('wallet_disconnected');
@@ -76,7 +83,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       const fetchSOLBalance = async (): Promise<void> => {
         try {
           const balanceLamports = await Promise.race([
-            connection.getBalance(publicKey, 'confirmed'),
+            connection.getBalance(activePublicKey, 'confirmed'),
             new Promise<never>((_, reject) => 
               setTimeout(() => reject(new Error('Timeout')), 5000) // 5s timeout
             )
@@ -99,7 +106,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       // Fetch USDFG balance (non-blocking, fail gracefully)
       const fetchUSDFGBalance = async (): Promise<void> => {
         try {
-          const tokenAccount = await getAssociatedTokenAddress(USDFG_MINT, publicKey);
+          const tokenAccount = await getAssociatedTokenAddress(USDFG_MINT, activePublicKey);
           const tokenBalance = await Promise.race([
             connection.getTokenAccountBalance(tokenAccount, 'confirmed'),
             new Promise<never>((_, reject) => 
@@ -127,15 +134,25 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         // Silently handle any uncaught errors
         setUsdfgBalance(0);
         });
-    } else if (!connected) {
+    } else if (!connected && !adapterConnected) {
       setBalance(null);
       setUsdfgBalance(null);
       onDisconnect();
     }
-  }, [connected, publicKey, onConnect, onDisconnect, connection]);
+  }, [connected, publicKey, wallets, onConnect, onDisconnect, connection]);
+
+  // Check if adapter is connected (even if hook state hasn't updated yet)
+  // This fixes iOS issue where connect() succeeds but hook state doesn't update
+  const adapterConnected = wallets.length > 0 && wallets.some(w => 
+    w.adapter.name === 'Phantom' && (w.adapter.connected || w.adapter.publicKey !== null)
+  );
+  
+  // Use adapter state if hook state hasn't updated yet (iOS fix)
+  const isActuallyConnected = connected && publicKey || adapterConnected;
+  const actualPublicKey = publicKey || wallets.find(w => w.adapter.name === 'Phantom')?.adapter.publicKey || null;
 
   // If connected, show connected state
-  if (connected && publicKey) {
+  if (isActuallyConnected && actualPublicKey) {
     // Compact mode for mobile
     if (compact) {
       return (
