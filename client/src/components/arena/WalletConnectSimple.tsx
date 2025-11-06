@@ -23,6 +23,8 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const { connection } = useConnection();
   const [balance, setBalance] = useState<number | null>(null);
   const [usdfgBalance, setUsdfgBalance] = useState<number | null>(null);
+  const [forceUpdate, setForceUpdate] = useState(0); // Force re-render trigger
+  const [forceUpdate, setForceUpdate] = useState(0); // Force re-render trigger
 
   // Auto-connect Phantom if in mobile browser (only if user hasn't explicitly disconnected)
   useEffect(() => {
@@ -404,18 +406,33 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
             
             // Wait for wallet adapter state to update (iOS can be slow)
             let attempts = 0;
-            const maxAttempts = 20; // Wait up to 2 seconds
+            const maxAttempts = 30; // Wait up to 3 seconds
+            let stateUpdated = false;
+            
             while (attempts < maxAttempts) {
               await new Promise(resolve => setTimeout(resolve, 100));
+              
               // Check if connection succeeded by checking the adapter's state
-              const isActuallyConnected = phantomWallet.adapter.connected || phantomWallet.adapter.publicKey !== null;
-              if (isActuallyConnected || (connected && publicKey)) {
+              const adapterConnected = phantomWallet.adapter.connected || phantomWallet.adapter.publicKey !== null;
+              const hookConnected = connected && publicKey;
+              
+              if (adapterConnected || hookConnected) {
                 console.log('✅ Wallet adapter state updated!');
+                stateUpdated = true;
                 break;
               }
+              
               attempts++;
               console.log(`   Waiting for state update... (${attempts}/${maxAttempts})`);
+              
+              // Force a re-render every few attempts to check state
+              if (attempts % 5 === 0) {
+                setForceUpdate(prev => prev + 1);
+              }
             }
+            
+            // Force a final re-render
+            setForceUpdate(prev => prev + 1);
             
             // Force a re-check of connection state
             console.log('🔍 Final connection state check...');
@@ -428,10 +445,29 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
               onConnect();
             }
             
-            // If still not connected after waiting, show a message
-            if (!connected && !phantomWallet.adapter.connected) {
+            // Force another re-render after calling onConnect
+            setTimeout(() => {
+              setForceUpdate(prev => prev + 1);
+            }, 100);
+            
+            // If still not connected after waiting, try to manually trigger state refresh
+            if (!stateUpdated && !phantomWallet.adapter.connected && !connected) {
               console.error('⚠️ Connection completed but state not updated');
-              alert('Connection successful but state not updating. Please refresh the page.');
+              console.log('   Attempting manual state refresh...');
+              
+              // Try to manually trigger a connection check
+              // Sometimes the adapter needs to be re-selected
+              try {
+                select(phantomWallet.adapter.name);
+                // Force one more re-render
+                setTimeout(() => {
+                  setForceUpdate(prev => prev + 1);
+                }, 500);
+              } catch (e) {
+                console.error('   Manual refresh failed:', e);
+              }
+              
+              alert('Connection successful! If the UI doesn\'t update, please refresh the page.');
             } else {
               console.log('✅ Connection successful and state updated!');
             }
