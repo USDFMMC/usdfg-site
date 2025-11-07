@@ -399,14 +399,52 @@ const ArenaHome: React.FC = () => {
   // Track completed challenge IDs to detect new completions
   const [completedChallengeIds, setCompletedChallengeIds] = useState<Set<string>>(new Set());
 
+  // MOCK DATA FOR TESTING - Remove this when done testing
+  const generateMockPlayers = (count: number): PlayerStats[] => {
+    const countries = ['US', 'GB', 'CA', 'AU', 'DE', 'FR', 'JP', 'BR', 'MX', 'IN', 'KR', 'ES', 'IT', 'NL', 'SE'];
+    const names = ['ProGamer', 'ElitePlayer', 'Champion', 'Winner', 'Master', 'Legend', 'Ace', 'Hero', 'Star', 'King', 'Queen', 'Warrior', 'Ninja', 'Sniper', 'Tank'];
+    
+    return Array.from({ length: count }, (_, i) => {
+      const wins = Math.floor(Math.random() * 100) + 10;
+      const losses = Math.floor(Math.random() * 50) + 5;
+      const gamesPlayed = wins + losses;
+      const winRate = (wins / gamesPlayed) * 100;
+      const totalEarned = Math.floor(Math.random() * 10000) + 1000;
+      const trustScore = Math.random() * 10;
+      const trustReviews = Math.floor(Math.random() * 20);
+      
+      return {
+        wallet: `${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`,
+        displayName: `${names[Math.floor(Math.random() * names.length)]}${i + 1}`,
+        wins,
+        losses,
+        winRate,
+        totalEarned,
+        gamesPlayed,
+        trustScore,
+        trustReviews,
+        country: countries[Math.floor(Math.random() * countries.length)],
+        gameStats: {},
+        categoryStats: {},
+        lastActive: Timestamp.now()
+      } as PlayerStats;
+    }).sort((a, b) => b.totalEarned - a.totalEarned); // Sort by totalEarned descending
+  };
+
   // Fetch top players for sidebar (with real-time refresh when challenges complete)
   useEffect(() => {
     const fetchTopPlayersData = async () => {
       try {
-        // Use dynamic limit - start with 30, can load more
+        // TEMPORARY: Use mock data for testing - Remove this and uncomment real fetch below
         const limit = showAllPlayers ? leaderboardLimit : 5;
-        const players = await getTopPlayers(limit, 'totalEarned');
-        setTopPlayers(players);
+        console.log(`🧪 TESTING: Using mock data for ${limit} players`);
+        const mockPlayers = generateMockPlayers(limit);
+        setTopPlayers(mockPlayers);
+        
+        // REAL FETCH (uncomment when done testing):
+        // const limit = showAllPlayers ? leaderboardLimit : 5;
+        // const players = await getTopPlayers(limit, 'totalEarned');
+        // setTopPlayers(players);
       } catch (error) {
         console.error('Failed to fetch top players:', error);
       } finally {
@@ -512,9 +550,16 @@ const ArenaHome: React.FC = () => {
       // Debounce refresh to avoid too many calls (wait for stats to be updated)
       const timeoutId = setTimeout(async () => {
         try {
+          // TEMPORARY: Use mock data for testing
           const limit = showAllPlayers ? leaderboardLimit : 5;
-          const players = await getTopPlayers(limit, 'totalEarned');
-          setTopPlayers(players);
+          console.log(`🧪 TESTING: Using mock data for ${limit} players (refresh)`);
+          const mockPlayers = generateMockPlayers(limit);
+          setTopPlayers(mockPlayers);
+          
+          // REAL FETCH (uncomment when done testing):
+          // const limit = showAllPlayers ? leaderboardLimit : 5;
+          // const players = await getTopPlayers(limit, 'totalEarned');
+          // setTopPlayers(players);
         } catch (error) {
           console.error('Failed to refresh leaderboard:', error);
         }
@@ -1049,9 +1094,16 @@ const ArenaHome: React.FC = () => {
         // Refresh leaderboard to show updated trust scores
         setTimeout(async () => {
         try {
+          // TEMPORARY: Use mock data for testing
           const limit = showAllPlayers ? leaderboardLimit : 5;
-          const players = await getTopPlayers(limit, 'totalEarned');
-          setTopPlayers(players);
+          console.log(`🧪 TESTING: Using mock data for ${limit} players (trust review)`);
+          const mockPlayers = generateMockPlayers(limit);
+          setTopPlayers(mockPlayers);
+          
+          // REAL FETCH (uncomment when done testing):
+          // const limit = showAllPlayers ? leaderboardLimit : 5;
+          // const players = await getTopPlayers(limit, 'totalEarned');
+          // setTopPlayers(players);
         } catch (error) {
           console.error('Failed to refresh leaderboard after trust review:', error);
         }
@@ -2779,8 +2831,14 @@ const ArenaHome: React.FC = () => {
                               const newLimit = leaderboardLimit + 30; // Load 30 more
                               setLeaderboardLimit(newLimit);
                               try {
-                                const players = await getTopPlayers(newLimit, 'totalEarned');
-                                setTopPlayers(players);
+                                // TEMPORARY: Use mock data for testing
+                                console.log(`🧪 TESTING: Loading ${newLimit} mock players`);
+                                const mockPlayers = generateMockPlayers(newLimit);
+                                setTopPlayers(mockPlayers);
+                                
+                                // REAL FETCH (uncomment when done testing):
+                                // const players = await getTopPlayers(newLimit, 'totalEarned');
+                                // setTopPlayers(players);
                               } catch (error) {
                                 console.error('Failed to load more players:', error);
                               } finally {
