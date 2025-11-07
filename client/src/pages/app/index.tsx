@@ -246,6 +246,8 @@ const ArenaHome: React.FC = () => {
   const [loadingTopTeams, setLoadingTopTeams] = useState<boolean>(false);
   const [showChatModal, setShowChatModal] = useState<boolean>(false);
   const [selectedChatChallenge, setSelectedChatChallenge] = useState<any>(null);
+  const [showTeamModal, setShowTeamModal] = useState<boolean>(false);
+  const [userTeam, setUserTeam] = useState<TeamStats | null>(null);
   
   
   // Mock price API - simulates real-time price updates
