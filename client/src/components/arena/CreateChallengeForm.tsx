@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import ElegantButton from '@/components/ui/ElegantButton';
 import { ADMIN_WALLET } from '@/lib/chain/config';
 
@@ -13,7 +14,7 @@ interface CreateChallengeFormProps {
 }
 
 const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
-  isConnected,
+  isConnected: propIsConnected,
   onConnect,
   onCreateChallenge,
   usdfgPrice,
@@ -21,6 +22,10 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
   userGamerTag,
   currentWallet
 }) => {
+  // Also check wallet state directly to ensure UI updates immediately
+  const { connected: walletConnected, publicKey } = useWallet();
+  const isConnected = propIsConnected || walletConnected;
+  
   const [formData, setFormData] = useState({
     game: 'NBA 2K25',
     platform: 'PS5',
@@ -41,6 +46,12 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
       username: userGamerTag || ''
     }));
   }, [userGamerTag]);
+  
+  // Force re-render when connection state changes
+  useEffect(() => {
+    // This effect ensures the component re-renders when wallet connects/disconnects
+    // The dependency on walletConnected will trigger a re-render
+  }, [walletConnected, publicKey]);
 
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 3;
