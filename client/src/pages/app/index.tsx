@@ -782,10 +782,28 @@ const ArenaHome: React.FC = () => {
     setIsCreatingChallenge(true);
     
     try {
-      // Get current wallet address
-      const currentWallet = publicKey?.toString() || null;
+      // Wait for wallet state to be fully ready (especially after connecting via form)
+      let attempts = 0;
+      let currentWallet = publicKey?.toString() || null;
+      
+      // Check adapter state directly as well
+      const phantomWallet = wallet.wallets.find(w => w.adapter.name === 'Phantom');
+      const adapterPublicKey = phantomWallet?.adapter?.publicKey?.toString() || null;
+      
+      // Use adapter's publicKey if hook's publicKey isn't ready yet
+      if (!currentWallet && adapterPublicKey) {
+        currentWallet = adapterPublicKey;
+      }
+      
+      // Wait up to 2 seconds for wallet state to update
+      while (!currentWallet && attempts < 20) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        currentWallet = publicKey?.toString() || phantomWallet?.adapter?.publicKey?.toString() || null;
+        attempts++;
+      }
+      
       if (!currentWallet) {
-        throw new Error("Wallet not connected");
+        throw new Error("Wallet not connected. Please connect your wallet first.");
       }
 
       // 🔍 Check if the user already has an active challenge (as creator OR participant)
@@ -885,11 +903,6 @@ const ArenaHome: React.FC = () => {
         challengeId = 'founder_' + Date.now().toString();
       } else {
         // Regular challenge - create on-chain
-      // Ensure wallet is fully connected and ready
-      if (!publicKey || !connected) {
-        throw new Error("Wallet not connected. Please connect your wallet first.");
-      }
-      
       // Create connection to devnet
       const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
       
@@ -898,17 +911,23 @@ const ArenaHome: React.FC = () => {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
       
-      // Double-check wallet state before creating challenge
-      // Sometimes the wallet adapter state hasn't updated yet
+      // Get the most up-to-date wallet state
       const phantomWallet = wallet.wallets.find(w => w.adapter.name === 'Phantom');
-      if (!phantomWallet?.adapter?.publicKey && !publicKey) {
+      const adapterPublicKey = phantomWallet?.adapter?.publicKey;
+      const adapterConnected = phantomWallet?.adapter?.connected || false;
+      
+      // Use adapter's state if hook state isn't ready yet
+      const walletPublicKey = adapterPublicKey || publicKey;
+      const walletConnected = adapterConnected || connected;
+      
+      if (!walletPublicKey || !walletConnected) {
         throw new Error("Wallet not ready. Please wait a moment and try again.");
       }
       
-      // Use the adapter's publicKey if available, otherwise use the hook's publicKey
-      const walletToUse = phantomWallet?.adapter?.publicKey ? {
+      // Use the adapter's methods if available, otherwise use the hook's methods
+      const walletToUse = adapterPublicKey ? {
         ...wallet,
-        publicKey: phantomWallet.adapter.publicKey,
+        publicKey: adapterPublicKey,
         signTransaction: phantomWallet.adapter.signTransaction.bind(phantomWallet.adapter),
         signAllTransactions: phantomWallet.adapter.signAllTransactions?.bind(phantomWallet.adapter)
       } : wallet;
