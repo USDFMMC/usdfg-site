@@ -1768,6 +1768,65 @@ export async function joinTeam(teamId: string, memberWallet: string): Promise<vo
 }
 
 /**
+ * Transfer team key holder to another member
+ * Only the current team key holder can transfer leadership
+ */
+export async function transferTeamKey(teamId: string, currentKeyHolder: string, newKeyHolder: string): Promise<void> {
+  try {
+    const teamRef = doc(db, 'teams', teamId);
+    const teamSnap = await getDoc(teamRef);
+    
+    if (!teamSnap.exists()) {
+      throw new Error("Team not found");
+    }
+    
+    const teamData = teamSnap.data() as TeamStats;
+    
+    // Security check: Only current key holder can transfer
+    if (teamData.teamKey !== currentKeyHolder) {
+      throw new Error("Only the current team key holder can transfer leadership");
+    }
+    
+    // Security check: New key holder must be an existing team member
+    if (!teamData.members.includes(newKeyHolder)) {
+      throw new Error("New team key holder must be an existing team member");
+    }
+    
+    // Security check: Cannot transfer to yourself
+    if (currentKeyHolder === newKeyHolder) {
+      throw new Error("Cannot transfer leadership to yourself");
+    }
+    
+    // Update team key and team ID (team ID is the wallet address of the key holder)
+    // We need to create a new document with the new team ID and delete the old one
+    const newTeamRef = doc(db, 'teams', newKeyHolder);
+    const newTeamSnap = await getDoc(newTeamRef);
+    
+    if (newTeamSnap.exists()) {
+      throw new Error("New key holder already has a team");
+    }
+    
+    // Create new team document with new key holder
+    const updatedTeam: TeamStats = {
+      ...teamData,
+      teamId: newKeyHolder,
+      teamKey: newKeyHolder,
+      lastActive: Timestamp.now()
+    };
+    
+    await setDoc(newTeamRef, updatedTeam);
+    
+    // Delete old team document
+    await deleteDoc(teamRef);
+    
+    console.log(`✅ Team key transferred from ${currentKeyHolder} to ${newKeyHolder} for team: ${teamData.teamName}`);
+  } catch (error) {
+    console.error('❌ Error transferring team key:', error);
+    throw error;
+  }
+}
+
+/**
  * Leave a team
  */
 export async function leaveTeam(teamId: string, memberWallet: string): Promise<void> {
