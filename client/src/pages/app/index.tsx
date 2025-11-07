@@ -522,7 +522,7 @@ const ArenaHome: React.FC = () => {
       
       return () => clearTimeout(timeoutId);
     }
-  }, [firestoreChallenges, completedChallengeIds, showAllPlayers]);
+  }, [firestoreChallenges, completedChallengeIds, showAllPlayers, leaderboardLimit]);
   
   // Auto-expire challenges after 2 hours
   useChallengeExpiry(firestoreChallenges);
