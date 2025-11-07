@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo, Suspense, lazy } from "react";
 import { Helmet } from "react-helmet";
+import ElegantNotification from "@/components/ui/ElegantNotification";
 import { Link } from "react-router-dom";
 import WalletConnectSimple from "@/components/arena/WalletConnectSimple";
 import { useWallet } from '@solana/wallet-adapter-react';
@@ -249,6 +250,16 @@ const ArenaHome: React.FC = () => {
   const [selectedChatChallenge, setSelectedChatChallenge] = useState<any>(null);
   const [showTeamModal, setShowTeamModal] = useState<boolean>(false);
   const [userTeam, setUserTeam] = useState<TeamStats | null>(null);
+  const [notification, setNotification] = useState<{
+    isOpen: boolean;
+    message: string;
+    title?: string;
+    type?: 'info' | 'warning' | 'error' | 'success';
+  }>({
+    isOpen: false,
+    message: '',
+    type: 'info'
+  });
   
   
   // Mock price API - simulates real-time price updates
@@ -1019,8 +1030,10 @@ const ArenaHome: React.FC = () => {
         category: getGameCategory(challengeData.game || extractGameFromTitle(challengeTitle)), // Store category for filtering
         // Store platform for display - players need to know which platform
         platform: challengeData.platform || 'All Platforms', // Store platform for display
-        // Challenge type - solo or team
-        challengeType: isTeamChallenge ? 'team' : 'solo', // Store challenge type
+                 // Challenge type - solo or team
+                 challengeType: isTeamChallenge ? 'team' : 'solo', // Store challenge type
+                 // For team challenges: only teams can accept, or open to any challenger
+                 teamOnly: isTeamChallenge ? (challengeData.teamOnly || false) : undefined, // Only set for team challenges
         // REMOVED: creatorTag, mode, rules, solanaAccountId
         // These are not needed for leaderboards and increase storage costs unnecessarily
       };
@@ -1737,6 +1750,16 @@ const ArenaHome: React.FC = () => {
           </div>
         </ElegantNavbar>
 
+        {/* Elegant Notification */}
+        <ElegantNotification
+          isOpen={notification.isOpen}
+          onClose={() => setNotification({ ...notification, isOpen: false })}
+          message={notification.message}
+          title={notification.title}
+          type={notification.type}
+          duration={5000}
+        />
+
         {/* Live Data Tracker */}
         <div className="container mx-auto px-4 py-2 w-full">
           <div className="flex items-center justify-between text-sm w-full">
@@ -1935,11 +1958,40 @@ const ArenaHome: React.FC = () => {
                       <div 
                         key={challenge.id} 
                         className={`relative bg-[#07080C]/95 border border-amber-500/30 rounded-xl p-4 cursor-pointer hover:border-amber-400/50 shadow-[0_0_20px_rgba(255,215,130,0.05)] hover:shadow-[0_0_30px_rgba(255,215,130,0.08)] transition-all overflow-hidden`}
-                        onClick={() => {
+                        onClick={async () => {
                           // Don't open join modal for completed challenges
                           if (challenge.status === "completed" || challenge.rawData?.payoutTriggered) {
                             return;
                           }
+                          
+                          // Check if this is a team challenge with teamOnly restriction
+                          const challengeType = challenge.rawData?.challengeType;
+                          const teamOnly = challenge.rawData?.teamOnly;
+                          
+                          if (challengeType === 'team' && teamOnly === true) {
+                            // Team-only challenge - verify user is in a team
+                            if (!currentWallet) {
+                              setNotification({
+                                isOpen: true,
+                                message: 'Please connect your wallet to join this team challenge.',
+                                title: 'Wallet Required',
+                                type: 'warning'
+                              });
+                              return;
+                            }
+                            
+                            const userTeam = await getTeamByMember(currentWallet);
+                            if (!userTeam) {
+                              setNotification({
+                                isOpen: true,
+                                message: 'This challenge is only open to teams. You must be part of a team to join. Please create or join a team first.',
+                                title: 'Team Required',
+                                type: 'warning'
+                              });
+                              return;
+                            }
+                          }
+                          
                           setSelectedChallenge(challenge);
                           setShowJoinModal(true);
                         }}
@@ -2018,6 +2070,22 @@ const ArenaHome: React.FC = () => {
                                 {challenge.username && ` • 👤 ${challenge.username}`}
                               </p>
                             )}
+                            {/* Team Challenge Indicator */}
+                            {(() => {
+                              const challengeType = challenge.rawData?.challengeType;
+                              const teamOnly = challenge.rawData?.teamOnly;
+                              if (challengeType === 'team') {
+                                return (
+                                  <div className="mt-2 inline-flex items-center px-2 py-1 bg-zinc-800/50 border border-amber-400/30 rounded text-xs">
+                                    <span className="text-amber-300 mr-1">👥</span>
+                                    <span className="text-amber-200">
+                                      {teamOnly ? 'Teams Only' : 'Open to All'}
+                                    </span>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
                             {challenge.createdAt && (
                               <p className="text-text-dim/60 text-xs neocore-body">
                                 Created {new Date(challenge.createdAt).toLocaleDateString()} at {new Date(challenge.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -2388,6 +2456,34 @@ const ArenaHome: React.FC = () => {
                             return (
                               <button 
                                 onClick={async () => {
+                                  // Check if this is a team challenge with teamOnly restriction
+                                  const challengeType = challenge.rawData?.challengeType;
+                                  const teamOnly = challenge.rawData?.teamOnly;
+                                  
+                                  if (challengeType === 'team' && teamOnly === true) {
+                                    // Team-only challenge - verify user is in a team
+                                    if (!currentWallet) {
+                                      setNotification({
+                                        isOpen: true,
+                                        message: 'Please connect your wallet to join this team challenge.',
+                                        title: 'Wallet Required',
+                                        type: 'warning'
+                                      });
+                                      return;
+                                    }
+                                    
+                                    const userTeam = await getTeamByMember(currentWallet);
+                                    if (!userTeam) {
+                                      setNotification({
+                                        isOpen: true,
+                                        message: 'This challenge is only open to teams. You must be part of a team to join. Please create or join a team first.',
+                                        title: 'Team Required',
+                                        type: 'warning'
+                                      });
+                                      return;
+                                    }
+                                  }
+                                  
                                   // Check if this is a Founder Challenge (no PDA, skip on-chain check)
                                   const founderChallenge = isFounderChallenge(challenge);
                                   
@@ -4193,6 +4289,17 @@ const JoinChallengeModal: React.FC<{
         throw new Error('Wallet not connected');
       }
 
+      // Check if this is a team challenge with teamOnly restriction
+      const challengeType = challenge.rawData?.challengeType;
+      const teamOnly = challenge.rawData?.teamOnly;
+      
+      if (challengeType === 'team' && teamOnly === true) {
+        // Team-only challenge - verify user is in a team
+        const userTeam = await getTeamByMember(walletAddress);
+        if (!userTeam) {
+          throw new Error('This challenge is only open to teams. You must be part of a team to join. Please create or join a team first.');
+        }
+      }
       
       // Check if this is a Founder Challenge (admin-created with 0 entry fee)
       const { ADMIN_WALLET } = await import('@/lib/chain/config');

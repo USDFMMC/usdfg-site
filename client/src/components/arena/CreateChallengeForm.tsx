@@ -44,7 +44,8 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     customPlatform: '', // Custom platform name when "Other/Custom" is selected
     rules: '',
     customRules: false,
-    challengeType: 'solo' as 'solo' | 'team' // Toggle between solo and team challenge
+    challengeType: 'solo' as 'solo' | 'team', // Toggle between solo and team challenge
+    teamOnly: false // For team challenges: true = only teams can accept, false = open to anyone
   });
 
   // Update username when userGamerTag changes (e.g., when wallet switches)
@@ -405,7 +406,43 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
               </button>
             </div>
             {formData.challengeType === 'team' && (
-              <p className="text-xs text-amber-400/70 mt-2">Team key holder creates challenge for the team</p>
+              <div className="mt-3 space-y-2">
+                <p className="text-xs text-amber-400/70">Team key holder creates challenge for the team</p>
+                
+                {/* Team Challenge Accept Toggle */}
+                <div className="mt-3 p-3 bg-zinc-800/50 border border-zinc-700 rounded-lg">
+                  <label className="block text-xs font-medium text-gray-300 mb-2">Who Can Accept Challenge?</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleInputChange('teamOnly', false)}
+                      className={`flex-1 px-3 py-2 rounded-lg border transition-all duration-300 text-xs font-semibold ${
+                        !formData.teamOnly
+                          ? 'border-amber-400/50 bg-amber-300/10 text-amber-300 shadow-[0_0_8px_rgba(255,215,130,0.15)]'
+                          : 'border-zinc-700/50 bg-zinc-800/60 text-zinc-300 hover:border-amber-300/30'
+                      }`}
+                    >
+                      🌐 Open to Any
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleInputChange('teamOnly', true)}
+                      className={`flex-1 px-3 py-2 rounded-lg border transition-all duration-300 text-xs font-semibold ${
+                        formData.teamOnly
+                          ? 'border-amber-400/50 bg-amber-300/10 text-amber-300 shadow-[0_0_8px_rgba(255,215,130,0.15)]'
+                          : 'border-zinc-700/50 bg-zinc-800/60 text-zinc-300 hover:border-amber-300/30'
+                      }`}
+                    >
+                      👥 Teams Only
+                    </button>
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-2">
+                    {formData.teamOnly 
+                      ? 'Only teams can accept this challenge' 
+                      : 'Anyone (solo players or teams) can accept this challenge'}
+                  </p>
+                </div>
+              </div>
             )}
           </div>
           

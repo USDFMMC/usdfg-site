@@ -46,6 +46,7 @@ export interface ChallengeData {
   expiresAt: Timestamp;               // Expiration time
   winner?: string;                    // Winner wallet (if completed) or team key
   challengeType?: 'solo' | 'team';    // Challenge type - solo or team (defaults to solo for backward compatibility)
+  teamOnly?: boolean;                 // For team challenges: true = only teams can accept, false = open to anyone (defaults to false)
   // Result submission fields
   results?: {
     [wallet: string]: {
@@ -263,7 +264,7 @@ export const fetchChallengeById = async (challengeId: string): Promise<Challenge
 };
 
 // Join challenge with proper Firestore operations
-export const joinChallenge = async (challengeId: string, wallet: string, isFounderChallenge: boolean = false) => {
+export const joinChallenge = async (challengeId: string, wallet: string, isFounderChallenge: boolean = false, isTeam?: boolean) => {
   try {
     const challengeRef = doc(db, "challenges", challengeId);
     const snap = await getDoc(challengeRef);
@@ -272,12 +273,56 @@ export const joinChallenge = async (challengeId: string, wallet: string, isFound
       throw new Error("Challenge not found");
     }
 
-    const data = snap.data();
+    const data = snap.data() as ChallengeData;
+    
+    // Check if this is a team challenge with teamOnly restriction
+    if (data.challengeType === 'team' && data.teamOnly === true) {
+      // Only teams can accept - check if challenger is part of a team
+      const challengerTeam = await getTeamByMember(wallet);
+      if (!challengerTeam) {
+        throw new Error("This challenge is only open to teams. You must be part of a team to accept.");
+      }
+      // Use team key for team challenges - only team key holder can accept
+      const teamKey = challengerTeam.teamKey;
+      if (teamKey !== wallet) {
+        throw new Error("Only the team key holder can accept team challenges. You are a team member, not the key holder.");
+      }
+      // Use team key as challenger
+      wallet = teamKey;
+      isTeam = true;
+    } else if (data.challengeType === 'team' && data.teamOnly === false) {
+      // Team challenge open to anyone - if challenger is a team, use team key
+      const challengerTeam = await getTeamByMember(wallet);
+      if (challengerTeam) {
+        // Challenger is part of a team - only team key holder can accept
+        if (challengerTeam.teamKey !== wallet) {
+          throw new Error("Only the team key holder can accept challenges. You are a team member, not the key holder.");
+        }
+        // Use team key as challenger
+        wallet = challengerTeam.teamKey;
+        isTeam = true;
+      }
+      // If challenger is not part of a team, they can accept as solo player (isTeam remains false)
+    } else if (data.challengeType === 'team') {
+      // Team challenge without teamOnly specified (backward compatibility) - treat as open to all
+      const challengerTeam = await getTeamByMember(wallet);
+      if (challengerTeam) {
+        // Challenger is part of a team - only team key holder can accept
+        if (challengerTeam.teamKey !== wallet) {
+          throw new Error("Only the team key holder can accept challenges. You are a team member, not the key holder.");
+        }
+        // Use team key as challenger
+        wallet = challengerTeam.teamKey;
+        isTeam = true;
+      }
+      // If challenger is not part of a team, they can accept as solo player (isTeam remains false)
+    }
+    
     if (data.players && data.players.length >= data.maxPlayers) {
       throw new Error("Challenge already full");
     }
 
-    // Check if player is already in the challenge
+    // Check if player/team is already in the challenge
     if (data.players && data.players.includes(wallet)) {
       throw new Error("You are already in this challenge");
     }
