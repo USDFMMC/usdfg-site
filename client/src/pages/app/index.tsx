@@ -240,6 +240,7 @@ const ArenaHome: React.FC = () => {
   } | null>(null);
   const [copiedWallet, setCopiedWallet] = useState<string | null>(null);
   const [showAllPlayers, setShowAllPlayers] = useState<boolean>(false);
+  const [leaderboardLimit, setLeaderboardLimit] = useState<number>(30); // Start with 30 players, load more on demand
   const [showChatModal, setShowChatModal] = useState<boolean>(false);
   const [selectedChatChallenge, setSelectedChatChallenge] = useState<any>(null);
   
@@ -402,8 +403,8 @@ const ArenaHome: React.FC = () => {
   useEffect(() => {
     const fetchTopPlayersData = async () => {
       try {
-        // Fetch more players if "Show All" is enabled
-        const limit = showAllPlayers ? 50 : 5;
+        // Use dynamic limit - start with 30, can load more
+        const limit = showAllPlayers ? leaderboardLimit : 5;
         const players = await getTopPlayers(limit, 'totalEarned');
         setTopPlayers(players);
       } catch (error) {
@@ -414,7 +415,7 @@ const ArenaHome: React.FC = () => {
     };
     
     fetchTopPlayersData();
-  }, [showAllPlayers]);
+  }, [showAllPlayers, leaderboardLimit]);
 
   // Test Firestore connection on component mount
   useEffect(() => {
@@ -511,7 +512,7 @@ const ArenaHome: React.FC = () => {
       // Debounce refresh to avoid too many calls (wait for stats to be updated)
       const timeoutId = setTimeout(async () => {
         try {
-          const limit = showAllPlayers ? 50 : 5;
+          const limit = showAllPlayers ? leaderboardLimit : 5;
           const players = await getTopPlayers(limit, 'totalEarned');
           setTopPlayers(players);
         } catch (error) {
@@ -1047,13 +1048,13 @@ const ArenaHome: React.FC = () => {
         
         // Refresh leaderboard to show updated trust scores
         setTimeout(async () => {
-          try {
-            const limit = showAllPlayers ? 50 : 5;
-            const players = await getTopPlayers(limit, 'totalEarned');
-            setTopPlayers(players);
-          } catch (error) {
-            console.error('Failed to refresh leaderboard after trust review:', error);
-          }
+        try {
+          const limit = showAllPlayers ? leaderboardLimit : 5;
+          const players = await getTopPlayers(limit, 'totalEarned');
+          setTopPlayers(players);
+        } catch (error) {
+          console.error('Failed to refresh leaderboard after trust review:', error);
+        }
         }, 2000); // Wait 2 seconds for Firestore to update and trust score to be recalculated
       } else {
         console.warn('⚠️ Could not find opponent wallet for trust review');
