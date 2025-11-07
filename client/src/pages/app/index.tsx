@@ -17,6 +17,7 @@ import { ADMIN_WALLET, USDFG_MINT, PROGRAM_ID, SEEDS } from '@/lib/chain/config'
 import { PublicKey } from '@solana/web3.js';
 import { getAssociatedTokenAddress } from '@solana/spl-token';
 import { testFirestoreConnection } from "@/lib/firebase/firestore";
+import { getWalletScopedValue, setWalletScopedValue, clearWalletScopedValue, PROFILE_STORAGE_KEYS } from "@/lib/storage/profile";
 import ElegantButton from "@/components/ui/ElegantButton";
 import ElegantModal from "@/components/ui/ElegantModal";
 import CreateChallengeForm from "@/components/arena/CreateChallengeForm";
@@ -279,61 +280,46 @@ const ArenaHome: React.FC = () => {
 
   // Wallet info available via useWallet hook
 
-  // Load user profile data from localStorage and Firestore (only for current wallet)
-  useEffect(() => {
-    if (!publicKey) {
-      // Clear profile data when wallet disconnects
-      setUserGamerTag('');
-      setUserCountry(null);
-      setUserProfileImage(null);
-      return;
-    }
-    
-    const loadUserProfile = async () => {
-      // Load wallet-specific profile data from localStorage first (for immediate display)
-      const walletKey = publicKey.toString();
-      const savedGamerTag = localStorage.getItem(`user_gamer_tag_${walletKey}`) || localStorage.getItem('user_gamer_tag'); // Fallback to old key for backward compatibility
-      const savedCountry = localStorage.getItem(`user_country_${walletKey}`) || localStorage.getItem('user_country');
-      const savedProfileImage = localStorage.getItem(`user_profile_image_${walletKey}`) || localStorage.getItem('user_profile_image');
-      
-      // Set from localStorage immediately
-    if (savedGamerTag) {
-      setUserGamerTag(savedGamerTag);
-      } else {
-        setUserGamerTag(''); // Clear if no saved tag for this wallet
-    }
-    if (savedCountry) {
-      setUserCountry(savedCountry);
-      } else {
+    // Load user profile data from localStorage and Firestore (only for current wallet)
+    useEffect(() => {
+      if (!publicKey) {
+        // Clear profile data when wallet disconnects
+        setUserGamerTag('');
         setUserCountry(null);
-    }
-    if (savedProfileImage) {
-      setUserProfileImage(savedProfileImage);
-      } else {
         setUserProfileImage(null);
+        return;
       }
       
-      // Also try to fetch from Firestore (may have more up-to-date data)
-      try {
-        const { getPlayerStats } = await import("@/lib/firebase/firestore");
-        const playerStats = await getPlayerStats(walletKey);
-        if (playerStats?.displayName) {
-          setUserGamerTag(playerStats.displayName);
-          // Also update localStorage to keep it in sync
-          localStorage.setItem(`user_gamer_tag_${walletKey}`, playerStats.displayName);
+      const loadUserProfile = async () => {
+        const walletKey = publicKey.toString();
+        const savedGamerTag = getWalletScopedValue(PROFILE_STORAGE_KEYS.gamerTag, walletKey);
+        const savedCountry = getWalletScopedValue(PROFILE_STORAGE_KEYS.country, walletKey);
+        const savedProfileImage = getWalletScopedValue(PROFILE_STORAGE_KEYS.profileImage, walletKey);
+        
+        setUserGamerTag(savedGamerTag ?? '');
+        setUserCountry(savedCountry || null);
+        setUserProfileImage(savedProfileImage || null);
+        
+        // Also try to fetch from Firestore (may have more up-to-date data)
+        try {
+          const { getPlayerStats } = await import("@/lib/firebase/firestore");
+          const playerStats = await getPlayerStats(walletKey);
+          if (playerStats?.displayName) {
+            setUserGamerTag(playerStats.displayName);
+            setWalletScopedValue(PROFILE_STORAGE_KEYS.gamerTag, walletKey, playerStats.displayName);
+          }
+          if (playerStats?.country) {
+            setUserCountry(playerStats.country);
+            setWalletScopedValue(PROFILE_STORAGE_KEYS.country, walletKey, playerStats.country);
+          }
+        } catch (error) {
+          // Firestore fetch failed, but we already have localStorage data
+          console.error('Failed to fetch player stats from Firestore:', error);
         }
-        if (playerStats?.country) {
-          setUserCountry(playerStats.country);
-          localStorage.setItem(`user_country_${walletKey}`, playerStats.country);
-        }
-      } catch (error) {
-        // Firestore fetch failed, but we already have localStorage data
-        console.error('Failed to fetch player stats from Firestore:', error);
-      }
-    };
-    
-    loadUserProfile();
-  }, [publicKey]); // Re-run when wallet changes
+      };
+      
+      loadUserProfile();
+    }, [publicKey]);
 
   // Clear wallet-specific state when wallet changes
   useEffect(() => {
@@ -1635,7 +1621,7 @@ const ArenaHome: React.FC = () => {
                     
                     // Load wallet-specific country from localStorage (not from state which might be stale)
                     const walletKey = publicKey.toString();
-                    const currentWalletCountry = localStorage.getItem(`user_country_${walletKey}`) || localStorage.getItem('user_country') || null;
+                    const currentWalletCountry = getWalletScopedValue(PROFILE_STORAGE_KEYS.country, walletKey);
                     if (currentWalletCountry !== userCountry) {
                       setUserCountry(currentWalletCountry);
                     }
@@ -1706,29 +1692,29 @@ const ArenaHome: React.FC = () => {
                   const displayName = firestoreStats?.displayName || undefined;
                   
                   // Load wallet-specific country from localStorage (not from state which might be stale)
-                  const walletKey = publicKey.toString();
-                  const currentWalletCountry = localStorage.getItem(`user_country_${walletKey}`) || localStorage.getItem('user_country') || null;
-                  if (currentWalletCountry !== userCountry) {
-                    setUserCountry(currentWalletCountry);
-                  }
-                  
-                  // Create proper PlayerStats object for current user
-                  const currentUserPlayer: PlayerStats = firestoreStats || {
-                    wallet: publicKey.toString(),
-                    displayName: displayName,
-                    wins: 0,
-                    losses: 0,
-                    winRate: 0,
-                    totalEarned: 0,
-                    gamesPlayed: 0,
-                    lastActive: Timestamp.now(),
-                    gameStats: {},
-                    categoryStats: {}
-                  };
-                  
-                  setSelectedPlayer(currentUserPlayer);
-                  setShowPlayerProfile(true);
-                }}
+                    const walletKey = publicKey.toString();
+                    const currentWalletCountry = getWalletScopedValue(PROFILE_STORAGE_KEYS.country, walletKey);
+                    if (currentWalletCountry !== userCountry) {
+                      setUserCountry(currentWalletCountry);
+                    }
+                    
+                    // Create proper PlayerStats object for current user
+                    const currentUserPlayer: PlayerStats = firestoreStats || {
+                      wallet: publicKey.toString(),
+                      displayName: displayName,
+                      wins: 0,
+                      losses: 0,
+                      winRate: 0,
+                      totalEarned: 0,
+                      gamesPlayed: 0,
+                      lastActive: Timestamp.now(),
+                      gameStats: {},
+                      categoryStats: {}
+                    };
+                    
+                    setSelectedPlayer(currentUserPlayer);
+                    setShowPlayerProfile(true);
+                  }}
                 className="flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-800/50 hover:bg-zinc-700/50 rounded-xl border border-zinc-700 hover:border-amber-300/50 transition-all text-white text-sm font-semibold"
                 title="Profile"
               >
@@ -2747,7 +2733,7 @@ const ArenaHome: React.FC = () => {
                       // Transform live data from topPlayers
                       const transformedPlayers = topPlayers.map((player, index) => {
                         // Get country code from Firestore first (shared across all users), then fallback to localStorage
-                        const playerCountryCode = player.country || localStorage.getItem(`user_country_${player.wallet}`);
+                        const playerCountryCode = player.country || getWalletScopedValue(PROFILE_STORAGE_KEYS.country, player.wallet);
                         const countryFlag = getCountryFlag(playerCountryCode);
                         
                         // Get trust score - ensure it's a number and defaults to 0 if undefined
@@ -3275,7 +3261,7 @@ const ArenaHome: React.FC = () => {
       {/* Player Profile Modal */}
       {selectedPlayer && (
         <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div></div>}>
-        <PlayerProfileModal
+          <PlayerProfileModal
           isOpen={showPlayerProfile}
           onClose={() => {
             setShowPlayerProfile(false);
@@ -3290,71 +3276,62 @@ const ArenaHome: React.FC = () => {
             lastActive: selectedPlayer.lastActive?.seconds ? { seconds: selectedPlayer.lastActive.seconds } : undefined
           }}
           isCurrentUser={!!(publicKey && selectedPlayer.wallet === publicKey.toString())}
-          onEditProfile={async (newName) => {
-            setUserGamerTag(newName);
-            // Save wallet-specific profile data
-            if (publicKey) {
-              const walletKey = publicKey.toString();
-              localStorage.setItem(`user_gamer_tag_${walletKey}`, newName);
-              // Also save to old key for backward compatibility
-            localStorage.setItem('user_gamer_tag', newName);
-            }
-            
-            // Update selectedPlayer immediately to show new name in modal
-            if (selectedPlayer) {
-              setSelectedPlayer({
-                ...selectedPlayer,
-                displayName: newName
-              });
-            }
-            
-            // Update display name in Firestore
-            if (publicKey) {
-              try {
-                await updatePlayerDisplayName(publicKey.toString(), newName);
-                // Refresh leaderboard to show updated name
-                const limit = showAllPlayers ? 50 : 5;
-                const players = await getTopPlayers(limit, 'totalEarned');
-                setTopPlayers(players);
-              } catch (error) {
-                console.error('Failed to update display name in Firestore:', error);
-              }
-            }
-          }}
-          onCountryChange={async (country) => {
-            setUserCountry(country);
-            if (publicKey) {
-              const walletKey = publicKey.toString();
-            if (country) {
-                localStorage.setItem(`user_country_${walletKey}`, country);
-                localStorage.setItem('user_country', country); // Backward compatibility
-            } else {
-                localStorage.removeItem(`user_country_${walletKey}`);
-              localStorage.removeItem('user_country');
+            onEditProfile={async (newName) => {
+              setUserGamerTag(newName);
+              if (publicKey) {
+                const walletKey = publicKey.toString();
+                setWalletScopedValue(PROFILE_STORAGE_KEYS.gamerTag, walletKey, newName);
               }
               
-              // Save country to Firestore so all players can see it
-              try {
-                const { updatePlayerCountry } = await import("@/lib/firebase/firestore");
-                await updatePlayerCountry(walletKey, country);
-              } catch (error) {
-                console.error('❌ Failed to save country to Firestore:', error);
+              // Update selectedPlayer immediately to show new name in modal
+              if (selectedPlayer) {
+                setSelectedPlayer({
+                  ...selectedPlayer,
+                  displayName: newName
+                });
               }
-            }
-          }}
-          onProfileImageChange={(image) => {
-            setUserProfileImage(image);
-            if (publicKey) {
-              const walletKey = publicKey.toString();
-            if (image) {
-                localStorage.setItem(`user_profile_image_${walletKey}`, image);
-                localStorage.setItem('user_profile_image', image); // Backward compatibility
-            } else {
-                localStorage.removeItem(`user_profile_image_${walletKey}`);
-              localStorage.removeItem('user_profile_image');
+              
+              // Update display name in Firestore
+              if (publicKey) {
+                try {
+                  await updatePlayerDisplayName(publicKey.toString(), newName);
+                  const limit = showAllPlayers ? 50 : 5;
+                  const players = await getTopPlayers(limit, 'totalEarned');
+                  setTopPlayers(players);
+                } catch (error) {
+                  console.error('Failed to update display name in Firestore:', error);
+                }
               }
-            }
-          }}
+            }}
+            onCountryChange={async (country) => {
+              setUserCountry(country);
+              if (publicKey) {
+                const walletKey = publicKey.toString();
+                if (country) {
+                  setWalletScopedValue(PROFILE_STORAGE_KEYS.country, walletKey, country);
+                } else {
+                  clearWalletScopedValue(PROFILE_STORAGE_KEYS.country, walletKey);
+                }
+                
+                try {
+                  const { updatePlayerCountry } = await import("@/lib/firebase/firestore");
+                  await updatePlayerCountry(walletKey, country);
+                } catch (error) {
+                  console.error('❌ Failed to save country to Firestore:', error);
+                }
+              }
+            }}
+            onProfileImageChange={(image) => {
+              setUserProfileImage(image);
+              if (publicKey) {
+                const walletKey = publicKey.toString();
+                if (image) {
+                  setWalletScopedValue(PROFILE_STORAGE_KEYS.profileImage, walletKey, image);
+                } else {
+                  clearWalletScopedValue(PROFILE_STORAGE_KEYS.profileImage, walletKey);
+                }
+              }
+            }}
           onChallengePlayer={handleChallengePlayer}
           hasActiveChallenge={publicKey ? challenges.some(c => 
             c.creator === publicKey.toString() && 
@@ -3371,8 +3348,10 @@ const ArenaHome: React.FC = () => {
         currentGamerTag={userGamerTag}
         onSave={async (gamerTag) => {
           setUserGamerTag(gamerTag);
-          // Store in localStorage for persistence
-          localStorage.setItem('user_gamer_tag', gamerTag);
+            if (publicKey) {
+              const walletKey = publicKey.toString();
+              setWalletScopedValue(PROFILE_STORAGE_KEYS.gamerTag, walletKey, gamerTag);
+            }
         }}
       />
 
