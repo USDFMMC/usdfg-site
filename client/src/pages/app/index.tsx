@@ -2881,15 +2881,59 @@ const ArenaHome: React.FC = () => {
           <CreateChallengeForm
             isConnected={isConnected}
             onConnect={async () => {
-              // Select and connect Phantom wallet
-              const phantomWallet = wallet.wallets.find(w => w.adapter.name === 'Phantom');
+              // Check if mobile
+              const isMobile = typeof window !== 'undefined' && (
+                /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                window.innerWidth < 768 ||
+                'ontouchstart' in window
+              );
+              
+              const isPhantomInjected = typeof window !== 'undefined' && (
+                (window as any).phantom?.solana?.isPhantom ||
+                (window as any).solana?.isPhantom ||
+                (window as any).solflare?.isSolflare ||
+                typeof (window as any).solana !== 'undefined'
+              );
+              
+              // Find Phantom wallet
+              let phantomWallet = wallet.wallets.find(w => w.adapter.name === 'Phantom');
+              
+              // On mobile, wait for wallets to load if needed
+              if (isMobile && !phantomWallet && wallet.wallets.length === 0) {
+                for (let i = 0; i < 6; i++) {
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                  phantomWallet = wallet.wallets.find(w => w.adapter.name === 'Phantom');
+                  if (phantomWallet) break;
+                }
+              }
+              
               if (phantomWallet) {
                 wallet.select(phantomWallet.adapter.name);
                 try {
                   await phantomWallet.adapter.connect();
+                  
+                  // Wait for state to update on mobile
+                  if (isMobile) {
+                    let attempts = 0;
+                    while (attempts < 20) {
+                      await new Promise(resolve => setTimeout(resolve, 100));
+                      const isActuallyConnected = phantomWallet.adapter.connected || phantomWallet.adapter.publicKey !== null;
+                      if (isActuallyConnected) break;
+                      attempts++;
+                    }
+                  }
                 } catch (error) {
                   console.error('Connection error:', error);
+                  // On mobile, try redirecting to Phantom app if connection fails
+                  if (isMobile && !isPhantomInjected) {
+                    const currentUrl = window.location.href;
+                    window.location.href = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}`;
+                  }
                 }
+              } else if (isMobile && !isPhantomInjected) {
+                // Redirect to Phantom app on mobile if wallet not found
+                const currentUrl = window.location.href;
+                window.location.href = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}`;
               }
             }}
             onCreateChallenge={handleCreateChallenge}

@@ -22,40 +22,14 @@ export interface ChallengeMeta {
  * Discover challenges from other devices using on-chain discovery
  */
 async function discoverChallengesFromBlockchain(): Promise<ChallengeMeta[]> {
-  console.log("🔍 Implementing on-chain challenge discovery...");
+  // TODO: Implement proper on-chain discovery by querying all challenge accounts
+  // This would involve:
+  // 1. Querying all accounts created by our challenge creation process
+  // 2. Parsing the account data to extract challenge metadata
+  // 3. Filtering out expired challenges
+  // 4. Returning the active challenges
   
   try {
-    // Query all challenge accounts from the blockchain
-    console.log("🌐 Querying blockchain for all challenge accounts...");
-    
-    // Implement real on-chain discovery
-    console.log("🌐 Implementing real on-chain discovery...");
-    
-    // For now, we'll implement a basic discovery mechanism
-    // In a real implementation, we'd query all accounts and filter for challenge accounts
-    // This is a placeholder for proper on-chain discovery
-    console.log("💡 Cross-device discovery: Using on-chain query approach");
-    console.log("🔧 TODO: Implement proper on-chain challenge discovery");
-    
-    // TODO: Implement proper on-chain discovery by querying all challenge accounts
-    // This would involve:
-    // 1. Querying all accounts created by our challenge creation process
-    // 2. Parsing the account data to extract challenge metadata
-    // 3. Filtering out expired challenges
-    // 4. Returning the active challenges
-    
-    // Implement real on-chain discovery
-    console.log("🌐 Implementing real on-chain discovery...");
-    
-    // Implement real on-chain discovery
-    console.log("🌐 Implementing real on-chain discovery...");
-    
-    // For now, we'll implement a basic discovery mechanism
-    // In a real implementation, we'd query all accounts and filter for challenge accounts
-    // This is a placeholder for proper on-chain discovery
-    console.log("💡 Cross-device discovery: Using on-chain query approach");
-    console.log("🔧 TODO: Implement proper on-chain challenge discovery");
-    
     return [];
   } catch (error) {
     console.error("❌ On-chain discovery failed:", error);
@@ -120,17 +94,12 @@ export async function fetchOpenChallenges(): Promise<ChallengeMeta[]> {
   console.log('🔍 Fetching open challenges from registry...');
   
   try {
-    console.log("✅ Connected to devnet, querying registry...");
-    
     // Get challenge IDs from registry
     const challengeIds = await fetchRegistry();
     
     if (challengeIds.length === 0) {
-      console.log("📝 No challenges found in registry");
       return [];
     }
-    
-    console.log(`🌐 Found ${challengeIds.length} challenges in registry`);
     
     const challenges: ChallengeMeta[] = [];
     
@@ -181,7 +150,6 @@ export async function fetchOpenChallenges(): Promise<ChallengeMeta[]> {
             };
             
             challenges.push(challenge);
-            console.log(`🎮 Challenge Loaded: ${challenge.game} | Entry Fee: ${challenge.entryFee} | Creator: ${challenge.creator.slice(0, 8)}... | Expires: ${new Date(challenge.expiresAt).toLocaleTimeString()}`);
           } else {
             console.warn(`⚠️ No metadata found for challenge ${challengeId}`);
           }
@@ -193,7 +161,6 @@ export async function fetchOpenChallenges(): Promise<ChallengeMeta[]> {
       }
     }
     
-    console.log(`✅ Loaded ${challenges.length} active challenges from registry`);
     return challenges;
     
   } catch (error) {
@@ -206,11 +173,7 @@ export async function fetchOpenChallenges(): Promise<ChallengeMeta[]> {
  * Fetch all active challenges from devnet - works without wallet
  */
 export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
-  console.log('🔄 Fetching challenges from devnet...');
-  
   try {
-    console.log("✅ Connected to devnet, querying challenge accounts...");
-    
     // Get challenge account IDs from localStorage (temporary tracking)
     const storedChallengeIds = localStorage.getItem('usdfg_challenge_ids');
     const storedChallenges = localStorage.getItem('usdfg_challenge_metadata');
@@ -221,7 +184,6 @@ export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
     if (storedChallengeIds) {
       try {
         challengeIds = JSON.parse(storedChallengeIds);
-        console.log(`📦 Found ${challengeIds.length} local challenge account IDs`);
       } catch (e) {
         console.error("❌ Failed to parse stored challenge IDs:", e);
         challengeIds = [];
@@ -231,7 +193,6 @@ export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
     if (storedChallenges) {
       try {
         challengeMetadata = JSON.parse(storedChallenges);
-        console.log(`📦 Found ${challengeMetadata.length} local challenge metadata entries`);
       } catch (e) {
         console.error("❌ Failed to parse stored challenge metadata:", e);
         challengeMetadata = [];
@@ -239,24 +200,11 @@ export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
     }
     
     // Try to discover challenges from other devices using on-chain discovery
-    console.log("🔍 Attempting to discover challenges from other devices...");
-    
-    // Implement proper on-chain discovery
     try {
-      console.log("🌐 Implementing on-chain challenge discovery...");
-      
-      // Call the new on-chain discovery function
       const discoveredChallenges = await discoverChallengesFromBlockchain();
-      console.log(`🌐 Discovered ${discoveredChallenges.length} challenges from other devices`);
-      
-      // Add discovered challenges to our local list
-      if (discoveredChallenges.length > 0) {
-        console.log("🌐 Adding discovered challenges to local storage for future reference");
-        // TODO: Add discovered challenges to localStorage for future reference
-      }
-      
+      // TODO: Add discovered challenges to localStorage for future reference
     } catch (error) {
-      console.log("🌐 Cross-device discovery failed, using local storage only:", error);
+      // Cross-device discovery failed, using local storage only
     }
     
     const challenges: ChallengeMeta[] = [];
@@ -294,7 +242,6 @@ export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
             };
             
             challenges.push(challenge);
-            console.log(`🎮 Challenge Loaded: ${challenge.game} | Entry Fee: ${challenge.entryFee} | Creator: ${challenge.creator.slice(0, 8)}... | Expires: ${new Date(challenge.expiresAt).toLocaleTimeString()}`);
           } else {
             console.warn(`⚠️ No metadata found for challenge ${challengeId}`);
           }
@@ -307,12 +254,8 @@ export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
     }
     
     if (challenges.length === 0) {
-      console.log("📝 No challenges found on devnet");
-      console.log("💡 To see challenges, create one using the 'Create Challenge' button");
-      console.log("⏰ Challenges expire after 2 hours to prevent network bloat");
+      // No challenges found on devnet
     }
-    
-    console.log(`✅ Loaded ${challenges.length} active challenges from devnet`);
     return challenges;
     
   } catch (error) {
@@ -326,17 +269,13 @@ export async function fetchActiveChallenges(): Promise<ChallengeMeta[]> {
  * TODO: Replace with actual Solana program query
  */
 export async function fetchChallengeDetails(challengeId: string): Promise<ChallengeMeta | null> {
-  console.log(`🔍 Fetching challenge details for: ${challengeId}`);
-  
   try {
     const accountInfo = await connection.getAccountInfo(new PublicKey(challengeId));
     if (accountInfo && accountInfo.data) {
-      console.log(`✅ Found challenge account: ${challengeId}`);
-  
       // Parse account data to extract challenge metadata
       // This is a placeholder - in a real implementation, we'd parse the account data
       const challenge: ChallengeMeta = {
-    id: challengeId,
+        id: challengeId,
         clientId: challengeId,
         creator: "Unknown",
         game: "Unknown Game",
@@ -348,10 +287,8 @@ export async function fetchChallengeDetails(challengeId: string): Promise<Challe
       };
       
       return challenge;
-    } else {
-      console.log(`❌ Challenge account not found: ${challengeId}`);
-      return null;
     }
+    return null;
   } catch (error) {
     console.error(`❌ Failed to fetch challenge details for ${challengeId}:`, error);
     return null;
