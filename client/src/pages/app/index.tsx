@@ -3057,7 +3057,21 @@ const ArenaHome: React.FC = () => {
           />
         </ElegantModal>
 
-
+        {/* Team Management Modal */}
+        {showTeamModal && (
+          <Suspense fallback={<div className="flex justify-center items-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div></div>}>
+            <ElegantModal
+              isOpen={showTeamModal}
+              onClose={() => setShowTeamModal(false)}
+              title="Team Management"
+            >
+              <TeamManagementModal
+                currentWallet={publicKey?.toString() || null}
+                onClose={() => setShowTeamModal(false)}
+              />
+            </ElegantModal>
+          </Suspense>
+        )}
 
         {/* Join Challenge Modal */}
         {showJoinModal && selectedChallenge && (
