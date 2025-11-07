@@ -248,35 +248,63 @@ export default function PlayerProfileModal({
 
   // Check special trophies and team info when modal opens
   useEffect(() => {
-    if (isOpen && player.wallet) {
-      const checkTrophies = async () => {
-        const unlocked = new Set<string>();
-        // Check OG First 1k trophy from player stats
-        if (player.wallet) {
-          const hasOgFirst1k = await checkPlayerHasOgFirst1k(player.wallet);
-          if (hasOgFirst1k) {
-            unlocked.add('og-1k');
-          }
-          // Check Founder Challenge trophy from player stats
-          const hasFounderChallenge = await checkPlayerHasFounderChallenge(player.wallet);
-          if (hasFounderChallenge) {
-            unlocked.add('founder-challenge');
-          }
+    if (!isOpen) {
+      setUserTeam(null);
+      setSpecialTrophiesUnlocked(new Set());
+      return;
+    }
+
+    const playerWallet = player.wallet || player.address;
+
+    if (!playerWallet) {
+      setUserTeam(null);
+      setSpecialTrophiesUnlocked(new Set());
+      return;
+    }
+
+    let isCancelled = false;
+    setUserTeam(null);
+
+    const checkTrophies = async () => {
+      const unlocked = new Set<string>();
+      try {
+        const hasOgFirst1k = await checkPlayerHasOgFirst1k(playerWallet);
+        if (hasOgFirst1k) {
+          unlocked.add('og-1k');
         }
+        const hasFounderChallenge = await checkPlayerHasFounderChallenge(playerWallet);
+        if (hasFounderChallenge) {
+          unlocked.add('founder-challenge');
+        }
+      } catch (error) {
+        console.error('Failed to check special trophies:', error);
+      }
+
+      if (!isCancelled) {
         setSpecialTrophiesUnlocked(unlocked);
-      };
-      
-      const fetchTeam = async () => {
-        if (player.wallet) {
-          const team = await getTeamByMember(player.wallet);
+      }
+    };
+    
+    const fetchTeam = async () => {
+      try {
+        const team = await getTeamByMember(playerWallet);
+        if (!isCancelled) {
           setUserTeam(team);
         }
-      };
-      
-      checkTrophies();
-      fetchTeam();
-    }
-  }, [isOpen, player.wallet]);
+      } catch (error) {
+        if (!isCancelled) {
+          setUserTeam(null);
+        }
+      }
+    };
+    
+    checkTrophies();
+    fetchTeam();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isOpen, player.wallet, player.address]);
   
   
   if (!isOpen) return null;

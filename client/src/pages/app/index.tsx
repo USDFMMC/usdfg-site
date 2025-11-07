@@ -1628,31 +1628,33 @@ const ArenaHome: React.FC = () => {
                 <button
                   onClick={async () => {
                     // Fetch current user's stats from Firestore (use Firestore data, not localStorage)
-                    const firestoreStats = await getPlayerStats(publicKey.toString());
+                    const walletKey = publicKey.toString();
+                    const firestoreStats = await getPlayerStats(walletKey);
                     
                     // Use Firestore displayName (don't fall back to localStorage - it might be from a different wallet)
                     const displayName = firestoreStats?.displayName || undefined;
                     
                     // Load wallet-specific country from localStorage (not from state which might be stale)
-                    const walletKey = publicKey.toString();
                     const currentWalletCountry = localStorage.getItem(`user_country_${walletKey}`) || localStorage.getItem('user_country') || null;
                     if (currentWalletCountry !== userCountry) {
                       setUserCountry(currentWalletCountry);
                     }
                     
                     // Create proper PlayerStats object for current user
-                    const currentUserPlayer: PlayerStats = firestoreStats || {
-                      wallet: publicKey.toString(),
-                      displayName: displayName,
-                      wins: 0,
-                      losses: 0,
-                      winRate: 0,
-                      totalEarned: 0,
-                      gamesPlayed: 0,
-                      lastActive: Timestamp.now(),
-                      gameStats: {},
-                      categoryStats: {}
-                    };
+                    const currentUserPlayer: PlayerStats = firestoreStats
+                      ? { ...firestoreStats, wallet: walletKey }
+                      : {
+                          wallet: walletKey,
+                          displayName,
+                          wins: 0,
+                          losses: 0,
+                          winRate: 0,
+                          totalEarned: 0,
+                          gamesPlayed: 0,
+                          lastActive: Timestamp.now(),
+                          gameStats: {},
+                          categoryStats: {}
+                        };
                     
                     setSelectedPlayer(currentUserPlayer);
                     setShowPlayerProfile(true);
@@ -1700,31 +1702,33 @@ const ArenaHome: React.FC = () => {
               <button
                 onClick={async () => {
                   // Fetch current user's stats from Firestore (use Firestore data, not localStorage)
-                  const firestoreStats = await getPlayerStats(publicKey.toString());
+                  const walletKey = publicKey.toString();
+                  const firestoreStats = await getPlayerStats(walletKey);
                   
                   // Use Firestore displayName (don't fall back to localStorage - it might be from a different wallet)
                   const displayName = firestoreStats?.displayName || undefined;
                   
                   // Load wallet-specific country from localStorage (not from state which might be stale)
-                  const walletKey = publicKey.toString();
                   const currentWalletCountry = localStorage.getItem(`user_country_${walletKey}`) || localStorage.getItem('user_country') || null;
                   if (currentWalletCountry !== userCountry) {
                     setUserCountry(currentWalletCountry);
                   }
                   
                   // Create proper PlayerStats object for current user
-                  const currentUserPlayer: PlayerStats = firestoreStats || {
-                    wallet: publicKey.toString(),
-                    displayName: displayName,
-                    wins: 0,
-                    losses: 0,
-                    winRate: 0,
-                    totalEarned: 0,
-                    gamesPlayed: 0,
-                    lastActive: Timestamp.now(),
-                    gameStats: {},
-                    categoryStats: {}
-                  };
+                  const currentUserPlayer: PlayerStats = firestoreStats
+                    ? { ...firestoreStats, wallet: walletKey }
+                    : {
+                        wallet: walletKey,
+                        displayName,
+                        wins: 0,
+                        losses: 0,
+                        winRate: 0,
+                        totalEarned: 0,
+                        gamesPlayed: 0,
+                        lastActive: Timestamp.now(),
+                        gameStats: {},
+                        categoryStats: {}
+                      };
                   
                   setSelectedPlayer(currentUserPlayer);
                   setShowPlayerProfile(true);
@@ -2805,19 +2809,37 @@ const ArenaHome: React.FC = () => {
                           // Fetch latest player stats from Firestore to ensure we have the most up-to-date trust score
                           if (player.playerStats) {
                             try {
-                              const latestStats = await getPlayerStats(player.playerStats.wallet);
-                              if (latestStats) {
-                                setSelectedPlayer(latestStats);
+                              const walletAddress = player.playerStats.wallet || player.wallet;
+                              if (!walletAddress) {
+                                setSelectedPlayer({
+                                  ...player.playerStats,
+                                  wallet: player.playerStats.wallet
+                                });
                               } else {
-                                // Fallback to cached data if fetch fails
-                                setSelectedPlayer(player.playerStats);
+                                const latestStats = await getPlayerStats(walletAddress);
+                                if (latestStats) {
+                                  setSelectedPlayer({
+                                    ...latestStats,
+                                    wallet: walletAddress
+                                  });
+                                } else {
+                                  // Fallback to cached data if fetch fails
+                                  setSelectedPlayer({
+                                    ...player.playerStats,
+                                    wallet: walletAddress
+                                  });
+                                }
                               }
                             } catch (error) {
                               console.error('Failed to fetch latest player stats:', error);
                               // Fallback to cached data if fetch fails
-                              setSelectedPlayer(player.playerStats);
+                              const fallbackWallet = player.playerStats.wallet || player.wallet;
+                              setSelectedPlayer({
+                                ...player.playerStats,
+                                wallet: fallbackWallet || player.playerStats.wallet
+                              });
                             }
-                          setShowPlayerProfile(true);
+                            setShowPlayerProfile(true);
                           }
                         }}
                         style={{ zIndex: 10, position: 'relative' }}
