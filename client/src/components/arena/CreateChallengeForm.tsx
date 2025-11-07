@@ -56,24 +56,35 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     }
   }, [userGamerTag]);
   
-  // Also update username when wallet connects (in case userGamerTag prop hasn't updated yet)
+  // Update username immediately when wallet connects (check localStorage directly)
   useEffect(() => {
-    if (walletConnected && publicKey && !userGamerTag) {
-      // Wait a bit for parent component to load userGamerTag
+    if (isConnected && publicKey) {
+      // Check localStorage immediately when wallet connects
+      const walletKey = publicKey.toString();
+      const savedGamerTag = localStorage.getItem(`user_gamer_tag_${walletKey}`) || localStorage.getItem('user_gamer_tag');
+      
+      if (savedGamerTag && savedGamerTag !== formData.username) {
+        setFormData(prev => ({
+          ...prev,
+          username: savedGamerTag
+        }));
+      }
+      
+      // Also wait a bit for parent component to load userGamerTag from Firestore
+      // This will update again if Firestore has a more recent value
       const timeoutId = setTimeout(() => {
-        // Check localStorage directly as fallback
-        const walletKey = publicKey.toString();
-        const savedGamerTag = localStorage.getItem(`user_gamer_tag_${walletKey}`) || localStorage.getItem('user_gamer_tag');
-        if (savedGamerTag && savedGamerTag !== formData.username) {
+        const updatedGamerTag = localStorage.getItem(`user_gamer_tag_${walletKey}`) || localStorage.getItem('user_gamer_tag');
+        if (updatedGamerTag && updatedGamerTag !== formData.username) {
           setFormData(prev => ({
             ...prev,
-            username: savedGamerTag
+            username: updatedGamerTag
           }));
         }
-      }, 500);
+      }, 1000); // Wait 1 second for Firestore fetch to complete
+      
       return () => clearTimeout(timeoutId);
     }
-  }, [walletConnected, publicKey, userGamerTag, formData.username]);
+  }, [isConnected, publicKey, formData.username]);
   
   // Force re-render when connection state changes
   useEffect(() => {
@@ -318,6 +329,17 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
         const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
         const isActuallyConnected = phantomWallet?.adapter?.connected || phantomWallet?.adapter?.publicKey !== null;
         if (isActuallyConnected) {
+          // Once connected, immediately check localStorage for username
+          const walletKey = phantomWallet.adapter.publicKey?.toString();
+          if (walletKey) {
+            const savedGamerTag = localStorage.getItem(`user_gamer_tag_${walletKey}`) || localStorage.getItem('user_gamer_tag');
+            if (savedGamerTag) {
+              setFormData(prev => ({
+                ...prev,
+                username: savedGamerTag
+              }));
+            }
+          }
           break;
         }
         attempts++;
