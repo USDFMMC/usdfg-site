@@ -38,13 +38,14 @@ const usersCollection = collection(db, 'users');
 // Optimized Challenge Data - Minimal Collection
 export interface ChallengeData {
   id?: string;
-  creator: string;                    // Creator wallet
-  challenger?: string;                // Challenger wallet (if accepted)
+  creator: string;                    // Creator wallet (or team key for team challenges)
+  challenger?: string;                // Challenger wallet (if accepted) or team key
   entryFee: number;                   // Entry fee amount
   status: 'pending' | 'active' | 'completed' | 'cancelled' | 'disputed' | 'in-progress';
   createdAt: Timestamp;               // Creation time
   expiresAt: Timestamp;               // Expiration time
-  winner?: string;                    // Winner wallet (if completed)
+  winner?: string;                    // Winner wallet (if completed) or team key
+  challengeType?: 'solo' | 'team';    // Challenge type - solo or team (defaults to solo for backward compatibility)
   // Result submission fields
   results?: {
     [wallet: string]: {
@@ -1121,6 +1122,39 @@ export interface PlayerStats {
   };
 }
 
+// Team Stats Interface - Elite Esports Teams
+export interface TeamStats {
+  teamId: string; // Unique team ID (wallet address of team key holder)
+  teamName: string; // Team name
+  teamKey: string; // Main wallet that controls the team (team owner)
+  members: string[]; // Array of member wallet addresses (up to 69)
+  wins: number;
+  losses: number;
+  winRate: number;
+  totalEarned: number;
+  gamesPlayed: number;
+  lastActive: Timestamp;
+  createdAt: Timestamp;
+  // Team trust score (average of all members)
+  trustScore?: number;
+  trustReviews?: number;
+  // Team game stats
+  gameStats: {
+    [game: string]: {
+      wins: number;
+      losses: number;
+      earned: number;
+    }
+  };
+  categoryStats: {
+    [category: string]: {
+      wins: number;
+      losses: number;
+      earned: number;
+    }
+  };
+}
+
 /**
  * Calculate trust score for a player from Firestore
  */
@@ -1645,6 +1679,260 @@ export async function updatePlayerCountry(wallet: string, countryCode: string | 
   } catch (error) {
     console.error('❌ Error updating country:', error);
     throw error;
+  }
+}
+
+/**
+ * Create a new team
+ */
+export async function createTeam(teamKey: string, teamName: string): Promise<string> {
+  try {
+    const teamRef = doc(db, 'teams', teamKey);
+    const teamSnap = await getDoc(teamRef);
+    
+    if (teamSnap.exists()) {
+      throw new Error("Team already exists with this wallet");
+    }
+    
+    const newTeam: TeamStats = {
+      teamId: teamKey,
+      teamName: teamName.trim(),
+      teamKey: teamKey,
+      members: [teamKey], // Team key holder is first member
+      wins: 0,
+      losses: 0,
+      winRate: 0,
+      totalEarned: 0,
+      gamesPlayed: 0,
+      lastActive: Timestamp.now(),
+      createdAt: Timestamp.now(),
+      trustScore: 0,
+      trustReviews: 0,
+      gameStats: {},
+      categoryStats: {}
+    };
+    
+    await setDoc(teamRef, newTeam);
+    console.log(`✅ Created team: ${teamName} (${teamKey})`);
+    return teamKey;
+  } catch (error) {
+    console.error('❌ Error creating team:', error);
+    throw error;
+  }
+}
+
+/**
+ * Join a team
+ */
+export async function joinTeam(teamId: string, memberWallet: string): Promise<void> {
+  try {
+    const teamRef = doc(db, 'teams', teamId);
+    const teamSnap = await getDoc(teamRef);
+    
+    if (!teamSnap.exists()) {
+      throw new Error("Team not found");
+    }
+    
+    const teamData = teamSnap.data() as TeamStats;
+    
+    if (teamData.members.includes(memberWallet)) {
+      throw new Error("Already a member of this team");
+    }
+    
+    if (teamData.members.length >= 69) {
+      throw new Error("Team is full (69 members max)");
+    }
+    
+    await updateDoc(teamRef, {
+      members: arrayUnion(memberWallet),
+      lastActive: Timestamp.now()
+    });
+    
+    console.log(`✅ ${memberWallet} joined team: ${teamData.teamName}`);
+  } catch (error) {
+    console.error('❌ Error joining team:', error);
+    throw error;
+  }
+}
+
+/**
+ * Leave a team
+ */
+export async function leaveTeam(teamId: string, memberWallet: string): Promise<void> {
+  try {
+    const teamRef = doc(db, 'teams', teamId);
+    const teamSnap = await getDoc(teamRef);
+    
+    if (!teamSnap.exists()) {
+      throw new Error("Team not found");
+    }
+    
+    const teamData = teamSnap.data() as TeamStats;
+    
+    if (teamData.teamKey === memberWallet) {
+      throw new Error("Team key holder cannot leave. Transfer team key first.");
+    }
+    
+    if (!teamData.members.includes(memberWallet)) {
+      throw new Error("Not a member of this team");
+    }
+    
+    await updateDoc(teamRef, {
+      members: teamData.members.filter(m => m !== memberWallet),
+      lastActive: Timestamp.now()
+    });
+    
+    console.log(`✅ ${memberWallet} left team: ${teamData.teamName}`);
+  } catch (error) {
+    console.error('❌ Error leaving team:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get team stats by team ID
+ */
+export async function getTeamStats(teamId: string): Promise<TeamStats | null> {
+  try {
+    const teamRef = doc(db, 'teams', teamId);
+    const teamSnap = await getDoc(teamRef);
+    
+    if (!teamSnap.exists()) {
+      return null;
+    }
+    
+    return teamSnap.data() as TeamStats;
+  } catch (error) {
+    console.error('❌ Error fetching team stats:', error);
+    return null;
+  }
+}
+
+/**
+ * Get team by member wallet
+ */
+export async function getTeamByMember(memberWallet: string): Promise<TeamStats | null> {
+  try {
+    const teamsRef = collection(db, 'teams');
+    const q = query(teamsRef, where('members', 'array-contains', memberWallet));
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) {
+      return null;
+    }
+    
+    return querySnapshot.docs[0].data() as TeamStats;
+  } catch (error) {
+    console.error('❌ Error fetching team by member:', error);
+    return null;
+  }
+}
+
+/**
+ * Update team stats after a challenge completes
+ */
+export async function updateTeamStats(
+  teamId: string,
+  result: 'win' | 'loss',
+  amountEarned: number,
+  game: string,
+  category: string
+): Promise<void> {
+  try {
+    const teamRef = doc(db, 'teams', teamId);
+    const teamSnap = await getDoc(teamRef);
+    
+    if (!teamSnap.exists()) {
+      throw new Error("Team not found");
+    }
+    
+    const currentStats = teamSnap.data() as TeamStats;
+    const newWins = result === 'win' ? currentStats.wins + 1 : currentStats.wins;
+    const newLosses = result === 'loss' ? currentStats.losses + 1 : currentStats.losses;
+    const newGamesPlayed = currentStats.gamesPlayed + 1;
+    const newWinRate = newGamesPlayed > 0 ? (newWins / newGamesPlayed) * 100 : 0;
+    const newTotalEarned = currentStats.totalEarned + amountEarned;
+    
+    // Update game stats
+    const currentGameStats = currentStats.gameStats[game] || { wins: 0, losses: 0, earned: 0 };
+    const newGameStats = {
+      ...currentStats.gameStats,
+      [game]: {
+        wins: result === 'win' ? currentGameStats.wins + 1 : currentGameStats.wins,
+        losses: result === 'loss' ? currentGameStats.losses + 1 : currentGameStats.losses,
+        earned: currentGameStats.earned + amountEarned
+      }
+    };
+    
+    // Update category stats
+    const currentCategoryStats = currentStats.categoryStats[category] || { wins: 0, losses: 0, earned: 0 };
+    const newCategoryStats = {
+      ...currentStats.categoryStats,
+      [category]: {
+        wins: result === 'win' ? currentCategoryStats.wins + 1 : currentCategoryStats.wins,
+        losses: result === 'loss' ? currentCategoryStats.losses + 1 : currentCategoryStats.losses,
+        earned: currentCategoryStats.earned + amountEarned
+      }
+    };
+    
+    await updateDoc(teamRef, {
+      wins: newWins,
+      losses: newLosses,
+      winRate: newWinRate,
+      totalEarned: newTotalEarned,
+      gamesPlayed: newGamesPlayed,
+      lastActive: Timestamp.now(),
+      gameStats: newGameStats,
+      categoryStats: newCategoryStats
+    });
+    
+    console.log(`✅ Updated team stats: ${teamId} - ${result} (+${amountEarned} USDFG)`);
+  } catch (error) {
+    console.error('❌ Error updating team stats:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get top teams for leaderboard
+ */
+export async function getTopTeams(limitCount: number = 10, sortBy: 'wins' | 'winRate' | 'totalEarned' = 'totalEarned'): Promise<TeamStats[]> {
+  try {
+    const teamsRef = collection(db, 'teams');
+    let q;
+    
+    switch (sortBy) {
+      case 'wins':
+        q = query(teamsRef, orderBy('wins', 'desc'), limit(limitCount));
+        break;
+      case 'winRate':
+        q = query(teamsRef, orderBy('winRate', 'desc'), limit(limitCount));
+        break;
+      case 'totalEarned':
+      default:
+        q = query(teamsRef, orderBy('totalEarned', 'desc'), limit(limitCount));
+        break;
+    }
+    
+    const querySnapshot = await getDocs(q);
+    const teams: TeamStats[] = [];
+    
+    querySnapshot.forEach((doc) => {
+      const data = doc.data() as TeamStats;
+      // Ensure trustScore is always a number (default to 0 if undefined)
+      if (data.trustScore === undefined) {
+        data.trustScore = 0;
+      }
+      if (data.trustReviews === undefined) {
+        data.trustReviews = 0;
+      }
+      teams.push(data);
+    });
+    
+    return teams;
+  } catch (error) {
+    console.error('❌ Error fetching top teams:', error);
+    return [];
   }
 }
 

@@ -8,7 +8,7 @@ import { joinChallengeOnChain } from "@/lib/chain/events";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
-import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, PlayerStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge } from "@/lib/firebase/firestore";
+import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats } from "@/lib/firebase/firestore";
 import { Timestamp } from "firebase/firestore";
 import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
@@ -782,6 +782,9 @@ const ArenaHome: React.FC = () => {
     setIsCreatingChallenge(true);
     
     try {
+      // Check if this is a team challenge
+      const isTeamChallenge = challengeData.challengeType === 'team';
+      
       // Wait for wallet state to be fully ready (especially after connecting via form)
       let attempts = 0;
       let currentWallet = publicKey?.toString() || null;
@@ -804,6 +807,23 @@ const ArenaHome: React.FC = () => {
       
       if (!currentWallet) {
         throw new Error("Wallet not connected. Please connect your wallet first.");
+      }
+      
+      // For team challenges, check if user is a team key holder
+      if (isTeamChallenge) {
+        const { getTeamByMember } = await import("@/lib/firebase/firestore");
+        const userTeam = await getTeamByMember(currentWallet);
+        
+        if (!userTeam) {
+          throw new Error("You must be part of a team to create team challenges. Create or join a team first.");
+        }
+        
+        if (userTeam.teamKey !== currentWallet) {
+          throw new Error("Only the team key holder can create team challenges.");
+        }
+        
+        // Use team's wallet (teamKey) for team challenges
+        currentWallet = userTeam.teamKey;
       }
 
       // 🔍 Check if the user already has an active challenge (as creator OR participant)
@@ -978,6 +998,8 @@ const ArenaHome: React.FC = () => {
         category: getGameCategory(challengeData.game || extractGameFromTitle(challengeTitle)), // Store category for filtering
         // Store platform for display - players need to know which platform
         platform: challengeData.platform || 'All Platforms', // Store platform for display
+        // Challenge type - solo or team
+        challengeType: isTeamChallenge ? 'team' : 'solo', // Store challenge type
         // REMOVED: creatorTag, mode, rules, solanaAccountId
         // These are not needed for leaderboards and increase storage costs unnecessarily
       };
