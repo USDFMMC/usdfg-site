@@ -25,6 +25,7 @@ const SubmitResultRoom = lazy(() => import("@/components/arena/SubmitResultRoom"
 const PlayerProfileModal = lazy(() => import("@/components/arena/PlayerProfileModal"));
 const ChallengeChatModal = lazy(() => import("@/components/arena/ChallengeChatModal").then(module => ({ default: module.ChallengeChatModal })));
 const TrustReviewModal = lazy(() => import("@/components/arena/TrustReviewModal"));
+const TeamManagementModal = lazy(() => import("@/components/arena/TeamManagementModal"));
 
 // Ad Rotation Component for Win Rate Box
 const AdRotationBox: React.FC = () => {
