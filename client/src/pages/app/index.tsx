@@ -283,18 +283,18 @@ const ArenaHome: React.FC = () => {
       const savedProfileImage = localStorage.getItem(`user_profile_image_${walletKey}`) || localStorage.getItem('user_profile_image');
       
       // Set from localStorage immediately
-      if (savedGamerTag) {
-        setUserGamerTag(savedGamerTag);
+    if (savedGamerTag) {
+      setUserGamerTag(savedGamerTag);
       } else {
         setUserGamerTag(''); // Clear if no saved tag for this wallet
-      }
-      if (savedCountry) {
-        setUserCountry(savedCountry);
+    }
+    if (savedCountry) {
+      setUserCountry(savedCountry);
       } else {
         setUserCountry(null);
-      }
-      if (savedProfileImage) {
-        setUserProfileImage(savedProfileImage);
+    }
+    if (savedProfileImage) {
+      setUserProfileImage(savedProfileImage);
       } else {
         setUserProfileImage(null);
       }
@@ -827,11 +827,14 @@ const ArenaHome: React.FC = () => {
         const userTeam = await getTeamByMember(currentWallet);
         
         if (!userTeam) {
-          throw new Error("You must be part of a team to create team challenges. Create or join a team first.");
+          // Close create challenge modal and open team management modal
+          setShowCreateModal(false);
+          setShowTeamModal(true);
+          throw new Error("You must be part of a team to create team challenges. Opening team management...");
         }
         
         if (userTeam.teamKey !== currentWallet) {
-          throw new Error("Only the team key holder can create team challenges.");
+          throw new Error("Only the team key holder can create team challenges. You are a team member, not the key holder.");
         }
         
         // Use team's wallet (teamKey) for team challenges
@@ -2914,16 +2917,16 @@ const ArenaHome: React.FC = () => {
                   <div className="px-6 pb-6 space-y-2">
                     {showAllPlayers ? (
                       <>
-                        <button
-                          onClick={() => {
+                    <button
+                      onClick={() => {
                             setShowAllPlayers(false);
                             setLeaderboardLimit(30); // Reset to default
-                            setLoadingTopPlayers(true);
-                          }}
-                          className="w-full py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-amber-400 text-sm font-semibold transition-colors"
-                        >
+                        setLoadingTopPlayers(true);
+                      }}
+                      className="w-full py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-amber-400 text-sm font-semibold transition-colors"
+                    >
                           ← Show Less (Top 5)
-                        </button>
+                    </button>
                         {/* Load More button - only show if we got the full limit (meaning there might be more) */}
                         {topPlayers.length === leaderboardLimit && (
                           <button
