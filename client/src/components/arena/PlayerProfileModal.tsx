@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Trophy, Gamepad2, Swords, Flame, Shield, Crown, X, Edit3 } from "lucide-react";
+import { Trophy, Gamepad2, Swords, Flame, Shield, Crown, X, Edit3, Users } from "lucide-react";
 import ProfileImageUpload from "../ui/ProfileImageUpload";
 import CountryFlagPicker from "../ui/CountryFlagPicker";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "../ui/tooltip";
 import { USDFG_RELICS, getUnlockedTrophies, getNextTrophy, getTrophyProgress, getTrophyColorClass, checkPlayerHasOgFirst1k, checkPlayerHasFounderChallenge } from "@/lib/trophies";
+import { getTeamByMember, TeamStats } from "@/lib/firebase/firestore";
 
 // Countries list for flag display - matches CountryFlagPicker
 const countries = [
