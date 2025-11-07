@@ -77,7 +77,7 @@ const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ currentWallet
     }
 
     if (!joinTeamId.trim()) {
-      setError('Team ID is required');
+      setError('Team key holder wallet address is required');
       return;
     }
 
@@ -184,21 +184,32 @@ const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ currentWallet
             </div>
           </div>
 
-          {userTeam.teamKey !== currentWallet && (
-            <ElegantButton
-              onClick={handleLeaveTeam}
-              variant="danger"
-              className="w-full"
-            >
-              Leave Team
-            </ElegantButton>
-          )}
-
-          {userTeam.teamKey === currentWallet && (
+          {userTeam.teamKey === currentWallet ? (
             <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-              <p className="text-amber-400 text-xs">
-                🔑 You are the team key holder. You control team challenges and can add/remove members.
+              <p className="text-amber-400 text-xs font-semibold mb-2">
+                🔑 You are the team key holder
               </p>
+              <p className="text-zinc-400 text-xs">
+                Only you can create team challenges. Your wallet controls the team account for security. Team members can participate but cannot control the team.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="p-3 bg-zinc-800/50 border border-zinc-700 rounded-lg">
+                <p className="text-zinc-400 text-xs mb-2">
+                  <span className="font-semibold text-white">Team Key Holder:</span> {userTeam.teamKey.slice(0, 8)}...{userTeam.teamKey.slice(-4)}
+                </p>
+                <p className="text-zinc-500 text-xs">
+                  Only the team key holder can create team challenges. You can participate in team challenges but cannot control the team account.
+                </p>
+              </div>
+              <ElegantButton
+                onClick={handleLeaveTeam}
+                variant="danger"
+                className="w-full"
+              >
+                Leave Team
+              </ElegantButton>
             </div>
           )}
         </div>
@@ -209,7 +220,7 @@ const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ currentWallet
           <div className="p-4 bg-zinc-800/50 border border-zinc-700 rounded-lg">
             <h3 className="text-base font-semibold text-white mb-3">Create Team</h3>
             <p className="text-xs text-zinc-400 mb-3">
-              Create a new team. Your wallet will be the team key holder (controls team challenges).
+              Create a new team. Your wallet will be the team key holder and will control all team challenges for security. Team members can participate but cannot control the team account.
             </p>
             <div className="space-y-2">
               <input
@@ -238,7 +249,7 @@ const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ currentWallet
           <div className="p-4 bg-zinc-800/50 border border-zinc-700 rounded-lg">
             <h3 className="text-base font-semibold text-white mb-3">Join Team</h3>
             <p className="text-xs text-zinc-400 mb-3">
-              Join an existing team by entering the team key holder's wallet address.
+              Join an existing team by entering the team key holder's wallet address. Only the team key holder can create team challenges for security.
             </p>
             <div className="space-y-2">
               <input
