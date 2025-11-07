@@ -1043,7 +1043,11 @@ const ArenaHome: React.FC = () => {
       
     } catch (error) {
       console.error("❌ Failed to create challenge:", error);
-      alert("Failed to create challenge: " + (error instanceof Error ? error.message : "Unknown error"));
+      // Don't show alert if we're redirecting to team management (to avoid double popups)
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      if (!errorMessage.includes("Opening team management")) {
+        alert("Failed to create challenge: " + errorMessage);
+      }
     } finally {
       setIsCreatingChallenge(false);
     }
