@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getTeamByMember, createTeam, joinTeam, leaveTeam, getTeamStats, transferTeamKey, TeamStats } from '@/lib/firebase/firestore';
+import { getTeamByMember, createTeam, joinTeam, leaveTeam, getTeamStats, TeamStats } from '@/lib/firebase/firestore';
 import ElegantButton from '@/components/ui/ElegantButton';
 
 interface TeamManagementModalProps {
@@ -12,10 +12,8 @@ const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ currentWallet
   const [loading, setLoading] = useState<boolean>(true);
   const [teamName, setTeamName] = useState<string>('');
   const [joinTeamId, setJoinTeamId] = useState<string>('');
-  const [transferToWallet, setTransferToWallet] = useState<string>('');
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [isJoining, setIsJoining] = useState<boolean>(false);
-  const [isTransferring, setIsTransferring] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
   // Fetch user's team
@@ -95,52 +93,6 @@ const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ currentWallet
       setError(error.message || 'Failed to join team');
     } finally {
       setIsJoining(false);
-    }
-  };
-
-  const handleTransferTeamKey = async () => {
-    if (!currentWallet || !userTeam) {
-      return;
-    }
-
-    if (!transferToWallet.trim()) {
-      setError('Please enter the wallet address of the new team key holder');
-      return;
-    }
-
-    // Security check: New key holder must be an existing team member
-    if (!userTeam.members.includes(transferToWallet.trim())) {
-      setError('New team key holder must be an existing team member');
-      return;
-    }
-
-    // Security check: Cannot transfer to yourself
-    if (transferToWallet.trim() === currentWallet) {
-      setError('Cannot transfer leadership to yourself');
-      return;
-    }
-
-    if (!window.confirm(
-      `⚠️ SECURITY WARNING ⚠️\n\n` +
-      `You are about to transfer team leadership to:\n${transferToWallet.trim()}\n\n` +
-      `This will give them full control of the team account.\n\n` +
-      `Are you absolutely sure you want to proceed?`
-    )) {
-      return;
-    }
-
-    try {
-      setIsTransferring(true);
-      setError('');
-      await transferTeamKey(userTeam.teamId, currentWallet, transferToWallet.trim());
-      // Refresh team data (team ID will have changed)
-      const team = await getTeamByMember(transferToWallet.trim());
-      setUserTeam(team);
-      setTransferToWallet('');
-    } catch (error: any) {
-      setError(error.message || 'Failed to transfer team key');
-    } finally {
-      setIsTransferring(false);
     }
   };
 
@@ -233,45 +185,16 @@ const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ currentWallet
           </div>
 
           {userTeam.teamKey === currentWallet ? (
-            <div className="space-y-3">
-              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                <p className="text-amber-400 text-xs font-semibold mb-2">
-                  🔑 You are the team key holder
-                </p>
-                <p className="text-zinc-400 text-xs">
-                  Only you can create team challenges. Your wallet controls the team account for security. Team members can participate but cannot control the team.
-                </p>
-              </div>
-              
-              {/* Transfer Team Key Section */}
-              {userTeam.members.length > 1 && (
-                <div className="p-4 bg-zinc-800/50 border border-zinc-700 rounded-lg">
-                  <h4 className="text-sm font-semibold text-white mb-2">Transfer Team Leadership</h4>
-                  <p className="text-xs text-zinc-400 mb-3">
-                    Transfer team leadership to another team member. This will give them full control of the team account.
-                  </p>
-                  <div className="space-y-2">
-                    <input
-                      type="text"
-                      value={transferToWallet}
-                      onChange={(e) => {
-                        setTransferToWallet(e.target.value);
-                        setError('');
-                      }}
-                      placeholder="Enter new team key holder wallet address"
-                      className="w-full px-3 py-2 bg-zinc-900/50 border border-zinc-700 rounded-lg text-sm text-white placeholder-zinc-500 focus:border-amber-400/50 focus:outline-none font-mono"
-                    />
-                    <ElegantButton
-                      onClick={handleTransferTeamKey}
-                      variant="secondary"
-                      disabled={isTransferring || !transferToWallet.trim()}
-                      className="w-full"
-                    >
-                      {isTransferring ? 'Transferring...' : 'Transfer Leadership'}
-                    </ElegantButton>
-                  </div>
-                </div>
-              )}
+            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+              <p className="text-amber-400 text-xs font-semibold mb-2">
+                🔑 You are the team key holder
+              </p>
+              <p className="text-zinc-400 text-xs mb-2">
+                Only you can create team challenges. Your wallet controls the team account for security. Team members can participate but cannot control the team.
+              </p>
+              <p className="text-zinc-500 text-xs italic">
+                Note: Team leadership is permanent. If you need to transfer leadership, share the wallet seed phrase with another team member.
+              </p>
             </div>
           ) : (
             <div className="space-y-2">
