@@ -241,6 +241,9 @@ const ArenaHome: React.FC = () => {
   const [copiedWallet, setCopiedWallet] = useState<string | null>(null);
   const [showAllPlayers, setShowAllPlayers] = useState<boolean>(false);
   const [leaderboardLimit, setLeaderboardLimit] = useState<number>(30); // Start with 30 players, load more on demand
+  const [leaderboardView, setLeaderboardView] = useState<'individual' | 'teams'>('individual'); // Toggle between Individual and Teams
+  const [topTeams, setTopTeams] = useState<TeamStats[]>([]);
+  const [loadingTopTeams, setLoadingTopTeams] = useState<boolean>(false);
   const [showChatModal, setShowChatModal] = useState<boolean>(false);
   const [selectedChatChallenge, setSelectedChatChallenge] = useState<any>(null);
   
@@ -454,29 +457,38 @@ const ArenaHome: React.FC = () => {
     }).sort((a, b) => b.totalEarned - a.totalEarned); // Sort by totalEarned descending
   };
 
-  // Fetch top players for sidebar (with real-time refresh when challenges complete)
+  // Fetch top players or teams for sidebar (with real-time refresh when challenges complete)
   useEffect(() => {
-    const fetchTopPlayersData = async () => {
+    const fetchLeaderboardData = async () => {
       try {
-        // TEMPORARY: Use mock data for testing - Remove this and uncomment real fetch below
-        const limit = showAllPlayers ? leaderboardLimit : 5;
-        console.log(`🧪 TESTING: Using mock data for ${limit} players`);
-        const mockPlayers = generateMockPlayers(limit);
-        setTopPlayers(mockPlayers);
-        
-        // REAL FETCH (uncomment when done testing):
-        // const limit = showAllPlayers ? leaderboardLimit : 5;
-        // const players = await getTopPlayers(limit, 'totalEarned');
-        // setTopPlayers(players);
+        if (leaderboardView === 'individual') {
+          // TEMPORARY: Use mock data for testing - Remove this and uncomment real fetch below
+          const limit = showAllPlayers ? leaderboardLimit : 5;
+          console.log(`🧪 TESTING: Using mock data for ${limit} players`);
+          const mockPlayers = generateMockPlayers(limit);
+          setTopPlayers(mockPlayers);
+          
+          // REAL FETCH (uncomment when done testing):
+          // const limit = showAllPlayers ? leaderboardLimit : 5;
+          // const players = await getTopPlayers(limit, 'totalEarned');
+          // setTopPlayers(players);
+        } else {
+          // Fetch teams
+          setLoadingTopTeams(true);
+          const limit = showAllPlayers ? leaderboardLimit : 5;
+          const teams = await getTopTeams(limit, 'totalEarned');
+          setTopTeams(teams);
+          setLoadingTopTeams(false);
+        }
       } catch (error) {
-        console.error('Failed to fetch top players:', error);
+        console.error('Failed to fetch leaderboard data:', error);
       } finally {
         setLoadingTopPlayers(false);
       }
     };
     
-    fetchTopPlayersData();
-  }, [showAllPlayers, leaderboardLimit]);
+    fetchLeaderboardData();
+  }, [showAllPlayers, leaderboardLimit, leaderboardView]);
 
   // Test Firestore connection on component mount
   useEffect(() => {
