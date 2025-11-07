@@ -2756,18 +2756,55 @@ const ArenaHome: React.FC = () => {
                   </div>
                 )}
                 
-                {/* Show More/Less Button */}
+                {/* Show More/Less and Load More Buttons */}
                 {!loadingTopPlayers && topPlayers.length > 0 && (
-                  <div className="px-6 pb-6">
-                    <button
-                      onClick={() => {
-                        setShowAllPlayers(!showAllPlayers);
-                        setLoadingTopPlayers(true);
-                      }}
-                      className="w-full py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-amber-400 text-sm font-semibold transition-colors"
-                    >
-                      {showAllPlayers ? '← Show Less' : `View All Players →`}
-                    </button>
+                  <div className="px-6 pb-6 space-y-2">
+                    {showAllPlayers ? (
+                      <>
+                        <button
+                          onClick={() => {
+                            setShowAllPlayers(false);
+                            setLeaderboardLimit(30); // Reset to default
+                            setLoadingTopPlayers(true);
+                          }}
+                          className="w-full py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-amber-400 text-sm font-semibold transition-colors"
+                        >
+                          ← Show Less (Top 5)
+                        </button>
+                        {/* Load More button - only show if we got the full limit (meaning there might be more) */}
+                        {topPlayers.length === leaderboardLimit && (
+                          <button
+                            onClick={async () => {
+                              setLoadingTopPlayers(true);
+                              const newLimit = leaderboardLimit + 30; // Load 30 more
+                              setLeaderboardLimit(newLimit);
+                              try {
+                                const players = await getTopPlayers(newLimit, 'totalEarned');
+                                setTopPlayers(players);
+                              } catch (error) {
+                                console.error('Failed to load more players:', error);
+                              } finally {
+                                setLoadingTopPlayers(false);
+                              }
+                            }}
+                            className="w-full py-2 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 text-sm font-semibold transition-colors"
+                          >
+                            Load More Players (+30)
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setShowAllPlayers(true);
+                          setLeaderboardLimit(30); // Start with 30
+                          setLoadingTopPlayers(true);
+                        }}
+                        className="w-full py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-amber-400 text-sm font-semibold transition-colors"
+                      >
+                        View All Players →
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
