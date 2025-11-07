@@ -281,6 +281,12 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     setConnecting(true);
     try {
       await onConnect();
+      
+      // Wait a bit for state to update, especially on mobile
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Force a re-render by checking wallet state
+      // The useEffect above will handle the actual re-render
     } catch (error) {
       console.error('Connection error:', error);
     } finally {
