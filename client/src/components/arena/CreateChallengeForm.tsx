@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import ElegantButton from '@/components/ui/ElegantButton';
 import { ADMIN_WALLET } from '@/lib/chain/config';
+import { getWalletScopedValue, PROFILE_STORAGE_KEYS } from '@/lib/storage/profile';
 
 interface CreateChallengeFormProps {
   isConnected: boolean;
@@ -57,36 +58,33 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
       }));
     }
   }, [userGamerTag]);
-  
-  // Update username immediately when wallet connects (check localStorage directly)
-  useEffect(() => {
-    if (isConnected && publicKey) {
-      // Check localStorage immediately when wallet connects
-      const walletKey = publicKey.toString();
-      const savedGamerTag = localStorage.getItem(`user_gamer_tag_${walletKey}`) || localStorage.getItem('user_gamer_tag');
-      
-      if (savedGamerTag && savedGamerTag !== formData.username) {
-        setFormData(prev => ({
-          ...prev,
-          username: savedGamerTag
-        }));
-      }
-      
-      // Also wait a bit for parent component to load userGamerTag from Firestore
-      // This will update again if Firestore has a more recent value
-      const timeoutId = setTimeout(() => {
-        const updatedGamerTag = localStorage.getItem(`user_gamer_tag_${walletKey}`) || localStorage.getItem('user_gamer_tag');
-        if (updatedGamerTag && updatedGamerTag !== formData.username) {
+    
+    // Update username immediately when wallet connects (check localStorage directly)
+    useEffect(() => {
+      if (isConnected && publicKey) {
+        const walletKey = publicKey.toString();
+        const savedGamerTag = getWalletScopedValue(PROFILE_STORAGE_KEYS.gamerTag, walletKey);
+        
+        if (savedGamerTag && savedGamerTag !== formData.username) {
           setFormData(prev => ({
             ...prev,
-            username: updatedGamerTag
+            username: savedGamerTag
           }));
         }
-      }, 1000); // Wait 1 second for Firestore fetch to complete
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [isConnected, publicKey, formData.username]);
+        
+        const timeoutId = setTimeout(() => {
+          const updatedGamerTag = getWalletScopedValue(PROFILE_STORAGE_KEYS.gamerTag, walletKey);
+          if (updatedGamerTag && updatedGamerTag !== formData.username) {
+            setFormData(prev => ({
+              ...prev,
+              username: updatedGamerTag
+            }));
+          }
+        }, 1000);
+        
+        return () => clearTimeout(timeoutId);
+      }
+    }, [isConnected, publicKey, formData.username]);
   
   // Force re-render when connection state changes
   useEffect(() => {
@@ -332,10 +330,10 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
         const isActuallyConnected = phantomWallet?.adapter?.connected || phantomWallet?.adapter?.publicKey !== null;
         if (isActuallyConnected) {
           // Once connected, immediately check localStorage for username
-          const walletKey = phantomWallet.adapter.publicKey?.toString();
-          if (walletKey) {
-            const savedGamerTag = localStorage.getItem(`user_gamer_tag_${walletKey}`) || localStorage.getItem('user_gamer_tag');
-            if (savedGamerTag) {
+            const walletKey = phantomWallet.adapter.publicKey?.toString();
+            if (walletKey) {
+              const savedGamerTag = getWalletScopedValue(PROFILE_STORAGE_KEYS.gamerTag, walletKey);
+              if (savedGamerTag) {
               setFormData(prev => ({
                 ...prev,
                 username: savedGamerTag

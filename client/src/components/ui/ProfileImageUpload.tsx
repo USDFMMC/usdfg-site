@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Gamepad2 } from "lucide-react";
 
 interface ProfileImageUploadProps {
@@ -13,6 +13,10 @@ export default function ProfileImageUpload({
   size = "md"
 }: ProfileImageUploadProps) {
   const [image, setImage] = useState<string | null>(currentImage || null);
+  
+    useEffect(() => {
+      setImage(currentImage || null);
+    }, [currentImage]);
 
   const sizeClasses = {
     sm: "h-16 w-16",
