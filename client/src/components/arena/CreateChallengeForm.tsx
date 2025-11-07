@@ -23,8 +23,15 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
   currentWallet
 }) => {
   // Also check wallet state directly to ensure UI updates immediately
-  const { connected: walletConnected, publicKey } = useWallet();
-  const isConnected = propIsConnected || walletConnected;
+  const { connected: walletConnected, publicKey, wallets } = useWallet();
+  
+  // Check adapter state directly for more reliable connection detection
+  const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
+  const adapterConnected = phantomWallet?.adapter?.connected || false;
+  const adapterPublicKey = phantomWallet?.adapter?.publicKey || null;
+  
+  // Use the most reliable connection state (adapter > hook > prop)
+  const isConnected = adapterConnected || walletConnected || propIsConnected || !!adapterPublicKey;
   
   const [formData, setFormData] = useState({
     game: 'NBA 2K25',
@@ -71,8 +78,8 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
   // Force re-render when connection state changes
   useEffect(() => {
     // This effect ensures the component re-renders when wallet connects/disconnects
-    // The dependency on walletConnected will trigger a re-render
-  }, [walletConnected, publicKey]);
+    // The dependency on walletConnected, adapterConnected, and publicKey will trigger a re-render
+  }, [walletConnected, adapterConnected, publicKey, adapterPublicKey]);
 
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 3;
