@@ -746,7 +746,10 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     console.log('🏆 WINNER DETERMINED:', winner);
     // Delete chat messages - clear winner, no dispute resolution needed
     await cleanupChallengeData(challengeId, false); // false = not dispute
-    console.log('📊 Updating player stats...');
+    console.log('📊 Updating stats...');
+    
+    // Check if this is a team challenge
+    const isTeamChallenge = data.challengeType === 'team';
     
     // Calculate prize pool if not stored (for backward compatibility with old challenges)
     let prizePool = data.prizePool;
@@ -759,20 +762,29 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
       console.log(`⚠️ Prize pool not found in challenge data, calculated from entry fee: ${entryFee} USDFG → ${prizePool} USDFG`);
     }
     
-    console.log('   Game:', data.game, 'Category:', data.category, 'Prize:', prizePool);
+    console.log('   Game:', data.game, 'Category:', data.category, 'Prize:', prizePool, 'Type:', isTeamChallenge ? 'Team' : 'Solo');
     
-    // Get display names from challenge data and sanitize
-    const rawWinnerName = winner === data.creator ? data.creatorTag : undefined;
-    const rawLoserName = loser === data.creator ? data.creatorTag : undefined;
-    
-    const winnerDisplayName = sanitizeDisplayName(rawWinnerName);
-    const loserDisplayName = sanitizeDisplayName(rawLoserName);
-    
-    // Update player stats
-    console.log('   Updating winner stats:', winner, 'as', winnerDisplayName || 'Anonymous');
-    await updatePlayerStats(winner, 'win', prizePool, data.game, data.category, winnerDisplayName);
-    console.log('   Updating loser stats:', loser, 'as', loserDisplayName || 'Anonymous');
-    await updatePlayerStats(loser, 'loss', 0, data.game, data.category, loserDisplayName);
+    // Update stats (player or team)
+    if (isTeamChallenge) {
+      // Update team stats for team challenges
+      console.log('   Updating winner team stats:', winner);
+      await updateTeamStats(winner, 'win', prizePool, data.game || 'Unknown', data.category || 'Sports');
+      console.log('   Updating loser team stats:', loser);
+      await updateTeamStats(loser, 'loss', 0, data.game || 'Unknown', data.category || 'Sports');
+    } else {
+      // Update player stats for solo challenges
+      // Get display names from challenge data and sanitize
+      const rawWinnerName = winner === data.creator ? data.creatorTag : undefined;
+      const rawLoserName = loser === data.creator ? data.creatorTag : undefined;
+      
+      const winnerDisplayName = sanitizeDisplayName(rawWinnerName);
+      const loserDisplayName = sanitizeDisplayName(rawLoserName);
+      
+      console.log('   Updating winner stats:', winner, 'as', winnerDisplayName || 'Anonymous');
+      await updatePlayerStats(winner, 'win', prizePool, data.game || 'Unknown', data.category || 'Sports', winnerDisplayName);
+      console.log('   Updating loser stats:', loser, 'as', loserDisplayName || 'Anonymous');
+      await updatePlayerStats(loser, 'loss', 0, data.game || 'Unknown', data.category || 'Sports', loserDisplayName);
+    }
     
     // Mark challenge as ready for winner to claim (Player pays gas, not admin!)
     await updateDoc(challengeRef, {
