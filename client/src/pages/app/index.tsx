@@ -262,7 +262,7 @@ const ArenaHome: React.FC = () => {
 
   // Wallet info available via useWallet hook
 
-  // Load user profile data from localStorage (only for current wallet)
+  // Load user profile data from localStorage and Firestore (only for current wallet)
   useEffect(() => {
     if (!publicKey) {
       // Clear profile data when wallet disconnects
@@ -272,27 +272,50 @@ const ArenaHome: React.FC = () => {
       return;
     }
     
-    // Load wallet-specific profile data from localStorage
-    const walletKey = publicKey.toString();
-    const savedGamerTag = localStorage.getItem(`user_gamer_tag_${walletKey}`) || localStorage.getItem('user_gamer_tag'); // Fallback to old key for backward compatibility
-    const savedCountry = localStorage.getItem(`user_country_${walletKey}`) || localStorage.getItem('user_country');
-    const savedProfileImage = localStorage.getItem(`user_profile_image_${walletKey}`) || localStorage.getItem('user_profile_image');
+    const loadUserProfile = async () => {
+      // Load wallet-specific profile data from localStorage first (for immediate display)
+      const walletKey = publicKey.toString();
+      const savedGamerTag = localStorage.getItem(`user_gamer_tag_${walletKey}`) || localStorage.getItem('user_gamer_tag'); // Fallback to old key for backward compatibility
+      const savedCountry = localStorage.getItem(`user_country_${walletKey}`) || localStorage.getItem('user_country');
+      const savedProfileImage = localStorage.getItem(`user_profile_image_${walletKey}`) || localStorage.getItem('user_profile_image');
+      
+      // Set from localStorage immediately
+      if (savedGamerTag) {
+        setUserGamerTag(savedGamerTag);
+      } else {
+        setUserGamerTag(''); // Clear if no saved tag for this wallet
+      }
+      if (savedCountry) {
+        setUserCountry(savedCountry);
+      } else {
+        setUserCountry(null);
+      }
+      if (savedProfileImage) {
+        setUserProfileImage(savedProfileImage);
+      } else {
+        setUserProfileImage(null);
+      }
+      
+      // Also try to fetch from Firestore (may have more up-to-date data)
+      try {
+        const { getPlayerStats } = await import("@/lib/firebase/firestore");
+        const playerStats = await getPlayerStats(walletKey);
+        if (playerStats?.displayName) {
+          setUserGamerTag(playerStats.displayName);
+          // Also update localStorage to keep it in sync
+          localStorage.setItem(`user_gamer_tag_${walletKey}`, playerStats.displayName);
+        }
+        if (playerStats?.country) {
+          setUserCountry(playerStats.country);
+          localStorage.setItem(`user_country_${walletKey}`, playerStats.country);
+        }
+      } catch (error) {
+        // Firestore fetch failed, but we already have localStorage data
+        console.error('Failed to fetch player stats from Firestore:', error);
+      }
+    };
     
-    if (savedGamerTag) {
-      setUserGamerTag(savedGamerTag);
-    } else {
-      setUserGamerTag(''); // Clear if no saved tag for this wallet
-    }
-    if (savedCountry) {
-      setUserCountry(savedCountry);
-    } else {
-      setUserCountry(null);
-    }
-    if (savedProfileImage) {
-      setUserProfileImage(savedProfileImage);
-    } else {
-      setUserProfileImage(null);
-    }
+    loadUserProfile();
   }, [publicKey]); // Re-run when wallet changes
 
   // Clear wallet-specific state when wallet changes

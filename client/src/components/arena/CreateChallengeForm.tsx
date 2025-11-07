@@ -41,11 +41,32 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
 
   // Update username when userGamerTag changes (e.g., when wallet switches)
   useEffect(() => {
-    setFormData(prev => ({
-      ...prev,
-      username: userGamerTag || ''
-    }));
+    if (userGamerTag) {
+      setFormData(prev => ({
+        ...prev,
+        username: userGamerTag
+      }));
+    }
   }, [userGamerTag]);
+  
+  // Also update username when wallet connects (in case userGamerTag prop hasn't updated yet)
+  useEffect(() => {
+    if (walletConnected && publicKey && !userGamerTag) {
+      // Wait a bit for parent component to load userGamerTag
+      const timeoutId = setTimeout(() => {
+        // Check localStorage directly as fallback
+        const walletKey = publicKey.toString();
+        const savedGamerTag = localStorage.getItem(`user_gamer_tag_${walletKey}`) || localStorage.getItem('user_gamer_tag');
+        if (savedGamerTag && savedGamerTag !== formData.username) {
+          setFormData(prev => ({
+            ...prev,
+            username: savedGamerTag
+          }));
+        }
+      }, 500);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [walletConnected, publicKey, userGamerTag, formData.username]);
   
   // Force re-render when connection state changes
   useEffect(() => {
