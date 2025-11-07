@@ -71,6 +71,14 @@ service cloud.firestore {
       allow update: if false; // Don't allow updates (immutable)
       allow delete: if true; // Allow deletion for cleanup/testing
     }
+    
+    // Teams - Elite Esports Teams
+    match /teams/{teamId} {
+      allow get, list: if true; // Anyone can view teams (explicitly allow get and list queries)
+      allow create: if true; // Allow creation (team key holder creates team)
+      allow update: if true; // Allow updates (team key holder can update, members can join/leave)
+      allow delete: if true; // Allow deletion for cleanup/testing
+    }
   }
 }
 
