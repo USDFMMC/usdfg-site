@@ -461,60 +461,60 @@ export default function PlayerProfileModal({
               transition={{ delay: 0.2 }}
               className="relative overflow-hidden rounded-xl bg-gradient-to-br from-amber-500/20 via-orange-500/15 to-amber-500/20 border border-amber-400/40 shadow-[0_0_30px_rgba(255,215,130,0.15)] hover:shadow-[0_0_40px_rgba(255,215,130,0.25)] transition-all duration-300"
             >
-              {/* Animated Background Glow */}
-              <div className="absolute inset-0 bg-gradient-to-r from-amber-400/10 via-transparent to-orange-400/10 animate-[shimmer_3s_ease-in-out_infinite]" />
-              
-              {/* Top Border Glow */}
-              <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent" />
-              
-              <div className="relative p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {/* Team Icon with Glow */}
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-amber-400/30 rounded-full blur-md animate-pulse" />
-                      <div className="relative w-12 h-12 rounded-full bg-gradient-to-br from-amber-400/40 to-orange-500/40 border-2 border-amber-300/50 flex items-center justify-center shadow-[0_0_20px_rgba(255,215,130,0.4)]">
-                        <Users className="h-6 w-6 text-amber-200" />
+                {/* Animated Background Glow */}
+                <div className="absolute inset-0 bg-gradient-to-r from-amber-400/10 via-transparent to-orange-400/10 animate-[shimmer_3s_ease-in-out_infinite]" />
+
+                {/* Top Border Glow */}
+                <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent" />
+
+                <div className="relative p-4">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:gap-3 sm:text-left">
+                      {/* Team Icon with Glow */}
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-amber-400/30 rounded-full blur-md animate-pulse" />
+                        <div className="relative w-12 h-12 rounded-full bg-gradient-to-br from-amber-400/40 to-orange-500/40 border-2 border-amber-300/50 flex items-center justify-center shadow-[0_0_20px_rgba(255,215,130,0.4)]">
+                          <Users className="h-6 w-6 text-amber-200" />
+                        </div>
                       </div>
-                    </div>
-                    
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-amber-300 text-sm font-bold uppercase tracking-wide">
-                          {userTeam.teamName}
-                        </span>
-                        {userTeam.teamKey === player.wallet && (
-                          <span className="px-2 py-0.5 bg-amber-400/20 border border-amber-300/40 rounded text-[10px] font-semibold text-amber-200 uppercase tracking-wider">
-                            Key Holder
+
+                      <div className="flex flex-col items-center gap-2 sm:items-start">
+                        <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start mb-1">
+                          <span className="text-amber-300 text-sm font-bold uppercase tracking-wide">
+                            {userTeam.teamName}
                           </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-4 text-xs text-amber-200/80">
-                        <span className="flex items-center gap-1">
-                          <Users className="h-3 w-3" />
-                          {userTeam.members.length}/69 Members
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Trophy className="h-3 w-3" />
-                          {userTeam.wins} Wins
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Crown className="h-3 w-3" />
-                          {userTeam.winRate.toFixed(1)}% WR
-                        </span>
+                          {userTeam.teamKey === player.wallet && (
+                            <span className="px-2 py-0.5 bg-amber-400/20 border border-amber-300/40 rounded text-[10px] font-semibold text-amber-200 uppercase tracking-wider">
+                              Key Holder
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-amber-200/80 sm:justify-start">
+                          <span className="flex items-center gap-1">
+                            <Users className="h-3 w-3" />
+                            {userTeam.members.length}/69 Members
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Trophy className="h-3 w-3" />
+                            {userTeam.wins} Wins
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Crown className="h-3 w-3" />
+                            {userTeam.winRate.toFixed(1)}% WR
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  
-                  {/* Team Stats Badge */}
-                  <div className="flex flex-col items-end gap-1">
-                    <div className="px-3 py-1.5 bg-gradient-to-r from-amber-500/30 to-orange-500/30 border border-amber-400/50 rounded-lg">
-                      <div className="text-[10px] text-amber-200/60 uppercase tracking-wider mb-0.5">Total Earned</div>
-                      <div className="text-lg font-bold text-amber-200">{userTeam.totalEarned.toFixed(1)} USDFG</div>
+
+                    {/* Team Stats Badge */}
+                    <div className="flex flex-col items-center gap-1 w-full sm:w-auto sm:items-end">
+                      <div className="px-3 py-1.5 w-full text-center bg-gradient-to-r from-amber-500/30 to-orange-500/30 border border-amber-400/50 rounded-lg sm:w-auto sm:text-right">
+                        <div className="text-[10px] text-amber-200/60 uppercase tracking-wider mb-0.5">Total Earned</div>
+                        <div className="text-lg font-bold text-amber-200">{userTeam.totalEarned.toFixed(1)} USDFG</div>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
             </motion.div>
           </div>
         )}
