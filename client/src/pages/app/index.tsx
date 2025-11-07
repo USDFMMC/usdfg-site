@@ -867,6 +867,11 @@ const ArenaHome: React.FC = () => {
       const maxPlayers = getMaxPlayersForMode(challengeData.mode);
 
       // Check if this is a Founder Challenge (admin with 0 entry fee)
+      // Ensure we have a valid wallet address
+      if (!currentWallet) {
+        throw new Error("Wallet address not found. Please connect your wallet first.");
+      }
+      
       const isAdmin = currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
       const entryFee = challengeData.entryFee || 0;
       const isFounderChallenge = isAdmin && (entryFee === 0 || entryFee < 0.000000001);
@@ -880,6 +885,11 @@ const ArenaHome: React.FC = () => {
         challengeId = 'founder_' + Date.now().toString();
       } else {
         // Regular challenge - create on-chain
+      // Ensure wallet is fully connected and ready
+      if (!publicKey || !connected) {
+        throw new Error("Wallet not connected. Please connect your wallet first.");
+      }
+      
       // Create connection to devnet
       const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
       
@@ -888,8 +898,23 @@ const ArenaHome: React.FC = () => {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
       
-        challengeId = await createChallenge(
-        wallet,
+      // Double-check wallet state before creating challenge
+      // Sometimes the wallet adapter state hasn't updated yet
+      const phantomWallet = wallet.wallets.find(w => w.adapter.name === 'Phantom');
+      if (!phantomWallet?.adapter?.publicKey && !publicKey) {
+        throw new Error("Wallet not ready. Please wait a moment and try again.");
+      }
+      
+      // Use the adapter's publicKey if available, otherwise use the hook's publicKey
+      const walletToUse = phantomWallet?.adapter?.publicKey ? {
+        ...wallet,
+        publicKey: phantomWallet.adapter.publicKey,
+        signTransaction: phantomWallet.adapter.signTransaction.bind(phantomWallet.adapter),
+        signAllTransactions: phantomWallet.adapter.signAllTransactions?.bind(phantomWallet.adapter)
+      } : wallet;
+      
+      challengeId = await createChallenge(
+        walletToUse,
         connection,
         challengeData.entryFee // Entry fee in USDFG
       );
