@@ -832,7 +832,10 @@ const ArenaHome: React.FC = () => {
         if (!userTeam) {
           // Close create challenge modal and open team management modal
           setShowCreateModal(false);
-          setShowTeamModal(true);
+          // Small delay to ensure modal closes before opening new one
+          setTimeout(() => {
+            setShowTeamModal(true);
+          }, 100);
           throw new Error("You must be part of a team to create team challenges. Opening team management...");
         }
         
@@ -1604,43 +1607,61 @@ const ArenaHome: React.FC = () => {
             </button>
             
             {publicKey && (
-              <button
-                onClick={async () => {
-                  // Fetch current user's stats from Firestore (use Firestore data, not localStorage)
-                  const firestoreStats = await getPlayerStats(publicKey.toString());
-                  
-                  // Use Firestore displayName (don't fall back to localStorage - it might be from a different wallet)
-                  const displayName = firestoreStats?.displayName || undefined;
-                  
-                  // Load wallet-specific country from localStorage (not from state which might be stale)
-                  const walletKey = publicKey.toString();
-                  const currentWalletCountry = localStorage.getItem(`user_country_${walletKey}`) || localStorage.getItem('user_country') || null;
-                  if (currentWalletCountry !== userCountry) {
-                    setUserCountry(currentWalletCountry);
-                  }
-                  
-                  // Create proper PlayerStats object for current user
-                  const currentUserPlayer: PlayerStats = firestoreStats || {
-                    wallet: publicKey.toString(),
-                    displayName: displayName,
-                    wins: 0,
-                    losses: 0,
-                    winRate: 0,
-                    totalEarned: 0,
-                    gamesPlayed: 0,
-                    lastActive: Timestamp.now(),
-                    gameStats: {},
-                    categoryStats: {}
-                  };
-                  
-                  setSelectedPlayer(currentUserPlayer);
-                  setShowPlayerProfile(true);
-                }}
-                className="flex items-center justify-center gap-2 px-4 py-2 h-10 bg-zinc-800/50 hover:bg-zinc-700/50 rounded-xl border border-zinc-700 hover:border-amber-300/50 transition-all text-white text-sm font-semibold"
-              >
-                <span className="text-amber-300">👤</span>
-                <span className="text-white">Profile</span>
-              </button>
+              <>
+                <button
+                  onClick={async () => {
+                    // Fetch current user's stats from Firestore (use Firestore data, not localStorage)
+                    const firestoreStats = await getPlayerStats(publicKey.toString());
+                    
+                    // Use Firestore displayName (don't fall back to localStorage - it might be from a different wallet)
+                    const displayName = firestoreStats?.displayName || undefined;
+                    
+                    // Load wallet-specific country from localStorage (not from state which might be stale)
+                    const walletKey = publicKey.toString();
+                    const currentWalletCountry = localStorage.getItem(`user_country_${walletKey}`) || localStorage.getItem('user_country') || null;
+                    if (currentWalletCountry !== userCountry) {
+                      setUserCountry(currentWalletCountry);
+                    }
+                    
+                    // Create proper PlayerStats object for current user
+                    const currentUserPlayer: PlayerStats = firestoreStats || {
+                      wallet: publicKey.toString(),
+                      displayName: displayName,
+                      wins: 0,
+                      losses: 0,
+                      winRate: 0,
+                      totalEarned: 0,
+                      gamesPlayed: 0,
+                      lastActive: Timestamp.now(),
+                      gameStats: {},
+                      categoryStats: {}
+                    };
+                    
+                    setSelectedPlayer(currentUserPlayer);
+                    setShowPlayerProfile(true);
+                  }}
+                  className="flex items-center justify-center gap-2 px-4 py-2 h-10 bg-zinc-800/50 hover:bg-zinc-700/50 rounded-xl border border-zinc-700 hover:border-amber-300/50 transition-all text-white text-sm font-semibold"
+                >
+                  <span className="text-amber-300">👤</span>
+                  <span className="text-white">Profile</span>
+                </button>
+                
+                {/* Team Management Button */}
+                <button
+                  onClick={async () => {
+                    // Fetch user's team
+                    const { getTeamByMember } = await import("@/lib/firebase/firestore");
+                    const team = await getTeamByMember(publicKey.toString());
+                    setUserTeam(team);
+                    setShowTeamModal(true);
+                  }}
+                  className="flex items-center justify-center gap-2 px-3 py-2 h-10 bg-zinc-800/50 hover:bg-zinc-700/50 rounded-xl border border-zinc-700 hover:border-amber-300/50 transition-all text-white text-sm font-semibold"
+                  title="View or manage your team"
+                >
+                  <span className="text-amber-300">👥</span>
+                  <span className="hidden sm:inline">Team</span>
+                </button>
+              </>
             )}
             
             <WalletConnectSimple 
