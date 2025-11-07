@@ -2979,16 +2979,22 @@ const ArenaHome: React.FC = () => {
                 try {
                   await phantomWallet.adapter.connect();
                   
-                  // Wait for state to update on mobile
-                  if (isMobile) {
-                    let attempts = 0;
-                    while (attempts < 20) {
-                      await new Promise(resolve => setTimeout(resolve, 100));
-                      const isActuallyConnected = phantomWallet.adapter.connected || phantomWallet.adapter.publicKey !== null;
-                      if (isActuallyConnected) break;
-                      attempts++;
+                  // Wait for state to update (both hook and adapter state)
+                  let attempts = 0;
+                  while (attempts < 30) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    const adapterConnected = phantomWallet.adapter.connected || phantomWallet.adapter.publicKey !== null;
+                    const hookConnected = connected || publicKey !== null;
+                    if (adapterConnected && hookConnected) {
+                      // Force a state update by triggering a re-render
+                      // The useEffect hooks will pick up the new state
+                      break;
                     }
+                    attempts++;
                   }
+                  
+                  // Additional wait for React state to propagate
+                  await new Promise(resolve => setTimeout(resolve, 300));
                 } catch (error) {
                   console.error('Connection error:', error);
                   // On mobile, try redirecting to Phantom app if connection fails
