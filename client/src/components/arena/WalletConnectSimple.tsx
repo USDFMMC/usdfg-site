@@ -599,12 +599,6 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
               >
                 {connecting ? 'Connecting...' : 'Connect Wallet'}
               </button>
-              
-              {connecting && (
-                <div className="text-sm text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded p-2">
-                  🔗 Please approve the connection in your wallet popup.
-                </div>
-              )}
             </>
           )}
           
