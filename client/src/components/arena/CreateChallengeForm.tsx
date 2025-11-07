@@ -310,11 +310,18 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     try {
       await onConnect();
       
-      // Wait a bit for state to update, especially on mobile
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Force a re-render by checking wallet state
-      // The useEffect above will handle the actual re-render
+      // Wait for state to update, especially on mobile
+      // Check adapter state directly for more reliable detection
+      let attempts = 0;
+      while (attempts < 20) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
+        const isActuallyConnected = phantomWallet?.adapter?.connected || phantomWallet?.adapter?.publicKey !== null;
+        if (isActuallyConnected) {
+          break;
+        }
+        attempts++;
+      }
     } catch (error) {
       console.error('Connection error:', error);
     } finally {
