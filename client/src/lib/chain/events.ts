@@ -305,14 +305,11 @@ export async function createChallengeOnChain(
   challengeData: Omit<ChallengeMeta, "id"|"clientId"|"timestamp"|"creator">,
   wallet: { signTransaction: (transaction: Transaction) => Promise<Transaction>, publicKey: PublicKey }
 ): Promise<string> {
-  console.log("🚀 Creating challenge on-chain...");
-  
   // Create a unique cache key based on challenge data
   const cacheKey = `${challengeData.game}-${challengeData.entryFee}-${Date.now()}`;
   
   // Check if this exact transaction is already in progress
   if (transactionCache.has(cacheKey)) {
-    console.log("⏳ Transaction already in progress, waiting...");
     return await transactionCache.get(cacheKey)!;
   }
   
@@ -341,17 +338,12 @@ async function createChallengeTransaction(
       throw new Error("Wallet not connected");
     }
     
-    console.log("✅ Wallet connected:", wallet.publicKey.toString());
-    
     // Generate a new keypair for this challenge
     const challengeKeypair = Keypair.generate();
     const challengeAccount = challengeKeypair.publicKey;
     
-    console.log("🔑 Generated challenge account:", challengeAccount.toString());
-    
     // Calculate rent exemption for the account
     const rentExemption = await connection.getMinimumBalanceForRentExemption(0);
-    console.log("💰 Rent exemption required:", rentExemption, "lamports");
     
     // Create the challenge account
     const createAccountInstruction = SystemProgram.createAccount({
@@ -370,9 +362,6 @@ async function createChallengeTransaction(
     transaction.recentBlockhash = blockhash;
     transaction.feePayer = wallet.publicKey;
     
-    // Sign and send transaction
-    console.log("📝 Signing and sending transaction...");
-    
     // First, partially sign with the challenge keypair
     transaction.partialSign(challengeKeypair);
     
@@ -381,11 +370,9 @@ async function createChallengeTransaction(
     
     try {
       const signature = await connection.sendRawTransaction(signedTransaction.serialize());
-      console.log("✅ Transaction sent:", signature);
       
       // Wait for confirmation
       await connection.confirmTransaction(signature);
-      console.log("✅ Transaction confirmed:", signature);
     } catch (error: any) {
       // Handle "already processed" error specifically
       if (error.message && error.message.includes("already been processed")) {
