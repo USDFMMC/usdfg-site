@@ -280,6 +280,23 @@ const ArenaHome: React.FC = () => {
     }
   }, [leaderboardView, showAllPlayers, leaderboardLimit]);
 
+  const handleLeaderboardViewChange = useCallback((view: 'individual' | 'teams') => {
+    if (leaderboardView === view) {
+      return;
+    }
+
+    setLeaderboardView(view);
+    setShowAllPlayers(false);
+    setLeaderboardLimit(30);
+    setLeaderboardSearchTerm('');
+
+    if (view === 'individual') {
+      setLoadingTopPlayers(true);
+    } else {
+      setLoadingTopTeams(true);
+    }
+  }, [leaderboardView]);
+
   
   // Mock price API - simulates real-time price updates
   const fetchUsdfgPrice = useCallback(async () => {
@@ -443,64 +460,28 @@ const ArenaHome: React.FC = () => {
   // Track completed challenge IDs to detect new completions
   const [completedChallengeIds, setCompletedChallengeIds] = useState<Set<string>>(new Set());
 
-  // MOCK DATA FOR TESTING - Remove this when done testing
-  const generateMockPlayers = (count: number): PlayerStats[] => {
-    const countries = ['US', 'GB', 'CA', 'AU', 'DE', 'FR', 'JP', 'BR', 'MX', 'IN', 'KR', 'ES', 'IT', 'NL', 'SE'];
-    const names = ['ProGamer', 'ElitePlayer', 'Champion', 'Winner', 'Master', 'Legend', 'Ace', 'Hero', 'Star', 'King', 'Queen', 'Warrior', 'Ninja', 'Sniper', 'Tank'];
-    
-    return Array.from({ length: count }, (_, i) => {
-      const wins = Math.floor(Math.random() * 100) + 10;
-      const losses = Math.floor(Math.random() * 50) + 5;
-      const gamesPlayed = wins + losses;
-      const winRate = (wins / gamesPlayed) * 100;
-      const totalEarned = Math.floor(Math.random() * 10000) + 1000;
-      const trustScore = Math.random() * 10;
-      const trustReviews = Math.floor(Math.random() * 20);
-      
-      return {
-        wallet: `${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`,
-        displayName: `${names[Math.floor(Math.random() * names.length)]}${i + 1}`,
-        wins,
-        losses,
-        winRate,
-        totalEarned,
-        gamesPlayed,
-        trustScore,
-        trustReviews,
-        country: countries[Math.floor(Math.random() * countries.length)],
-        gameStats: {},
-        categoryStats: {},
-        lastActive: Timestamp.now()
-      } as PlayerStats;
-    }).sort((a, b) => b.totalEarned - a.totalEarned); // Sort by totalEarned descending
-  };
-
   // Fetch top players or teams for sidebar (with real-time refresh when challenges complete)
   useEffect(() => {
     const fetchLeaderboardData = async () => {
       try {
         if (leaderboardView === 'individual') {
-          // TEMPORARY: Use mock data for testing - Remove this and uncomment real fetch below
           const limit = showAllPlayers ? leaderboardLimit : 5;
-          console.log(`🧪 TESTING: Using mock data for ${limit} players`);
-          const mockPlayers = generateMockPlayers(limit);
-          setTopPlayers(mockPlayers);
-          
-          // REAL FETCH (uncomment when done testing):
-          // const fetchedPlayers = await getTopPlayers(limit, 'totalEarned');
-          // setTopPlayers(fetchedPlayers);
+          setLoadingTopPlayers(true);
+          await loadTopPlayers(limit);
         } else {
           await refreshTopTeams();
         }
       } catch (error) {
         console.error('Failed to fetch leaderboard data:', error);
       } finally {
-        setLoadingTopPlayers(false);
+        if (leaderboardView === 'individual') {
+          setLoadingTopPlayers(false);
+        }
       }
     };
 
     fetchLeaderboardData();
-  }, [showAllPlayers, leaderboardLimit, leaderboardView, refreshTopTeams]);
+  }, [showAllPlayers, leaderboardLimit, leaderboardView, loadTopPlayers, refreshTopTeams]);
 
   // Test Firestore connection on component mount
   useEffect(() => {
@@ -1584,6 +1565,31 @@ const ArenaHome: React.FC = () => {
       document.body.classList.remove('arena-page');
     };
   }, []);
+
+  const isTeamsView = leaderboardView === 'teams';
+  const isSoloView = !isTeamsView;
+  const leaderboardSearchPlaceholder = isTeamsView 
+    ? 'Search by team name or key...'
+    : 'Search by name or wallet address...';
+  const isLoadingLeaderboard = isTeamsView ? loadingTopTeams : loadingTopPlayers;
+  const hasLeaderboardEntries = isTeamsView ? topTeams.length > 0 : topPlayers.length > 0;
+  const leaderboardTitle = isTeamsView ? 'Top Teams' : 'Top Players';
+  const leaderboardSubtitle = isTeamsView
+    ? 'Top ranked teams • Search by team name or key'
+    : 'Top ranked players • Search by name or wallet address';
+  const leaderboardEmptyStateTitle = isTeamsView ? 'No teams yet' : 'No players yet';
+  const leaderboardEmptyStateSubtitle = isTeamsView
+    ? 'Create a team and enter the leaderboard!'
+    : 'Be the first to compete!';
+  const currentLeaderboardItems = isTeamsView ? topTeams : topPlayers;
+  const leaderboardEntityLabel = isTeamsView ? 'Teams' : 'Players';
+  const setLeaderboardLoading = useCallback((value: boolean) => {
+    if (isTeamsView) {
+      setLoadingTopTeams(value);
+    } else {
+      setLoadingTopPlayers(value);
+    }
+  }, [isTeamsView]);
 
   return (
     <>
@@ -2692,15 +2698,45 @@ const ArenaHome: React.FC = () => {
                 <h2 className="text-2xl font-bold uppercase tracking-wider text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)] flex items-center justify-center">
                   <span className="mr-2">🏆</span>
                   Arena Leaders
+                  <span className="ml-2 text-sm text-amber-300 font-semibold uppercase tracking-normal">
+                    {leaderboardTitle}
+                  </span>
                 </h2>
-                <p className="text-xs text-zinc-400 mt-1">Top ranked players • Search by name or wallet address</p>
+                <p className="text-xs text-zinc-400 mt-1">{leaderboardSubtitle}</p>
+                
+                <div className="mt-4 flex items-center justify-center gap-2 px-6">
+                  <button
+                    type="button"
+                    onClick={() => handleLeaderboardViewChange('individual')}
+                    aria-pressed={isSoloView}
+                    className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+                      isSoloView
+                        ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-black border-amber-300 shadow-[0_0_15px_rgba(255,215,130,0.35)]'
+                        : 'bg-transparent text-amber-300 border-amber-400/40 hover:border-amber-300/70 hover:text-white'
+                    }`}
+                  >
+                    Solo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLeaderboardViewChange('teams')}
+                    aria-pressed={isTeamsView}
+                    className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+                      isTeamsView
+                        ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-black border-amber-300 shadow-[0_0_15px_rgba(255,215,130,0.35)]'
+                        : 'bg-transparent text-amber-300 border-amber-400/40 hover:border-amber-300/70 hover:text-white'
+                    }`}
+                  >
+                    Teams
+                  </button>
+                </div>
                 
                 {/* Search Bar */}
                 <div className="mt-4 px-6">
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="Search by name or wallet address..."
+                      placeholder={leaderboardSearchPlaceholder}
                       value={leaderboardSearchTerm}
                       onChange={(e) => setLeaderboardSearchTerm(e.target.value)}
                       className="w-full px-4 py-2 bg-zinc-900/50 border border-zinc-700 rounded-xl text-white placeholder-zinc-400 focus:border-amber-300/50 focus:outline-none transition-all text-sm"
@@ -2713,18 +2749,177 @@ const ArenaHome: React.FC = () => {
               </div>
               <div className="p-6">
                 
-                {loadingTopPlayers ? (
+                {isLoadingLeaderboard ? (
                   <div className="flex justify-center items-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div>
                   </div>
-                ) : topPlayers.length === 0 ? (
+                ) : !hasLeaderboardEntries ? (
                   <div className="text-center py-8">
-                    <div className="text-zinc-400 text-sm">No players yet</div>
-                    <div className="text-zinc-500 text-xs mt-2">Be the first to compete!</div>
+                    <div className="text-zinc-400 text-sm">{leaderboardEmptyStateTitle}</div>
+                    <div className="text-zinc-500 text-xs mt-2">{leaderboardEmptyStateSubtitle}</div>
                   </div>
                 ) : (
                   <div className="divide-y divide-zinc-800">
                     {(() => {
+                      if (isTeamsView) {
+                        const transformedTeams = topTeams.map((team, index) => ({
+                          rank: index + 1,
+                          name: team.teamName && team.teamName.trim().length > 0
+                            ? team.teamName
+                            : `Team ${team.teamKey.slice(0, 6)}...${team.teamKey.slice(-4)}`,
+                          trust: typeof team.trustScore === 'number' ? team.trustScore : 0,
+                          wins: team.wins || 0,
+                          losses: team.losses || 0,
+                          winRate: Number.isFinite(team.winRate) ? team.winRate : 0,
+                          totalEarned: team.totalEarned || 0,
+                          membersCount: Array.isArray(team.members) ? team.members.length : 0,
+                          teamKey: team.teamKey,
+                          teamId: team.teamId,
+                          members: Array.isArray(team.members) ? team.members : [],
+                          trustReviews: team.trustReviews || 0,
+                        }));
+
+                        const normalizedTerm = leaderboardSearchTerm.trim().toLowerCase();
+                        const filteredTeams = normalizedTerm === ''
+                          ? transformedTeams
+                          : transformedTeams.filter((team) => {
+                              const matchesName = team.name.toLowerCase().includes(normalizedTerm);
+                              const matchesKey = team.teamKey.toLowerCase().includes(normalizedTerm);
+                              const matchesId = (team.teamId || '').toLowerCase().includes(normalizedTerm);
+                              const matchesMember = team.members.some((member) =>
+                                member.toLowerCase().includes(normalizedTerm)
+                              );
+                              return matchesName || matchesKey || matchesId || matchesMember;
+                            });
+
+                        if (filteredTeams.length === 0 && leaderboardSearchTerm !== '') {
+                          return (
+                            <div className="text-center py-8">
+                              <div className="text-zinc-400 text-sm">
+                                No {leaderboardEntityLabel.toLowerCase()} found matching "{leaderboardSearchTerm}"
+                              </div>
+                              <div className="text-zinc-500 text-xs mt-2">Try a different search term</div>
+                            </div>
+                          );
+                        }
+
+                        return filteredTeams.map((team) => (
+                          <div
+                            key={team.teamId || team.teamKey}
+                            className={`flex flex-col sm:flex-row items-stretch sm:items-center justify-between px-4 sm:px-6 py-3 sm:py-4 hover:bg-[#0B0C12]/60 transition cursor-pointer relative group ${
+                              team.rank <= 3 ? "bg-gradient-to-r from-amber-300/10 to-transparent" : ""
+                            }`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setPendingJoinTeamId(team.teamKey);
+                              setShowTeamModal(true);
+                            }}
+                            style={{ zIndex: 10, position: 'relative' }}
+                          >
+                            <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 pointer-events-none">
+                              <div
+                                className={`h-12 w-12 sm:h-10 sm:w-10 flex items-center justify-center rounded-full text-base sm:text-sm font-bold border shrink-0 ${
+                                  team.rank === 1
+                                    ? "border-amber-300 text-amber-300"
+                                    : team.rank === 2
+                                    ? "border-zinc-400 text-zinc-300"
+                                    : team.rank === 3
+                                    ? "border-orange-400 text-orange-300"
+                                    : "border-zinc-700 text-zinc-400"
+                                }`}
+                              >
+                                {team.rank}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 text-base sm:text-lg font-semibold text-white">
+                                  <span className="truncate">{team.name}</span>
+                                  <span className="text-xs text-amber-300 shrink-0">👥 {team.membersCount} members</span>
+                                  {team.rank === 1 && <span className="text-amber-300 shrink-0">👑</span>}
+                                </div>
+                                <div className="text-xs text-zinc-400 mt-0.5">
+                                  Trust {team.trust.toFixed(1)}/10 • Win Rate {team.winRate.toFixed(1)}%
+                                </div>
+                                <div className="flex items-center gap-2 mt-1 pointer-events-auto">
+                                  <div className="text-xs text-zinc-500 font-mono truncate">
+                                    {`${team.teamKey.slice(0, 6)}...${team.teamKey.slice(-4)}`}
+                                  </div>
+                                  <button
+                                    onClick={(event) => {
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      event.nativeEvent.stopImmediatePropagation();
+                                      navigator.clipboard.writeText(team.teamKey);
+                                      const button = event.target as HTMLElement;
+                                      const originalText = button.textContent;
+                                      button.textContent = '✓';
+                                      button.className = 'text-xs text-green-400 transition-colors shrink-0';
+                                      setTimeout(() => {
+                                        button.textContent = originalText;
+                                        button.className = 'text-xs text-zinc-400 hover:text-zinc-300 transition-colors cursor-pointer pointer-events-auto shrink-0';
+                                      }, 1000);
+                                    }}
+                                    onMouseDown={(event) => {
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                    }}
+                                    className="text-xs text-zinc-400 hover:text-zinc-300 transition-colors cursor-pointer pointer-events-auto shrink-0"
+                                    title="Copy team key"
+                                    style={{ zIndex: 20 }}
+                                  >
+                                    📋
+                                  </button>
+                                </div>
+                                <div className="flex items-center gap-2 mt-2 text-xs text-amber-200 pointer-events-none">
+                                  <span className="font-semibold">Total Earned:</span>
+                                  <span>{team.totalEarned.toLocaleString()} USDFG</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="hidden sm:flex items-center gap-4 pointer-events-none">
+                              <div className="flex items-center gap-1 text-green-400 text-sm font-semibold">
+                                <span className="text-xs text-zinc-500">W</span>
+                                <span>{team.wins}</span>
+                              </div>
+                              <div className="flex items-center gap-1 text-red-400 text-sm font-semibold">
+                                <span className="text-xs text-zinc-500">L</span>
+                                <span>{team.losses}</span>
+                              </div>
+                              <div className="flex items-center gap-1 text-amber-200 text-sm font-semibold">
+                                <span className="text-xs text-zinc-500">USDFG</span>
+                                <span>{team.totalEarned.toLocaleString()}</span>
+                              </div>
+                              <div className="flex items-center gap-1 text-amber-200 text-sm font-semibold">
+                                <span className="text-xs text-zinc-500">Trust</span>
+                                <span>{team.trust.toFixed(1)}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex sm:hidden items-center justify-between gap-3 mt-2 pt-2 border-t border-zinc-800/50 pointer-events-none">
+                              <div className="flex items-center gap-3">
+                                <div className="flex flex-col items-center gap-0">
+                                  <div className="text-xs text-zinc-500">W</div>
+                                  <div className="text-sm font-bold text-green-400">{team.wins}</div>
+                                </div>
+                                <div className="flex flex-col items-center gap-0">
+                                  <div className="text-xs text-zinc-500">L</div>
+                                  <div className="text-sm font-bold text-red-400">{team.losses}</div>
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-center gap-0">
+                                <div className="text-xs text-zinc-500">USDFG</div>
+                                <div className="text-sm font-bold text-amber-200">{team.totalEarned.toLocaleString()}</div>
+                              </div>
+                              <div className="flex flex-col items-center gap-0">
+                                <div className="text-xs text-zinc-500">Trust</div>
+                                <div className="text-sm font-bold text-amber-200">{team.trust.toFixed(1)}</div>
+                              </div>
+                            </div>
+                          </div>
+                        ));
+                      }
+
                       // Helper function to get country flag from country code
                       const getCountryFlag = (countryCode: string | null | undefined): string => {
                         if (!countryCode) return '🌍'; // Default world map if no country set
@@ -2782,7 +2977,7 @@ const ArenaHome: React.FC = () => {
                         return (
                           <div className="text-center py-8">
                             <div className="text-zinc-400 text-sm">
-                              No players found matching "{leaderboardSearchTerm}"
+                              No {leaderboardEntityLabel.toLowerCase()} found matching "{leaderboardSearchTerm}"
                             </div>
                             <div className="text-zinc-500 text-xs mt-2">
                               Try a different search term
@@ -3035,7 +3230,7 @@ const ArenaHome: React.FC = () => {
                 )}
                 
                 {/* Show More/Less and Load More Buttons */}
-                {!loadingTopPlayers && topPlayers.length > 0 && (
+                {!isLoadingLeaderboard && currentLeaderboardItems.length > 0 && (
                   <div className="px-6 pb-6 space-y-2">
                     {showAllPlayers ? (
                       <>
@@ -3043,17 +3238,17 @@ const ArenaHome: React.FC = () => {
                       onClick={() => {
                             setShowAllPlayers(false);
                             setLeaderboardLimit(30); // Reset to default
-                        setLoadingTopPlayers(true);
+                            setLeaderboardLoading(true);
                       }}
                       className="w-full py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-amber-400 text-sm font-semibold transition-colors"
                     >
                           ← Show Less (Top 5)
                     </button>
                         {/* Load More button - only show if we got the full limit (meaning there might be more) */}
-                        {topPlayers.length === leaderboardLimit && (
+                        {currentLeaderboardItems.length === leaderboardLimit && (
                           <button
                             onClick={async () => {
-                              setLoadingTopPlayers(true);
+                              setLeaderboardLoading(true);
                               const newLimit = leaderboardLimit + 30; // Load 30 more
                               setLeaderboardLimit(newLimit);
                               try {
@@ -3068,12 +3263,12 @@ const ArenaHome: React.FC = () => {
                               } catch (error) {
                                 console.error('Failed to load more players:', error);
                               } finally {
-                                setLoadingTopPlayers(false);
+                                setLeaderboardLoading(false);
                               }
                             }}
                             className="w-full py-2 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 text-sm font-semibold transition-colors"
                           >
-                            Load More Players (+30)
+                            Load More {leaderboardEntityLabel} (+30)
                           </button>
                         )}
                       </>
@@ -3082,11 +3277,11 @@ const ArenaHome: React.FC = () => {
                         onClick={() => {
                           setShowAllPlayers(true);
                           setLeaderboardLimit(30); // Start with 30
-                          setLoadingTopPlayers(true);
+                          setLeaderboardLoading(true);
                         }}
                         className="w-full py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-amber-400 text-sm font-semibold transition-colors"
                       >
-                        View All Players →
+                        View All {leaderboardEntityLabel} →
                       </button>
                     )}
                   </div>
