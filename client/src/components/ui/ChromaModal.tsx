@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { gsap } from 'gsap';
 import { X } from 'lucide-react';
+import { lockBodyScroll, unlockBodyScroll } from '@/lib/ui/scrollLock';
 
 interface ChromaModalProps {
   isOpen: boolean;
@@ -37,7 +38,7 @@ const ChromaModal: React.FC<ChromaModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden';
+      lockBodyScroll();
       // Animate in
       gsap.fromTo(backdropRef.current, 
         { opacity: 0 },
@@ -48,8 +49,12 @@ const ChromaModal: React.FC<ChromaModalProps> = ({
         { scale: 1, opacity: 1, y: 0, duration: 0.4, ease: "back.out(1.7)" }
       );
     } else {
-      document.body.style.overflow = '';
+      unlockBodyScroll();
     }
+
+    return () => {
+      unlockBodyScroll();
+    };
   }, [isOpen]);
 
   const moveTo = (x: number, y: number) => {

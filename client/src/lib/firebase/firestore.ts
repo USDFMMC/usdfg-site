@@ -98,11 +98,19 @@ export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'cr
       }
     }
     
-    const docRef = await addDoc(collection(db, "challenges"), {
+    const challengePayload: any = {
       ...challengeData,
       createdAt: Timestamp.now(),
       players: [challengeData.creator], // Creator is first player
+    };
+
+    Object.keys(challengePayload).forEach((key) => {
+      if (challengePayload[key] === undefined) {
+        delete challengePayload[key];
+      }
     });
+
+    const docRef = await addDoc(collection(db, "challenges"), challengePayload);
     
     // If eligible, create/update player stats with trophy flag
     if (shouldAwardOgFirst1k) {

@@ -2015,17 +2015,13 @@ const ArenaHome: React.FC = () => {
                         <div className="absolute inset-0 overflow-hidden rounded-2xl z-0">
                           {(() => {
                             const gameName = challenge.game || extractGameFromTitle(challenge.title);
-                            const category = getGameCategory(gameName);
                             const imagePath = getGameImage(gameName);
-                            // Debug log for first challenge only to avoid spam
-                            if (challenge === challenges[0]) {
-                            }
                             return (
                               <img
                                 src={imagePath}
                                 alt={gameName}
-                                className="absolute inset-0 w-full h-full object-cover object-center opacity-60"
-                                style={{ objectFit: 'cover', objectPosition: 'center' }}
+                                className="absolute inset-0 w-full h-full object-cover"
+                                style={{ objectFit: 'contain', objectPosition: 'center' }}
                                 loading="lazy"
                                 decoding="async"
                                 onError={(e) => {
@@ -2036,7 +2032,7 @@ const ArenaHome: React.FC = () => {
                               />
                             );
                           })()}
-                          <div className="absolute inset-0 bg-gradient-to-br from-[#07080C]/60 via-[#07080C]/50 to-[#07080C]/60 rounded-2xl" />
+                          <div className="absolute inset-0 bg-gradient-to-br from-[#07080C]/70 via-[#07080C]/60 to-[#07080C]/70 rounded-2xl" />
                         </div>
                         
                         {/* Ambient Glow */}

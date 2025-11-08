@@ -6,7 +6,7 @@ import CountryFlagPicker from "../ui/CountryFlagPicker";
 import ElegantButton from "@/components/ui/ElegantButton";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "../ui/tooltip";
 import { USDFG_RELICS, getUnlockedTrophies, getNextTrophy, getTrophyProgress, getTrophyColorClass, checkPlayerHasOgFirst1k, checkPlayerHasFounderChallenge } from "@/lib/trophies";
-import { getTeamByMember, joinTeam, removeTeamMember, TeamStats } from "@/lib/firebase/firestore";
+import { getTeamByMember, joinTeam, leaveTeam, removeTeamMember, TeamStats } from "@/lib/firebase/firestore";
 
 // Countries list for flag display - matches CountryFlagPicker
 const countries = [
@@ -418,8 +418,8 @@ export default function PlayerProfileModal({
       return;
     }
 
-    if (userTeam && userTeam.teamId && viewerTeam.teamId && userTeam.teamId !== viewerTeam.teamId) {
-      setTeamActionError('Player is already on another team. Ask them to leave before inviting.');
+    if (userTeam && userTeam.teamKey === targetWallet) {
+      setTeamActionError('Player is the key holder of their current team. Ask them to transfer leadership first.');
       return;
     }
 
@@ -427,6 +427,11 @@ export default function PlayerProfileModal({
       setTeamActionError(null);
       setTeamActionSuccess(null);
       setIsInvitingToTeam(true);
+
+      if (userTeam && userTeam.teamId && userTeam.members.includes(targetWallet)) {
+        await leaveTeam(userTeam.teamId, targetWallet);
+      }
+
       const teamId = viewerTeam.teamId || viewerTeam.teamKey;
       await joinTeam(teamId, targetWallet);
       const updatedViewerTeam = await getTeamByMember(currentWallet);
@@ -499,8 +504,7 @@ export default function PlayerProfileModal({
     viewerIsTeamKey &&
     playerWallet &&
     !viewerTeam.members.includes(playerWallet) &&
-    viewerTeam.members.length < 69 &&
-    (!userTeam || isSameTeam)
+    viewerTeam.members.length < 69
   );
   const canRemoveFromTeam = Boolean(
     viewerIsTeamKey &&
@@ -510,11 +514,6 @@ export default function PlayerProfileModal({
     userTeam &&
     userTeam.members.includes(playerWallet) &&
     playerWallet !== viewerTeam.teamKey
-  );
-  const viewerTeamDifferentFromPlayer = Boolean(
-    viewerTeam &&
-    userTeam &&
-    viewerTeam.teamId !== userTeam.teamId
   );
 
   return (
@@ -653,100 +652,80 @@ export default function PlayerProfileModal({
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="relative overflow-hidden rounded-xl bg-gradient-to-br from-amber-500/20 via-orange-500/15 to-amber-500/20 border border-amber-400/40 shadow-[0_0_30px_rgba(255,215,130,0.15)] hover:shadow-[0_0_40px_rgba(255,215,130,0.25)] transition-all duration-300"
+              className="rounded-lg border border-amber-300/25 bg-[#0B0C12]/85 shadow-[0_10px_30px_rgba(9,9,12,0.45)] backdrop-blur-sm transition-all duration-200 hover:border-amber-300/35"
             >
-                {/* Animated Background Glow */}
-                <div className="absolute inset-0 bg-gradient-to-r from-amber-400/10 via-transparent to-orange-400/10 animate-[shimmer_3s_ease-in-out_infinite]" />
-
-                {/* Top Border Glow */}
-                <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent" />
-
-                <div className="relative p-4">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:gap-3 sm:text-left">
-                      {/* Team Icon with Glow */}
-                      <div className="relative">
-                        <div className="absolute inset-0 bg-amber-400/30 rounded-full blur-md animate-pulse" />
-                        <div className="relative w-12 h-12 rounded-full bg-gradient-to-br from-amber-400/40 to-orange-500/40 border-2 border-amber-300/50 flex items-center justify-center shadow-[0_0_20px_rgba(255,215,130,0.4)]">
-                          <Users className="h-6 w-6 text-amber-200" />
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col items-center gap-2 sm:items-start">
-                        <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start mb-1">
-                          <span className="text-amber-300 text-sm font-bold uppercase tracking-wide">
-                            {userTeam.teamName}
-                          </span>
-                          {userTeam.teamKey === player.wallet && (
-                            <span className="px-2 py-0.5 bg-amber-400/20 border border-amber-300/40 rounded text-[10px] font-semibold text-amber-200 uppercase tracking-wider">
-                              Key Holder
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-amber-200/80 sm:justify-start">
-                          <span className="flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            {userTeam.members.length}/69 Members
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Trophy className="h-3 w-3" />
-                            {userTeam.wins} Wins
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Crown className="h-3 w-3" />
-                            {userTeam.winRate.toFixed(1)}% WR
-                          </span>
-                        </div>
-                      </div>
+              <div className="p-3 sm:p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col items-center text-center gap-3 sm:flex-row sm:text-left sm:items-center sm:gap-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full border border-amber-300/30 bg-amber-300/10 text-amber-200">
+                      <Users className="h-4 w-4" />
                     </div>
-
-                    {/* Team Stats Badge */}
-                    <div className="flex flex-col items-center gap-1 w-full sm:w-auto sm:items-end">
-                      <div className="px-3 py-1.5 w-full text-center bg-gradient-to-r from-amber-500/30 to-orange-500/30 border border-amber-400/50 rounded-lg sm:w-auto sm:text-right">
-                        <div className="text-[10px] text-amber-200/60 uppercase tracking-wider mb-0.5">Total Earned</div>
-                        <div className="text-lg font-bold text-amber-200">{userTeam.totalEarned.toFixed(1)} USDFG</div>
+                    <div className="flex flex-col items-center sm:items-start gap-1">
+                      <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                        <span className="text-sm font-semibold uppercase tracking-tight text-amber-200">
+                          {userTeam.teamName}
+                        </span>
+                        {userTeam.teamKey === player.wallet && (
+                          <span className="rounded-full border border-amber-300/30 px-2 py-0.5 text-[10px] uppercase tracking-wide text-amber-200/80">
+                            Key Holder
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-amber-100/70 sm:justify-start">
+                        <span className="flex items-center gap-1">
+                          <Users className="h-3 w-3" />
+                          {userTeam.members.length}/69 Members
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Trophy className="h-3 w-3" />
+                          {userTeam.wins} Wins
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Crown className="h-3 w-3" />
+                          {userTeam.winRate.toFixed(1)}% WR
+                        </span>
                       </div>
                     </div>
                   </div>
-                    {(canJoinViewedTeam || canInviteToMyTeam || canRemoveFromTeam) && (
-                      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:justify-end">
-                        {canJoinViewedTeam && (
-                          <ElegantButton
-                            onClick={handleJoinViewedTeam}
-                            variant="secondary"
-                            className="w-full sm:w-auto"
-                            disabled={isJoiningTeam || isTeamFull}
-                          >
-                            {isJoiningTeam ? 'Joining...' : isTeamFull ? 'Team Full' : 'Join Team'}
-                          </ElegantButton>
-                        )}
-                        {canInviteToMyTeam && (
-                          <ElegantButton
-                            onClick={handleInvitePlayerToViewerTeam}
-                            variant="primary"
-                            className="w-full sm:w-auto"
-                            disabled={isInvitingToTeam}
-                          >
-                            {isInvitingToTeam ? 'Adding...' : 'Add to My Team'}
-                          </ElegantButton>
-                        )}
-                        {canRemoveFromTeam && (
-                          <ElegantButton
-                            onClick={handleRemoveMemberFromTeam}
-                            variant="danger"
-                            className="w-full sm:w-auto"
-                            disabled={isRemovingFromTeam}
-                          >
-                            {isRemovingFromTeam ? 'Removing...' : 'Remove From Team'}
-                          </ElegantButton>
-                        )}
-                      </div>
+                  <div className="flex flex-col items-center sm:items-end gap-1 text-right">
+                    <span className="text-[10px] uppercase tracking-wide text-amber-200/60">Total Earned</span>
+                    <span className="text-base font-semibold text-amber-100">{userTeam.totalEarned.toFixed(1)} USDFG</span>
+                  </div>
+                </div>
+                {(canJoinViewedTeam || canInviteToMyTeam || canRemoveFromTeam) && (
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                    {canJoinViewedTeam && (
+                      <ElegantButton
+                        onClick={handleJoinViewedTeam}
+                        variant="secondary"
+                        className="w-full sm:w-auto text-sm"
+                        disabled={isJoiningTeam || isTeamFull}
+                      >
+                        {isJoiningTeam ? 'Joining...' : isTeamFull ? 'Team Full' : 'Join Team'}
+                      </ElegantButton>
                     )}
-                    {viewerIsTeamKey && viewerTeamDifferentFromPlayer && (
-                      <p className="mt-2 text-[11px] text-amber-200/70 text-center sm:text-right">
-                        Player must leave their current team before you can invite them.
-                      </p>
+                    {canInviteToMyTeam && (
+                      <ElegantButton
+                        onClick={handleInvitePlayerToViewerTeam}
+                        variant="primary"
+                        className="w-full sm:w-auto text-sm"
+                        disabled={isInvitingToTeam}
+                      >
+                        {isInvitingToTeam ? 'Adding...' : 'Add to My Team'}
+                      </ElegantButton>
                     )}
+                    {canRemoveFromTeam && (
+                      <ElegantButton
+                        onClick={handleRemoveMemberFromTeam}
+                        variant="danger"
+                        className="w-full sm:w-auto text-sm"
+                        disabled={isRemovingFromTeam}
+                      >
+                        {isRemovingFromTeam ? 'Removing...' : 'Remove From Team'}
+                      </ElegantButton>
+                    )}
+                  </div>
+                )}
                 </div>
             </motion.div>
           </div>

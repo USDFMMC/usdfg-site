@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { lockBodyScroll, unlockBodyScroll } from '@/lib/ui/scrollLock';
 
 interface ElegantModalProps {
   isOpen: boolean;
@@ -18,10 +19,14 @@ const ElegantModal: React.FC<ElegantModalProps> = ({
 }) => {
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden';
+      lockBodyScroll();
     } else {
-      document.body.style.overflow = '';
+      unlockBodyScroll();
     }
+
+    return () => {
+      unlockBodyScroll();
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
