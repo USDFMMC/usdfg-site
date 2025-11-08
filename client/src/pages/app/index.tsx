@@ -280,6 +280,17 @@ const ArenaHome: React.FC = () => {
     }
   }, [leaderboardView, showAllPlayers, leaderboardLimit]);
 
+  const loadTopPlayers = useCallback(async (limitOverride?: number) => {
+    try {
+      const limit = limitOverride ?? (showAllPlayers ? leaderboardLimit : 5);
+      const players = await getTopPlayers(limit, 'totalEarned');
+      setTopPlayers(players);
+    } catch (error) {
+      console.error('Failed to load top players:', error);
+      setTopPlayers([]);
+    }
+  }, [showAllPlayers, leaderboardLimit]);
+
   const handleLeaderboardViewChange = useCallback((view: 'individual' | 'teams') => {
     if (leaderboardView === view) {
       return;
