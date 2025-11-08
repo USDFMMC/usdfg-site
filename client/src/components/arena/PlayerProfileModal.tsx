@@ -3,9 +3,10 @@ import { motion } from "framer-motion";
 import { Trophy, Gamepad2, Swords, Flame, Shield, Crown, X, Edit3, Users } from "lucide-react";
 import ProfileImageUpload from "../ui/ProfileImageUpload";
 import CountryFlagPicker from "../ui/CountryFlagPicker";
+import ElegantButton from "@/components/ui/ElegantButton";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "../ui/tooltip";
 import { USDFG_RELICS, getUnlockedTrophies, getNextTrophy, getTrophyProgress, getTrophyColorClass, checkPlayerHasOgFirst1k, checkPlayerHasFounderChallenge } from "@/lib/trophies";
-import { getTeamByMember, TeamStats } from "@/lib/firebase/firestore";
+import { getTeamByMember, joinTeam, removeTeamMember, TeamStats } from "@/lib/firebase/firestore";
 
 // Countries list for flag display - matches CountryFlagPicker
 const countries = [
@@ -222,6 +223,8 @@ interface PlayerProfileModalProps {
   onProfileImageChange?: (image: string | null) => void;
   onChallengePlayer?: (playerData: any) => void;
   hasActiveChallenge?: boolean;
+  currentWallet?: string | null;
+  onTeamUpdated?: () => void;
 }
 
 export default function PlayerProfileModal({ 
@@ -233,7 +236,9 @@ export default function PlayerProfileModal({
   onCountryChange,
   onProfileImageChange,
   onChallengePlayer,
-  hasActiveChallenge = false
+  hasActiveChallenge = false,
+  currentWallet,
+  onTeamUpdated
 }: PlayerProfileModalProps) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(player.displayName || player.name || 'Player');
@@ -243,6 +248,11 @@ export default function PlayerProfileModal({
   const [selectedTrophyForPopup, setSelectedTrophyForPopup] = useState<any>(null);
   const [specialTrophiesUnlocked, setSpecialTrophiesUnlocked] = useState<Set<string>>(new Set());
   const [userTeam, setUserTeam] = useState<TeamStats | null>(null);
+  const [viewerTeam, setViewerTeam] = useState<TeamStats | null>(null);
+  const [isJoiningTeam, setIsJoiningTeam] = useState(false);
+  const [isRemovingFromTeam, setIsRemovingFromTeam] = useState(false);
+  const [teamActionError, setTeamActionError] = useState<string | null>(null);
+  const [teamActionSuccess, setTeamActionSuccess] = useState<string | null>(null);
   
   // No mock data - use real data from Firestore
 
@@ -251,33 +261,50 @@ export default function PlayerProfileModal({
     if (isOpen && player.wallet) {
       const checkTrophies = async () => {
         const unlocked = new Set<string>();
-        // Check OG First 1k trophy from player stats
-        if (player.wallet) {
-          const hasOgFirst1k = await checkPlayerHasOgFirst1k(player.wallet);
-          if (hasOgFirst1k) {
-            unlocked.add('og-1k');
-          }
-          // Check Founder Challenge trophy from player stats
-          const hasFounderChallenge = await checkPlayerHasFounderChallenge(player.wallet);
-          if (hasFounderChallenge) {
-            unlocked.add('founder-challenge');
-          }
+        const hasOgFirst1k = await checkPlayerHasOgFirst1k(player.wallet);
+        if (hasOgFirst1k) {
+          unlocked.add('og-1k');
+        }
+        const hasFounderChallenge = await checkPlayerHasFounderChallenge(player.wallet);
+        if (hasFounderChallenge) {
+          unlocked.add('founder-challenge');
         }
         setSpecialTrophiesUnlocked(unlocked);
       };
-      
+
       const fetchTeam = async () => {
-        if (player.wallet) {
-          const team = await getTeamByMember(player.wallet);
-          setUserTeam(team);
-        }
+        const team = await getTeamByMember(player.wallet!);
+        setUserTeam(team);
       };
-      
+
       checkTrophies();
       fetchTeam();
     }
   }, [isOpen, player.wallet]);
-  
+
+  useEffect(() => {
+    if (isOpen && currentWallet) {
+      const fetchViewerTeam = async () => {
+        try {
+          const team = await getTeamByMember(currentWallet);
+          setViewerTeam(team);
+        } catch (error) {
+          console.error('Failed to fetch viewer team:', error);
+        }
+      };
+
+      fetchViewerTeam();
+    } else {
+      setViewerTeam(null);
+    }
+  }, [isOpen, currentWallet]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTeamActionError(null);
+      setTeamActionSuccess(null);
+    }
+  }, [isOpen, player.wallet]);
   
   if (!isOpen) return null;
 
@@ -327,13 +354,102 @@ export default function PlayerProfileModal({
     }
   };
 
+  const handleJoinViewedTeam = async () => {
+    if (!currentWallet) {
+      setTeamActionError('Connect your wallet to join this team');
+      return;
+    }
+
+    if (!userTeam) {
+      setTeamActionError('Team details are unavailable right now');
+      return;
+    }
+
+    const targetWallet = player.wallet;
+    if (!targetWallet) {
+      setTeamActionError('Player wallet unavailable');
+      return;
+    }
+
+    try {
+      setTeamActionError(null);
+      setTeamActionSuccess(null);
+      setIsJoiningTeam(true);
+      const teamId = userTeam.teamId || userTeam.teamKey;
+      await joinTeam(teamId, currentWallet);
+      const updatedViewerTeam = await getTeamByMember(currentWallet);
+      setViewerTeam(updatedViewerTeam);
+      const refreshedPlayerTeam = await getTeamByMember(targetWallet);
+      setUserTeam(refreshedPlayerTeam);
+      setTeamActionSuccess('Joined team successfully');
+      onTeamUpdated?.();
+    } catch (error: any) {
+      setTeamActionError(error.message || 'Failed to join team');
+    } finally {
+      setIsJoiningTeam(false);
+    }
+  };
+
+  const handleRemoveMemberFromTeam = async () => {
+    if (!currentWallet || !viewerTeam) {
+      setTeamActionError('You need to be the team key holder to manage members');
+      return;
+    }
+
+    const targetWallet = player.wallet;
+    if (!targetWallet) {
+      setTeamActionError('Player wallet unavailable');
+      return;
+    }
+
+    try {
+      setTeamActionError(null);
+      setTeamActionSuccess(null);
+      setIsRemovingFromTeam(true);
+      const teamId = viewerTeam.teamId || viewerTeam.teamKey;
+      await removeTeamMember(teamId, targetWallet, currentWallet);
+      const updatedViewerTeam = await getTeamByMember(currentWallet);
+      setViewerTeam(updatedViewerTeam);
+      const refreshedPlayerTeam = await getTeamByMember(targetWallet);
+      setUserTeam(refreshedPlayerTeam);
+      setTeamActionSuccess('Player removed from team');
+      onTeamUpdated?.();
+    } catch (error: any) {
+      setTeamActionError(error.message || 'Failed to remove team member');
+    } finally {
+      setIsRemovingFromTeam(false);
+    }
+  };
+
         // Calculate additional stats from real data
-        const totalGames = (player.wins || 0) + (player.losses || 0);
-        const streak = 0; // TODO: Track actual win streak in Firestore
-        const integrity = typeof player.trustScore === 'number' ? player.trustScore : 0; // Use real trust score from Firestore (0 if no data)
-        const favoriteGame = null; // TODO: Calculate from gameStats
-        const rank = player.rank || 1;
-        const rankTitle = rank === 1 ? "Mythic Prime" : rank <= 3 ? "Diamond Elite" : rank <= 10 ? "Platinum Pro" : "Gold Warrior";
+          const totalGames = (player.wins || 0) + (player.losses || 0);
+          const streak = 0; // TODO: Track actual win streak in Firestore
+          const integrity = typeof player.trustScore === 'number' ? player.trustScore : 0; // Use real trust score from Firestore (0 if no data)
+          const favoriteGame = null; // TODO: Calculate from gameStats
+          const rank = player.rank || 1;
+          const rankTitle = rank === 1 ? "Mythic Prime" : rank <= 3 ? "Diamond Elite" : rank <= 10 ? "Platinum Pro" : "Gold Warrior";
+
+  const playerWallet = player.wallet || player.address;
+  const isTeamFull = userTeam ? userTeam.members.length >= 69 : false;
+  const viewerIsTeamKey = viewerTeam && currentWallet ? viewerTeam.teamKey === currentWallet : false;
+  const isSameTeam = viewerTeam && userTeam ? viewerTeam.teamId === userTeam.teamId : false;
+  const canJoinViewedTeam = Boolean(
+    !isCurrentUser &&
+    userTeam &&
+    currentWallet &&
+    !viewerTeam &&
+    !isTeamFull &&
+    !userTeam.members.includes(currentWallet)
+  );
+  const canRemoveFromTeam = Boolean(
+    viewerIsTeamKey &&
+    isSameTeam &&
+    playerWallet &&
+    viewerTeam &&
+    userTeam &&
+    userTeam.members.includes(playerWallet) &&
+    playerWallet !== viewerTeam.teamKey
+  );
 
   return (
     <motion.div
@@ -452,6 +568,18 @@ export default function PlayerProfileModal({
           </div>
         </div>
 
+          {(teamActionError || teamActionSuccess) && (
+            <div
+              className={`relative z-10 mt-6 mx-6 p-3 rounded-lg border ${
+                teamActionError
+                  ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                  : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+              }`}
+            >
+              <p className="text-xs">{teamActionError ?? teamActionSuccess}</p>
+            </div>
+          )}
+
         {/* Team Info Section - Elite & Eye-Catching */}
         {userTeam && (
           <div className="relative z-10 mt-6 px-6">
@@ -514,6 +642,30 @@ export default function PlayerProfileModal({
                       </div>
                     </div>
                   </div>
+                    {(canJoinViewedTeam || canRemoveFromTeam) && (
+                      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                        {canJoinViewedTeam && (
+                          <ElegantButton
+                            onClick={handleJoinViewedTeam}
+                            variant="secondary"
+                            className="w-full sm:w-auto"
+                            disabled={isJoiningTeam || isTeamFull}
+                          >
+                            {isJoiningTeam ? 'Joining...' : isTeamFull ? 'Team Full' : 'Join Team'}
+                          </ElegantButton>
+                        )}
+                        {canRemoveFromTeam && (
+                          <ElegantButton
+                            onClick={handleRemoveMemberFromTeam}
+                            variant="danger"
+                            className="w-full sm:w-auto"
+                            disabled={isRemovingFromTeam}
+                          >
+                            {isRemovingFromTeam ? 'Removing...' : 'Remove From Team'}
+                          </ElegantButton>
+                        )}
+                      </div>
+                    )}
                 </div>
             </motion.div>
           </div>
