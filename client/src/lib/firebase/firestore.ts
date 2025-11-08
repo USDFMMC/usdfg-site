@@ -1,12 +1,12 @@
-import { 
-  collection, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  onSnapshot, 
-  query, 
-  orderBy, 
+import {
+  collection,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  query,
+  orderBy,
   where,
   getDocs,
   getDoc,
@@ -16,6 +16,7 @@ import {
   writeBatch,
   increment,
   arrayUnion,
+  arrayRemove,
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from './config';
@@ -1842,6 +1843,44 @@ export async function leaveTeam(teamId: string, memberWallet: string): Promise<v
     console.log(`✅ ${memberWallet} left team: ${teamData.teamName}`);
   } catch (error) {
     console.error('❌ Error leaving team:', error);
+    throw error;
+  }
+}
+
+/**
+ * Remove a member from a team (team key holder only)
+ */
+export async function removeTeamMember(teamId: string, memberWallet: string, requesterWallet: string): Promise<void> {
+  try {
+    const teamRef = doc(db, 'teams', teamId);
+    const teamSnap = await getDoc(teamRef);
+
+    if (!teamSnap.exists()) {
+      throw new Error("Team not found");
+    }
+
+    const teamData = teamSnap.data() as TeamStats;
+
+    if (teamData.teamKey !== requesterWallet) {
+      throw new Error("Only the team key holder can remove members");
+    }
+
+    if (memberWallet === teamData.teamKey) {
+      throw new Error("Team key holder cannot be removed");
+    }
+
+    if (!teamData.members.includes(memberWallet)) {
+      throw new Error("Player is not a member of this team");
+    }
+
+    await updateDoc(teamRef, {
+      members: arrayRemove(memberWallet),
+      lastActive: Timestamp.now()
+    });
+
+    console.log(`✅ ${memberWallet} was removed from team: ${teamData.teamName} by ${requesterWallet}`);
+  } catch (error) {
+    console.error('❌ Error removing team member:', error);
     throw error;
   }
 }

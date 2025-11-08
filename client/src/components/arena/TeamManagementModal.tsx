@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { getTeamByMember, createTeam, joinTeam, leaveTeam, getTeamStats, TeamStats } from '@/lib/firebase/firestore';
+import { getTeamByMember, createTeam, joinTeam, leaveTeam, removeTeamMember, getTeamStats, TeamStats } from '@/lib/firebase/firestore';
 import ElegantButton from '@/components/ui/ElegantButton';
 
 interface TeamManagementModalProps {
   currentWallet: string | null;
   onClose: () => void;
+  onTeamUpdated?: () => void;
 }
 
-const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ currentWallet, onClose }) => {
+const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ currentWallet, onClose, onTeamUpdated }) => {
   const [userTeam, setUserTeam] = useState<TeamStats | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [teamName, setTeamName] = useState<string>('');
@@ -15,6 +16,8 @@ const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ currentWallet
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [isJoining, setIsJoining] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  const [success, setSuccess] = useState<string>('');
+  const [removingMember, setRemovingMember] = useState<string | null>(null);
 
   // Fetch user's team
   useEffect(() => {
@@ -58,11 +61,14 @@ const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ currentWallet
     try {
       setIsCreating(true);
       setError('');
+      setSuccess('');
       await createTeam(currentWallet, teamName.trim());
       // Refresh team data
       const team = await getTeamByMember(currentWallet);
       setUserTeam(team);
       setTeamName('');
+      setSuccess('Team created successfully');
+      onTeamUpdated?.();
     } catch (error: any) {
       setError(error.message || 'Failed to create team');
     } finally {
@@ -84,11 +90,14 @@ const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ currentWallet
     try {
       setIsJoining(true);
       setError('');
+      setSuccess('');
       await joinTeam(joinTeamId.trim(), currentWallet);
       // Refresh team data
       const team = await getTeamByMember(currentWallet);
       setUserTeam(team);
       setJoinTeamId('');
+      setSuccess('Joined team successfully');
+      onTeamUpdated?.();
     } catch (error: any) {
       setError(error.message || 'Failed to join team');
     } finally {
@@ -107,10 +116,39 @@ const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ currentWallet
 
     try {
       setError('');
+      setSuccess('');
       await leaveTeam(userTeam.teamId, currentWallet);
       setUserTeam(null);
+      setSuccess('Left team successfully');
+      onTeamUpdated?.();
     } catch (error: any) {
       setError(error.message || 'Failed to leave team');
+    }
+  };
+
+  const handleRemoveMember = async (member: string) => {
+    if (!currentWallet || !userTeam) {
+      return;
+    }
+
+    if (!window.confirm(`Remove ${member.slice(0, 8)}...${member.slice(-4)} from ${userTeam.teamName}?`)) {
+      return;
+    }
+
+    try {
+      setError('');
+      setSuccess('');
+      setRemovingMember(member);
+      await removeTeamMember(userTeam.teamId, member, currentWallet);
+      // Refresh team data for current user (team key holder)
+      const updatedTeam = await getTeamByMember(currentWallet);
+      setUserTeam(updatedTeam);
+      setSuccess('Member removed successfully');
+      onTeamUpdated?.();
+    } catch (error: any) {
+      setError(error.message || 'Failed to remove team member');
+    } finally {
+      setRemovingMember(null);
     }
   };
 
@@ -129,6 +167,11 @@ const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ currentWallet
           <p className="text-red-400 text-sm">{error}</p>
         </div>
       )}
+        {success && (
+          <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+            <p className="text-emerald-300 text-sm">{success}</p>
+          </div>
+        )}
 
       {userTeam ? (
         // User is in a team - Show team info
@@ -171,14 +214,26 @@ const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ currentWallet
             <h4 className="text-sm font-semibold text-white mb-2">Team Members</h4>
             <div className="space-y-1 max-h-40 overflow-y-auto">
               {userTeam.members.map((member, index) => (
-                <div key={member} className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-300 font-mono">{member.slice(0, 8)}...{member.slice(-4)}</span>
-                  {member === userTeam.teamKey && (
-                    <span className="text-amber-400 text-xs">🔑 Key Holder</span>
-                  )}
-                  {member === currentWallet && (
-                    <span className="text-cyan-400 text-xs">You</span>
-                  )}
+                  <div key={member} className="flex items-center justify-between text-xs gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-zinc-300 font-mono">{member.slice(0, 8)}...{member.slice(-4)}</span>
+                      {member === userTeam.teamKey && (
+                        <span className="text-amber-400 text-xs">🔑 Key Holder</span>
+                      )}
+                      {member === currentWallet && (
+                        <span className="text-cyan-400 text-xs">You</span>
+                      )}
+                    </div>
+                    {userTeam.teamKey === currentWallet && member !== userTeam.teamKey && (
+                      <ElegantButton
+                        onClick={() => handleRemoveMember(member)}
+                        variant="danger"
+                        className="px-2 py-1 text-[10px]"
+                        disabled={removingMember === member}
+                      >
+                        {removingMember === member ? 'Removing...' : 'Remove'}
+                      </ElegantButton>
+                    )}
                 </div>
               ))}
             </div>

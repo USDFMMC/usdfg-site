@@ -262,6 +262,24 @@ const ArenaHome: React.FC = () => {
     type: 'info'
   });
   
+  const refreshTopTeams = useCallback(async () => {
+    const shouldToggleLoading = leaderboardView === 'teams';
+    try {
+      if (shouldToggleLoading) {
+        setLoadingTopTeams(true);
+      }
+      const limit = showAllPlayers ? leaderboardLimit : 5;
+      const teams = await getTopTeams(limit, 'totalEarned');
+      setTopTeams(teams);
+    } catch (error) {
+      console.error('Failed to refresh team leaderboard:', error);
+    } finally {
+      if (shouldToggleLoading) {
+        setLoadingTopTeams(false);
+      }
+    }
+  }, [leaderboardView, showAllPlayers, leaderboardLimit]);
+
   
   // Mock price API - simulates real-time price updates
   const fetchUsdfgPrice = useCallback(async () => {
@@ -469,16 +487,10 @@ const ArenaHome: React.FC = () => {
           setTopPlayers(mockPlayers);
           
           // REAL FETCH (uncomment when done testing):
-          // const limit = showAllPlayers ? leaderboardLimit : 5;
-          // const players = await getTopPlayers(limit, 'totalEarned');
-          // setTopPlayers(players);
+          // const fetchedPlayers = await getTopPlayers(limit, 'totalEarned');
+          // setTopPlayers(fetchedPlayers);
         } else {
-          // Fetch teams
-          setLoadingTopTeams(true);
-          const limit = showAllPlayers ? leaderboardLimit : 5;
-          const teams = await getTopTeams(limit, 'totalEarned');
-          setTopTeams(teams);
-          setLoadingTopTeams(false);
+          await refreshTopTeams();
         }
       } catch (error) {
         console.error('Failed to fetch leaderboard data:', error);
@@ -486,9 +498,9 @@ const ArenaHome: React.FC = () => {
         setLoadingTopPlayers(false);
       }
     };
-    
+
     fetchLeaderboardData();
-  }, [showAllPlayers, leaderboardLimit, leaderboardView]);
+  }, [showAllPlayers, leaderboardLimit, leaderboardView, refreshTopTeams]);
 
   // Test Firestore connection on component mount
   useEffect(() => {
@@ -3175,6 +3187,7 @@ const ArenaHome: React.FC = () => {
               <TeamManagementModal
                 currentWallet={publicKey?.toString() || null}
                 onClose={() => setShowTeamModal(false)}
+                onTeamUpdated={refreshTopTeams}
               />
             </ElegantModal>
           </Suspense>
@@ -3337,6 +3350,8 @@ const ArenaHome: React.FC = () => {
             c.creator === publicKey.toString() && 
             (c.status === 'active' || c.status === 'pending')
           ) : false}
+          currentWallet={publicKey?.toString() || null}
+          onTeamUpdated={refreshTopTeams}
         />
         </Suspense>
       )}
