@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Trophy, Copy, Crown } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { motion } from "framer-motion";
-import { getTopPlayers, PlayerStats } from "@/lib/firebase/firestore";
+import { getTopPlayers, PlayerStats, getTopTeams, TeamStats } from "@/lib/firebase/firestore";
 
 interface Player {
   rank: number;
@@ -15,6 +15,19 @@ interface Player {
   winStreak: number;
   gains: number;
   rankTitle: string;
+}
+
+interface TeamLeaderboardEntry {
+  rank: number;
+  teamName: string;
+  teamKey: string;
+  wins: number;
+  losses: number;
+  winRate: string;
+  members: number;
+  gains: number;
+  trustScore: number;
+  trustReviews: number;
 }
 
 interface Tab {
@@ -56,54 +69,81 @@ function getTier(winRate: number, gamesPlayed: number): string {
 
 const LeaderboardPreview: React.FC = () => {
   const [activeTab, setActiveTab] = useState("total-gains");
+  const [leaderboardType, setLeaderboardType] = useState<'solo' | 'team'>('solo');
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
+  const [teams, setTeams] = useState<TeamLeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   
   const tabs: Tab[] = [
     { id: "most-wins", label: "Most Wins" },
     { id: "total-gains", label: "Total Skill Rewards" },
   ];
+  const tableColumnCount = leaderboardType === 'solo' ? 8 : 7;
   
-  // Fetch real player data from Firestore
+  useEffect(() => {
+    setCopiedIdx(null);
+  }, [leaderboardType]);
+
+  // Fetch real player/team data from Firestore
   useEffect(() => {
     const fetchLeaderboard = async () => {
       setLoading(true);
       try {
-        let sortBy: 'wins' | 'winRate' | 'totalEarned' = 'totalEarned';
-        
-        if (activeTab === 'most-wins') {
-          sortBy = 'wins';
-        } else if (activeTab === 'total-gains') {
-          sortBy = 'totalEarned';
+        let sortBy: 'wins' | 'winRate' | 'totalEarned' = activeTab === 'most-wins' ? 'wins' : 'totalEarned';
+
+        if (leaderboardType === 'team') {
+          const topTeams = await getTopTeams(10, sortBy);
+          const transformedTeams: TeamLeaderboardEntry[] = topTeams.map((team: TeamStats, index: number) => {
+            const winRateValue = Number.isFinite(team.winRate) ? team.winRate : 0;
+            return {
+              rank: index + 1,
+              teamName: team.teamName?.trim()
+                ? team.teamName
+                : `Team ${team.teamKey.slice(0, 6)}...${team.teamKey.slice(-4)}`,
+              teamKey: team.teamKey,
+              wins: team.wins,
+              losses: team.losses,
+              winRate: `${winRateValue.toFixed(1)}%`,
+              members: Array.isArray(team.members) ? team.members.length : 0,
+              gains: team.totalEarned,
+              trustScore: typeof team.trustScore === 'number' ? team.trustScore : 0,
+              trustReviews: team.trustReviews || 0
+            };
+          });
+
+          setTeams(transformedTeams);
+          setPlayers([]);
+        } else {
+          const topPlayers = await getTopPlayers(10, sortBy);
+
+          // Transform Firestore data to Player interface
+          const transformedPlayers: Player[] = topPlayers.map((p: PlayerStats, index: number) => ({
+            rank: index + 1,
+            wallet: p.wallet,
+            wins: p.wins,
+            losses: p.losses,
+            winRate: `${p.winRate.toFixed(1)}%`,
+            winStreak: 0, // TODO: Add streak tracking
+            gains: p.totalEarned,
+            rankTitle: getTier(p.winRate, p.gamesPlayed)
+          }));
+
+          setPlayers(transformedPlayers);
+          setTeams([]);
         }
-        
-        const topPlayers = await getTopPlayers(10, sortBy);
-        
-        // Transform Firestore data to Player interface
-        const transformedPlayers: Player[] = topPlayers.map((p: PlayerStats, index: number) => ({
-          rank: index + 1,
-          wallet: p.wallet,
-          wins: p.wins,
-          losses: p.losses,
-          winRate: `${p.winRate.toFixed(1)}%`,
-          winStreak: 0, // TODO: Add streak tracking
-          gains: p.totalEarned,
-          rankTitle: getTier(p.winRate, p.gamesPlayed)
-        }));
-        
-        setPlayers(transformedPlayers);
       } catch (error) {
         console.error('Failed to fetch leaderboard:', error);
         // Keep empty array on error
         setPlayers([]);
+        setTeams([]);
       } finally {
         setLoading(false);
       }
     };
     
     fetchLeaderboard();
-  }, [activeTab]);
+  }, [activeTab, leaderboardType]);
   
   return (
     <section className="py-12 bg-[#07080C]">
@@ -133,6 +173,32 @@ const LeaderboardPreview: React.FC = () => {
         </div>
 
         <div className="max-w-5xl mx-auto relative">
+          {/* Solo / Team Toggle */}
+          <div className="flex justify-center gap-2 mb-4">
+            <Button
+              variant={leaderboardType === 'solo' ? "default" : "ghost"}
+              className={`px-4 py-1.5 text-xs font-semibold ${
+                leaderboardType === 'solo'
+                  ? "bg-gradient-to-r from-amber-400/90 to-orange-500/90 text-black shadow-[0_0_12px_rgba(255,215,130,0.2)] border border-amber-400/30"
+                  : "text-amber-300 hover:text-white"
+              }`}
+              onClick={() => setLeaderboardType('solo')}
+            >
+              Solo
+            </Button>
+            <Button
+              variant={leaderboardType === 'team' ? "default" : "ghost"}
+              className={`px-4 py-1.5 text-xs font-semibold ${
+                leaderboardType === 'team'
+                  ? "bg-gradient-to-r from-amber-400/90 to-orange-500/90 text-black shadow-[0_0_12px_rgba(255,215,130,0.2)] border border-amber-400/30"
+                  : "text-amber-300 hover:text-white"
+              }`}
+              onClick={() => setLeaderboardType('team')}
+            >
+              Teams
+            </Button>
+          </div>
+
           {/* Leaderboard Tabs */}
           <div className="flex flex-wrap justify-center mb-4 border-b border-amber-800/40">
             {tabs.map((tab) => (
@@ -157,108 +223,171 @@ const LeaderboardPreview: React.FC = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12 text-center text-sm">Rank</TableHead>
-                  <TableHead className="text-left text-sm">Wallet</TableHead>
-                  <TableHead className="text-center text-sm">Wins</TableHead>
-                  <TableHead className="text-center text-sm">Losses</TableHead>
-                  <TableHead className="text-center text-sm">Win Rate</TableHead>
-                  <TableHead className="text-center text-sm">Streak</TableHead>
-                  <TableHead className="w-36 text-center text-sm" style={{ overflow: 'visible', position: 'relative' }}>
-                    <div className="flex items-center justify-center gap-1 relative">
-                      Skill Rewards (USDFG)
-                    </div>
-                  </TableHead>
-                  <TableHead className="w-24 text-center text-sm">Tier</TableHead>
+                  {leaderboardType === 'solo' ? (
+                    <>
+                      <TableHead className="text-left text-sm">Wallet</TableHead>
+                      <TableHead className="text-center text-sm">Wins</TableHead>
+                      <TableHead className="text-center text-sm">Losses</TableHead>
+                      <TableHead className="text-center text-sm">Win Rate</TableHead>
+                      <TableHead className="text-center text-sm">Streak</TableHead>
+                      <TableHead className="w-36 text-center text-sm" style={{ overflow: 'visible', position: 'relative' }}>
+                        <div className="flex items-center justify-center gap-1 relative">
+                          Skill Rewards (USDFG)
+                        </div>
+                      </TableHead>
+                      <TableHead className="w-24 text-center text-sm">Tier</TableHead>
+                    </>
+                  ) : (
+                    <>
+                      <TableHead className="text-left text-sm">Team</TableHead>
+                      <TableHead className="text-center text-sm">Members</TableHead>
+                      <TableHead className="text-center text-sm">Wins</TableHead>
+                      <TableHead className="text-center text-sm">Losses</TableHead>
+                      <TableHead className="text-center text-sm">Win Rate</TableHead>
+                      <TableHead className="w-36 text-center text-sm" style={{ overflow: 'visible', position: 'relative' }}>
+                        <div className="flex items-center justify-center gap-1 relative">
+                          Skill Rewards (USDFG)
+                        </div>
+                      </TableHead>
+                      <TableHead className="w-28 text-center text-sm">Trust</TableHead>
+                    </>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
+                    <TableCell colSpan={tableColumnCount} className="text-center py-8">
                       <div className="flex flex-col items-center gap-2">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
                         <p className="text-cyan-300 text-sm">Loading leaderboard...</p>
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : players.length === 0 ? (
+                ) : leaderboardType === 'solo' ? (
+                  players.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={tableColumnCount} className="text-center py-8">
+                        <div className="flex flex-col items-center gap-2">
+                          <Trophy className="w-12 h-12 text-cyan-400/50" />
+                          <p className="text-cyan-300 text-sm font-semibold">No players yet!</p>
+                          <p className="text-gray-400 text-xs">Be the first to complete a challenge and claim the top spot.</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    players.map((player, i) => {
+                      const masked = `${player.wallet.slice(0, 6)}...${player.wallet.slice(-4)}`;
+                      const tierTooltip = tierTooltips[player.rankTitle] || player.rankTitle;
+                      return (
+                        <TableRow
+                          key={player.wallet}
+                          className={`relative group transition-transform duration-200 ${i < 3 ? "z-10 animate-glow-row" : ""}`}
+                          style={i < 3 ? { boxShadow: "0 0 32px 8px var(--tier-glow-" + player.rankTitle.toLowerCase() + ")" } : {}}
+                        >
+                          <TableCell className="text-center font-bold text-base">{player.rank}</TableCell>
+                          <TableCell className="font-mono text-sm flex items-center gap-2">
+                            <span>{masked}</span>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Copy className="w-4 h-4 cursor-pointer hover:text-cyan-400" onClick={() => {navigator.clipboard.writeText(player.wallet); setCopiedIdx(i); setTimeout(() => setCopiedIdx(null), 1200);}} />
+                                </TooltipTrigger>
+                                <TooltipContent className="bg-black/80 text-cyan-100 border-cyan-400/40">
+                                  {copiedIdx === i ? "Copied!" : "Copy wallet address"}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </TableCell>
+                          <TableCell className="text-center text-sm">{player.wins}</TableCell>
+                          <TableCell className="text-center text-sm">{player.losses}</TableCell>
+                          <TableCell className="text-center text-sm">{player.winRate}</TableCell>
+                          <TableCell className="text-center text-sm">{player.winStreak}</TableCell>
+                          <TableCell className="text-center font-bold text-amber-300 text-sm">{formatUSDFG(player.gains)}</TableCell>
+                          <TableCell className="text-center">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-semibold text-white shadow-[0_0_6px_rgba(255,215,130,0.12)] border text-sm ${
+                                    player.rankTitle === "Gold"
+                                      ? "bg-gradient-to-r from-yellow-400/90 to-yellow-600/90 border-yellow-400/50"
+                                      : player.rankTitle === "Silver"
+                                      ? "bg-gradient-to-r from-gray-300/90 to-gray-500/90 border-gray-300/50"
+                                      : player.rankTitle === "Bronze"
+                                      ? "bg-gradient-to-r from-amber-700/90 to-yellow-500/90 border-amber-700/50"
+                                      : "bg-gradient-to-r from-cyan-400/90 to-blue-600/90 border-cyan-400/50"
+                                  } animate-fade-in-up`}
+                                  >
+                                    {player.rankTitle === "Gold" && <Crown className="w-4 h-4 text-yellow-300 drop-shadow-glow animate-bounce" />}
+                                    {player.rankTitle === "Silver" && <Crown className="w-4 h-4 text-gray-200 drop-shadow-glow animate-bounce" />}
+                                    {player.rankTitle === "Bronze" && <Crown className="w-4 h-4 text-amber-400 drop-shadow-glow animate-bounce" />}
+                                    {player.rankTitle === "Platinum" && <Crown className="w-4 h-4 text-cyan-200 drop-shadow-glow animate-bounce" />}
+                                    {player.rankTitle === "Ghostly" && <Crown className="w-4 h-4 text-purple-400 drop-shadow-glow animate-bounce" style={{ filter: 'drop-shadow(0 0 6px #a78bfa) drop-shadow(0 0 12px #fff)' }} />}
+                                    <span className="ml-1">{player.rankTitle}</span>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <span className="text-sm">{tierTooltip}</span>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )
+                ) : teams.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
+                    <TableCell colSpan={tableColumnCount} className="text-center py-8">
                       <div className="flex flex-col items-center gap-2">
                         <Trophy className="w-12 h-12 text-cyan-400/50" />
-                        <p className="text-cyan-300 text-sm font-semibold">No players yet!</p>
-                        <p className="text-gray-400 text-xs">Be the first to complete a challenge and claim the top spot.</p>
+                        <p className="text-cyan-300 text-sm font-semibold">No teams yet!</p>
+                        <p className="text-gray-400 text-xs">Create a team to climb the leaderboard.</p>
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : players.map((player, i) => {
-                  const masked = `${player.wallet.slice(0, 6)}...${player.wallet.slice(-4)}`;
-                  const tierColor = tierColors[player.rankTitle] || "bg-gray-700 text-white border-gray-500";
-                  const tierTooltip = tierTooltips[player.rankTitle] || player.rankTitle;
-                  return (
-                    <TableRow
-                      key={player.wallet}
-                      className={`relative group transition-transform duration-200 ${i < 3 ? "z-10 animate-glow-row" : ""}`}
-                      style={i < 3 ? { boxShadow: "0 0 32px 8px var(--tier-glow-" + player.rankTitle.toLowerCase() + ")" } : {}}
-                    >
-                      <TableCell className="text-center font-bold text-base">{player.rank}</TableCell>
-                      <TableCell className="font-mono text-sm flex items-center gap-2">
-                        <span>{masked}</span>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Copy className="w-4 h-4 cursor-pointer hover:text-cyan-400" onClick={() => {navigator.clipboard.writeText(player.wallet); setCopiedIdx(i); setTimeout(() => setCopiedIdx(null), 1200);}} />
-                            </TooltipTrigger>
-                            <TooltipContent className="bg-black/80 text-cyan-100 border-cyan-400/40">
-                              {copiedIdx === i ? "Copied!" : "Copy wallet address"}
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </TableCell>
-                      <TableCell className="text-center text-sm">{player.wins}</TableCell>
-                      <TableCell className="text-center text-sm">{player.losses}</TableCell>
-                      <TableCell className="text-center text-sm">{player.winRate}</TableCell>
-                      <TableCell className="text-center text-sm">{player.winStreak}</TableCell>
-                      <TableCell className="text-center font-bold text-amber-300 text-sm">{formatUSDFG(player.gains)}</TableCell>
-                      <TableCell className="text-center">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-semibold text-white shadow-[0_0_6px_rgba(255,215,130,0.12)] border text-sm ${
-                                player.rankTitle === "Gold"
-                                  ? "bg-gradient-to-r from-yellow-400/90 to-yellow-600/90 border-yellow-400/50"
-                                  : player.rankTitle === "Silver"
-                                  ? "bg-gradient-to-r from-gray-300/90 to-gray-500/90 border-gray-300/50"
-                                  : player.rankTitle === "Bronze"
-                                  ? "bg-gradient-to-r from-amber-700/90 to-yellow-500/90 border-amber-700/50"
-                                  : "bg-gradient-to-r from-cyan-400/90 to-blue-600/90 border-cyan-400/50"
-                              } animate-fade-in-up`}
-                              >
-                                {/* Crown/medal icon */}
-                                {player.rankTitle === "Gold" && <Crown className="w-4 h-4 text-yellow-300 drop-shadow-glow animate-bounce" />}
-                                {player.rankTitle === "Silver" && <Crown className="w-4 h-4 text-gray-200 drop-shadow-glow animate-bounce" />}
-                                {player.rankTitle === "Bronze" && <Crown className="w-4 h-4 text-amber-400 drop-shadow-glow animate-bounce" />}
-                                {player.rankTitle === "Platinum" && <Crown className="w-4 h-4 text-cyan-200 drop-shadow-glow animate-bounce" />}
-                                {player.rankTitle === "Ghostly" && <Crown className="w-4 h-4 text-purple-400 drop-shadow-glow animate-bounce" style={{ filter: 'drop-shadow(0 0 6px #a78bfa) drop-shadow(0 0 12px #fff)' }} />}
-                                <span className="ml-1">{player.rankTitle}</span>
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <span className="text-sm">
-                                {player.rankTitle} Tier: {player.rankTitle === "Gold"
-                                  ? "Top 1% - Legendary performance"
-                                  : player.rankTitle === "Silver"
-                                  ? "Top 10% - Elite competitor"
-                                  : player.rankTitle === "Bronze"
-                                  ? "Top 25% - Proven winner"
-                                  : "Platinum - Consistent excellence"}
-                              </span>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                ) : (
+                  teams.map((team, i) => {
+                    const masked = `${team.teamKey.slice(0, 6)}...${team.teamKey.slice(-4)}`;
+                    return (
+                      <TableRow
+                        key={team.teamKey}
+                        className={`relative group transition-transform duration-200 ${i < 3 ? "z-10 animate-glow-row" : ""}`}
+                      >
+                        <TableCell className="text-center font-bold text-base">{team.rank}</TableCell>
+                        <TableCell className="text-sm">
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-white text-sm md:text-base">{team.teamName}</span>
+                            <div className="flex items-center gap-2 text-xs text-cyan-200 mt-1">
+                              <span className="font-mono text-amber-300">{masked}</span>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Copy className="w-4 h-4 cursor-pointer hover:text-cyan-400" onClick={() => {navigator.clipboard.writeText(team.teamKey); setCopiedIdx(i); setTimeout(() => setCopiedIdx(null), 1200);}} />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="bg-black/80 text-cyan-100 border-cyan-400/40">
+                                    {copiedIdx === i ? "Copied!" : "Copy team key"}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center text-sm">{team.members}</TableCell>
+                        <TableCell className="text-center text-sm">{team.wins}</TableCell>
+                        <TableCell className="text-center text-sm">{team.losses}</TableCell>
+                        <TableCell className="text-center text-sm">{team.winRate}</TableCell>
+                        <TableCell className="text-center font-bold text-amber-300 text-sm">{formatUSDFG(team.gains)}</TableCell>
+                        <TableCell className="text-center text-sm">
+                          <span className="text-amber-200 font-semibold">{team.trustScore.toFixed(1)}/10</span>
+                          {team.trustReviews > 0 && (
+                            <span className="block text-xs text-zinc-400 mt-0.5">{team.trustReviews} review{team.trustReviews === 1 ? '' : 's'}</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
               </TableBody>
             </Table>
           </div>
