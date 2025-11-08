@@ -250,6 +250,7 @@ export default function PlayerProfileModal({
   const [userTeam, setUserTeam] = useState<TeamStats | null>(null);
   const [viewerTeam, setViewerTeam] = useState<TeamStats | null>(null);
   const [isJoiningTeam, setIsJoiningTeam] = useState(false);
+  const [isInvitingToTeam, setIsInvitingToTeam] = useState(false);
   const [isRemovingFromTeam, setIsRemovingFromTeam] = useState(false);
   const [teamActionError, setTeamActionError] = useState<string | null>(null);
   const [teamActionSuccess, setTeamActionSuccess] = useState<string | null>(null);
@@ -390,6 +391,57 @@ export default function PlayerProfileModal({
     }
   };
 
+  const handleInvitePlayerToViewerTeam = async () => {
+    if (!currentWallet || !viewerTeam) {
+      setTeamActionError('You need to be the team key holder to invite players');
+      return;
+    }
+
+    const targetWallet = player.wallet;
+    if (!targetWallet) {
+      setTeamActionError('Player wallet unavailable');
+      return;
+    }
+
+    if (!viewerIsTeamKey) {
+      setTeamActionError('Only the team key holder can add members');
+      return;
+    }
+
+    if (viewerTeam.members.includes(targetWallet)) {
+      setTeamActionError('Player is already on your team');
+      return;
+    }
+
+    if (viewerTeam.members.length >= 69) {
+      setTeamActionError('Your team is full (69 members max)');
+      return;
+    }
+
+    if (userTeam && userTeam.teamId && viewerTeam.teamId && userTeam.teamId !== viewerTeam.teamId) {
+      setTeamActionError('Player is already on another team. Ask them to leave before inviting.');
+      return;
+    }
+
+    try {
+      setTeamActionError(null);
+      setTeamActionSuccess(null);
+      setIsInvitingToTeam(true);
+      const teamId = viewerTeam.teamId || viewerTeam.teamKey;
+      await joinTeam(teamId, targetWallet);
+      const updatedViewerTeam = await getTeamByMember(currentWallet);
+      setViewerTeam(updatedViewerTeam);
+      const refreshedPlayerTeam = await getTeamByMember(targetWallet);
+      setUserTeam(refreshedPlayerTeam);
+      setTeamActionSuccess('Player added to your team');
+      onTeamUpdated?.();
+    } catch (error: any) {
+      setTeamActionError(error.message || 'Failed to add player to your team');
+    } finally {
+      setIsInvitingToTeam(false);
+    }
+  };
+
   const handleRemoveMemberFromTeam = async () => {
     if (!currentWallet || !viewerTeam) {
       setTeamActionError('You need to be the team key holder to manage members');
@@ -441,6 +493,15 @@ export default function PlayerProfileModal({
     !isTeamFull &&
     !userTeam.members.includes(currentWallet)
   );
+  const canInviteToMyTeam = Boolean(
+    !isCurrentUser &&
+    viewerTeam &&
+    viewerIsTeamKey &&
+    playerWallet &&
+    !viewerTeam.members.includes(playerWallet) &&
+    viewerTeam.members.length < 69 &&
+    (!userTeam || isSameTeam)
+  );
   const canRemoveFromTeam = Boolean(
     viewerIsTeamKey &&
     isSameTeam &&
@@ -449,6 +510,11 @@ export default function PlayerProfileModal({
     userTeam &&
     userTeam.members.includes(playerWallet) &&
     playerWallet !== viewerTeam.teamKey
+  );
+  const viewerTeamDifferentFromPlayer = Boolean(
+    viewerTeam &&
+    userTeam &&
+    viewerTeam.teamId !== userTeam.teamId
   );
 
   return (
@@ -642,7 +708,7 @@ export default function PlayerProfileModal({
                       </div>
                     </div>
                   </div>
-                    {(canJoinViewedTeam || canRemoveFromTeam) && (
+                    {(canJoinViewedTeam || canInviteToMyTeam || canRemoveFromTeam) && (
                       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:justify-end">
                         {canJoinViewedTeam && (
                           <ElegantButton
@@ -652,6 +718,16 @@ export default function PlayerProfileModal({
                             disabled={isJoiningTeam || isTeamFull}
                           >
                             {isJoiningTeam ? 'Joining...' : isTeamFull ? 'Team Full' : 'Join Team'}
+                          </ElegantButton>
+                        )}
+                        {canInviteToMyTeam && (
+                          <ElegantButton
+                            onClick={handleInvitePlayerToViewerTeam}
+                            variant="primary"
+                            className="w-full sm:w-auto"
+                            disabled={isInvitingToTeam}
+                          >
+                            {isInvitingToTeam ? 'Adding...' : 'Add to My Team'}
                           </ElegantButton>
                         )}
                         {canRemoveFromTeam && (
@@ -665,6 +741,11 @@ export default function PlayerProfileModal({
                           </ElegantButton>
                         )}
                       </div>
+                    )}
+                    {viewerIsTeamKey && viewerTeamDifferentFromPlayer && (
+                      <p className="mt-2 text-[11px] text-amber-200/70 text-center sm:text-right">
+                        Player must leave their current team before you can invite them.
+                      </p>
                     )}
                 </div>
             </motion.div>
