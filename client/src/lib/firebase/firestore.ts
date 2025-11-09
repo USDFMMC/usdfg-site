@@ -1540,6 +1540,146 @@ export async function getPlayersOnlineCount(): Promise<number> {
 }
 
 /**
+ * Ensure a Firestore user document exists for lobby locking features.
+ * Creates the document with a null currentLock if it does not already exist.
+ */
+export async function ensureUserLockDocument(userId: string): Promise<void> {
+  if (!userId) return;
+
+  try {
+    const userRef = doc(db, 'users', userId);
+    const snapshot = await getDoc(userRef);
+
+    if (!snapshot.exists()) {
+      await setDoc(userRef, {
+        currentLock: null,
+        createdAt: serverTimestamp(),
+        lockUpdatedAt: serverTimestamp(),
+      });
+    } else if (!('currentLock' in (snapshot.data() || {}))) {
+      await setDoc(userRef, {
+        currentLock: null,
+        lockUpdatedAt: serverTimestamp(),
+      }, { merge: true });
+    }
+  } catch (error) {
+    console.error('❌ Error ensuring user lock document:', error);
+  }
+}
+
+/**
+ * Set or clear the current lock target for a user in the lobby.
+ */
+export async function setUserCurrentLock(userId: string, opponentId: string | null): Promise<void> {
+  if (!userId) {
+    throw new Error('User ID is required to set current lock');
+  }
+
+  try {
+    const userRef = doc(db, 'users', userId);
+    await setDoc(userRef, {
+      currentLock: opponentId ?? null,
+      lockUpdatedAt: serverTimestamp(),
+    }, { merge: true });
+  } catch (error) {
+    console.error('❌ Error setting user currentLock:', error);
+    throw error;
+  }
+}
+
+/**
+ * Clear the lock state for two users after a friendly match resolves.
+ */
+export async function clearMutualLock(userA: string, userB: string): Promise<void> {
+  if (!userA || !userB) {
+    throw new Error('Both user IDs are required to clear mutual lock');
+  }
+
+  try {
+    const batch = writeBatch(db);
+    const userARef = doc(db, 'users', userA);
+    const userBRef = doc(db, 'users', userB);
+
+    batch.set(userARef, {
+      currentLock: null,
+      lockUpdatedAt: serverTimestamp(),
+    }, { merge: true });
+
+    batch.set(userBRef, {
+      currentLock: null,
+      lockUpdatedAt: serverTimestamp(),
+    }, { merge: true });
+
+    await batch.commit();
+  } catch (error) {
+    console.error('❌ Error clearing mutual lock:', error);
+    throw error;
+  }
+}
+
+/**
+ * Listen to all lobby locks so the client can react to mutual lock pairs.
+ */
+export function listenToAllUserLocks(
+  callback: (locks: Record<string, string | null>) => void
+): () => void {
+  return onSnapshot(usersCollection, (snapshot) => {
+    const locks: Record<string, string | null> = {};
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      locks[docSnap.id] = (data?.currentLock ?? null) as string | null;
+    });
+
+    callback(locks);
+  }, (error) => {
+    console.error('❌ Error listening to user locks:', error);
+  });
+}
+
+/**
+ * Record a friendly match submission. Stores each player's self-reported outcome.
+ */
+export async function recordFriendlyMatchResult(params: {
+  matchId: string;
+  reporter: string;
+  opponent: string;
+  didWin: boolean;
+  proofProvided: boolean;
+}): Promise<void> {
+  if (!params.matchId) {
+    throw new Error('matchId is required to record friendly match result');
+  }
+
+  try {
+    const matchRef = doc(db, 'friendly_matches', params.matchId);
+    const matchSnap = await getDoc(matchRef);
+    const timestamp = serverTimestamp();
+    const players = [params.reporter, params.opponent].filter(Boolean).sort();
+
+    const payload: Record<string, any> = {
+      matchId: params.matchId,
+      players,
+      updatedAt: timestamp,
+      [`submissions.${params.reporter}`]: {
+        didWin: params.didWin,
+        proofProvided: params.proofProvided,
+        submittedAt: timestamp,
+      }
+    };
+
+    if (!matchSnap.exists()) {
+      payload.createdAt = timestamp;
+    }
+
+    await setDoc(matchRef, payload, { merge: true });
+  } catch (error) {
+    console.error('❌ Error recording friendly match result:', error);
+    throw error;
+  }
+}
+
+/**
  * Update player display name in Firestore
  */
 /**
