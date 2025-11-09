@@ -9,7 +9,7 @@ import { joinChallengeOnChain } from "@/lib/chain/events";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
-import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats } from "@/lib/firebase/firestore";
+import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult } from "@/lib/firebase/firestore";
 import { Timestamp } from "firebase/firestore";
 import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
@@ -202,6 +202,7 @@ const ArenaHome: React.FC = () => {
         return '/assets/categories/sports.png'; // Default to sports category image
     }
   };
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showSubmitResultModal, setShowSubmitResultModal] = useState(false);
@@ -261,7 +262,26 @@ const ArenaHome: React.FC = () => {
     message: '',
     type: 'info'
   });
+  const [userLocks, setUserLocks] = useState<Record<string, string | null>>({});
+  const [lockInProgress, setLockInProgress] = useState<string | null>(null);
+  const [friendlyMatch, setFriendlyMatch] = useState<{
+    opponentId: string;
+    opponentName: string;
+    matchId: string;
+  } | null>(null);
+  const [showFriendlySubmitResult, setShowFriendlySubmitResult] = useState(false);
+  const [submittingFriendlyResult, setSubmittingFriendlyResult] = useState(false);
   
+  const formatWalletAddress = useCallback((wallet: string) => {
+    if (!wallet) return '';
+    if (wallet.length <= 10) return wallet;
+    return `${wallet.slice(0, 4)}...${wallet.slice(-4)}`;
+  }, []);
+
+  const createFriendlyMatchId = useCallback((walletA: string, walletB: string) => {
+    return `friendly-${[walletA, walletB].filter(Boolean).sort().join('-')}`;
+  }, []);
+
   const refreshTopTeams = useCallback(async () => {
     const shouldToggleLoading = leaderboardView === 'teams';
     try {
@@ -373,16 +393,19 @@ const ArenaHome: React.FC = () => {
       // Wallet disconnected - clear all wallet-specific state
       setShowPlayerProfile(false);
       setSelectedPlayer(null);
-      setShowCreateModal(false);
-      setShowJoinModal(false);
-      setShowSubmitResultModal(false);
-      setSelectedChallenge(null);
-      setShowTrustReview(false);
-      setTrustReviewOpponent('');
-      setPendingMatchResult(null);
-      setClaimingPrize(null);
-      setMarkingPrizeTransferred(null);
-      setShowMyChallenges(false);
+        setShowCreateModal(false);
+        setShowJoinModal(false);
+        setShowSubmitResultModal(false);
+        setSelectedChallenge(null);
+        setShowTrustReview(false);
+        setTrustReviewOpponent('');
+        setPendingMatchResult(null);
+        setClaimingPrize(null);
+        setMarkingPrizeTransferred(null);
+        setShowMyChallenges(false);
+        setFriendlyMatch(null);
+        setShowFriendlySubmitResult(false);
+        setLockInProgress(null);
       return;
     }
     
@@ -547,6 +570,16 @@ const ArenaHome: React.FC = () => {
     }
   }, [publicKey]);
   
+  useEffect(() => {
+    if (!publicKey) {
+      return;
+    }
+
+    ensureUserLockDocument(publicKey.toString()).catch((error) => {
+      console.error('❌ Failed to ensure user lock document:', error);
+    });
+  }, [publicKey]);
+  
   // Fetch players online count
   useEffect(() => {
     const fetchPlayersOnline = async () => {
@@ -563,6 +596,70 @@ const ArenaHome: React.FC = () => {
     const interval = setInterval(fetchPlayersOnline, 30000);
     return () => clearInterval(interval);
   }, []);
+  
+  useEffect(() => {
+    const unsubscribe = listenToAllUserLocks((locks) => {
+      setUserLocks(locks);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!currentWallet || !mutualLockOpponentId) {
+      setFriendlyMatch(null);
+      setShowFriendlySubmitResult(false);
+      return;
+    }
+
+    const matchId = createFriendlyMatchId(currentWallet, mutualLockOpponentId);
+    const opponentFromLeaderboard = topPlayers.find((player) => player.wallet === mutualLockOpponentId);
+    const fallbackName = opponentFromLeaderboard?.displayName && opponentFromLeaderboard.displayName.trim().length > 0
+      ? opponentFromLeaderboard.displayName
+      : formatWalletAddress(mutualLockOpponentId);
+
+    setFriendlyMatch((previous) => {
+      if (previous && previous.matchId === matchId) {
+        if (previous.opponentName === fallbackName) {
+          return previous;
+        }
+        return { ...previous, opponentName: fallbackName };
+      }
+
+      return {
+        opponentId: mutualLockOpponentId,
+        opponentName: fallbackName,
+        matchId,
+      };
+    });
+
+    let isMounted = true;
+
+    if (!opponentFromLeaderboard?.displayName) {
+      getPlayerStats(mutualLockOpponentId).then((stats) => {
+        if (!isMounted || !stats?.displayName) {
+          return;
+        }
+        setFriendlyMatch((previous) => {
+          if (!previous || previous.opponentId !== mutualLockOpponentId) {
+            return previous;
+          }
+          if (previous.opponentName === stats.displayName) {
+            return previous;
+          }
+          return { ...previous, opponentName: stats.displayName };
+        });
+      }).catch((error) => {
+        console.error('❌ Failed to load opponent display name:', error);
+      });
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentWallet, mutualLockOpponentId, topPlayers, createFriendlyMatchId, formatWalletAddress]);
   
   // Refresh leaderboard when a challenge completes (new completion detected)
   // MUST be after firestoreChallenges is defined
@@ -1098,6 +1195,37 @@ const ArenaHome: React.FC = () => {
       alert(`Share this challenge:\n\n${shareText}`);
     }
   };
+  
+  const handleLockToggle = useCallback(async (targetWallet: string) => {
+    if (!targetWallet) {
+      return;
+    }
+
+    if (!currentWallet) {
+      connect();
+      return;
+    }
+
+    if (targetWallet === currentWallet) {
+      return;
+    }
+
+    setLockInProgress(targetWallet);
+    try {
+      const nextLock = currentLockTarget === targetWallet ? null : targetWallet;
+      await setUserCurrentLock(currentWallet, nextLock);
+    } catch (error) {
+      console.error('❌ Failed to update lock state:', error);
+      setNotification({
+        isOpen: true,
+        title: 'Lock Failed',
+        message: 'Could not update lock state. Please try again.',
+        type: 'error',
+      });
+    } finally {
+      setLockInProgress(null);
+    }
+  }, [currentWallet, currentLockTarget, connect]);
 
   // Handle result submission - now stores result and shows trust review
   const handleSubmitResult = async (didWin: boolean, proofFile?: File | null) => {
@@ -1282,6 +1410,50 @@ const ArenaHome: React.FC = () => {
       }
     }
   };
+
+  const handleFriendlyResultSubmit = useCallback(async (didWin: boolean, proofFile?: File | null) => {
+    if (!friendlyMatch || !currentWallet) {
+      return;
+    }
+
+    const opponentId = friendlyMatch.opponentId;
+    const opponentName = friendlyMatch.opponentName;
+
+    try {
+      setSubmittingFriendlyResult(true);
+
+      await recordFriendlyMatchResult({
+        matchId: friendlyMatch.matchId,
+        reporter: currentWallet,
+        opponent: opponentId,
+        didWin,
+        proofProvided: !!proofFile,
+      });
+
+      await clearMutualLock(currentWallet, opponentId);
+
+      setNotification({
+        isOpen: true,
+        title: 'Result Submitted',
+        message: `Friendly match result recorded vs ${opponentName}`,
+        type: 'success',
+      });
+
+      setShowFriendlySubmitResult(false);
+      setFriendlyMatch(null);
+    } catch (error) {
+      console.error('❌ Failed to submit friendly match result:', error);
+      setNotification({
+        isOpen: true,
+        title: 'Submission Failed',
+        message: 'Could not submit match result. Please try again.',
+        type: 'error',
+      });
+      throw error;
+    } finally {
+      setSubmittingFriendlyResult(false);
+    }
+  }, [friendlyMatch, currentWallet]);
 
   // Handle reward claiming
   const handleClaimPrize = async (challenge: any) => {
@@ -1543,6 +1715,17 @@ const ArenaHome: React.FC = () => {
   // EXCLUDE completed, cancelled, disputed, and expired challenges
   // Use Firestore data directly for most reliable status check
   const currentWallet = publicKey?.toString() || null;
+  const currentLockTarget = useMemo(() => {
+    if (!currentWallet) return null;
+    return userLocks[currentWallet] ?? null;
+  }, [currentWallet, userLocks]);
+
+  const mutualLockOpponentId = useMemo(() => {
+    if (!currentWallet || !currentLockTarget) return null;
+    const lockValue = userLocks[currentLockTarget] ?? null;
+    return lockValue === currentWallet ? currentLockTarget : null;
+  }, [currentWallet, currentLockTarget, userLocks]);
+
   const hasActiveChallenge = currentWallet && firestoreChallenges.some((fc: any) => {
     // Check if user created this challenge
     const isCreator = fc.creator === currentWallet;
@@ -1601,6 +1784,106 @@ const ArenaHome: React.FC = () => {
       setLoadingTopPlayers(value);
     }
   }, [isTeamsView]);
+
+  const renderLockAction = useCallback((playerWallet: string, displayName: string) => {
+    if (!playerWallet) {
+      return null;
+    }
+
+    const resolvedName = displayName && displayName.trim().length > 0 ? displayName : formatWalletAddress(playerWallet);
+
+    if (playerWallet === currentWallet) {
+      return (
+        <div className="text-xs text-green-400 font-semibold pointer-events-none">
+          You
+        </div>
+      );
+    }
+
+    if (!currentWallet) {
+      return (
+        <button
+          className="px-3 py-1.5 rounded-lg border border-amber-500/30 bg-zinc-800/60 text-amber-200 text-xs font-semibold hover:border-amber-400/50 transition-colors pointer-events-auto"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if ('stopImmediatePropagation' in event.nativeEvent) {
+              event.nativeEvent.stopImmediatePropagation();
+            }
+            connect();
+          }}
+        >
+          Connect to Lock
+        </button>
+      );
+    }
+
+    const isLoading = lockInProgress === playerWallet;
+    const playerLockTarget = userLocks[playerWallet] ?? null;
+    const isLockedByMe = currentLockTarget === playerWallet;
+    const isLockedOnMe = playerLockTarget === currentWallet;
+    const isMutual = mutualLockOpponentId === playerWallet;
+
+    if (isMutual) {
+      return (
+        <button
+          className="px-3 py-1.5 rounded-lg border border-green-500/40 bg-green-600/20 text-green-200 text-xs font-semibold hover:bg-green-600/30 transition-colors pointer-events-auto"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if ('stopImmediatePropagation' in event.nativeEvent) {
+              event.nativeEvent.stopImmediatePropagation();
+            }
+            setFriendlyMatch((previous) => {
+              if (previous && previous.opponentId === playerWallet) {
+                if (displayName && previous.opponentName !== displayName) {
+                  return { ...previous, opponentName: displayName };
+                }
+                return previous;
+              }
+              return {
+                opponentId: playerWallet,
+                opponentName: resolvedName,
+                matchId: createFriendlyMatchId(currentWallet, playerWallet),
+              };
+            });
+            setShowFriendlySubmitResult(true);
+          }}
+        >
+          Submit Result
+        </button>
+      );
+    }
+
+    let label = 'Lock In';
+    let buttonClass = 'px-3 py-1.5 rounded-lg border border-amber-500/30 bg-zinc-800/60 text-amber-200 text-xs font-semibold hover:border-amber-400/50 hover:bg-zinc-700/60 transition-colors pointer-events-auto';
+
+    if (isLockedByMe) {
+      label = 'Cancel Lock';
+      buttonClass = 'px-3 py-1.5 rounded-lg border border-red-500/40 bg-red-600/20 text-red-200 text-xs font-semibold hover:bg-red-600/30 transition-colors pointer-events-auto';
+    } else if (isLockedOnMe) {
+      label = 'Lock Back';
+      buttonClass = 'px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-600/20 text-amber-200 text-xs font-semibold hover:bg-amber-600/30 transition-colors pointer-events-auto';
+    }
+
+    return (
+      <button
+        className={`${buttonClass} ${isLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
+        disabled={isLoading}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if ('stopImmediatePropagation' in event.nativeEvent) {
+            event.nativeEvent.stopImmediatePropagation();
+          }
+          handleLockToggle(playerWallet);
+        }}
+        title={isLockedByMe && !isLockedOnMe ? 'Waiting for opponent to lock back' : undefined}
+      >
+        {isLoading ? 'Updating...' : label}
+      </button>
+    );
+  }, [currentWallet, connect, lockInProgress, userLocks, currentLockTarget, mutualLockOpponentId, handleLockToggle, formatWalletAddress, createFriendlyMatchId]);
 
   return (
     <>
@@ -3226,6 +3509,9 @@ const ArenaHome: React.FC = () => {
                           </div>
                         </div>
                         </div>
+                    <div className="mt-3 sm:mt-0 sm:ml-6 flex items-center justify-end pointer-events-auto">
+                      {renderLockAction(player.wallet, player.name)}
+                    </div>
                       </div>
                       ));
                     })()}
@@ -3451,6 +3737,20 @@ const ArenaHome: React.FC = () => {
             </Suspense>
           );
         })()}
+
+          {friendlyMatch && (
+            <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div></div>}>
+              <SubmitResultRoom
+                isOpen={showFriendlySubmitResult}
+                onClose={() => setShowFriendlySubmitResult(false)}
+                challengeId={friendlyMatch.matchId}
+                challengeTitle={`Friendly Match vs ${friendlyMatch.opponentName || formatWalletAddress(friendlyMatch.opponentId)}`}
+                currentWallet={publicKey?.toString() || ""}
+                onSubmit={handleFriendlyResultSubmit}
+                isSubmitting={submittingFriendlyResult}
+              />
+            </Suspense>
+          )}
 
         {/* Mobile FAB - Create Challenge - Smaller and positioned to not block content */}
         <button
