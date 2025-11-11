@@ -48,6 +48,14 @@ service cloud.firestore {
       allow delete: if true;
     }
     
+    // Challenge Notifications - alerts when someone sends a challenge to a specific player
+    match /challenge_notifications/{notificationId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
+    
     // Friendly Matches - player-initiated matches without entry fees
     match /friendly_matches/{matchId} {
       allow read: if true;

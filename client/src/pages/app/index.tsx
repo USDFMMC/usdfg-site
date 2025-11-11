@@ -9,7 +9,7 @@ import { joinChallengeOnChain } from "@/lib/chain/events";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
-import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage, uploadTeamImage, updateTeamImage } from "@/lib/firebase/firestore";
+import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage, uploadTeamImage, updateTeamImage, upsertChallengeNotification, listenToChallengeNotifications, ChallengeNotification } from "@/lib/firebase/firestore";
 import { Timestamp } from "firebase/firestore";
 import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
@@ -281,6 +281,8 @@ const ArenaHome: React.FC = () => {
   const [submittingFriendlyResult, setSubmittingFriendlyResult] = useState(false);
   const [lockNotificationsList, setLockNotificationsList] = useState<LockNotification[]>([]);
   const lockNotificationStatusRef = useRef<Record<string, LockNotification['status']>>({});
+  const [challengeNotificationsList, setChallengeNotificationsList] = useState<ChallengeNotification[]>([]);
+  const challengeNotificationStatusRef = useRef<Record<string, ChallengeNotification['status']>>({});
   const lastFriendlyMatchIdRef = useRef<string | null>(null);
   
   const profileInitial = useMemo(() => {
@@ -829,6 +831,60 @@ const ArenaHome: React.FC = () => {
     );
   }, [lockNotificationsList, normalizedCurrentWallet, formatWalletAddress]);
 
+  // Listen to challenge notifications
+  useEffect(() => {
+    if (!publicKey) {
+      setChallengeNotificationsList([]);
+      challengeNotificationStatusRef.current = {};
+      return;
+    }
+
+    const unsubscribe = listenToChallengeNotifications(publicKey.toString(), (notifications) => {
+      setChallengeNotificationsList(notifications);
+    });
+
+    return () => unsubscribe();
+  }, [publicKey]);
+
+  // Show toasts for new challenge notifications
+  useEffect(() => {
+    const previousStatuses = challengeNotificationStatusRef.current;
+
+    challengeNotificationsList.forEach((notification) => {
+      const prevStatus = previousStatuses[notification.challengeId];
+      const creatorWallet = notification.creator?.toLowerCase();
+      const targetWallet = notification.targetPlayer?.toLowerCase();
+      const creatorDisplayName =
+        notification.creatorDisplayName ||
+        (notification.creator ? formatWalletAddress(notification.creator) : 'Player');
+      
+      const challengeTitle = notification.challengeTitle || 'Challenge';
+      const entryFee = notification.entryFee || 0;
+      const prizePool = notification.prizePool || entryFee * 2;
+
+      if (
+        notification.status === 'pending' &&
+        targetWallet === normalizedCurrentWallet &&
+        prevStatus !== 'pending'
+      ) {
+        setNotification({
+          isOpen: true,
+          title: 'Challenge Received',
+          message: `${creatorDisplayName} sent you a challenge: ${challengeTitle}. Entry Fee: ${entryFee} USDFG, Prize Pool: ${prizePool} USDFG`,
+          type: 'info',
+        });
+      }
+    });
+
+    challengeNotificationStatusRef.current = challengeNotificationsList.reduce(
+      (acc, notification) => {
+        acc[notification.challengeId] = notification.status;
+        return acc;
+      },
+      {} as Record<string, ChallengeNotification['status']>
+    );
+  }, [challengeNotificationsList, normalizedCurrentWallet, formatWalletAddress]);
+
   useEffect(() => {
     if (!normalizedCurrentWallet || !mutualLockOpponentId) {
       setFriendlyMatch(null);
@@ -1106,10 +1162,54 @@ const ArenaHome: React.FC = () => {
       );
       
       if (confirmSend) {
-        // TODO: Implement sending challenge to specific player
-        // This would involve updating the challenge to target this specific player
-        alert(`Challenge sent to ${playerData.displayName || playerData.name}! They will be notified.`);
-        setShowPlayerProfile(false);
+        // Update challenge to target this specific player and create notification
+        (async () => {
+          try {
+            const targetWallet = playerData.address || playerData.wallet;
+            if (!targetWallet) {
+              alert('Could not find player wallet address');
+              return;
+            }
+
+            // Update challenge with targetPlayer
+            const { updateChallenge } = await import("@/lib/firebase/firestore");
+            await updateChallenge(userActiveChallenge.id!, {
+              targetPlayer: targetWallet,
+            });
+
+            // Get creator display name
+            const creatorStats = await getPlayerStats(currentWallet);
+            const creatorDisplayName = creatorStats?.displayName;
+
+            // Get target player display name
+            const targetStats = await getPlayerStats(targetWallet);
+            const targetDisplayName = targetStats?.displayName;
+
+            // Create challenge notification
+            await upsertChallengeNotification({
+              challengeId: userActiveChallenge.id!,
+              creator: currentWallet,
+              targetPlayer: targetWallet,
+              creatorDisplayName,
+              targetDisplayName,
+              challengeTitle: userActiveChallenge.title,
+              entryFee: userActiveChallenge.entryFee,
+              prizePool: userActiveChallenge.prizePool,
+              status: 'pending',
+            });
+
+            setNotification({
+              isOpen: true,
+              title: 'Challenge Sent',
+              message: `Challenge sent to ${playerData.displayName || playerData.name}! They will be notified.`,
+              type: 'success',
+            });
+            setShowPlayerProfile(false);
+          } catch (error: any) {
+            console.error('Failed to send challenge:', error);
+            alert(`Failed to send challenge: ${error.message || 'Unknown error'}`);
+          }
+        })();
       }
     } else {
       // User doesn't have an active challenge, redirect to create one

@@ -42,6 +42,7 @@ export interface ChallengeData {
   id?: string;
   creator: string;                    // Creator wallet (or team key for team challenges)
   challenger?: string;                // Challenger wallet (if accepted) or team key
+  targetPlayer?: string;               // Optional: specific player to challenge (for direct challenges)
   entryFee: number;                   // Entry fee amount
   status: 'pending' | 'active' | 'completed' | 'cancelled' | 'disputed' | 'in-progress';
   createdAt: Timestamp;               // Creation time
@@ -88,6 +89,23 @@ export interface LockNotification {
   participants?: string[];
   status: LockNotificationStatus;
   lastActionBy?: string;
+  createdAt?: Timestamp | null;
+  updatedAt?: Timestamp | null;
+}
+
+export type ChallengeNotificationStatus = 'pending' | 'accepted' | 'declined' | 'expired';
+
+export interface ChallengeNotification {
+  id: string;
+  challengeId: string;
+  creator: string;
+  targetPlayer: string;
+  creatorDisplayName?: string;
+  targetDisplayName?: string;
+  challengeTitle?: string;
+  entryFee?: number;
+  prizePool?: number;
+  status: ChallengeNotificationStatus;
   createdAt?: Timestamp | null;
   updatedAt?: Timestamp | null;
 }
@@ -147,6 +165,36 @@ export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'cr
       
       await setDoc(playerRef, newStats);
       console.log(`🏆 OG First 2.1K Trophy awarded to ${creatorWallet.slice(0, 8)}... for creating their first challenge!`);
+    }
+    
+    // If challenge has a targetPlayer, create a notification
+    if (challengeData.targetPlayer) {
+      try {
+        // Get creator display name
+        const creatorStats = await getDoc(playerRef);
+        const creatorDisplayName = creatorStats.exists() ? creatorStats.data()?.displayName : undefined;
+        
+        // Get target player display name
+        const targetPlayerRef = doc(db, 'player_stats', challengeData.targetPlayer);
+        const targetPlayerStats = await getDoc(targetPlayerRef);
+        const targetDisplayName = targetPlayerStats.exists() ? targetPlayerStats.data()?.displayName : undefined;
+        
+        await upsertChallengeNotification({
+          challengeId: docRef.id,
+          creator: creatorWallet,
+          targetPlayer: challengeData.targetPlayer,
+          creatorDisplayName,
+          targetDisplayName,
+          challengeTitle: challengeData.title,
+          entryFee: challengeData.entryFee,
+          prizePool: challengeData.prizePool,
+          status: 'pending',
+        });
+        console.log(`✅ Challenge notification sent to ${challengeData.targetPlayer.slice(0, 8)}...`);
+      } catch (error) {
+        console.error('❌ Failed to create challenge notification:', error);
+        // Don't throw - challenge was created successfully
+      }
     }
     
     console.log('✅ Challenge created with ID:', docRef.id);
@@ -371,6 +419,22 @@ export const joinChallenge = async (challengeId: string, wallet: string, isFound
     }
 
     await updateDoc(challengeRef, updates);
+
+    // Update challenge notification status if this was a targeted challenge
+    if (data.targetPlayer && data.targetPlayer.toLowerCase() === wallet.toLowerCase()) {
+      try {
+        await upsertChallengeNotification({
+          challengeId,
+          creator: data.creator,
+          targetPlayer: data.targetPlayer,
+          status: 'accepted',
+        });
+        console.log('✅ Challenge notification updated to accepted');
+      } catch (error) {
+        console.error('❌ Failed to update challenge notification:', error);
+        // Don't throw - challenge was joined successfully
+      }
+    }
 
     // If this is a Founder Challenge, mark player as having participated
     if (isFounderChallenge) {
@@ -1703,6 +1767,127 @@ export function listenToLockNotifications(
     },
     (error) => {
       console.error('❌ Error listening to lock notifications:', error);
+    }
+  );
+}
+
+/**
+ * Create or update a challenge notification
+ */
+export async function upsertChallengeNotification({
+  challengeId,
+  creator,
+  targetPlayer,
+  creatorDisplayName,
+  targetDisplayName,
+  challengeTitle,
+  entryFee,
+  prizePool,
+  status,
+}: {
+  challengeId: string;
+  creator: string;
+  targetPlayer: string;
+  creatorDisplayName?: string;
+  targetDisplayName?: string;
+  challengeTitle?: string;
+  entryFee?: number;
+  prizePool?: number;
+  status: ChallengeNotificationStatus;
+}): Promise<void> {
+  if (!challengeId || !creator || !targetPlayer) {
+    throw new Error('challengeId, creator, and targetPlayer are required');
+  }
+
+  try {
+    // Create notification ID from challengeId and targetPlayer
+    const notificationId = `${challengeId}_${targetPlayer.toLowerCase()}`;
+    const notificationRef = doc(db, 'challenge_notifications', notificationId);
+    
+    const payload: Record<string, any> = {
+      challengeId,
+      creator,
+      targetPlayer: targetPlayer.toLowerCase(),
+      status,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (creatorDisplayName !== undefined) {
+      payload.creatorDisplayName = creatorDisplayName;
+    }
+    if (targetDisplayName !== undefined) {
+      payload.targetDisplayName = targetDisplayName;
+    }
+    if (challengeTitle !== undefined) {
+      payload.challengeTitle = challengeTitle;
+    }
+    if (entryFee !== undefined) {
+      payload.entryFee = entryFee;
+    }
+    if (prizePool !== undefined) {
+      payload.prizePool = prizePool;
+    }
+
+    const notificationSnap = await getDoc(notificationRef);
+    if (notificationSnap.exists()) {
+      await updateDoc(notificationRef, payload);
+    } else {
+      await setDoc(notificationRef, {
+        ...payload,
+        createdAt: serverTimestamp(),
+      });
+    }
+
+    console.log(`✅ Challenge notification ${status} for ${targetPlayer.slice(0, 8)}...`);
+  } catch (error) {
+    console.error('❌ Error upserting challenge notification:', error);
+    throw error;
+  }
+}
+
+/**
+ * Listen to challenge notifications for a specific player
+ */
+export function listenToChallengeNotifications(
+  wallet: string,
+  callback: (notifications: ChallengeNotification[]) => void
+): () => void {
+  if (!wallet) {
+    return () => undefined;
+  }
+
+  const walletLower = wallet.toLowerCase();
+  const notificationsQuery = query(
+    collection(db, 'challenge_notifications'),
+    where('targetPlayer', '==', walletLower),
+    where('status', '==', 'pending')
+  );
+
+  return onSnapshot(
+    notificationsQuery,
+    (snapshot) => {
+      const notifications: ChallengeNotification[] = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          challengeId: data.challengeId,
+          creator: data.creator,
+          targetPlayer: data.targetPlayer,
+          creatorDisplayName: data.creatorDisplayName,
+          targetDisplayName: data.targetDisplayName,
+          challengeTitle: data.challengeTitle,
+          entryFee: data.entryFee,
+          prizePool: data.prizePool,
+          status: data.status,
+          createdAt: data.createdAt ?? null,
+          updatedAt: data.updatedAt ?? null,
+        };
+      });
+
+      callback(notifications);
+    },
+    (error) => {
+      console.error('❌ Error listening to challenge notifications:', error);
     }
   );
 }
