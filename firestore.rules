@@ -48,6 +48,14 @@ service cloud.firestore {
       allow delete: if true;
     }
     
+    // Friendly Matches - player-initiated matches without entry fees
+    match /friendly_matches/{matchId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
+    
     // Free USDFG Claim Events - anyone can read, system can write
     match /free_claims/{claimId} {
       allow read: if true; // Anyone can view active claim events
