@@ -121,6 +121,14 @@ const ArenaHome: React.FC = () => {
   // Use MWA connection state
   const isConnected = connected;
 
+  const normalizedCurrentWallet = useMemo(() => {
+    return publicKey?.toString()?.toLowerCase() || null;
+  }, [publicKey]);
+
+  const currentWallet = useMemo(() => {
+    return publicKey?.toString() || null;
+  }, [publicKey]);
+
   // Smart function to extract game name from challenge title (saves storage costs)
   // Helper to extract mode from title (e.g., "NBA 2K25 - Head-to-Head by Player" -> "Head-to-Head")
   const extractModeFromTitle = (title: string): string => {
@@ -281,6 +289,17 @@ const ArenaHome: React.FC = () => {
   const createFriendlyMatchId = useCallback((walletA: string, walletB: string) => {
     return `friendly-${[walletA, walletB].filter(Boolean).sort().join('-')}`;
   }, []);
+
+  const currentLockTarget = useMemo(() => {
+    if (!currentWallet) return null;
+    return userLocks[currentWallet] ?? null;
+  }, [currentWallet, userLocks]);
+
+  const mutualLockOpponentId = useMemo(() => {
+    if (!normalizedCurrentWallet || !currentLockTarget) return null;
+    const lockValue = userLocks[currentLockTarget] ?? null;
+    return lockValue === normalizedCurrentWallet ? currentLockTarget : null;
+  }, [normalizedCurrentWallet, currentLockTarget, userLocks]);
 
   const refreshTopTeams = useCallback(async () => {
     const shouldToggleLoading = leaderboardView === 'teams';
@@ -608,13 +627,13 @@ const ArenaHome: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!currentWallet || !mutualLockOpponentId) {
+    if (!normalizedCurrentWallet || !mutualLockOpponentId) {
       setFriendlyMatch(null);
       setShowFriendlySubmitResult(false);
       return;
     }
 
-    const matchId = createFriendlyMatchId(currentWallet, mutualLockOpponentId);
+    const matchId = createFriendlyMatchId(normalizedCurrentWallet, mutualLockOpponentId);
     const opponentFromLeaderboard = topPlayers.find((player) => player.wallet === mutualLockOpponentId);
     const fallbackName = opponentFromLeaderboard?.displayName && opponentFromLeaderboard.displayName.trim().length > 0
       ? opponentFromLeaderboard.displayName
@@ -659,7 +678,7 @@ const ArenaHome: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [currentWallet, mutualLockOpponentId, topPlayers, createFriendlyMatchId, formatWalletAddress]);
+  }, [normalizedCurrentWallet, mutualLockOpponentId, topPlayers, createFriendlyMatchId, formatWalletAddress]);
   
   // Refresh leaderboard when a challenge completes (new completion detected)
   // MUST be after firestoreChallenges is defined
@@ -1714,18 +1733,6 @@ const ArenaHome: React.FC = () => {
   // Check if user has active challenge (for button disable logic)
   // EXCLUDE completed, cancelled, disputed, and expired challenges
   // Use Firestore data directly for most reliable status check
-  const currentWallet = publicKey?.toString() || null;
-  const currentLockTarget = useMemo(() => {
-    if (!currentWallet) return null;
-    return userLocks[currentWallet] ?? null;
-  }, [currentWallet, userLocks]);
-
-  const mutualLockOpponentId = useMemo(() => {
-    if (!currentWallet || !currentLockTarget) return null;
-    const lockValue = userLocks[currentLockTarget] ?? null;
-    return lockValue === currentWallet ? currentLockTarget : null;
-  }, [currentWallet, currentLockTarget, userLocks]);
-
   const hasActiveChallenge = currentWallet && firestoreChallenges.some((fc: any) => {
     // Check if user created this challenge
     const isCreator = fc.creator === currentWallet;
