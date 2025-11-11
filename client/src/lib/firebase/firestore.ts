@@ -35,6 +35,7 @@ export async function testFirestoreConnection() {
 
 // Collection references
 const usersCollection = collection(db, 'users');
+const lockNotificationsCollection = collection(db, 'lock_notifications');
 
 // Optimized Challenge Data - Minimal Collection
 export interface ChallengeData {
@@ -73,6 +74,22 @@ export interface ChallengeData {
   platform?: string;                  // Platform (PS5, PC, Xbox, etc.) for display
   // REMOVED: rules, mode, creatorTag, solanaAccountId, cancelRequests
   // These are not needed for leaderboard and increase storage costs unnecessarily
+}
+
+export type LockNotificationStatus = 'pending' | 'accepted' | 'cancelled' | 'completed';
+
+export interface LockNotification {
+  id: string;
+  matchId: string;
+  initiator?: string;
+  target?: string;
+  initiatorDisplayName?: string;
+  targetDisplayName?: string;
+  participants?: string[];
+  status: LockNotificationStatus;
+  lastActionBy?: string;
+  createdAt?: Timestamp | null;
+  updatedAt?: Timestamp | null;
 }
 
 // Challenge operations
@@ -1585,6 +1602,106 @@ export async function setUserCurrentLock(userId: string, opponentId: string | nu
     console.error('❌ Error setting user currentLock:', error);
     throw error;
   }
+}
+
+interface UpsertLockNotificationInput {
+  matchId: string;
+  status: LockNotificationStatus;
+  initiator?: string;
+  target?: string;
+  initiatorDisplayName?: string;
+  targetDisplayName?: string;
+  lastActionBy: string;
+}
+
+export async function upsertLockNotification({
+  matchId,
+  status,
+  initiator,
+  target,
+  initiatorDisplayName,
+  targetDisplayName,
+  lastActionBy,
+}: UpsertLockNotificationInput): Promise<void> {
+  if (!matchId) {
+    throw new Error('matchId is required for lock notification');
+  }
+
+  try {
+    const notificationRef = doc(lockNotificationsCollection, matchId);
+    const payload: Record<string, any> = {
+      matchId,
+      status,
+      lastActionBy,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (initiator) {
+      payload.initiator = initiator;
+    }
+    if (target) {
+      payload.target = target;
+    }
+    if (initiatorDisplayName !== undefined) {
+      payload.initiatorDisplayName = initiatorDisplayName;
+    }
+    if (targetDisplayName !== undefined) {
+      payload.targetDisplayName = targetDisplayName;
+    }
+    if (initiator && target) {
+      payload.participants = [initiator.toLowerCase(), target.toLowerCase()];
+    }
+    if (status === 'pending') {
+      payload.createdAt = serverTimestamp();
+    }
+
+    await setDoc(notificationRef, payload, { merge: true });
+  } catch (error) {
+    console.error('❌ Error upserting lock notification:', error);
+    throw error;
+  }
+}
+
+export function listenToLockNotifications(
+  wallet: string,
+  callback: (notifications: LockNotification[]) => void
+): () => void {
+  if (!wallet) {
+    return () => undefined;
+  }
+
+  const walletLower = wallet.toLowerCase();
+  const notificationsQuery = query(
+    lockNotificationsCollection,
+    where('participants', 'array-contains', walletLower)
+  );
+
+  return onSnapshot(
+    notificationsQuery,
+    (snapshot) => {
+      const notifications: LockNotification[] = snapshot.docs.map((docSnap) => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          matchId: data.matchId,
+          initiator: data.initiator,
+          target: data.target,
+          initiatorDisplayName: data.initiatorDisplayName,
+          targetDisplayName: data.targetDisplayName,
+          participants: data.participants,
+          status: data.status,
+          lastActionBy: data.lastActionBy,
+          createdAt: data.createdAt ?? null,
+          updatedAt: data.updatedAt ?? null,
+        };
+      });
+
+      callback(notifications);
+    },
+    (error) => {
+      console.error('❌ Error listening to lock notifications:', error);
+    }
+  );
 }
 
 /**

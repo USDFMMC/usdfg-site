@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo, Suspense, lazy } from "react";
+import React, { useState, useCallback, useEffect, useMemo, Suspense, lazy, useRef } from "react";
 import { Helmet } from "react-helmet";
 import ElegantNotification from "@/components/ui/ElegantNotification";
 import { Link } from "react-router-dom";
@@ -9,7 +9,7 @@ import { joinChallengeOnChain } from "@/lib/chain/events";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
-import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult } from "@/lib/firebase/firestore";
+import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification } from "@/lib/firebase/firestore";
 import { Timestamp } from "firebase/firestore";
 import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
@@ -279,6 +279,9 @@ const ArenaHome: React.FC = () => {
   } | null>(null);
   const [showFriendlySubmitResult, setShowFriendlySubmitResult] = useState(false);
   const [submittingFriendlyResult, setSubmittingFriendlyResult] = useState(false);
+  const [lockNotificationsList, setLockNotificationsList] = useState<LockNotification[]>([]);
+  const lockNotificationStatusRef = useRef<Record<string, LockNotification['status']>>({});
+  const lastFriendlyMatchIdRef = useRef<string | null>(null);
   
   const profileInitial = useMemo(() => {
     if (userProfileImage) return null;
@@ -289,6 +292,34 @@ const ArenaHome: React.FC = () => {
     if (!source) return "👤";
     return source.charAt(0).toUpperCase();
   }, [userProfileImage, userGamerTag, publicKey]);
+
+  const incomingLockRequests = useMemo(() => {
+    if (!normalizedCurrentWallet) return [];
+
+    return lockNotificationsList.filter(
+      (notification) =>
+        notification.status === 'pending' &&
+        notification.target?.toLowerCase() === normalizedCurrentWallet
+    );
+  }, [lockNotificationsList, normalizedCurrentWallet]);
+
+  const pendingLockInitiators = useMemo(() => {
+    const set = new Set<string>();
+    incomingLockRequests.forEach((notification) => {
+      if (notification.initiator) {
+        set.add(notification.initiator.toLowerCase());
+      }
+    });
+    return set;
+  }, [incomingLockRequests]);
+
+  const lockNotificationsByMatchId = useMemo(() => {
+    const map: Record<string, LockNotification> = {};
+    lockNotificationsList.forEach((notification) => {
+      map[notification.matchId] = notification;
+    });
+    return map;
+  }, [lockNotificationsList]);
 
   const renderNavAvatar = useCallback(
     (size: "sm" | "md" = "md") => {
@@ -712,9 +743,87 @@ const ArenaHome: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (!publicKey) {
+      setLockNotificationsList([]);
+      lockNotificationStatusRef.current = {};
+      return;
+    }
+
+    const unsubscribe = listenToLockNotifications(publicKey.toString(), (notifications) => {
+      setLockNotificationsList(notifications);
+    });
+
+    return () => unsubscribe();
+  }, [publicKey]);
+
+  useEffect(() => {
+    const previousStatuses = lockNotificationStatusRef.current;
+
+    lockNotificationsList.forEach((notification) => {
+      const prevStatus = previousStatuses[notification.matchId];
+      const initiatorWallet = notification.initiator?.toLowerCase();
+      const targetWallet = notification.target?.toLowerCase();
+      const displayName =
+        notification.initiatorDisplayName ||
+        (notification.initiator ? formatWalletAddress(notification.initiator) : 'Opponent');
+      const targetDisplayName =
+        notification.targetDisplayName ||
+        (notification.target ? formatWalletAddress(notification.target) : 'Player');
+
+      if (
+        notification.status === 'pending' &&
+        targetWallet === normalizedCurrentWallet &&
+        prevStatus !== 'pending'
+      ) {
+        setNotification({
+          isOpen: true,
+          title: 'Lock Request',
+          message: `${displayName} locked you in. Tap “Lock Back” on their card to start a friendly match.`,
+          type: 'info',
+        });
+      }
+
+      if (
+        notification.status === 'accepted' &&
+        initiatorWallet === normalizedCurrentWallet &&
+        prevStatus !== 'accepted'
+      ) {
+        setNotification({
+          isOpen: true,
+          title: 'Lock Accepted',
+          message: `${targetDisplayName} locked back. Friendly match is ready!`,
+          type: 'success',
+        });
+      }
+
+      if (
+        notification.status === 'cancelled' &&
+        targetWallet === normalizedCurrentWallet &&
+        prevStatus && prevStatus !== 'cancelled'
+      ) {
+        setNotification({
+          isOpen: true,
+          title: 'Lock Cancelled',
+          message: `${displayName} cancelled the lock.`,
+          type: 'warning',
+        });
+      }
+    });
+
+    lockNotificationStatusRef.current = lockNotificationsList.reduce(
+      (acc, notification) => {
+        acc[notification.matchId] = notification.status;
+        return acc;
+      },
+      {} as Record<string, LockNotification['status']>
+    );
+  }, [lockNotificationsList, normalizedCurrentWallet, formatWalletAddress]);
+
+  useEffect(() => {
     if (!normalizedCurrentWallet || !mutualLockOpponentId) {
       setFriendlyMatch(null);
       setShowFriendlySubmitResult(false);
+      lastFriendlyMatchIdRef.current = null;
       return;
     }
 
@@ -738,6 +847,28 @@ const ArenaHome: React.FC = () => {
         matchId,
       };
     });
+
+    const isNewMatch = lastFriendlyMatchIdRef.current !== matchId;
+    if (isNewMatch) {
+      lastFriendlyMatchIdRef.current = matchId;
+      setShowFriendlySubmitResult(true);
+      setNotification({
+        isOpen: true,
+        title: 'Friendly Match Ready',
+        message: `You and ${fallbackName} locked in. Submit results whenever you’re ready.`,
+        type: 'success',
+      });
+
+      if (normalizedCurrentWallet) {
+        upsertLockNotification({
+          matchId,
+          status: 'accepted',
+          lastActionBy: normalizedCurrentWallet,
+        }).catch((error) => {
+          console.error('❌ Failed to mark lock notification accepted:', error);
+        });
+      }
+    }
 
     let isMounted = true;
 
@@ -763,7 +894,7 @@ const ArenaHome: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [normalizedCurrentWallet, mutualLockOpponentId, topPlayers, createFriendlyMatchId, formatWalletAddress]);
+  }, [normalizedCurrentWallet, mutualLockOpponentId, topPlayers, createFriendlyMatchId, formatWalletAddress, upsertLockNotification]);
   
   // Refresh leaderboard when a challenge completes (new completion detected)
   // MUST be after firestoreChallenges is defined
@@ -790,16 +921,9 @@ const ArenaHome: React.FC = () => {
       // Debounce refresh to avoid too many calls (wait for stats to be updated)
       const timeoutId = setTimeout(async () => {
         try {
-          // TEMPORARY: Use mock data for testing
           const limit = showAllPlayers ? leaderboardLimit : 5;
-          console.log(`🧪 TESTING: Using mock data for ${limit} players (refresh)`);
-          const mockPlayers = generateMockPlayers(limit);
-          setTopPlayers(mockPlayers);
-          
-          // REAL FETCH (uncomment when done testing):
-          // const limit = showAllPlayers ? leaderboardLimit : 5;
-          // const players = await getTopPlayers(limit, 'totalEarned');
-          // setTopPlayers(players);
+          const players = await getTopPlayers(limit, 'totalEarned');
+          setTopPlayers(players);
         } catch (error) {
           console.error('Failed to refresh leaderboard:', error);
         }
@@ -1318,6 +1442,34 @@ const ArenaHome: React.FC = () => {
     try {
       const nextLock = currentLockTarget === targetWallet ? null : targetWallet;
       await setUserCurrentLock(currentWallet, nextLock);
+
+      const normalizedCurrent = currentWallet.toLowerCase();
+      const normalizedTarget = targetWallet.toLowerCase();
+      const matchId = createFriendlyMatchId(normalizedCurrent, normalizedTarget);
+
+      if (nextLock) {
+        const targetPlayer = topPlayers.find(
+          (player) => player.wallet?.toLowerCase() === normalizedTarget
+        );
+
+        await upsertLockNotification({
+          matchId,
+          status: 'pending',
+          initiator: normalizedCurrent,
+          target: normalizedTarget,
+          initiatorDisplayName: userGamerTag && userGamerTag.trim().length > 0
+            ? userGamerTag.trim()
+            : formatWalletAddress(currentWallet),
+          targetDisplayName: targetPlayer?.displayName || formatWalletAddress(targetWallet),
+          lastActionBy: normalizedCurrent,
+        });
+      } else {
+        await upsertLockNotification({
+          matchId,
+          status: 'cancelled',
+          lastActionBy: normalizedCurrent,
+        });
+      }
     } catch (error) {
       console.error('❌ Failed to update lock state:', error);
       setNotification({
@@ -1329,7 +1481,7 @@ const ArenaHome: React.FC = () => {
     } finally {
       setLockInProgress(null);
     }
-  }, [currentWallet, currentLockTarget, connect]);
+  }, [currentWallet, currentLockTarget, connect, createFriendlyMatchId, topPlayers, userGamerTag, formatWalletAddress]);
 
   // Handle result submission - now stores result and shows trust review
   const handleSubmitResult = async (didWin: boolean, proofFile?: File | null) => {
@@ -1443,16 +1595,9 @@ const ArenaHome: React.FC = () => {
         // Refresh leaderboard to show updated trust scores
         setTimeout(async () => {
         try {
-          // TEMPORARY: Use mock data for testing
           const limit = showAllPlayers ? leaderboardLimit : 5;
-          console.log(`🧪 TESTING: Using mock data for ${limit} players (trust review)`);
-          const mockPlayers = generateMockPlayers(limit);
-          setTopPlayers(mockPlayers);
-          
-          // REAL FETCH (uncomment when done testing):
-          // const limit = showAllPlayers ? leaderboardLimit : 5;
-          // const players = await getTopPlayers(limit, 'totalEarned');
-          // setTopPlayers(players);
+          const players = await getTopPlayers(limit, 'totalEarned');
+          setTopPlayers(players);
         } catch (error) {
           console.error('Failed to refresh leaderboard after trust review:', error);
         }
@@ -1536,6 +1681,12 @@ const ArenaHome: React.FC = () => {
 
       await clearMutualLock(currentWallet, opponentId);
 
+      await upsertLockNotification({
+        matchId: friendlyMatch.matchId,
+        status: 'completed',
+        lastActionBy: currentWallet,
+      });
+
       setNotification({
         isOpen: true,
         title: 'Result Submitted',
@@ -1557,7 +1708,7 @@ const ArenaHome: React.FC = () => {
     } finally {
       setSubmittingFriendlyResult(false);
     }
-  }, [friendlyMatch, currentWallet]);
+  }, [friendlyMatch, currentWallet, upsertLockNotification]);
 
   // Handle reward claiming
   const handleClaimPrize = async (challenge: any) => {
@@ -1915,6 +2066,7 @@ const ArenaHome: React.FC = () => {
     const isLockedByMe = currentLockTarget === playerWallet;
     const isLockedOnMe = playerLockTarget === currentWallet;
     const isMutual = mutualLockOpponentId === playerWallet;
+    const isPendingRequest = pendingLockInitiators.has(playerWallet.toLowerCase());
 
     if (isMutual) {
       return (
@@ -1954,8 +2106,12 @@ const ArenaHome: React.FC = () => {
       label = 'Cancel Lock';
       buttonClass = 'px-3 py-1.5 rounded-lg border border-red-500/40 bg-red-600/20 text-red-200 text-xs font-semibold hover:bg-red-600/30 transition-colors pointer-events-auto';
     } else if (isLockedOnMe) {
-      label = 'Lock Back';
+      label = isPendingRequest ? 'Lock Back (New)' : 'Lock Back';
       buttonClass = 'px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-600/20 text-amber-200 text-xs font-semibold hover:bg-amber-600/30 transition-colors pointer-events-auto';
+    }
+
+    if (isPendingRequest && !isMutual) {
+      buttonClass += ' shadow-[0_0_12px_rgba(255,200,0,0.45)] animate-pulse';
     }
 
     return (
@@ -1975,7 +2131,7 @@ const ArenaHome: React.FC = () => {
         {isLoading ? 'Updating...' : label}
       </button>
     );
-  }, [currentWallet, connect, lockInProgress, userLocks, currentLockTarget, mutualLockOpponentId, handleLockToggle, formatWalletAddress, createFriendlyMatchId]);
+  }, [currentWallet, connect, lockInProgress, userLocks, currentLockTarget, mutualLockOpponentId, handleLockToggle, formatWalletAddress, createFriendlyMatchId, pendingLockInitiators]);
 
   return (
     <>
@@ -3599,14 +3755,7 @@ const ArenaHome: React.FC = () => {
                               const newLimit = leaderboardLimit + 30; // Load 30 more
                               setLeaderboardLimit(newLimit);
                               try {
-                                // TEMPORARY: Use mock data for testing
-                                console.log(`🧪 TESTING: Loading ${newLimit} mock players`);
-                                const mockPlayers = generateMockPlayers(newLimit);
-                                setTopPlayers(mockPlayers);
-                                
-                                // REAL FETCH (uncomment when done testing):
-                                // const players = await getTopPlayers(newLimit, 'totalEarned');
-                                // setTopPlayers(players);
+                                await loadTopPlayers(newLimit);
                               } catch (error) {
                                 console.error('Failed to load more players:', error);
                               } finally {
