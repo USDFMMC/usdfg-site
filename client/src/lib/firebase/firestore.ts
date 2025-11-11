@@ -1593,9 +1593,10 @@ export async function setUserCurrentLock(userId: string, opponentId: string | nu
   }
 
   try {
+    const normalizedOpponentId = opponentId ? opponentId.toLowerCase() : null;
     const userRef = doc(db, 'users', userId);
     await setDoc(userRef, {
-      currentLock: opponentId ?? null,
+      currentLock: normalizedOpponentId,
       lockUpdatedAt: serverTimestamp(),
     }, { merge: true });
   } catch (error) {
@@ -1745,7 +1746,8 @@ export function listenToAllUserLocks(
 
     snapshot.forEach((docSnap) => {
       const data = docSnap.data();
-      locks[docSnap.id] = (data?.currentLock ?? null) as string | null;
+      const rawLock = (data?.currentLock ?? null) as string | null;
+      locks[docSnap.id] = rawLock ? rawLock.toLowerCase() : null;
     });
 
     callback(locks);

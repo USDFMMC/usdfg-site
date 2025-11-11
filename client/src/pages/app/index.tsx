@@ -407,9 +407,10 @@ const ArenaHome: React.FC = () => {
   }, []);
 
   const currentLockTarget = useMemo(() => {
-    if (!currentWallet) return null;
-    return userLocks[currentWallet] ?? null;
-  }, [currentWallet, userLocks]);
+    if (!normalizedCurrentWallet) return null;
+    const rawTarget = userLocks[normalizedCurrentWallet] ?? null;
+    return rawTarget ?? null;
+  }, [normalizedCurrentWallet, userLocks]);
 
   const mutualLockOpponentId = useMemo(() => {
     if (!normalizedCurrentWallet || !currentLockTarget) return null;
@@ -828,7 +829,7 @@ const ArenaHome: React.FC = () => {
     }
 
     const matchId = createFriendlyMatchId(normalizedCurrentWallet, mutualLockOpponentId);
-    const opponentFromLeaderboard = topPlayers.find((player) => player.wallet === mutualLockOpponentId);
+    const opponentFromLeaderboard = topPlayers.find((player) => player.wallet?.toLowerCase() === mutualLockOpponentId);
     const fallbackName = opponentFromLeaderboard?.displayName && opponentFromLeaderboard.displayName.trim().length > 0
       ? opponentFromLeaderboard.displayName
       : formatWalletAddress(mutualLockOpponentId);
@@ -1429,45 +1430,46 @@ const ArenaHome: React.FC = () => {
       return;
     }
 
-    if (!currentWallet) {
+    if (!normalizedCurrentWallet) {
       connect();
       return;
     }
 
-    if (targetWallet === currentWallet) {
+    const normalizedTarget = targetWallet.toLowerCase();
+    if (normalizedTarget === normalizedCurrentWallet) {
       return;
     }
 
     setLockInProgress(targetWallet);
     try {
-      const nextLock = currentLockTarget === targetWallet ? null : targetWallet;
-      await setUserCurrentLock(currentWallet, nextLock);
+      const normalizedCurrentLockTarget = currentLockTarget ?? null;
+      const nextLock = normalizedCurrentLockTarget === normalizedTarget ? null : normalizedTarget;
+      await setUserCurrentLock(normalizedCurrentWallet, nextLock);
 
-      const normalizedCurrent = currentWallet.toLowerCase();
-      const normalizedTarget = targetWallet.toLowerCase();
-      const matchId = createFriendlyMatchId(normalizedCurrent, normalizedTarget);
+      const matchId = createFriendlyMatchId(normalizedCurrentWallet, normalizedTarget);
 
       if (nextLock) {
         const targetPlayer = topPlayers.find(
           (player) => player.wallet?.toLowerCase() === normalizedTarget
         );
+        const targetCurrentLock = userLocks[normalizedTarget] ?? null;
 
         await upsertLockNotification({
           matchId,
-          status: 'pending',
-          initiator: normalizedCurrent,
+          status: targetCurrentLock === normalizedCurrentWallet ? 'accepted' : 'pending',
+          initiator: normalizedCurrentWallet,
           target: normalizedTarget,
           initiatorDisplayName: userGamerTag && userGamerTag.trim().length > 0
             ? userGamerTag.trim()
-            : formatWalletAddress(currentWallet),
+            : formatWalletAddress(currentWallet || normalizedCurrentWallet),
           targetDisplayName: targetPlayer?.displayName || formatWalletAddress(targetWallet),
-          lastActionBy: normalizedCurrent,
+          lastActionBy: normalizedCurrentWallet,
         });
       } else {
         await upsertLockNotification({
           matchId,
           status: 'cancelled',
-          lastActionBy: normalizedCurrent,
+          lastActionBy: normalizedCurrentWallet,
         });
       }
     } catch (error) {
@@ -1481,7 +1483,7 @@ const ArenaHome: React.FC = () => {
     } finally {
       setLockInProgress(null);
     }
-  }, [currentWallet, currentLockTarget, connect, createFriendlyMatchId, topPlayers, userGamerTag, formatWalletAddress]);
+  }, [normalizedCurrentWallet, currentWallet, currentLockTarget, connect, createFriendlyMatchId, topPlayers, userGamerTag, formatWalletAddress, userLocks]);
 
   // Handle result submission - now stores result and shows trust review
   const handleSubmitResult = async (didWin: boolean, proofFile?: File | null) => {
@@ -2061,11 +2063,12 @@ const ArenaHome: React.FC = () => {
       );
     }
 
-    const isLoading = lockInProgress === playerWallet;
-    const playerLockTarget = userLocks[playerWallet] ?? null;
-    const isLockedByMe = currentLockTarget === playerWallet;
-    const isLockedOnMe = playerLockTarget === currentWallet;
-    const isMutual = mutualLockOpponentId === playerWallet;
+    const normalizedPlayerWallet = playerWallet.toLowerCase();
+    const isLoading = lockInProgress?.toLowerCase() === normalizedPlayerWallet;
+    const playerLockTarget = userLocks[normalizedPlayerWallet] ?? null;
+    const isLockedByMe = currentLockTarget === normalizedPlayerWallet;
+    const isLockedOnMe = playerLockTarget === normalizedCurrentWallet;
+    const isMutual = mutualLockOpponentId === normalizedPlayerWallet;
     const isPendingRequest = pendingLockInitiators.has(playerWallet.toLowerCase());
 
     if (isMutual) {
@@ -2079,16 +2082,16 @@ const ArenaHome: React.FC = () => {
               event.nativeEvent.stopImmediatePropagation();
             }
             setFriendlyMatch((previous) => {
-              if (previous && previous.opponentId === playerWallet) {
+              if (previous && previous.opponentId === normalizedPlayerWallet) {
                 if (displayName && previous.opponentName !== displayName) {
                   return { ...previous, opponentName: displayName };
                 }
                 return previous;
               }
               return {
-                opponentId: playerWallet,
+                opponentId: normalizedPlayerWallet,
                 opponentName: resolvedName,
-                matchId: createFriendlyMatchId(currentWallet, playerWallet),
+                matchId: createFriendlyMatchId(normalizedCurrentWallet, normalizedPlayerWallet),
               };
             });
             setShowFriendlySubmitResult(true);
@@ -2131,7 +2134,7 @@ const ArenaHome: React.FC = () => {
         {isLoading ? 'Updating...' : label}
       </button>
     );
-  }, [currentWallet, connect, lockInProgress, userLocks, currentLockTarget, mutualLockOpponentId, handleLockToggle, formatWalletAddress, createFriendlyMatchId, pendingLockInitiators]);
+  }, [currentWallet, normalizedCurrentWallet, connect, lockInProgress, userLocks, currentLockTarget, mutualLockOpponentId, handleLockToggle, formatWalletAddress, createFriendlyMatchId, pendingLockInitiators]);
 
   return (
     <>
