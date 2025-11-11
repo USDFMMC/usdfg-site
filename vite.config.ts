@@ -61,13 +61,14 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: false,
     minify: "terser",
+    terserOptions: {
+      safari10: true,
+      format: {
+        comments: false,
+      },
+    },
     commonjsOptions: {
       transformMixedEsModules: true,
-    },
-    terserOptions: {
-      compress: {
-        drop_debugger: true,
-      },
     },
     rollupOptions: {
       output: {
