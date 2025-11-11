@@ -280,6 +280,91 @@ const ArenaHome: React.FC = () => {
   const [showFriendlySubmitResult, setShowFriendlySubmitResult] = useState(false);
   const [submittingFriendlyResult, setSubmittingFriendlyResult] = useState(false);
   
+  const profileInitial = useMemo(() => {
+    if (userProfileImage) return null;
+    const source =
+      (userGamerTag && userGamerTag.trim().length > 0
+        ? userGamerTag.trim()
+        : publicKey?.toString()) || "";
+    if (!source) return "👤";
+    return source.charAt(0).toUpperCase();
+  }, [userProfileImage, userGamerTag, publicKey]);
+
+  const renderNavAvatar = useCallback(
+    (size: "sm" | "md" = "md") => {
+      const dimension = size === "sm" ? "w-8 h-8" : "w-10 h-10";
+      if (userProfileImage) {
+        return (
+          <img
+            src={userProfileImage}
+            alt="Profile"
+            className={`${dimension} rounded-full object-cover border border-amber-400/40 shadow-[0_0_12px_rgba(255,215,130,0.25)]`}
+          />
+        );
+      }
+      return (
+        <div
+          className={`${dimension} rounded-full bg-gradient-to-br from-amber-400/30 via-orange-400/20 to-amber-300/10 border border-amber-400/40 flex items-center justify-center text-sm font-semibold text-amber-100`}
+        >
+          {profileInitial || "👤"}
+        </div>
+      );
+    },
+    [userProfileImage, profileInitial]
+  );
+
+  const handleOpenProfile = useCallback(async () => {
+    if (!publicKey) return;
+
+    const walletKey = publicKey.toString();
+    const currentWalletCountry = getWalletScopedValue(PROFILE_STORAGE_KEYS.country, walletKey);
+    if (currentWalletCountry !== userCountry) {
+      setUserCountry(currentWalletCountry);
+    }
+
+    try {
+      const firestoreStats = await getPlayerStats(walletKey);
+      const displayName =
+        firestoreStats?.displayName ||
+        (userGamerTag && userGamerTag.trim().length > 0 ? userGamerTag.trim() : undefined);
+      const currentUserPlayer: PlayerStats =
+        firestoreStats ||
+        ({
+          wallet: walletKey,
+          displayName,
+          wins: 0,
+          losses: 0,
+          winRate: 0,
+          totalEarned: 0,
+          gamesPlayed: 0,
+          lastActive: Timestamp.now(),
+          gameStats: {},
+          categoryStats: {},
+        } as PlayerStats);
+
+      setSelectedPlayer(currentUserPlayer);
+    } catch (error) {
+      console.error("Failed to fetch player stats:", error);
+      const fallbackDisplayName =
+        (userGamerTag && userGamerTag.trim().length > 0 ? userGamerTag.trim() : '') || walletKey;
+      const fallbackPlayer: PlayerStats = {
+        wallet: walletKey,
+        displayName: fallbackDisplayName,
+        wins: 0,
+        losses: 0,
+        winRate: 0,
+        totalEarned: 0,
+        gamesPlayed: 0,
+        lastActive: Timestamp.now(),
+        gameStats: {},
+        categoryStats: {},
+      };
+      setSelectedPlayer(fallbackPlayer);
+    }
+
+    setShowPlayerProfile(true);
+  }, [publicKey, userCountry, userGamerTag]);
+  
   const formatWalletAddress = useCallback((wallet: string) => {
     if (!wallet) return '';
     if (wallet.length <= 10) return wallet;
@@ -1931,41 +2016,25 @@ const ArenaHome: React.FC = () => {
             {publicKey && (
               <>
                 <button
-                  onClick={async () => {
-                    // Fetch current user's stats from Firestore (use Firestore data, not localStorage)
-                    const firestoreStats = await getPlayerStats(publicKey.toString());
-                    
-                    // Use Firestore displayName (don't fall back to localStorage - it might be from a different wallet)
-                    const displayName = firestoreStats?.displayName || undefined;
-                    
-                    // Load wallet-specific country from localStorage (not from state which might be stale)
-                    const walletKey = publicKey.toString();
-                    const currentWalletCountry = getWalletScopedValue(PROFILE_STORAGE_KEYS.country, walletKey);
-                    if (currentWalletCountry !== userCountry) {
-                      setUserCountry(currentWalletCountry);
-                    }
-                    
-                    // Create proper PlayerStats object for current user
-                    const currentUserPlayer: PlayerStats = firestoreStats || {
-                      wallet: publicKey.toString(),
-                      displayName: displayName,
-                      wins: 0,
-                      losses: 0,
-                      winRate: 0,
-                      totalEarned: 0,
-                      gamesPlayed: 0,
-                      lastActive: Timestamp.now(),
-                      gameStats: {},
-                      categoryStats: {}
-                    };
-                    
-                    setSelectedPlayer(currentUserPlayer);
-                    setShowPlayerProfile(true);
+                  onClick={() => {
+                    void handleOpenProfile();
                   }}
-                  className="flex items-center justify-center gap-2 px-4 py-2 h-10 bg-zinc-800/50 hover:bg-zinc-700/50 rounded-xl border border-zinc-700 hover:border-amber-300/50 transition-all text-white text-sm font-semibold"
+                  className="flex items-center gap-3 px-3 py-2 h-10 bg-zinc-800/50 hover:bg-zinc-700/50 rounded-xl border border-zinc-700 hover:border-amber-300/50 transition-all text-white text-sm font-semibold"
+                  title="View profile"
                 >
-                  <span className="text-amber-300">👤</span>
-                  <span className="text-white">Profile</span>
+                  {renderNavAvatar("md")}
+                  <div className="flex flex-col items-start leading-tight">
+                    <span className="text-[10px] uppercase tracking-wide text-amber-300">
+                      Profile
+                    </span>
+                    <span className="text-xs sm:text-sm font-semibold text-white max-w-[140px] truncate">
+                      {userGamerTag && userGamerTag.trim().length > 0
+                        ? userGamerTag.trim()
+                        : `${publicKey.toString().slice(0, 4)}...${publicKey
+                            .toString()
+                            .slice(-4)}`}
+                    </span>
+                  </div>
                 </button>
                 
                 {/* Team Management Button */}
@@ -2003,42 +2072,20 @@ const ArenaHome: React.FC = () => {
           <div className="flex md:hidden items-center gap-2">
             {publicKey && isConnected && (
               <button
-                onClick={async () => {
-                  // Fetch current user's stats from Firestore (use Firestore data, not localStorage)
-                  const firestoreStats = await getPlayerStats(publicKey.toString());
-                  
-                  // Use Firestore displayName (don't fall back to localStorage - it might be from a different wallet)
-                  const displayName = firestoreStats?.displayName || undefined;
-                  
-                  // Load wallet-specific country from localStorage (not from state which might be stale)
-                    const walletKey = publicKey.toString();
-                    const currentWalletCountry = getWalletScopedValue(PROFILE_STORAGE_KEYS.country, walletKey);
-                    if (currentWalletCountry !== userCountry) {
-                      setUserCountry(currentWalletCountry);
-                    }
-                    
-                    // Create proper PlayerStats object for current user
-                    const currentUserPlayer: PlayerStats = firestoreStats || {
-                      wallet: publicKey.toString(),
-                      displayName: displayName,
-                      wins: 0,
-                      losses: 0,
-                      winRate: 0,
-                      totalEarned: 0,
-                      gamesPlayed: 0,
-                      lastActive: Timestamp.now(),
-                      gameStats: {},
-                      categoryStats: {}
-                    };
-                    
-                    setSelectedPlayer(currentUserPlayer);
-                    setShowPlayerProfile(true);
-                  }}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 bg-zinc-800/50 hover:bg-zinc-700/50 rounded-xl border border-zinc-700 hover:border-amber-300/50 transition-all text-white text-sm font-semibold"
+                onClick={() => {
+                  void handleOpenProfile();
+                }}
+                className="flex items-center justify-center gap-2 px-2.5 py-1.5 bg-zinc-800/50 hover:bg-zinc-700/50 rounded-xl border border-zinc-700 hover:border-amber-300/50 transition-all text-white text-sm font-semibold"
                 title="Profile"
               >
-                <span className="text-amber-300 text-base">👤</span>
-                <span className="hidden sm:inline text-white">Profile</span>
+                {renderNavAvatar("sm")}
+                <span className="hidden sm:inline text-white text-sm font-semibold">
+                  {userGamerTag && userGamerTag.trim().length > 0
+                    ? userGamerTag.trim()
+                    : `${publicKey.toString().slice(0, 4)}...${publicKey
+                        .toString()
+                        .slice(-4)}`}
+                </span>
               </button>
             )}
             <WalletConnectSimple 
