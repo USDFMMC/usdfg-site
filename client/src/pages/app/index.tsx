@@ -3992,8 +3992,9 @@ const ArenaHome: React.FC = () => {
             name: selectedPlayer.displayName || selectedPlayer.wallet || 'Player',
             address: selectedPlayer.wallet,
             ...selectedPlayer,
-            ...(userCountry ? { country: userCountry } : {}),
-            ...(userProfileImage ? { profileImage: userProfileImage } : {}),
+            ...(userCountry && selectedPlayer.wallet === publicKey?.toString() ? { country: userCountry } : {}),
+            ...(selectedPlayer.wallet === publicKey?.toString() && userProfileImage ? { profileImage: userProfileImage } : {}),
+            ...(selectedPlayer.wallet !== publicKey?.toString() ? { profileImage: getWalletScopedValue(PROFILE_STORAGE_KEYS.profileImage, selectedPlayer.wallet) || undefined } : {}),
             lastActive: selectedPlayer.lastActive?.seconds ? { seconds: selectedPlayer.lastActive.seconds } : undefined
           }}
           isCurrentUser={!!(publicKey && selectedPlayer.wallet === publicKey.toString())}
