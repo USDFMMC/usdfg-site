@@ -9,7 +9,7 @@ import { joinChallengeOnChain } from "@/lib/chain/events";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
-import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification } from "@/lib/firebase/firestore";
+import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage } from "@/lib/firebase/firestore";
 import { Timestamp } from "firebase/firestore";
 import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
@@ -513,6 +513,15 @@ const ArenaHome: React.FC = () => {
           if (playerStats?.country) {
             setUserCountry(playerStats.country);
             setWalletScopedValue(PROFILE_STORAGE_KEYS.country, walletKey, playerStats.country);
+          }
+          // Load profile image from Firestore (visible to everyone)
+          if (playerStats?.profileImage) {
+            setUserProfileImage(playerStats.profileImage);
+            // Also sync to localStorage as backup
+            setWalletScopedValue(PROFILE_STORAGE_KEYS.profileImage, walletKey, playerStats.profileImage);
+          } else if (savedProfileImage) {
+            // Keep localStorage image if Firestore doesn't have one
+            setUserProfileImage(savedProfileImage);
           }
         } catch (error) {
           // Firestore fetch failed, but we already have localStorage data
@@ -3466,6 +3475,7 @@ const ArenaHome: React.FC = () => {
                           integrity: trustScore, // Use trustScore for integrity display
                           wallet: player.wallet,
                           gamesPlayed: player.gamesPlayed,
+                          profileImage: player.profileImage || getWalletScopedValue(PROFILE_STORAGE_KEYS.profileImage, player.wallet), // Use Firestore image first, fallback to localStorage
                           playerStats: player // Store full PlayerStats for modal
                         };
                       });
@@ -3993,8 +4003,10 @@ const ArenaHome: React.FC = () => {
             address: selectedPlayer.wallet,
             ...selectedPlayer,
             ...(userCountry && selectedPlayer.wallet === publicKey?.toString() ? { country: userCountry } : {}),
-            ...(selectedPlayer.wallet === publicKey?.toString() && userProfileImage ? { profileImage: userProfileImage } : {}),
-            ...(selectedPlayer.wallet !== publicKey?.toString() ? { profileImage: getWalletScopedValue(PROFILE_STORAGE_KEYS.profileImage, selectedPlayer.wallet) || undefined } : {}),
+            // Use Firestore profileImage first (visible to everyone), then fallback to localStorage
+            profileImage: selectedPlayer.profileImage || 
+              (selectedPlayer.wallet === publicKey?.toString() ? userProfileImage : undefined) ||
+              (selectedPlayer.wallet !== publicKey?.toString() ? getWalletScopedValue(PROFILE_STORAGE_KEYS.profileImage, selectedPlayer.wallet) : undefined),
             lastActive: selectedPlayer.lastActive?.seconds ? { seconds: selectedPlayer.lastActive.seconds } : undefined
           }}
           isCurrentUser={!!(publicKey && selectedPlayer.wallet === publicKey.toString())}
@@ -4043,14 +4055,48 @@ const ArenaHome: React.FC = () => {
                 }
               }
             }}
-            onProfileImageChange={(image) => {
-              setUserProfileImage(image);
+            onProfileImageChange={async (image, file) => {
               if (publicKey) {
                 const walletKey = publicKey.toString();
-                if (image) {
-                  setWalletScopedValue(PROFILE_STORAGE_KEYS.profileImage, walletKey, image);
+                
+                if (file && image) {
+                  // Upload to Firebase Storage and get URL
+                  try {
+                    const imageURL = await uploadProfileImage(walletKey, file);
+                    // Save URL to Firestore
+                    await updatePlayerProfileImage(walletKey, imageURL);
+                    // Update local state with Storage URL
+                    setUserProfileImage(imageURL);
+                    // Also save to localStorage as backup
+                    setWalletScopedValue(PROFILE_STORAGE_KEYS.profileImage, walletKey, imageURL);
+                    
+                    // Refresh leaderboard to show updated image
+                    const limit = showAllPlayers ? 50 : 5;
+                    const players = await getTopPlayers(limit, 'totalEarned');
+                    setTopPlayers(players);
+                  } catch (error) {
+                    console.error('❌ Failed to upload profile image:', error);
+                    alert('Failed to upload profile image. Please try again.');
+                  }
+                } else if (!image) {
+                  // Removing image
+                  try {
+                    await updatePlayerProfileImage(walletKey, null);
+                    setUserProfileImage(null);
+                    clearWalletScopedValue(PROFILE_STORAGE_KEYS.profileImage, walletKey);
+                    
+                    // Refresh leaderboard
+                    const limit = showAllPlayers ? 50 : 5;
+                    const players = await getTopPlayers(limit, 'totalEarned');
+                    setTopPlayers(players);
+                  } catch (error) {
+                    console.error('❌ Failed to remove profile image:', error);
+                    alert('Failed to remove profile image. Please try again.');
+                  }
                 } else {
-                  clearWalletScopedValue(PROFILE_STORAGE_KEYS.profileImage, walletKey);
+                  // Fallback: just update local state (for backwards compatibility)
+                  setUserProfileImage(image);
+                  setWalletScopedValue(PROFILE_STORAGE_KEYS.profileImage, walletKey, image);
                 }
               }
             }}

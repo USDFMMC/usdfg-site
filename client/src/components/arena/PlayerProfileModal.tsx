@@ -220,7 +220,7 @@ interface PlayerProfileModalProps {
   isCurrentUser?: boolean;
   onEditProfile?: (newName: string) => void;
   onCountryChange?: (country: string | null) => void;
-  onProfileImageChange?: (image: string | null) => void;
+  onProfileImageChange?: (image: string | null, file?: File | null) => void;
   onChallengePlayer?: (playerData: any) => void;
   hasActiveChallenge?: boolean;
   currentWallet?: string | null;

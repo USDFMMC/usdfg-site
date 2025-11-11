@@ -3,7 +3,7 @@ import { Gamepad2 } from "lucide-react";
 
 interface ProfileImageUploadProps {
   currentImage?: string | null;
-  onImageChange?: (image: string | null) => void;
+  onImageChange?: (image: string | null, file?: File | null) => void;
   size?: "sm" | "md" | "lg";
 }
 
@@ -31,9 +31,11 @@ export default function ProfileImageUpload({
       reader.onloadend = () => {
         const imageUrl = reader.result as string;
         setImage(imageUrl);
-        onImageChange?.(imageUrl);
+        onImageChange?.(imageUrl, file);
       };
       reader.readAsDataURL(file);
+    } else {
+      onImageChange?.(null, null);
     }
   };
 

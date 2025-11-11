@@ -19,7 +19,8 @@ import {
   arrayRemove,
   serverTimestamp
 } from 'firebase/firestore';
-import { db } from './config';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { db, storage } from './config';
 
 // Test Firestore connection
 export async function testFirestoreConnection() {
@@ -1177,6 +1178,7 @@ export interface PlayerStats {
   wallet: string;
   displayName?: string; // Player's chosen username (from creatorTag)
   country?: string; // Player's country code (e.g., "US", "GB", "CA")
+  profileImage?: string; // Profile image URL from Firebase Storage
   wins: number;
   losses: number;
   winRate: number;
@@ -2003,6 +2005,138 @@ export async function updatePlayerCountry(wallet: string, countryCode: string | 
     }
   } catch (error) {
     console.error('❌ Error updating country:', error);
+    throw error;
+  }
+}
+
+/**
+ * Upload profile image to Firebase Storage and return the download URL
+ */
+export async function uploadProfileImage(wallet: string, imageFile: File): Promise<string> {
+  try {
+    // Create a reference to the storage location: profile_images/{wallet}.jpg
+    const imageRef = ref(storage, `profile_images/${wallet.toLowerCase()}.jpg`);
+    
+    // Convert image to blob if needed, compress to reduce size
+    const compressedFile = await compressImage(imageFile);
+    
+    // Upload the file
+    await uploadBytes(imageRef, compressedFile);
+    
+    // Get the download URL
+    const downloadURL = await getDownloadURL(imageRef);
+    console.log(`✅ Profile image uploaded for ${wallet}: ${downloadURL}`);
+    
+    return downloadURL;
+  } catch (error) {
+    console.error('❌ Error uploading profile image:', error);
+    throw error;
+  }
+}
+
+/**
+ * Compress image to reduce file size (target: ~50KB)
+ */
+async function compressImage(file: File, maxSizeKB: number = 50): Promise<File> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        // Calculate new dimensions (max 400x400 for profile images)
+        const maxDimension = 400;
+        if (width > height) {
+          if (width > maxDimension) {
+            height = (height * maxDimension) / width;
+            width = maxDimension;
+          }
+        } else {
+          if (height > maxDimension) {
+            width = (width * maxDimension) / height;
+            height = maxDimension;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        // Convert to blob with quality compression
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name, { type: 'image/jpeg' });
+              resolve(compressedFile);
+            } else {
+              resolve(file); // Fallback to original if compression fails
+            }
+          },
+          'image/jpeg',
+          0.85 // 85% quality
+        );
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Update player's profile image URL in Firestore
+ */
+export async function updatePlayerProfileImage(wallet: string, imageURL: string | null): Promise<void> {
+  try {
+    const playerRef = doc(db, 'player_stats', wallet);
+    const playerSnap = await getDoc(playerRef);
+    
+    if (playerSnap.exists()) {
+      if (imageURL) {
+        await updateDoc(playerRef, {
+          profileImage: imageURL
+        });
+        console.log(`✅ Updated profile image for ${wallet}`);
+      } else {
+        // Delete image from Storage if removing
+        const imageRef = ref(storage, `profile_images/${wallet.toLowerCase()}.jpg`);
+        try {
+          await deleteObject(imageRef);
+        } catch (deleteError) {
+          console.warn('⚠️ Could not delete old image from Storage:', deleteError);
+        }
+        
+        // Remove profileImage field from Firestore
+        await updateDoc(playerRef, {
+          profileImage: null
+        });
+        console.log(`✅ Removed profile image for ${wallet}`);
+      }
+    } else {
+      // Player doesn't exist yet, create with profile image
+      if (imageURL) {
+        await setDoc(playerRef, {
+          wallet,
+          profileImage: imageURL,
+          wins: 0,
+          losses: 0,
+          winRate: 0,
+          totalEarned: 0,
+          gamesPlayed: 0,
+          lastActive: Timestamp.now(),
+          trustScore: 0,
+          trustReviews: 0,
+          gameStats: {},
+          categoryStats: {}
+        });
+        console.log(`✅ Created player stats with profile image for ${wallet}`);
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error updating profile image:', error);
     throw error;
   }
 }
