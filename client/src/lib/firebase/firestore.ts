@@ -1211,6 +1211,7 @@ export interface TeamStats {
   teamId: string; // Unique team ID (wallet address of team key holder)
   teamName: string; // Team name
   teamKey: string; // Main wallet that controls the team (team owner)
+  teamImage?: string; // Team logo/image URL (base64 stored in Firestore)
   members: string[]; // Array of member wallet addresses (up to 69)
   wins: number;
   losses: number;
@@ -2138,6 +2139,58 @@ export async function updatePlayerProfileImage(wallet: string, imageURL: string 
     }
   } catch (error) {
     console.error('❌ Error updating profile image:', error);
+    throw error;
+  }
+}
+
+/**
+ * Upload team image as base64 stored in Firestore (FREE - uses Firestore free tier)
+ * Separate from individual player profile images
+ */
+export async function uploadTeamImage(teamKey: string, imageFile: File): Promise<string> {
+  try {
+    // Compress image first to reduce size (~50KB target)
+    const compressedFile = await compressImage(imageFile);
+    
+    // Convert to base64 data URL
+    const base64 = await fileToBase64(compressedFile);
+    
+    console.log(`✅ Team image compressed and ready for ${teamKey} (${Math.round(base64.length / 1024)}KB)`);
+    
+    // Return base64 data URL - will be stored in Firestore
+    return base64;
+  } catch (error) {
+    console.error('❌ Error processing team image:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update team's image URL in Firestore
+ */
+export async function updateTeamImage(teamKey: string, imageURL: string | null): Promise<void> {
+  try {
+    const teamRef = doc(db, 'teams', teamKey);
+    const teamSnap = await getDoc(teamRef);
+    
+    if (teamSnap.exists()) {
+      if (imageURL) {
+        await updateDoc(teamRef, {
+          teamImage: imageURL
+        });
+        console.log(`✅ Updated team image for ${teamKey}`);
+      } else {
+        // Remove teamImage field from Firestore
+        await updateDoc(teamRef, {
+          teamImage: null
+        });
+        console.log(`✅ Removed team image for ${teamKey}`);
+      }
+    } else {
+      throw new Error("Team does not exist");
+    }
+  } catch (error) {
+    console.error('❌ Error updating team image:', error);
     throw error;
   }
 }

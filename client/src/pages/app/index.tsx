@@ -9,7 +9,7 @@ import { joinChallengeOnChain } from "@/lib/chain/events";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
-import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage } from "@/lib/firebase/firestore";
+import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage, uploadTeamImage, updateTeamImage } from "@/lib/firebase/firestore";
 import { Timestamp } from "firebase/firestore";
 import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
@@ -3287,6 +3287,7 @@ const ArenaHome: React.FC = () => {
                           membersCount: Array.isArray(team.members) ? team.members.length : 0,
                           teamKey: team.teamKey,
                           teamId: team.teamId,
+                          teamImage: team.teamImage, // Team logo/image (separate from creator's profile image)
                           members: Array.isArray(team.members) ? team.members : [],
                           trustReviews: team.trustReviews || 0,
                         }));
@@ -3331,7 +3332,7 @@ const ArenaHome: React.FC = () => {
                           >
                             <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 pointer-events-none">
                               <div
-                                className={`h-12 w-12 sm:h-10 sm:w-10 flex items-center justify-center rounded-full text-base sm:text-sm font-bold border shrink-0 ${
+                                className={`h-12 w-12 sm:h-10 sm:w-10 flex items-center justify-center rounded-full text-base sm:text-sm font-bold border shrink-0 overflow-hidden relative ${
                                   team.rank === 1
                                     ? "border-amber-300 text-amber-300"
                                     : team.rank === 2
@@ -3341,7 +3342,41 @@ const ArenaHome: React.FC = () => {
                                     : "border-zinc-700 text-zinc-400"
                                 }`}
                               >
-                                {team.rank}
+                                {team.teamImage ? (
+                                  <>
+                                    {/* Team image as background */}
+                                    <img 
+                                      src={team.teamImage} 
+                                      alt={team.name}
+                                      className="absolute inset-0 w-full h-full object-cover"
+                                      onError={(e) => {
+                                        // Fallback to rank number if image fails to load
+                                        const target = e.target as HTMLImageElement;
+                                        target.style.display = 'none';
+                                        const parent = target.parentElement;
+                                        if (parent) {
+                                          parent.innerHTML = String(team.rank);
+                                        }
+                                      }}
+                                    />
+                                    {/* Rank number centered on top of image */}
+                                    <div className={`absolute inset-0 flex items-center justify-center ${
+                                      team.rank === 1
+                                        ? "text-amber-300"
+                                        : team.rank === 2
+                                        ? "text-zinc-300"
+                                        : team.rank === 3
+                                        ? "text-orange-300"
+                                        : "text-zinc-400"
+                                    }`}>
+                                      <span className="text-base sm:text-sm font-bold drop-shadow-[0_0_6px_rgba(0,0,0,0.9)] relative z-10 bg-black/40 rounded-full w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center">
+                                        {team.rank}
+                                      </span>
+                                    </div>
+                                  </>
+                                ) : (
+                                  team.rank
+                                )}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 text-base sm:text-lg font-semibold text-white">
