@@ -3557,12 +3557,18 @@ const ArenaHome: React.FC = () => {
                                     }
                                   }}
                                 />
-                                {/* Rank badge overlay for top 3 */}
-                                {player.rank <= 3 && (
-                                  <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-black/80 border border-current flex items-center justify-center text-[10px] font-bold">
-                                    {player.rank}
-                                  </div>
-                                )}
+                                {/* Rank number badge - always visible in corner for all ranks */}
+                                <div className={`absolute -top-1 -right-1 h-6 w-6 sm:h-5 sm:w-5 rounded-full border-2 flex items-center justify-center text-xs sm:text-[10px] font-bold shadow-lg ${
+                                  player.rank === 1
+                                    ? "bg-amber-400/90 text-black border-amber-300"
+                                    : player.rank === 2
+                                    ? "bg-zinc-300/90 text-black border-zinc-400"
+                                    : player.rank === 3
+                                    ? "bg-orange-400/90 text-black border-orange-300"
+                                    : "bg-zinc-600/90 text-white border-zinc-700"
+                                }`}>
+                                  {player.rank}
+                                </div>
                               </>
                             ) : (
                               player.rank
