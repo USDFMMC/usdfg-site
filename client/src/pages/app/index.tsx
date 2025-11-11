@@ -3369,7 +3369,7 @@ const ArenaHome: React.FC = () => {
                                         ? "text-orange-300"
                                         : "text-zinc-400"
                                     }`}>
-                                      <span className="text-base sm:text-sm font-bold drop-shadow-[0_0_6px_rgba(0,0,0,0.9)] relative z-10 bg-black/40 rounded-full w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center">
+                                      <span className="text-base sm:text-sm font-bold drop-shadow-[0_0_8px_rgba(0,0,0,1),0_0_4px_rgba(0,0,0,0.8)] relative z-10">
                                         {team.rank}
                                       </span>
                                     </div>
@@ -3603,7 +3603,7 @@ const ArenaHome: React.FC = () => {
                                     ? "text-orange-300"
                                     : "text-zinc-400"
                                 }`}>
-                                  <span className="text-base sm:text-sm font-bold drop-shadow-[0_0_6px_rgba(0,0,0,0.9)] relative z-10 bg-black/40 rounded-full w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center">
+                                  <span className="text-base sm:text-sm font-bold drop-shadow-[0_0_8px_rgba(0,0,0,1),0_0_4px_rgba(0,0,0,0.8)] relative z-10">
                                     {player.rank}
                                   </span>
                                 </div>
