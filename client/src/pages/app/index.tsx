@@ -3543,10 +3543,11 @@ const ArenaHome: React.FC = () => {
                           >
                             {player.profileImage ? (
                               <>
+                                {/* Profile image as background */}
                                 <img 
                                   src={player.profileImage} 
                                   alt={player.name}
-                                  className="w-full h-full object-cover"
+                                  className="absolute inset-0 w-full h-full object-cover"
                                   onError={(e) => {
                                     // Fallback to rank number if image fails to load
                                     const target = e.target as HTMLImageElement;
@@ -3557,17 +3558,19 @@ const ArenaHome: React.FC = () => {
                                     }
                                   }}
                                 />
-                                {/* Rank number badge - always visible in corner for all ranks */}
-                                <div className={`absolute -top-1 -right-1 h-6 w-6 sm:h-5 sm:w-5 rounded-full border-2 flex items-center justify-center text-xs sm:text-[10px] font-bold shadow-lg ${
+                                {/* Rank number centered on top of image */}
+                                <div className={`absolute inset-0 flex items-center justify-center ${
                                   player.rank === 1
-                                    ? "bg-amber-400/90 text-black border-amber-300"
+                                    ? "text-amber-300"
                                     : player.rank === 2
-                                    ? "bg-zinc-300/90 text-black border-zinc-400"
+                                    ? "text-zinc-300"
                                     : player.rank === 3
-                                    ? "bg-orange-400/90 text-black border-orange-300"
-                                    : "bg-zinc-600/90 text-white border-zinc-700"
+                                    ? "text-orange-300"
+                                    : "text-zinc-400"
                                 }`}>
-                                  {player.rank}
+                                  <span className="text-base sm:text-sm font-bold drop-shadow-[0_0_6px_rgba(0,0,0,0.9)] relative z-10 bg-black/40 rounded-full w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center">
+                                    {player.rank}
+                                  </span>
                                 </div>
                               </>
                             ) : (
