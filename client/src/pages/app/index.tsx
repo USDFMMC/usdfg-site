@@ -3531,7 +3531,7 @@ const ArenaHome: React.FC = () => {
                         {/* Top Row: Rank, Name, and Basic Info */}
                         <div className="flex items-center gap-3 sm:gap-4 pointer-events-none flex-1 min-w-0">
                           <div
-                            className={`h-12 w-12 sm:h-10 sm:w-10 flex items-center justify-center rounded-full text-base sm:text-sm font-bold border shrink-0 ${
+                            className={`h-12 w-12 sm:h-10 sm:w-10 flex items-center justify-center rounded-full text-base sm:text-sm font-bold border shrink-0 overflow-hidden relative ${
                               player.rank === 1
                                 ? "border-amber-300 text-amber-300"
                                 : player.rank === 2
@@ -3541,7 +3541,32 @@ const ArenaHome: React.FC = () => {
                                 : "border-zinc-700 text-zinc-400"
                             }`}
                           >
-                            {player.rank}
+                            {player.profileImage ? (
+                              <>
+                                <img 
+                                  src={player.profileImage} 
+                                  alt={player.name}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    // Fallback to rank number if image fails to load
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    const parent = target.parentElement;
+                                    if (parent) {
+                                      parent.innerHTML = String(player.rank);
+                                    }
+                                  }}
+                                />
+                                {/* Rank badge overlay for top 3 */}
+                                {player.rank <= 3 && (
+                                  <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-black/80 border border-current flex items-center justify-center text-[10px] font-bold">
+                                    {player.rank}
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              player.rank
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 text-base sm:text-lg font-semibold text-white">
