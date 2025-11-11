@@ -19,8 +19,7 @@ import {
   arrayRemove,
   serverTimestamp
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage } from './config';
+import { db } from './config';
 
 // Test Firestore connection
 export async function testFirestoreConnection() {
@@ -2010,28 +2009,38 @@ export async function updatePlayerCountry(wallet: string, countryCode: string | 
 }
 
 /**
- * Upload profile image to Firebase Storage and return the download URL
+ * Upload profile image as base64 stored in Firestore (FREE - uses Firestore free tier)
+ * Firestore free tier: 1GB storage = ~20,000 profile images at 50KB each
  */
 export async function uploadProfileImage(wallet: string, imageFile: File): Promise<string> {
   try {
-    // Create a reference to the storage location: profile_images/{wallet}.jpg
-    const imageRef = ref(storage, `profile_images/${wallet.toLowerCase()}.jpg`);
-    
-    // Convert image to blob if needed, compress to reduce size
+    // Compress image first to reduce size (~50KB target)
     const compressedFile = await compressImage(imageFile);
     
-    // Upload the file
-    await uploadBytes(imageRef, compressedFile);
+    // Convert to base64 data URL
+    const base64 = await fileToBase64(compressedFile);
     
-    // Get the download URL
-    const downloadURL = await getDownloadURL(imageRef);
-    console.log(`✅ Profile image uploaded for ${wallet}: ${downloadURL}`);
+    console.log(`✅ Profile image compressed and ready for ${wallet} (${Math.round(base64.length / 1024)}KB)`);
     
-    return downloadURL;
+    // Return base64 data URL - will be stored in Firestore
+    // Firestore free tier: 1GB = plenty for profile images
+    return base64;
   } catch (error) {
-    console.error('❌ Error uploading profile image:', error);
+    console.error('❌ Error processing profile image:', error);
     throw error;
   }
+}
+
+/**
+ * Convert File to base64 data URL
+ */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 /**
@@ -2101,14 +2110,6 @@ export async function updatePlayerProfileImage(wallet: string, imageURL: string 
         });
         console.log(`✅ Updated profile image for ${wallet}`);
       } else {
-        // Delete image from Storage if removing
-        const imageRef = ref(storage, `profile_images/${wallet.toLowerCase()}.jpg`);
-        try {
-          await deleteObject(imageRef);
-        } catch (deleteError) {
-          console.warn('⚠️ Could not delete old image from Storage:', deleteError);
-        }
-        
         // Remove profileImage field from Firestore
         await updateDoc(playerRef, {
           profileImage: null
