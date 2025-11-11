@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { getTeamByMember, createTeam, joinTeam, leaveTeam, removeTeamMember, getTeamStats, TeamStats } from '@/lib/firebase/firestore';
+import { getTeamByMember, createTeam, joinTeam, leaveTeam, removeTeamMember, getTeamStats, TeamStats, uploadTeamImage, updateTeamImage } from '@/lib/firebase/firestore';
 import ElegantButton from '@/components/ui/ElegantButton';
+import ProfileImageUpload from '@/components/ui/ProfileImageUpload';
 
 interface TeamManagementModalProps {
   currentWallet: string | null;
@@ -177,7 +178,45 @@ const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ currentWallet
         // User is in a team - Show team info
         <div className="space-y-4">
           <div className="p-4 bg-zinc-800/50 border border-zinc-700 rounded-lg">
-            <h3 className="text-lg font-semibold text-white mb-2">{userTeam.teamName}</h3>
+            <div className="flex items-center gap-4 mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-2">{userTeam.teamName}</h3>
+                {userTeam.teamKey === currentWallet && (
+                  <div className="mt-3">
+                    <label className="text-xs text-zinc-400 mb-2 block">Team Logo</label>
+                    <ProfileImageUpload
+                      currentImage={userTeam.teamImage || null}
+                      onImageChange={async (image, file) => {
+                        if (userTeam && userTeam.teamKey === currentWallet) {
+                          try {
+                            if (file && image) {
+                              const imageURL = await uploadTeamImage(userTeam.teamKey, file);
+                              await updateTeamImage(userTeam.teamKey, imageURL);
+                              // Refresh team data
+                              const updatedTeam = await getTeamByMember(currentWallet);
+                              setUserTeam(updatedTeam);
+                              setSuccess('Team logo updated successfully');
+                              onTeamUpdated?.();
+                            } else if (!image) {
+                              await updateTeamImage(userTeam.teamKey, null);
+                              // Refresh team data
+                              const updatedTeam = await getTeamByMember(currentWallet);
+                              setUserTeam(updatedTeam);
+                              setSuccess('Team logo removed successfully');
+                              onTeamUpdated?.();
+                            }
+                          } catch (error: any) {
+                            setError(error.message || 'Failed to update team logo');
+                          }
+                        }
+                      }}
+                      size="md"
+                    />
+                    <p className="text-xs text-zinc-500 mt-2">Only team key holder can change team logo</p>
+                  </div>
+                )}
+              </div>
+            </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-zinc-400">Team Key:</span>
