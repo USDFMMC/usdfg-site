@@ -778,8 +778,8 @@ const ArenaHome: React.FC = () => {
       ) {
         setNotification({
           isOpen: true,
-          title: 'Lock Request',
-          message: `${displayName} locked you in. Tap “Lock Back” on their card to start a friendly match.`,
+          title: 'Friendly Challenge Request',
+          message: `${displayName} challenged you to a friendly match. Tap “Accept Challenge” on their card to start.`,
           type: 'info',
         });
       }
@@ -791,8 +791,8 @@ const ArenaHome: React.FC = () => {
       ) {
         setNotification({
           isOpen: true,
-          title: 'Lock Accepted',
-          message: `${targetDisplayName} locked back. Friendly match is ready!`,
+          title: 'Challenge Accepted',
+          message: `${targetDisplayName} accepted your challenge. Friendly match is ready!`,
           type: 'success',
         });
       }
@@ -804,8 +804,8 @@ const ArenaHome: React.FC = () => {
       ) {
         setNotification({
           isOpen: true,
-          title: 'Lock Cancelled',
-          message: `${displayName} cancelled the lock.`,
+          title: 'Challenge Cancelled',
+          message: `${displayName} cancelled the challenge.`,
           type: 'warning',
         });
       }
@@ -1476,8 +1476,8 @@ const ArenaHome: React.FC = () => {
       console.error('❌ Failed to update lock state:', error);
       setNotification({
         isOpen: true,
-        title: 'Lock Failed',
-        message: 'Could not update lock state. Please try again.',
+        title: 'Challenge Failed',
+        message: 'Could not send challenge request. Please try again.',
         type: 'error',
       });
     } finally {
@@ -2102,14 +2102,14 @@ const ArenaHome: React.FC = () => {
       );
     }
 
-    let label = 'Lock In';
+    let label = 'Challenge Friendly';
     let buttonClass = 'px-3 py-1.5 rounded-lg border border-amber-500/30 bg-zinc-800/60 text-amber-200 text-xs font-semibold hover:border-amber-400/50 hover:bg-zinc-700/60 transition-colors pointer-events-auto';
 
     if (isLockedByMe) {
-      label = 'Cancel Lock';
+      label = 'Cancel Challenge';
       buttonClass = 'px-3 py-1.5 rounded-lg border border-red-500/40 bg-red-600/20 text-red-200 text-xs font-semibold hover:bg-red-600/30 transition-colors pointer-events-auto';
     } else if (isLockedOnMe) {
-      label = isPendingRequest ? 'Lock Back (New)' : 'Lock Back';
+      label = isPendingRequest ? 'Accept Challenge (New)' : 'Accept Challenge';
       buttonClass = 'px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-600/20 text-amber-200 text-xs font-semibold hover:bg-amber-600/30 transition-colors pointer-events-auto';
     }
 
@@ -2129,7 +2129,7 @@ const ArenaHome: React.FC = () => {
           }
           handleLockToggle(playerWallet);
         }}
-        title={isLockedByMe && !isLockedOnMe ? 'Waiting for opponent to lock back' : undefined}
+        title={isLockedByMe && !isLockedOnMe ? 'Waiting for opponent to accept challenge' : undefined}
       >
         {isLoading ? 'Updating...' : label}
       </button>
