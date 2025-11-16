@@ -9,6 +9,7 @@ interface TournamentBracketViewProps {
   players?: string[];
   currentWallet?: string | null;
   challengeId: string;
+  onOpenSubmitResult?: (matchId: string, opponentWallet: string) => void;
 }
 
 const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
@@ -16,6 +17,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   players = [],
   currentWallet,
   challengeId,
+  onOpenSubmitResult,
 }) => {
   if (!tournament || !tournament.bracket?.length) {
     return (
@@ -51,12 +53,30 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
       ? playerMatch.match.player2
       : playerMatch.match.player1);
 
+  const maxPlayers = tournament.maxPlayers || players.length;
+  const currentPlayers = players.length;
+  const isWaitingForPlayers = stage === 'waiting_for_players';
+
   return (
     <div className="space-y-4">
-      {playerMatch && (
+      {isWaitingForPlayers && (
+        <div className="rounded-xl border border-blue-400/30 bg-blue-500/10 p-4 text-sm text-blue-100">
+          <div className="text-xs uppercase tracking-widest text-blue-300">
+            Waiting for players
+          </div>
+          <div className="mt-2 text-base font-semibold text-white">
+            {currentPlayers} / {maxPlayers} players joined
+          </div>
+          <p className="mt-1 text-xs text-blue-100/80">
+            The tournament will start automatically when all {maxPlayers} players join. Share the challenge link to invite others!
+          </p>
+        </div>
+      )}
+
+      {playerMatch && stage === 'round_in_progress' && (
         <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">
           <div className="text-xs uppercase tracking-widest text-amber-300">
-            You’re locked in
+            You're locked in
           </div>
           <div className="mt-2 text-base font-semibold text-white">
             Round {playerMatch.round.roundNumber}:{" "}
@@ -68,6 +88,14 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
             Chat with your opponent and start the match. Submit results once
             you finish—winner advances automatically.
           </p>
+          {opponentWallet && onOpenSubmitResult && playerMatch.match.status !== 'completed' && (
+            <button
+              onClick={() => onOpenSubmitResult(playerMatch.match.id, opponentWallet)}
+              className="mt-3 w-full rounded-lg bg-amber-400/20 px-4 py-2 text-sm font-semibold text-amber-200 transition-all hover:bg-amber-400/30 hover:shadow-[0_0_12px_rgba(255,215,130,0.3)] border border-amber-400/40"
+            >
+              Submit Result
+            </button>
+          )}
         </div>
       )}
 

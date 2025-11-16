@@ -48,7 +48,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     customPlatform: '', // Custom platform name when "Other/Custom" is selected
     rules: '',
     customRules: false,
-    challengeType: 'solo' as 'solo' | 'team', // Toggle between solo and team challenge
+    challengeType: 'solo' as 'solo' | 'team' | 'tournament', // Toggle between solo, team, and tournament challenge
     teamOnly: false, // For team challenges: true = only teams can accept, false = open to anyone
     tournamentMaxPlayers: 8 as 4 | 8 | 16,
   });
@@ -56,9 +56,8 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
   const tournamentPlayerOptions: Array<4 | 8 | 16> = [4, 8, 16];
 
   const isTournamentMode = useMemo(() => {
-    const mode = formData.mode || '';
-    return typeof mode === 'string' && mode.toLowerCase().includes('tournament');
-  }, [formData.mode]);
+    return formData.challengeType === 'tournament';
+  }, [formData.challengeType]);
 
   // Update username when userGamerTag changes (e.g., when wallet switches)
   useEffect(() => {
@@ -254,7 +253,10 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     }
     
     if (step === 2) {
-      if (!formData.mode) errors.push('Please select a challenge mode');
+      // Only require mode for non-tournament challenges
+      if (!isTournamentMode && !formData.mode) {
+        errors.push('Please select a challenge mode');
+      }
       const entryFee = typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) : formData.entryFee;
       
       // Check if user is admin (allow 0 entry fee for Founder Challenges)
@@ -275,8 +277,8 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
         // Valid - no error for Founder Challenges
       }
 
-      const isTournamentModeSelected = typeof formData.mode === 'string' && formData.mode.toLowerCase().includes('tournament');
-      if (isTournamentModeSelected) {
+      // Validate tournament bracket size
+      if (isTournamentMode) {
         const maxPlayers = Number(formData.tournamentMaxPlayers);
         if (!tournamentPlayerOptions.includes(maxPlayers as 4 | 8 | 16)) {
           errors.push('Select a valid tournament size (4, 8, or 16 players).');
@@ -324,7 +326,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
       const platformName = formData.platform === 'Other/Custom' ? formData.customPlatform : formData.platform;
       
       const selectedMode = formData.mode || '';
-      const isTournamentSelected = typeof selectedMode === 'string' && selectedMode.toLowerCase().includes('tournament');
+      const isTournamentSelected = formData.challengeType === 'tournament';
       const defaultMaxPlayers = selectedMode.includes('2v2')
         ? 2
         : selectedMode.includes('3v3')
@@ -339,6 +341,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
         ...formData,
         game: gameName, // Use custom game name or selected game
         platform: platformName, // Use custom platform name or selected platform
+        mode: isTournamentSelected ? 'Tournament (Bracket Mode)' : formData.mode, // Set mode for tournaments
         maxPlayers: resolvedMaxPlayers,
         format: isTournamentSelected ? 'tournament' : 'standard',
         tournament: isTournamentSelected
@@ -420,7 +423,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
       {/* Step 1: Game Selection */}
       {currentStep === 1 && (
         <div className="space-y-3">
-          {/* Challenge Type Toggle - Solo or Team */}
+          {/* Challenge Type Toggle - Solo, Team, or Tournament */}
           <div className="mb-4">
             <label className="block text-xs font-medium text-gray-300 mb-2">Challenge Type</label>
             <div className="flex gap-2">
@@ -445,6 +448,17 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                 }`}
               >
                 👥 Team
+              </button>
+              <button
+                type="button"
+                onClick={() => handleInputChange('challengeType', 'tournament')}
+                className={`flex-1 px-4 py-2.5 rounded-lg border transition-all duration-300 text-sm font-semibold ${
+                  formData.challengeType === 'tournament'
+                    ? 'border-amber-400/50 bg-amber-300/10 text-amber-300 shadow-[0_0_10px_rgba(255,215,130,0.15)]'
+                    : 'border-zinc-700/50 bg-zinc-800/60 text-zinc-300 hover:border-amber-300/30'
+                }`}
+              >
+                🏆 Tournament
               </button>
             </div>
             {formData.challengeType === 'team' && (
@@ -484,6 +498,30 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                       : 'Anyone (solo players or teams) can accept this challenge'}
                   </p>
                 </div>
+              </div>
+            )}
+            {formData.challengeType === 'tournament' && (
+              <div className="mt-3 p-3 bg-zinc-800/50 border border-zinc-700 rounded-lg">
+                <label className="block text-xs font-medium text-gray-300 mb-2">Bracket Size</label>
+                <select
+                  value={formData.tournamentMaxPlayers}
+                  onChange={(e) =>
+                    handleInputChange(
+                      'tournamentMaxPlayers',
+                      Number(e.target.value) as 4 | 8 | 16
+                    )
+                  }
+                  className="w-full px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white hover:border-amber-300/30 focus:border-amber-400/50 focus:outline-none transition-all"
+                >
+                  {tournamentPlayerOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option} Players
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-zinc-400 mt-2">
+                  Single-elimination bracket. Prize pool = entry fee × number of players. Winners advance automatically.
+                </p>
               </div>
             )}
           </div>
@@ -582,17 +620,18 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
           <div>
             <h3 className="text-base font-semibold text-white mb-3">Challenge Configuration</h3>
             
-            <div className="mb-3">
-              <label className="block text-xs font-medium text-gray-300 mb-1.5">Challenge Mode</label>
-              <select
-                value={formData.mode}
-                onChange={(e) => handleInputChange('mode', e.target.value)}
-                className="w-full px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white focus:border-amber-400/50 focus:outline-none transition-all"
-              >
-                {gameModes[formData.game as keyof typeof gameModes]?.map(mode => (
-                  <option key={mode} value={mode}>{mode}</option>
-                ))}
-              </select>
+            {!isTournamentMode && (
+              <div className="mb-3">
+                <label className="block text-xs font-medium text-gray-300 mb-1.5">Challenge Mode</label>
+                <select
+                  value={formData.mode}
+                  onChange={(e) => handleInputChange('mode', e.target.value)}
+                  className="w-full px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white focus:border-amber-400/50 focus:outline-none transition-all"
+                >
+                  {gameModes[formData.game as keyof typeof gameModes]?.filter(mode => mode !== 'Tournament (Bracket Mode)').map(mode => (
+                    <option key={mode} value={mode}>{mode}</option>
+                  ))}
+                </select>
               
               {/* Mode explanation */}
               <div className="mt-2 p-2 bg-zinc-800/40 rounded-lg border border-zinc-700/50">
@@ -611,6 +650,16 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                 </div>
               </div>
             </div>
+            )}
+            
+            {isTournamentMode && (
+              <div className="mb-3 p-3 bg-amber-400/10 border border-amber-400/30 rounded-lg">
+                <p className="text-xs text-amber-300 font-semibold mb-1">🏆 Tournament Mode</p>
+                <p className="text-xs text-gray-300">
+                  Single-elimination bracket with {formData.tournamentMaxPlayers} players. Winners advance automatically to the next round until a champion is crowned.
+                </p>
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-medium text-gray-300 mb-1.5">
@@ -668,38 +717,14 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                   if (isAdmin && entryFee === 0) {
                     return <span className="text-purple-300">🏆 Founder Challenge - Set prize pool manually when transferring USDFG</span>;
                   }
-                  return <>Prize Pool: {(typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) || 0 : formData.entryFee || 0) * 2} USDFG (2x entry fee)</>;
+                  if (isTournamentMode) {
+                    return <>Prize Pool: {entryFee * formData.tournamentMaxPlayers} USDFG (entry fee × {formData.tournamentMaxPlayers} players)</>;
+                  }
+                  return <>Prize Pool: {entryFee * 2} USDFG (2x entry fee)</>;
                 })()}
               </div>
             </div>
           </div>
-
-          {isTournamentMode && (
-            <div className="mt-3">
-              <label className="block text-xs font-medium text-gray-300 mb-1.5">
-                Bracket Size
-              </label>
-              <select
-                value={formData.tournamentMaxPlayers}
-                onChange={(e) =>
-                  handleInputChange(
-                    'tournamentMaxPlayers',
-                    Number(e.target.value) as 4 | 8 | 16
-                  )
-                }
-                className="w-full px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white focus:border-amber-400/50 focus:outline-none transition-all"
-              >
-                {tournamentPlayerOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option} Players
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1.5 text-xs text-gray-400">
-                Single-elimination bracket. Prize pool = entry fee × number of players. Winners advance automatically.
-              </p>
-            </div>
-          )}
         </div>
       )}
 

@@ -10,7 +10,7 @@ import TournamentBracketView from "@/components/arena/TournamentBracketView";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
-import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage, uploadTeamImage, updateTeamImage, upsertChallengeNotification, listenToChallengeNotifications, ChallengeNotification, fetchChallengeById } from "@/lib/firebase/firestore";
+import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage, uploadTeamImage, updateTeamImage, upsertChallengeNotification, listenToChallengeNotifications, ChallengeNotification, fetchChallengeById, submitTournamentMatchResult } from "@/lib/firebase/firestore";
 import { Timestamp } from "firebase/firestore";
 import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
@@ -212,22 +212,22 @@ const ArenaHome: React.FC = () => {
     }
   };
 
-const mergeChallengeDataForModal = (cardChallenge: any, firestoreChallenge?: ChallengeData | null) => {
-  if (!firestoreChallenge) return cardChallenge;
-  
-  return {
-    ...cardChallenge,
-    ...firestoreChallenge,
-    id: firestoreChallenge.id || cardChallenge.id,
-    title: firestoreChallenge.title || cardChallenge.title,
-    entryFee: firestoreChallenge.entryFee ?? cardChallenge.entryFee,
-    prizePool: firestoreChallenge.prizePool ?? cardChallenge.prizePool,
-    status: firestoreChallenge.status || cardChallenge.status,
-    rawData: firestoreChallenge,
-    players: firestoreChallenge.players?.length || cardChallenge.players,
-    capacity: firestoreChallenge.maxPlayers || cardChallenge.capacity,
-  };
-};
+  const mergeChallengeDataForModal = useCallback((cardChallenge: any, firestoreChallenge?: ChallengeData | null) => {
+    if (!firestoreChallenge) return cardChallenge;
+    
+    return {
+      ...cardChallenge,
+      ...firestoreChallenge,
+      id: firestoreChallenge.id || cardChallenge.id,
+      title: firestoreChallenge.title || cardChallenge.title,
+      entryFee: firestoreChallenge.entryFee ?? cardChallenge.entryFee,
+      prizePool: firestoreChallenge.prizePool ?? cardChallenge.prizePool,
+      status: firestoreChallenge.status || cardChallenge.status,
+      rawData: firestoreChallenge,
+      players: firestoreChallenge.players?.length || cardChallenge.players,
+      capacity: firestoreChallenge.maxPlayers || cardChallenge.capacity,
+    };
+  }, []);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -275,8 +275,9 @@ const mergeChallengeDataForModal = (cardChallenge: any, firestoreChallenge?: Cha
   const [topTeams, setTopTeams] = useState<TeamStats[]>([]);
   const [loadingTopTeams, setLoadingTopTeams] = useState<boolean>(false);
   const [showChatModal, setShowChatModal] = useState<boolean>(false);
-const [selectedChatChallenge, setSelectedChatChallenge] = useState<any>(null);
+  const [selectedChatChallenge, setSelectedChatChallenge] = useState<any>(null);
 const [showTournamentLobby, setShowTournamentLobby] = useState(false);
+const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string; opponentWallet: string } | null>(null);
   const [showTeamModal, setShowTeamModal] = useState<boolean>(false);
   const [userTeam, setUserTeam] = useState<TeamStats | null>(null);
   const [notification, setNotification] = useState<{
@@ -1025,6 +1026,63 @@ const [showTournamentLobby, setShowTournamentLobby] = useState(false);
   useResultDeadlines(firestoreChallenges);
   
   
+  // Auto-open Tournament Lobby when player joins a tournament (waiting or in progress)
+  useEffect(() => {
+    if (!publicKey || !firestoreChallenges || !isConnected) return;
+    
+    const currentWallet = publicKey.toString().toLowerCase();
+    
+    // Check for tournament challenges where user is a participant
+    const myTournamentChallenges = firestoreChallenges.filter((challenge: any) => {
+      const format = challenge.format || (challenge.tournament ? 'tournament' : 'standard');
+      if (format !== 'tournament') return false;
+      
+      const players = challenge.players || [];
+      const isParticipant = players.some((player: string) => 
+        player.toLowerCase() === currentWallet
+      );
+      
+      return isParticipant;
+    });
+    
+    // Auto-open tournament lobby if user is in a tournament and modal isn't already open
+    if (myTournamentChallenges.length > 0 && !showTournamentLobby && !showSubmitResultModal && !showTrustReview) {
+      const challenge = myTournamentChallenges[0];
+      const tournament = challenge.tournament;
+      const stage = tournament?.stage || 'waiting_for_players';
+      
+      // Only auto-open if tournament is waiting for players or in progress
+      // (Don't auto-open if it's completed or cancelled)
+      if (stage === 'waiting_for_players' || stage === 'round_in_progress' || stage === 'awaiting_results') {
+        try {
+          const merged = mergeChallengeDataForModal(challenge, challenge);
+          setSelectedChallenge(merged);
+          setShowTournamentLobby(true);
+          console.log(`🏆 Tournament lobby opened (stage: ${stage})`);
+        } catch (error) {
+          console.error('Failed to open tournament lobby:', error);
+        }
+      }
+    }
+  }, [firestoreChallenges, publicKey, isConnected, showTournamentLobby, showSubmitResultModal, showTrustReview, mergeChallengeDataForModal]);
+
+  // Update selectedChallenge in real-time when tournament data changes
+  useEffect(() => {
+    if (!selectedChallenge || !showTournamentLobby || !firestoreChallenges) return;
+    
+    const challengeId = selectedChallenge.id;
+    const updatedChallenge = firestoreChallenges.find((c: any) => c.id === challengeId);
+    
+    if (updatedChallenge) {
+      try {
+        const merged = mergeChallengeDataForModal(selectedChallenge, updatedChallenge);
+        setSelectedChallenge(merged);
+      } catch (error) {
+        console.error('Failed to update tournament challenge:', error);
+      }
+    }
+  }, [firestoreChallenges, selectedChallenge?.id, showTournamentLobby, mergeChallengeDataForModal]);
+  
   // Auto-open Submit Result Room when user's challenge becomes "in-progress"
   useEffect(() => {
     if (!publicKey || !firestoreChallenges || !isConnected) return;
@@ -1032,6 +1090,10 @@ const [showTournamentLobby, setShowTournamentLobby] = useState(false);
     const currentWallet = publicKey.toString().toLowerCase();
     
     const myInProgressChallenges = firestoreChallenges.filter((challenge: any) => {
+      // Skip tournament challenges (handled separately above)
+      const format = challenge.format || (challenge.tournament ? 'tournament' : 'standard');
+      if (format === 'tournament') return false;
+      
       if (challenge.status !== 'in-progress') return false;
       
       const players = challenge.players || [];
@@ -1223,7 +1285,7 @@ const [showTournamentLobby, setShowTournamentLobby] = useState(false);
               message: `Challenge sent to ${playerData.displayName || playerData.name}! They will be notified.`,
               type: 'success',
             });
-            setShowPlayerProfile(false);
+        setShowPlayerProfile(false);
           } catch (error: any) {
             console.error('Failed to send challenge:', error);
             alert(`Failed to send challenge: ${error.message || 'Unknown error'}`);
@@ -1615,6 +1677,13 @@ const [showTournamentLobby, setShowTournamentLobby] = useState(false);
     }
   }, [normalizedCurrentWallet, currentWallet, currentLockTarget, connect, createFriendlyMatchId, topPlayers, userGamerTag, formatWalletAddress, userLocks]);
 
+  // Handle opening submit result modal for tournament matches
+  const handleOpenTournamentSubmitResult = (matchId: string, opponentWallet: string) => {
+    setTournamentMatchData({ matchId, opponentWallet });
+    setShowTournamentLobby(false); // Close tournament lobby to show submit result modal
+    setShowSubmitResultModal(true);
+  };
+
   // Handle result submission - now stores result and shows trust review
   const handleSubmitResult = async (didWin: boolean, proofFile?: File | null) => {
     if (!selectedChallenge || !publicKey) {
@@ -1623,8 +1692,37 @@ const [showTournamentLobby, setShowTournamentLobby] = useState(false);
     }
 
     try {
+      // Check if this is a tournament match
+      const format = selectedChallenge.rawData?.format || (selectedChallenge.rawData?.tournament ? 'tournament' : 'standard');
+      const isTournament = format === 'tournament';
       
-      // Get opponent wallet before storing match result
+      // For tournaments, skip trust review and submit directly
+      if (isTournament && tournamentMatchData) {
+        const walletAddress = publicKey.toBase58();
+        
+        // Submit result (both win and loss are handled the same way)
+        await submitTournamentMatchResult(
+          selectedChallenge.id,
+          tournamentMatchData.matchId,
+          walletAddress,
+          didWin
+        );
+        
+        // Close submit result modal and reopen tournament lobby
+        setShowSubmitResultModal(false);
+        setTournamentMatchData(null);
+        setShowTournamentLobby(true);
+        
+        // Show success message
+        const message = didWin 
+          ? "🏆 Result submitted! Waiting for opponent to submit their result..."
+          : "😔 Result submitted. Waiting for opponent to submit their result...";
+        alert(message);
+        return;
+      }
+      
+      // Standard challenge - proceed with trust review flow
+      // Get opponent wallet - find from players array
       const playersArray = selectedChallenge.rawData?.players || (Array.isArray(selectedChallenge.players) ? selectedChallenge.players : []);
       const opponentWallet = playersArray.find((p: string) => p?.toLowerCase() !== publicKey.toBase58().toLowerCase());
       
@@ -1633,7 +1731,7 @@ const [showTournamentLobby, setShowTournamentLobby] = useState(false);
         didWin, 
         proofFile, 
         challengeId: selectedChallenge.id,
-        opponentWallet: opponentWallet || undefined // Store opponent wallet for trust review
+        opponentWallet: opponentWallet || undefined, // Store opponent wallet for trust review
       };
       setPendingMatchResult(matchResult);
       
@@ -1687,8 +1785,10 @@ const [showTournamentLobby, setShowTournamentLobby] = useState(false);
     try {
       // Submit the match result to Firestore (if not already submitted or auto-won)
       // If autoWon is true, the result was already auto-determined when opponent submitted loss
+      // Note: Tournaments skip trust review entirely and handle results in handleSubmitResult
       if (!pendingMatchResult.autoWon) {
         try {
+          // Standard challenge result submission
       await submitChallengeResult(challengeId, publicKey.toBase58(), pendingMatchResult.didWin);
           console.log('✅ Match result submitted');
         } catch (resultError: any) {
@@ -1749,26 +1849,29 @@ const [showTournamentLobby, setShowTournamentLobby] = useState(false);
       setShowTrustReview(false);
       setTrustReviewOpponent('');
       
-      // Check if user needs to claim prize after review
+      // Save values before clearing
       const needsClaim = pendingMatchResult.needsClaim;
+      const didWin = pendingMatchResult.didWin;
+      const autoWon = pendingMatchResult.autoWon;
       const challengeForClaim = needsClaim ? selectedChallenge : null;
       
       // Clear pending match result but keep challenge if needs claim
       setPendingMatchResult(null);
+      
       if (!needsClaim) {
       setSelectedChallenge(null);
       }
       
       // Show success message
       let successMessage = '';
-      if (pendingMatchResult.autoWon) {
+      if (autoWon) {
         successMessage = opponentWallet 
           ? "🏆 Your opponent submitted a loss - you won automatically! Trust review recorded."
           : "🏆 You won automatically! Trust review recorded.";
       } else {
         successMessage = opponentWallet 
-          ? (pendingMatchResult.didWin ? "🏆 You submitted that you WON! Trust review recorded." : "😔 You submitted that you LOST. Trust review recorded.")
-          : (pendingMatchResult.didWin ? "🏆 You submitted that you WON!" : "😔 You submitted that you LOST.");
+          ? (didWin ? "🏆 You submitted that you WON! Trust review recorded." : "😔 You submitted that you LOST. Trust review recorded.")
+          : (didWin ? "🏆 You submitted that you WON!" : "😔 You submitted that you LOST.");
       }
       
       if (needsClaim && challengeForClaim) {
@@ -3312,8 +3415,8 @@ const [showTournamentLobby, setShowTournamentLobby] = useState(false);
                                 setSelectedChallenge(challenge);
                                 setShowTournamentLobby(true);
                               } else {
-                                setSelectedChatChallenge(challenge);
-                                setShowChatModal(true);
+                              setSelectedChatChallenge(challenge);
+                              setShowChatModal(true);
                               }
                             }}
                             className="relative w-full mt-2 px-3 py-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-200 border border-amber-400/40 hover:border-amber-400/60 font-semibold rounded-lg transition-all flex items-center justify-center gap-2 shadow-[0_0_10px_rgba(255,215,130,0.15)] hover:shadow-[0_0_15px_rgba(255,215,130,0.25)] z-20 backdrop-blur-sm"
@@ -3497,7 +3600,7 @@ const [showTournamentLobby, setShowTournamentLobby] = useState(false);
                                         : "text-zinc-400"
                                     }`}>
                                       <span className="text-base sm:text-sm font-bold relative z-10 bg-black/30 rounded-full w-7 h-7 sm:w-6 sm:h-6 flex items-center justify-center backdrop-blur-[1px] border border-white/15 drop-shadow-[0_0_4px_rgba(0,0,0,0.9)]">
-                                        {team.rank}
+                                {team.rank}
                                       </span>
                                     </div>
                                   </>
@@ -3731,7 +3834,7 @@ const [showTournamentLobby, setShowTournamentLobby] = useState(false);
                                     : "text-zinc-400"
                                 }`}>
                                   <span className="text-base sm:text-sm font-bold relative z-10 bg-black/30 rounded-full w-7 h-7 sm:w-6 sm:h-6 flex items-center justify-center backdrop-blur-[1px] border border-white/15 drop-shadow-[0_0_4px_rgba(0,0,0,0.9)]">
-                                    {player.rank}
+                            {player.rank}
                                   </span>
                                 </div>
                               </>
@@ -4125,52 +4228,76 @@ const [showTournamentLobby, setShowTournamentLobby] = useState(false);
           const players = selectedChallenge.rawData?.players || [];
 
           if (isTournament) {
-            if (!showTournamentLobby) {
-              return null;
+            // Render tournament lobby modal
+            if (showTournamentLobby) {
+              return (
+                <ElegantModal
+                  isOpen={showTournamentLobby}
+                  onClose={() => {
+                    setShowTournamentLobby(false);
+                    setSelectedChallenge(null);
+                  }}
+                  title={`${selectedChallenge.title || "Tournament"} Bracket`}
+                >
+                  <TournamentBracketView
+                    tournament={selectedChallenge.rawData?.tournament}
+                    players={players}
+                    currentWallet={publicKey?.toString() || null}
+                    challengeId={selectedChallenge.id}
+                    onOpenSubmitResult={handleOpenTournamentSubmitResult}
+                  />
+                </ElegantModal>
+              );
             }
-            return (
-              <ElegantModal
-                isOpen={showTournamentLobby}
-                onClose={() => {
-                  setShowTournamentLobby(false);
-                  setSelectedChallenge(null);
-                }}
-                title={`${selectedChallenge.title || "Tournament"} Bracket`}
-              >
-                <TournamentBracketView
-                  tournament={selectedChallenge.rawData?.tournament}
-                  players={players}
-                  currentWallet={publicKey?.toString() || null}
-                  challengeId={selectedChallenge.id}
-                />
-              </ElegantModal>
-            );
+            
+            // Render submit result modal for tournament matches
+            if (showSubmitResultModal && tournamentMatchData) {
+              return (
+                <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div></div>}>
+                  <SubmitResultRoom
+                    isOpen={showSubmitResultModal}
+                    onClose={() => {
+                      setShowSubmitResultModal(false);
+                      setTournamentMatchData(null);
+                      // Reopen tournament lobby after closing submit result modal
+                      setShowTournamentLobby(true);
+                    }}
+                    challengeId={selectedChallenge.id}
+                    challengeTitle={selectedChallenge.title || ""}
+                    currentWallet={publicKey?.toString() || ""}
+                    onSubmit={handleSubmitResult}
+                  />
+                </Suspense>
+              );
+            }
+            
+            return null;
           }
 
           // Standard challenge: keep current submit modal behavior
           const isMainChallenger =
             players.length >= 2 &&
-            currentWallet &&
+            currentWallet && 
             (players[0]?.toLowerCase() === currentWallet ||
               players[1]?.toLowerCase() === currentWallet);
-
+          
           if (!isMainChallenger) {
             return null;
           }
-
+          
           return (
             <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div></div>}>
-              <SubmitResultRoom
-                isOpen={showSubmitResultModal}
-                onClose={() => {
-                  setShowSubmitResultModal(false);
+        <SubmitResultRoom
+          isOpen={showSubmitResultModal}
+          onClose={() => {
+            setShowSubmitResultModal(false);
                   setTimeout(() => setSelectedChallenge(null), 100);
-                }}
+          }}
                 challengeId={selectedChallenge.id}
                 challengeTitle={selectedChallenge.title || ""}
-                currentWallet={publicKey?.toString() || ""}
-                onSubmit={handleSubmitResult}
-              />
+          currentWallet={publicKey?.toString() || ""}
+          onSubmit={handleSubmitResult}
+        />
             </Suspense>
           );
         })()}
@@ -4304,7 +4431,7 @@ const [showTournamentLobby, setShowTournamentLobby] = useState(false);
                   try {
                     await updatePlayerProfileImage(walletKey, null);
                     setUserProfileImage(null);
-                    clearWalletScopedValue(PROFILE_STORAGE_KEYS.profileImage, walletKey);
+                  clearWalletScopedValue(PROFILE_STORAGE_KEYS.profileImage, walletKey);
                     
                     // Refresh leaderboard
                     const limit = showAllPlayers ? 50 : 5;
@@ -5365,29 +5492,39 @@ const JoinChallengeModal: React.FC<{
         if (isTournament) {
           await joinChallenge(challenge.id, walletAddress);
 
-          const refreshed = await fetchChallengeById(challenge.id);
-          const merged = mergeChallengeDataForModal(challenge, refreshed);
-          setSelectedChallenge(merged);
-          setShowTournamentLobby(true);
+          try {
+            const refreshed = await fetchChallengeById(challenge.id);
+            const merged = mergeChallengeDataForModal(challenge, refreshed);
+            setSelectedChallenge(merged);
+            setShowTournamentLobby(true);
+          } catch (mergeError) {
+            console.error('Failed to merge challenge data, but join succeeded:', mergeError);
+            // Join succeeded, so just close the modal and let real-time updates handle the UI
+            setState('success');
+            setTimeout(() => {
+              onClose();
+            }, 1500);
+            return; // Exit early since we've already handled success
+          }
         } else {
-          if (!signTransaction) {
-            throw new Error('Wallet does not support transaction signing');
-          }
-        
-          // Step 1: Join on-chain (Solana transaction)
-          // Use the PDA from the challenge data, not the Firestore ID
-          const challengePDA = challenge.rawData?.pda || challenge.pda;
-          if (!challengePDA) {
-            throw new Error('Challenge has no on-chain PDA. Cannot join this challenge.');
-          }
-          
-          await joinChallengeOnChain(challengePDA, challenge.entryFee, walletAddress, {
-            signTransaction: signTransaction,
-            publicKey: publicKey
-          });
-          
-          // Step 2: Update Firestore
-          await joinChallenge(challenge.id, walletAddress);
+        if (!signTransaction) {
+          throw new Error('Wallet does not support transaction signing');
+        }
+      
+      // Step 1: Join on-chain (Solana transaction)
+      // Use the PDA from the challenge data, not the Firestore ID
+      const challengePDA = challenge.rawData?.pda || challenge.pda;
+      if (!challengePDA) {
+        throw new Error('Challenge has no on-chain PDA. Cannot join this challenge.');
+      }
+      
+      await joinChallengeOnChain(challengePDA, challenge.entryFee, walletAddress, {
+        signTransaction: signTransaction,
+        publicKey: publicKey
+      });
+      
+      // Step 2: Update Firestore
+      await joinChallenge(challenge.id, walletAddress);
         }
       }
       

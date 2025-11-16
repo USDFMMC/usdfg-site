@@ -92,6 +92,8 @@ export interface BracketMatch {
   status: BracketMatchStatus;
   startedAt?: Timestamp;
   completedAt?: Timestamp;
+  player1Result?: 'win' | 'loss'; // Track player1's submission
+  player2Result?: 'win' | 'loss'; // Track player2's submission
 }
 
 export interface BracketRound {
@@ -223,6 +225,8 @@ const sanitizeTournamentState = (state: TournamentState): TournamentState => {
         if (match.winner) sanitizedMatch.winner = match.winner;
         if (match.startedAt) sanitizedMatch.startedAt = match.startedAt;
         if (match.completedAt) sanitizedMatch.completedAt = match.completedAt;
+        if (match.player1Result) sanitizedMatch.player1Result = match.player1Result;
+        if (match.player2Result) sanitizedMatch.player2Result = match.player2Result;
 
         return sanitizedMatch;
       }),
@@ -234,6 +238,406 @@ const sanitizeTournamentState = (state: TournamentState): TournamentState => {
   }
 
   return sanitized;
+};
+
+/**
+ * Submit a tournament match result
+ * Only advances bracket when both players have submitted matching results
+ */
+export const submitTournamentMatchResult = async (
+  challengeId: string,
+  matchId: string,
+  playerWallet: string,
+  didWin: boolean
+): Promise<void> => {
+  try {
+    const challengeRef = doc(db, 'challenges', challengeId);
+    const snap = await getDoc(challengeRef);
+    
+    if (!snap.exists()) {
+      throw new Error('Challenge not found');
+    }
+
+    const data = snap.data() as ChallengeData;
+    const tournament = data.tournament;
+    
+    if (!tournament || !tournament.bracket) {
+      throw new Error('Tournament bracket not found');
+    }
+
+    const bracket = deepCloneBracket(tournament.bracket);
+    let matchFound = false;
+    let currentRoundIndex = -1;
+    let matchIndex = -1;
+    let match: BracketMatch | null = null;
+
+    // Find the match
+    for (let roundIdx = 0; roundIdx < bracket.length; roundIdx++) {
+      const round = bracket[roundIdx];
+      for (let matchIdx = 0; matchIdx < round.matches.length; matchIdx++) {
+        const m = round.matches[matchIdx];
+        if (m.id === matchId) {
+          match = m;
+          matchFound = true;
+          currentRoundIndex = roundIdx;
+          matchIndex = matchIdx;
+          break;
+        }
+      }
+      if (matchFound) break;
+    }
+
+    if (!matchFound || !match) {
+      throw new Error('Match not found in bracket');
+    }
+
+    // Verify player is in this match
+    const isPlayer1 = match.player1?.toLowerCase() === playerWallet.toLowerCase();
+    const isPlayer2 = match.player2?.toLowerCase() === playerWallet.toLowerCase();
+    
+    if (!isPlayer1 && !isPlayer2) {
+      throw new Error('Player is not a participant in this match');
+    }
+
+    // Record player's submission
+    const result: 'win' | 'loss' = didWin ? 'win' : 'loss';
+    if (isPlayer1) {
+      match.player1Result = result;
+    } else {
+      match.player2Result = result;
+    }
+
+    // Check if both players have submitted
+    const bothSubmitted = match.player1Result !== undefined && match.player2Result !== undefined;
+
+    if (!bothSubmitted) {
+      // Only one player has submitted - just save the result and wait
+      const updates: any = {
+        'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
+        updatedAt: serverTimestamp(),
+      };
+      await updateDoc(challengeRef, updates);
+      console.log('✅ Match result submitted, waiting for opponent...');
+      return;
+    }
+
+    // Both players have submitted - check if results match
+    const player1Won = match.player1Result === 'win';
+    const player2Won = match.player2Result === 'win';
+
+    // Determine winner based on submissions
+    let winnerWallet: string | null = null;
+    if (player1Won && !player2Won && match.player1) {
+      // Player1 claims win, Player2 claims loss - Player1 wins
+      winnerWallet = match.player1;
+    } else if (player2Won && !player1Won && match.player2) {
+      // Player2 claims win, Player1 claims loss - Player2 wins
+      winnerWallet = match.player2;
+    } else if (player1Won && player2Won) {
+      // Both claim win - conflict, need dispute resolution
+      throw new Error('Both players claim victory. Dispute resolution required.');
+    } else if (!player1Won && !player2Won) {
+      // Both claim loss - conflict, need dispute resolution
+      throw new Error('Both players claim loss. Dispute resolution required.');
+    }
+
+    if (!winnerWallet) {
+      throw new Error('Could not determine winner from submissions');
+    }
+
+    // Mark match as completed
+    match.winner = winnerWallet;
+    match.status = 'completed';
+    match.completedAt = Timestamp.now();
+
+    // Advance winner to next round
+    const currentRound = bracket[currentRoundIndex];
+    if (!currentRound) {
+      throw new Error('Current round not found');
+    }
+
+    // Check if this is the final round
+    if (currentRoundIndex === bracket.length - 1) {
+      // This is the final - tournament is complete
+      const updates: any = {
+        'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
+        'tournament.champion': winnerWallet,
+        'tournament.stage': 'completed',
+        'status': 'completed',
+        updatedAt: serverTimestamp(),
+      };
+      
+      await updateDoc(challengeRef, updates);
+      console.log('✅ Tournament completed! Champion:', winnerWallet);
+      return;
+    }
+
+    // Advance to next round
+    const nextRound = bracket[currentRoundIndex + 1];
+    if (!nextRound) {
+      throw new Error('Next round not found');
+    }
+
+    // Calculate which slot in the next round this winner should go to
+    const nextMatchIndex = Math.floor(matchIndex / 2);
+    const nextMatch = nextRound.matches[nextMatchIndex];
+    
+    if (!nextMatch) {
+      throw new Error('Next round match not found');
+    }
+
+    // Determine if winner goes to player1 or player2 slot
+    if (matchIndex % 2 === 0) {
+      nextMatch.player1 = winnerWallet;
+    } else {
+      nextMatch.player2 = winnerWallet;
+    }
+
+    // If both players are set, mark the next match as ready
+    if (nextMatch.player1 && nextMatch.player2) {
+      nextMatch.status = 'ready';
+    }
+
+    // Check if all matches in current round are completed
+    const allMatchesCompleted = currentRound.matches.every(m => m.status === 'completed');
+    
+    // Update tournament state
+    const updates: any = {
+      'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
+      updatedAt: serverTimestamp(),
+    };
+
+    // If all matches in current round are done, advance to next round
+    if (allMatchesCompleted) {
+      const nextRoundNumber = currentRound.roundNumber + 1;
+      updates['tournament.currentRound'] = nextRoundNumber;
+      updates['tournament.stage'] = 'round_in_progress';
+      
+      // Activate next round matches
+      const updatedBracket = activateRoundMatches(bracket, nextRoundNumber);
+      updates['tournament.bracket'] = sanitizeTournamentState({ ...tournament, bracket: updatedBracket }).bracket;
+    }
+
+    await updateDoc(challengeRef, updates);
+    console.log('✅ Both players submitted - winner advanced to next round:', winnerWallet);
+  } catch (error) {
+    console.error('❌ Error submitting tournament match result:', error);
+    throw error;
+  }
+};
+
+/**
+ * Advance a tournament bracket winner to the next round
+ * Marks the current match as completed and moves the winner to the next round's match
+ * @deprecated Use submitTournamentMatchResult instead
+ */
+export const advanceBracketWinner = async (
+  challengeId: string,
+  matchId: string,
+  winnerWallet: string
+): Promise<void> => {
+  try {
+    const challengeRef = doc(db, 'challenges', challengeId);
+    const snap = await getDoc(challengeRef);
+    
+    if (!snap.exists()) {
+      throw new Error('Challenge not found');
+    }
+
+    const data = snap.data() as ChallengeData;
+    const tournament = data.tournament;
+    
+    if (!tournament || !tournament.bracket) {
+      throw new Error('Tournament bracket not found');
+    }
+
+    const bracket = deepCloneBracket(tournament.bracket);
+    let matchFound = false;
+    let currentRoundIndex = -1;
+    let matchIndex = -1;
+
+    // Find the match and mark it as completed
+    for (let roundIdx = 0; roundIdx < bracket.length; roundIdx++) {
+      const round = bracket[roundIdx];
+      for (let matchIdx = 0; matchIdx < round.matches.length; matchIdx++) {
+        const match = round.matches[matchIdx];
+        if (match.id === matchId) {
+          // Verify the winner is actually in this match
+          const isPlayer1 = match.player1?.toLowerCase() === winnerWallet.toLowerCase();
+          const isPlayer2 = match.player2?.toLowerCase() === winnerWallet.toLowerCase();
+          
+          if (!isPlayer1 && !isPlayer2) {
+            throw new Error('Winner is not a participant in this match');
+          }
+
+          // Mark match as completed
+          match.winner = winnerWallet;
+          match.status = 'completed';
+          match.completedAt = Timestamp.now();
+          
+          matchFound = true;
+          currentRoundIndex = roundIdx;
+          matchIndex = matchIdx;
+          break;
+        }
+      }
+      if (matchFound) break;
+    }
+
+    if (!matchFound) {
+      throw new Error('Match not found in bracket');
+    }
+
+    // Advance winner to next round
+    const currentRound = bracket[currentRoundIndex];
+    if (!currentRound) {
+      throw new Error('Current round not found');
+    }
+
+    // Check if this is the final round
+    if (currentRoundIndex === bracket.length - 1) {
+      // This is the final - tournament is complete
+      const updates: any = {
+        'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
+        'tournament.champion': winnerWallet,
+        'tournament.stage': 'completed',
+        'status': 'completed',
+        updatedAt: serverTimestamp(),
+      };
+      
+      await updateDoc(challengeRef, updates);
+      console.log('✅ Tournament completed! Champion:', winnerWallet);
+      return;
+    }
+
+    // Advance to next round
+    const nextRound = bracket[currentRoundIndex + 1];
+    if (!nextRound) {
+      throw new Error('Next round not found');
+    }
+
+    // Calculate which slot in the next round this winner should go to
+    // In a bracket, match 0 winner goes to slot 0, match 1 winner goes to slot 1, etc.
+    const nextMatchIndex = Math.floor(matchIndex / 2);
+    const nextMatch = nextRound.matches[nextMatchIndex];
+    
+    if (!nextMatch) {
+      throw new Error('Next round match not found');
+    }
+
+    // Determine if winner goes to player1 or player2 slot
+    // Even match indices (0, 2, 4...) go to player1, odd (1, 3, 5...) go to player2
+    if (matchIndex % 2 === 0) {
+      nextMatch.player1 = winnerWallet;
+    } else {
+      nextMatch.player2 = winnerWallet;
+    }
+
+    // If both players are set, mark the next match as ready
+    if (nextMatch.player1 && nextMatch.player2) {
+      nextMatch.status = 'ready';
+    }
+
+    // Check if all matches in current round are completed
+    const allMatchesCompleted = currentRound.matches.every(m => m.status === 'completed');
+    
+    // Update tournament state
+    const updates: any = {
+      'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
+      updatedAt: serverTimestamp(),
+    };
+
+    // If all matches in current round are done, advance to next round
+    if (allMatchesCompleted) {
+      const nextRoundNumber = currentRound.roundNumber + 1;
+      updates['tournament.currentRound'] = nextRoundNumber;
+      updates['tournament.stage'] = 'round_in_progress';
+      
+      // Activate next round matches
+      const updatedBracket = activateRoundMatches(bracket, nextRoundNumber);
+      updates['tournament.bracket'] = sanitizeTournamentState({ ...tournament, bracket: updatedBracket }).bracket;
+    }
+
+    await updateDoc(challengeRef, updates);
+    console.log('✅ Winner advanced to next round:', winnerWallet);
+  } catch (error) {
+    console.error('❌ Error advancing bracket winner:', error);
+    throw error;
+  }
+};
+
+/**
+ * Mark a tournament match loser as eliminated
+ * This is called when a player submits a loss
+ */
+export const markTournamentMatchLoser = async (
+  challengeId: string,
+  matchId: string,
+  loserWallet: string
+): Promise<void> => {
+  try {
+    const challengeRef = doc(db, 'challenges', challengeId);
+    const snap = await getDoc(challengeRef);
+    
+    if (!snap.exists()) {
+      throw new Error('Challenge not found');
+    }
+
+    const data = snap.data() as ChallengeData;
+    const tournament = data.tournament;
+    
+    if (!tournament || !tournament.bracket) {
+      throw new Error('Tournament bracket not found');
+    }
+
+    const bracket = deepCloneBracket(tournament.bracket);
+    let matchFound = false;
+
+    // Find the match and verify the loser is in it
+    for (let roundIdx = 0; roundIdx < bracket.length; roundIdx++) {
+      const round = bracket[roundIdx];
+      for (let matchIdx = 0; matchIdx < round.matches.length; matchIdx++) {
+        const match = round.matches[matchIdx];
+        if (match.id === matchId) {
+          // Verify the loser is actually in this match
+          const isPlayer1 = match.player1?.toLowerCase() === loserWallet.toLowerCase();
+          const isPlayer2 = match.player2?.toLowerCase() === loserWallet.toLowerCase();
+          
+          if (!isPlayer1 && !isPlayer2) {
+            throw new Error('Loser is not a participant in this match');
+          }
+
+          // If match is already completed, don't do anything
+          if (match.status === 'completed') {
+            console.log('Match already completed, skipping loser mark');
+            return;
+          }
+
+          // Match will be completed when winner submits via advanceBracketWinner
+          // For now, we just log that loser submitted
+          matchFound = true;
+          break;
+        }
+      }
+      if (matchFound) break;
+    }
+
+    if (!matchFound) {
+      throw new Error('Match not found in bracket');
+    }
+
+    // Update tournament state (bracket will be updated when winner submits)
+    const updates: any = {
+      'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
+      updatedAt: serverTimestamp(),
+    };
+
+    await updateDoc(challengeRef, updates);
+    console.log('✅ Loser marked in tournament match:', loserWallet);
+  } catch (error) {
+    console.error('❌ Error marking tournament match loser:', error);
+    throw error;
+  }
 };
 
 export type LockNotificationStatus = 'pending' | 'accepted' | 'cancelled' | 'completed';
