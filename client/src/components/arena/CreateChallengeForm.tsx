@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { Info } from 'lucide-react';
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import ElegantButton from '@/components/ui/ElegantButton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ADMIN_WALLET } from '@/lib/chain/config';
 import { getWalletScopedValue, PROFILE_STORAGE_KEYS } from '@/lib/storage/profile';
 
@@ -46,8 +49,16 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     rules: '',
     customRules: false,
     challengeType: 'solo' as 'solo' | 'team', // Toggle between solo and team challenge
-    teamOnly: false // For team challenges: true = only teams can accept, false = open to anyone
+    teamOnly: false, // For team challenges: true = only teams can accept, false = open to anyone
+    tournamentMaxPlayers: 8 as 4 | 8 | 16,
   });
+
+  const tournamentPlayerOptions: Array<4 | 8 | 16> = [4, 8, 16];
+
+  const isTournamentMode = useMemo(() => {
+    const mode = formData.mode || '';
+    return typeof mode === 'string' && mode.toLowerCase().includes('tournament');
+  }, [formData.mode]);
 
   // Update username when userGamerTag changes (e.g., when wallet switches)
   useEffect(() => {
@@ -141,20 +152,20 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
 
   // Game-specific modes - Enhanced with competitive options
   const gameModes = {
-    'EA UFC 6': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
-    'FC 26': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
-    'Madden 26': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
-    'NBA 2K26': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Custom Challenge'],
-    'F1 2023': ['Best Lap Time', '1v1 Race to Finish', 'Custom Challenge'],
-    'Mario Kart': ['Best Lap Time', '1v1 Race to Finish', 'Custom Challenge'],
-    'Gran Turismo 7': ['Best Lap Time', '1v1 Race to Finish', 'Custom Challenge'],
-    'Mortal Kombat 1': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Custom Challenge'],
-    'Street Fighter 6': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Custom Challenge'],
-    'Tekken 8': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Custom Challenge'],
-    'COD MW3': ['Run the Fade', '10 and Done', 'Snipers Only', 'Custom Challenge'],
-    'Fortnite': ['Run the Fade', '10 and Done', 'Snipers Only', 'Custom Challenge'],
-    'Valorant': ['Run the Fade', '10 and Done', 'Snipers Only', 'Custom Challenge'],
-    'Custom': ['Custom Challenge']
+    'EA UFC 6': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'FC 26': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Madden 26': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'NBA 2K26': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'F1 2023': ['Best Lap Time', '1v1 Race to Finish', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Mario Kart': ['Best Lap Time', '1v1 Race to Finish', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Gran Turismo 7': ['Best Lap Time', '1v1 Race to Finish', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Mortal Kombat 1': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Street Fighter 6': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Tekken 8': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'COD MW3': ['Run the Fade', '10 and Done', 'Snipers Only', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Fortnite': ['Run the Fade', '10 and Done', 'Snipers Only', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Valorant': ['Run the Fade', '10 and Done', 'Snipers Only', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Custom': ['Custom Challenge', 'Tournament (Bracket Mode)']
   };
 
   const getModeExplanation = (mode: string) => {
@@ -179,7 +190,8 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
       'Snipers Only': 'Sniper rifles only. Precision and patience are key to victory.',
       
       // Custom
-      'Custom Challenge': 'Create your own rules and format. Maximum flexibility for unique challenges.'
+      'Custom Challenge': 'Create your own rules and format. Maximum flexibility for unique challenges.',
+      'Tournament (Bracket Mode)': 'Run a mini bracket with 4, 8, or 16 players. Winners advance until a champion is crowned.'
     };
     return explanations[mode] || 'Custom challenge format with your own rules.';
   };
@@ -217,6 +229,8 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
       rules = '• First to 10 kills wins\n• Fast-paced action\n• Clear victory conditions\n• Winner takes all';
     } else if (mode === 'Snipers Only') {
       rules = '• Sniper rifles only\n• Precision and patience\n• No other weapons\n• Winner takes all';
+    } else if (mode === 'Tournament (Bracket Mode)') {
+      rules = '• Single elimination bracket\n• Winners advance automatically\n• Entry fees locked for all participants\n• Submit results with proof after each match\n• Disconnects = round loss unless opponents agree to rematch';
     } else {
       rules = '• Custom rules\n• Flexible format\n• Your own challenge\n• Winner takes all';
     }
@@ -260,6 +274,14 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
       if (isAdmin && entryFee === 0) {
         // Valid - no error for Founder Challenges
       }
+
+      const isTournamentModeSelected = typeof formData.mode === 'string' && formData.mode.toLowerCase().includes('tournament');
+      if (isTournamentModeSelected) {
+        const maxPlayers = Number(formData.tournamentMaxPlayers);
+        if (!tournamentPlayerOptions.includes(maxPlayers as 4 | 8 | 16)) {
+          errors.push('Select a valid tournament size (4, 8, or 16 players).');
+        }
+      }
     }
     
     if (step === 3) {
@@ -301,11 +323,33 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
       // Use custom platform name if "Other/Custom" is selected, otherwise use the selected platform
       const platformName = formData.platform === 'Other/Custom' ? formData.customPlatform : formData.platform;
       
+      const selectedMode = formData.mode || '';
+      const isTournamentSelected = typeof selectedMode === 'string' && selectedMode.toLowerCase().includes('tournament');
+      const defaultMaxPlayers = selectedMode.includes('2v2')
+        ? 2
+        : selectedMode.includes('3v3')
+        ? 3
+        : selectedMode.includes('5v5')
+        ? 5
+        : 2;
+
+      const resolvedMaxPlayers = isTournamentSelected ? formData.tournamentMaxPlayers : defaultMaxPlayers;
+
       const challengeData = {
         ...formData,
         game: gameName, // Use custom game name or selected game
         platform: platformName, // Use custom platform name or selected platform
-        maxPlayers: formData.mode.includes('2v2') ? 2 : formData.mode.includes('3v3') ? 3 : formData.mode.includes('5v5') ? 5 : 2,
+        maxPlayers: resolvedMaxPlayers,
+        format: isTournamentSelected ? 'tournament' : 'standard',
+        tournament: isTournamentSelected
+          ? {
+              format: 'tournament',
+              maxPlayers: formData.tournamentMaxPlayers,
+              currentRound: 1,
+              stage: 'waiting_for_players',
+              bracket: []
+            }
+          : undefined,
         // Don't set prizePool here - it will be calculated in handleCreateChallenge
         // prizePool: formData.entryFee * 2, // REMOVED - calculated in handleCreateChallenge with platform fee
         category: getGameCategory(gameName), // Get category from game name
@@ -591,8 +635,30 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                   })()}
                   className="flex-1 px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white placeholder-zinc-500 focus:border-amber-400/50 focus:outline-none transition-all"
                 />
-                <div className="text-xs text-gray-400">
-                  ≈ ${usdfgToUsd(typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) || 0 : formData.entryFee || 0).toFixed(2)} USD
+                <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                  <span>
+                    ≈ {usdfgToUsd(typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) || 0 : formData.entryFee || 0).toFixed(2)} USDC (conversion estimate)
+                  </span>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/10 text-white/80 border border-white/15 cursor-help hover:bg-white/15 transition">
+                          <Info className="w-3.5 h-3.5" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="top"
+                        align="center"
+                        sideOffset={6}
+                        avoidCollisions={true}
+                        collisionPadding={8}
+                        className="bg-black/90 border border-amber-400/40 text-amber-100 text-xs leading-snug whitespace-normal text-center px-3 py-2 rounded-md shadow-lg z-[99999]"
+                      >
+                        <TooltipPrimitive.Arrow className="fill-black/90" />
+                        <p>Displayed values are estimates based on current market value.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               </div>
               <div className="mt-1.5 text-xs text-gray-400">
@@ -607,6 +673,33 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
               </div>
             </div>
           </div>
+
+          {isTournamentMode && (
+            <div className="mt-3">
+              <label className="block text-xs font-medium text-gray-300 mb-1.5">
+                Bracket Size
+              </label>
+              <select
+                value={formData.tournamentMaxPlayers}
+                onChange={(e) =>
+                  handleInputChange(
+                    'tournamentMaxPlayers',
+                    Number(e.target.value) as 4 | 8 | 16
+                  )
+                }
+                className="w-full px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white focus:border-amber-400/50 focus:outline-none transition-all"
+              >
+                {tournamentPlayerOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option} Players
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1.5 text-xs text-gray-400">
+                Single-elimination bracket. Prize pool = entry fee × number of players. Winners advance automatically.
+              </p>
+            </div>
+          )}
         </div>
       )}
 

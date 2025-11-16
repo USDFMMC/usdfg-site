@@ -6,10 +6,11 @@ import WalletConnectSimple from "@/components/arena/WalletConnectSimple";
 import { useWallet } from '@solana/wallet-adapter-react';
 // Removed legacy wallet import - using MWA hooks instead
 import { joinChallengeOnChain } from "@/lib/chain/events";
+import TournamentBracketView from "@/components/arena/TournamentBracketView";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
-import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage, uploadTeamImage, updateTeamImage, upsertChallengeNotification, listenToChallengeNotifications, ChallengeNotification } from "@/lib/firebase/firestore";
+import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage, uploadTeamImage, updateTeamImage, upsertChallengeNotification, listenToChallengeNotifications, ChallengeNotification, fetchChallengeById } from "@/lib/firebase/firestore";
 import { Timestamp } from "firebase/firestore";
 import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
@@ -211,6 +212,23 @@ const ArenaHome: React.FC = () => {
     }
   };
 
+const mergeChallengeDataForModal = (cardChallenge: any, firestoreChallenge?: ChallengeData | null) => {
+  if (!firestoreChallenge) return cardChallenge;
+  
+  return {
+    ...cardChallenge,
+    ...firestoreChallenge,
+    id: firestoreChallenge.id || cardChallenge.id,
+    title: firestoreChallenge.title || cardChallenge.title,
+    entryFee: firestoreChallenge.entryFee ?? cardChallenge.entryFee,
+    prizePool: firestoreChallenge.prizePool ?? cardChallenge.prizePool,
+    status: firestoreChallenge.status || cardChallenge.status,
+    rawData: firestoreChallenge,
+    players: firestoreChallenge.players?.length || cardChallenge.players,
+    capacity: firestoreChallenge.maxPlayers || cardChallenge.capacity,
+  };
+};
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showSubmitResultModal, setShowSubmitResultModal] = useState(false);
@@ -257,7 +275,8 @@ const ArenaHome: React.FC = () => {
   const [topTeams, setTopTeams] = useState<TeamStats[]>([]);
   const [loadingTopTeams, setLoadingTopTeams] = useState<boolean>(false);
   const [showChatModal, setShowChatModal] = useState<boolean>(false);
-  const [selectedChatChallenge, setSelectedChatChallenge] = useState<any>(null);
+const [selectedChatChallenge, setSelectedChatChallenge] = useState<any>(null);
+const [showTournamentLobby, setShowTournamentLobby] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState<boolean>(false);
   const [userTeam, setUserTeam] = useState<TeamStats | null>(null);
   const [notification, setNotification] = useState<{
@@ -1107,7 +1126,7 @@ const ArenaHome: React.FC = () => {
       }
     };
 
-    const maxPlayers = getMaxPlayers(mode);
+    const maxPlayers = challenge.maxPlayers || getMaxPlayers(mode);
     // Use players array if available, otherwise check challenger
     const currentPlayers = challenge.players?.length || (challenge.challenger ? 2 : 1);
 
@@ -1359,7 +1378,7 @@ const ArenaHome: React.FC = () => {
         }
       };
 
-      const maxPlayers = getMaxPlayersForMode(challengeData.mode);
+      const maxPlayers = challengeData.maxPlayers || getMaxPlayersForMode(challengeData.mode);
 
       // Check if this is a Founder Challenge (admin with 0 entry fee)
       // Ensure we have a valid wallet address
@@ -1444,7 +1463,9 @@ const ArenaHome: React.FC = () => {
         // winner: undefined, // Will be set when match completes (don't include undefined fields)
         // UI fields for display
         players: [currentWallet], // Creator is first player
-        maxPlayers: challengeData.maxPlayers || 2, // Use provided maxPlayers or default to 2 for Head-to-Head
+        maxPlayers: challengeData.maxPlayers || maxPlayers, // Respect tournament size when provided
+        format: challengeData.format || (challengeData.tournament ? 'tournament' : 'standard'),
+        tournament: challengeData.format === 'tournament' ? challengeData.tournament : undefined,
         // Prize claim fields
         pda: isFounderChallenge ? null : challengeId, // Store the challenge PDA from smart contract (null for Founder Challenges)
         prizePool: prizePool, // Prize pool (for Founder Challenges, admin sets this)
@@ -3286,8 +3307,14 @@ const ArenaHome: React.FC = () => {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedChatChallenge(challenge);
-                              setShowChatModal(true);
+                              const format = (challenge.rawData as any)?.format || ((challenge.rawData as any)?.tournament ? 'tournament' : 'standard');
+                              if (format === 'tournament') {
+                                setSelectedChallenge(challenge);
+                                setShowTournamentLobby(true);
+                              } else {
+                                setSelectedChatChallenge(challenge);
+                                setShowChatModal(true);
+                              }
                             }}
                             className="relative w-full mt-2 px-3 py-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-200 border border-amber-400/40 hover:border-amber-400/60 font-semibold rounded-lg transition-all flex items-center justify-center gap-2 shadow-[0_0_10px_rgba(255,215,130,0.15)] hover:shadow-[0_0_15px_rgba(255,215,130,0.25)] z-20 backdrop-blur-sm"
                           >
@@ -4090,35 +4117,60 @@ const ArenaHome: React.FC = () => {
 
         {/* Submit Result Room - Only render for main challengers (creator and first challenger who accepted) */}
         {selectedChallenge?.id && (() => {
+          const format =
+            (selectedChallenge.rawData as any)?.format ||
+            ((selectedChallenge.rawData as any)?.tournament ? "tournament" : "standard");
+          const isTournament = format === "tournament";
           const currentWallet = publicKey?.toString()?.toLowerCase();
           const players = selectedChallenge.rawData?.players || [];
-          // Only main challengers can see submit result (not spectators)
-          // players[0] = creator (who created the challenge)
-          // players[1] = first challenger who accepted/joined the challenge (the other main challenger)
-          // players[2+] = spectators (not eligible to submit results)
-          const isMainChallenger = players.length >= 2 && 
-            currentWallet && 
-            (players[0]?.toLowerCase() === currentWallet || players[1]?.toLowerCase() === currentWallet);
-          
-          // Only show if user is a main challenger (creator or first challenger who accepted)
+
+          if (isTournament) {
+            if (!showTournamentLobby) {
+              return null;
+            }
+            return (
+              <ElegantModal
+                isOpen={showTournamentLobby}
+                onClose={() => {
+                  setShowTournamentLobby(false);
+                  setSelectedChallenge(null);
+                }}
+                title={`${selectedChallenge.title || "Tournament"} Bracket`}
+              >
+                <TournamentBracketView
+                  tournament={selectedChallenge.rawData?.tournament}
+                  players={players}
+                  currentWallet={publicKey?.toString() || null}
+                  challengeId={selectedChallenge.id}
+                />
+              </ElegantModal>
+            );
+          }
+
+          // Standard challenge: keep current submit modal behavior
+          const isMainChallenger =
+            players.length >= 2 &&
+            currentWallet &&
+            (players[0]?.toLowerCase() === currentWallet ||
+              players[1]?.toLowerCase() === currentWallet);
+
           if (!isMainChallenger) {
             return null;
           }
-          
+
           return (
             <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div></div>}>
-        <SubmitResultRoom
-          isOpen={showSubmitResultModal}
-          onClose={() => {
-            setShowSubmitResultModal(false);
-                  // Delay clearing selectedChallenge to allow components to cleanup
+              <SubmitResultRoom
+                isOpen={showSubmitResultModal}
+                onClose={() => {
+                  setShowSubmitResultModal(false);
                   setTimeout(() => setSelectedChallenge(null), 100);
-          }}
+                }}
                 challengeId={selectedChallenge.id}
                 challengeTitle={selectedChallenge.title || ""}
-          currentWallet={publicKey?.toString() || ""}
-          onSubmit={handleSubmitResult}
-        />
+                currentWallet={publicKey?.toString() || ""}
+                onSubmit={handleSubmitResult}
+              />
             </Suspense>
           );
         })()}
@@ -4431,7 +4483,8 @@ const CreateChallengeModal: React.FC<{
     mode: 'Head-to-Head',
     customMode: '',
     rules: '',
-    customRules: false
+    customRules: false,
+    tournamentMaxPlayers: 8 as 4 | 8 | 16
   });
 
   const [currentStep, setCurrentStep] = useState(1);
@@ -4441,6 +4494,10 @@ const CreateChallengeModal: React.FC<{
   
   // Dynamic total steps based on mode
   const totalSteps = formData.mode === 'Custom Mode' ? 3 : 2;
+  const isTournamentMode = useMemo(() => {
+    const mode = formData.mode || '';
+    return mode.toLowerCase().includes('tournament');
+  }, [formData.mode]);
 
   // Available games for selection
   const availableGames = [
@@ -4457,18 +4514,19 @@ const CreateChallengeModal: React.FC<{
 
   // Platform options
   const platforms = ['PS5', 'Xbox', 'PC', 'Switch', 'Other/Custom'];
+  const tournamentPlayerOptions: Array<4 | 8 | 16> = [4, 8, 16];
 
   // Game-specific modes - Enhanced with competitive options
   const gameModes = {
-    'NBA 2K25': ['Head-to-Head (Full Game)', 'Best of 3 Series', 'Quick Match (2 Quarters)', 'Park Match (2v2/3v3)', 'Custom Challenge'],
-    'FIFA 24': ['Head-to-Head (Full Match)', 'Best of 3 Series', 'Quick Match (2 Halves)', 'Squad Match (2v2)', 'Custom Challenge'],
-    'Street Fighter 6': ['Versus Match', 'Best of 3 Series', 'Elimination Bracket', 'First to 5', 'Custom Challenge'],
-    'Call of Duty': ['Duel (1v1)', 'Squad Battle (2v2)', 'Full Lobby (5v5)', 'Battle Royale', 'Custom Challenge'],
-    'Tekken 8': ['Versus Match', 'Best of 3 Series', 'Elimination Bracket', 'First to 5', 'Custom Challenge'],
-    'Forza Horizon': ['Time Trial', 'Head-to-Head Race', 'Grand Prix Series', 'Drift Challenge', 'Custom Challenge'],
-    'Valorant': ['Duel (1v1)', 'Squad Battle (2v2)', 'Full Lobby (5v5)', 'Tournament Bracket', 'Custom Challenge'],
-    'Madden NFL 24': ['Head-to-Head (Full Game)', 'Best of 3 Series', 'Quick Match (2 Quarters)', 'Squad Match (2v2)', 'Custom Challenge'],
-    'Other/Custom': ['Custom Challenge']
+    'NBA 2K25': ['Head-to-Head (Full Game)', 'Best of 3 Series', 'Quick Match (2 Quarters)', 'Park Match (2v2/3v3)', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'FIFA 24': ['Head-to-Head (Full Match)', 'Best of 3 Series', 'Quick Match (2 Halves)', 'Squad Match (2v2)', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Street Fighter 6': ['Versus Match', 'Best of 3 Series', 'Elimination Bracket', 'First to 5', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Call of Duty': ['Duel (1v1)', 'Squad Battle (2v2)', 'Full Lobby (5v5)', 'Battle Royale', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Tekken 8': ['Versus Match', 'Best of 3 Series', 'Elimination Bracket', 'First to 5', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Forza Horizon': ['Time Trial', 'Head-to-Head Race', 'Grand Prix Series', 'Drift Challenge', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Valorant': ['Duel (1v1)', 'Squad Battle (2v2)', 'Full Lobby (5v5)', 'Tournament Bracket', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Madden NFL 24': ['Head-to-Head (Full Game)', 'Best of 3 Series', 'Quick Match (2 Quarters)', 'Squad Match (2v2)', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Other/Custom': ['Custom Challenge', 'Tournament (Bracket Mode)']
   };
 
   // Comprehensive preset JSON for game + mode combinations
@@ -4620,6 +4678,10 @@ const CreateChallengeModal: React.FC<{
         updateFormData({
           rules: preset.rules.join('\n• ')
         });
+      } else if (formData.mode === 'Tournament (Bracket Mode)') {
+        updateFormData({
+          rules: '• Single elimination bracket\n• Winners advance automatically\n• Entry fees locked until tournament ends\n• Submit results with proof each round\n• Disconnects = round loss unless rematch agreed'
+        });
       }
     }
   }, [formData.game, formData.mode, formData.customRules]);
@@ -4640,6 +4702,8 @@ const CreateChallengeModal: React.FC<{
         return "2 quarters only • No pause abuse • Standard teams only.";
       case "Park Match (2v2/3v3)":
         return "2v2 or 3v3 MyPlayer mode • No AI teammates • Win by 2.";
+      case "Tournament (Bracket Mode)":
+        return "Single-elimination bracket • Choose 4/8/16 players • Winners advance until a champion remains.";
       case "Custom Challenge":
         return "Add your own rules clearly and fairly. Unclear or unfair rules may be rejected.";
       default:
@@ -4691,6 +4755,14 @@ const CreateChallengeModal: React.FC<{
     if (isAdmin && entryFeeNum === 0) {
       // Valid - no error for Founder Challenges
     }
+
+    const isTournamentSelected = (formData.mode || '').toLowerCase().includes('tournament');
+    if (isTournamentSelected) {
+      const maxPlayers = Number(formData.tournamentMaxPlayers);
+      if (!tournamentPlayerOptions.includes(maxPlayers as 4 | 8 | 16)) {
+        errors.push('Select a valid bracket size (4, 8, or 16 players).');
+      }
+    }
     
     return errors;
   }, [formData]);
@@ -4724,8 +4796,35 @@ const CreateChallengeModal: React.FC<{
       return; // Don't submit if there are errors
     }
     
-    // Create the challenge
-    onCreateChallenge(formData);
+    // Create the challenge with tournament metadata when relevant
+    const selectedMode = formData.mode || '';
+    const isTournamentSelected = selectedMode.toLowerCase().includes('tournament');
+    const defaultMaxPlayers = selectedMode.includes('2v2')
+      ? 2
+      : selectedMode.includes('3v3')
+      ? 3
+      : selectedMode.includes('5v5')
+      ? 5
+      : 2;
+
+    const resolvedMaxPlayers = isTournamentSelected ? formData.tournamentMaxPlayers : defaultMaxPlayers;
+
+    const challengePayload = {
+      ...formData,
+      maxPlayers: resolvedMaxPlayers,
+      format: isTournamentSelected ? 'tournament' : 'standard',
+      tournament: isTournamentSelected
+        ? {
+            format: 'tournament',
+            maxPlayers: formData.tournamentMaxPlayers,
+            currentRound: 1,
+            stage: 'waiting_for_players',
+            bracket: []
+          }
+        : undefined
+    };
+
+    onCreateChallenge(challengePayload);
     onClose();
   }, [formData, onCreateChallenge, onClose, validateStep1, validateStep2]);
 
@@ -5011,6 +5110,32 @@ const CreateChallengeModal: React.FC<{
                       })()}
                     </div>
                   </div>
+
+              {isTournamentMode && (
+                <div className="mt-4">
+                  <label className="block text-xs font-semibold text-gray-300 mb-1">
+                    Bracket Size
+                  </label>
+                  <select
+                    value={formData.tournamentMaxPlayers}
+                    onChange={(e) =>
+                      updateFormData({
+                        tournamentMaxPlayers: Number(e.target.value) as 4 | 8 | 16
+                      })
+                    }
+                    className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-white focus:border-amber-400/60 focus:outline-none transition-all"
+                  >
+                    {tournamentPlayerOptions.map(option => (
+                      <option key={option} value={option}>
+                        {option} Players
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1.5">
+                    Single-elimination. Prize pool = entry fee × number of players.
+                  </p>
+                </div>
+              )}
                 </Field>
 
                 <div className="flex justify-end mt-6 mb-4 sticky bottom-0 bg-[#11051E] pt-4">
@@ -5234,24 +5359,36 @@ const JoinChallengeModal: React.FC<{
         await joinChallenge(challenge.id, walletAddress, true);
       } else {
         // Regular challenge - require on-chain transaction
-        if (!signTransaction) {
-          throw new Error('Wallet does not support transaction signing');
+        const format = ((challenge.rawData as any)?.format) || ((challenge.rawData as any)?.tournament ? 'tournament' : 'standard');
+        const isTournament = format === 'tournament';
+
+        if (isTournament) {
+          await joinChallenge(challenge.id, walletAddress);
+
+          const refreshed = await fetchChallengeById(challenge.id);
+          const merged = mergeChallengeDataForModal(challenge, refreshed);
+          setSelectedChallenge(merged);
+          setShowTournamentLobby(true);
+        } else {
+          if (!signTransaction) {
+            throw new Error('Wallet does not support transaction signing');
+          }
+        
+          // Step 1: Join on-chain (Solana transaction)
+          // Use the PDA from the challenge data, not the Firestore ID
+          const challengePDA = challenge.rawData?.pda || challenge.pda;
+          if (!challengePDA) {
+            throw new Error('Challenge has no on-chain PDA. Cannot join this challenge.');
+          }
+          
+          await joinChallengeOnChain(challengePDA, challenge.entryFee, walletAddress, {
+            signTransaction: signTransaction,
+            publicKey: publicKey
+          });
+          
+          // Step 2: Update Firestore
+          await joinChallenge(challenge.id, walletAddress);
         }
-      
-      // Step 1: Join on-chain (Solana transaction)
-      // Use the PDA from the challenge data, not the Firestore ID
-      const challengePDA = challenge.rawData?.pda || challenge.pda;
-      if (!challengePDA) {
-        throw new Error('Challenge has no on-chain PDA. Cannot join this challenge.');
-      }
-      
-      await joinChallengeOnChain(challengePDA, challenge.entryFee, walletAddress, {
-        signTransaction: signTransaction,
-        publicKey: publicKey
-      });
-      
-      // Step 2: Update Firestore
-      await joinChallenge(challenge.id, walletAddress);
       }
       
       // Refresh USDFG balance after successful challenge join (entry fee was deducted)

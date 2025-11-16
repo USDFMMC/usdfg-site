@@ -61,6 +61,8 @@ export interface ChallengeData {
   // UI fields (minimal for display)
   players?: string[];                 // Array of player wallets
   maxPlayers?: number;                // Maximum players allowed
+  format?: 'standard' | 'tournament'; // Challenge format. Default = standard (1v1)
+  tournament?: TournamentState;       // Tournament metadata when format === 'tournament'
   // Prize claim fields
   canClaim?: boolean;                 // Whether winner can claim prize
   payoutTriggered?: boolean;          // Whether prize has been claimed
@@ -76,6 +78,163 @@ export interface ChallengeData {
   // REMOVED: rules, mode, creatorTag, solanaAccountId, cancelRequests
   // These are not needed for leaderboard and increase storage costs unnecessarily
 }
+
+export type TournamentStage = 'waiting_for_players' | 'round_in_progress' | 'awaiting_results' | 'completed';
+export type BracketMatchStatus = 'waiting' | 'ready' | 'in-progress' | 'completed';
+
+export interface BracketMatch {
+  id: string;
+  round: number;
+  slot: number;
+  player1?: string;
+  player2?: string;
+  winner?: string;
+  status: BracketMatchStatus;
+  startedAt?: Timestamp;
+  completedAt?: Timestamp;
+}
+
+export interface BracketRound {
+  roundNumber: number;
+  matches: BracketMatch[];
+}
+
+export interface TournamentState {
+  format: 'tournament';
+  maxPlayers: number;
+  currentRound: number;
+  stage: TournamentStage;
+  bracket: BracketRound[];
+  champion?: string;
+}
+
+const createInitialBracket = (maxPlayers: number): BracketRound[] => {
+  const rounds: BracketRound[] = [];
+  let matchesInRound = maxPlayers / 2;
+  let roundNumber = 1;
+
+  while (matchesInRound >= 1) {
+    const matches: BracketMatch[] = Array.from({ length: matchesInRound }, (_, idx) => ({
+      id: `r${roundNumber}-m${idx + 1}`,
+      round: roundNumber,
+      slot: idx,
+      status: 'waiting',
+    }));
+
+    rounds.push({ roundNumber, matches });
+    matchesInRound = matchesInRound / 2;
+    roundNumber += 1;
+  }
+
+  return rounds;
+};
+
+const deepCloneBracket = (bracket: BracketRound[] | undefined): BracketRound[] => {
+  if (!bracket) return [];
+  return bracket.map(round => ({
+    roundNumber: round.roundNumber,
+    matches: round.matches.map(match => ({ ...match })),
+  }));
+};
+
+const seedPlayersIntoBracket = (bracket: BracketRound[], players: string[]): BracketRound[] => {
+  if (!bracket.length) return bracket;
+
+  const cloned = deepCloneBracket(bracket);
+  const firstRound = cloned[0];
+  if (!firstRound) {
+    return cloned;
+  }
+
+  let index = 0;
+  firstRound.matches.forEach(match => {
+    match.player1 = players[index++] || match.player1;
+    match.player2 = players[index++] || match.player2;
+
+    const hasBoth = Boolean(match.player1 && match.player2);
+    match.status = hasBoth ? (match.status === 'completed' ? 'completed' : 'ready') : 'waiting';
+  });
+
+  return cloned;
+};
+
+const ensureTournamentState = (
+  tournament: TournamentState | undefined,
+  maxPlayers: number
+): TournamentState => {
+  if (tournament && tournament.bracket?.length) {
+    return {
+      ...tournament,
+      maxPlayers: tournament.maxPlayers || maxPlayers,
+      format: 'tournament',
+    };
+  }
+
+  return {
+    format: 'tournament',
+    maxPlayers,
+    currentRound: 1,
+    stage: 'waiting_for_players',
+    bracket: createInitialBracket(maxPlayers),
+  };
+};
+
+const activateRoundMatches = (
+  bracket: BracketRound[],
+  roundNumber: number
+): BracketRound[] => {
+  return bracket.map(round => {
+    if (round.roundNumber !== roundNumber) {
+      return round;
+    }
+
+    return {
+      ...round,
+      matches: round.matches.map(match => {
+        const hasBothPlayers = Boolean(match.player1 && match.player2);
+        return {
+          ...match,
+          status: hasBothPlayers ? 'in-progress' : match.status,
+          startedAt: hasBothPlayers ? match.startedAt || Timestamp.now() : match.startedAt,
+        };
+      }),
+    };
+  });
+};
+
+const sanitizeTournamentState = (state: TournamentState): TournamentState => {
+  const sanitized: TournamentState = {
+    format: 'tournament',
+    maxPlayers: state.maxPlayers,
+    currentRound: state.currentRound,
+    stage: state.stage,
+    bracket: state.bracket.map(round => ({
+      roundNumber: round.roundNumber,
+      matches: round.matches.map(match => {
+        const sanitizedMatch: any = {
+          id: match.id,
+          round: match.round,
+          slot: match.slot,
+          status: match.status,
+        };
+
+        if (match.player1) sanitizedMatch.player1 = match.player1;
+        if (match.player2) sanitizedMatch.player2 = match.player2;
+        if (match.winner) sanitizedMatch.winner = match.winner;
+        if (match.startedAt) sanitizedMatch.startedAt = match.startedAt;
+        if (match.completedAt) sanitizedMatch.completedAt = match.completedAt;
+
+        return sanitizedMatch;
+      }),
+    })),
+  };
+
+  if (state.champion) {
+    sanitized.champion = state.champion;
+  }
+
+  return sanitized;
+};
 
 export type LockNotificationStatus = 'pending' | 'accepted' | 'cancelled' | 'completed';
 
@@ -144,6 +303,35 @@ export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'cr
         delete challengePayload[key];
       }
     });
+
+    const resolvedFormat: 'standard' | 'tournament' =
+      challengePayload.format === 'tournament' || challengePayload.tournament
+        ? 'tournament'
+        : 'standard';
+    challengePayload.format = resolvedFormat;
+
+    const resolvedMaxPlayers =
+      challengePayload.maxPlayers ||
+      (resolvedFormat === 'tournament'
+        ? challengePayload.tournament?.maxPlayers || 8
+        : 2);
+    challengePayload.maxPlayers = resolvedMaxPlayers;
+
+    if (resolvedFormat === 'tournament') {
+      const tournamentState = ensureTournamentState(
+        challengePayload.tournament,
+        resolvedMaxPlayers
+      );
+      tournamentState.bracket = seedPlayersIntoBracket(
+        tournamentState.bracket,
+        challengePayload.players
+      );
+      tournamentState.stage = 'waiting_for_players';
+      tournamentState.currentRound = 1;
+      challengePayload.tournament = sanitizeTournamentState(tournamentState);
+    } else {
+      delete challengePayload.tournament;
+    }
 
     const docRef = await addDoc(collection(db, "challenges"), challengePayload);
     
@@ -348,6 +536,12 @@ export const joinChallenge = async (challengeId: string, wallet: string, isFound
     }
 
     const data = snap.data() as ChallengeData;
+    const format = data.format || (data.tournament ? 'tournament' : 'standard');
+    const maxPlayers =
+      data.maxPlayers ||
+      (format === 'tournament'
+        ? data.tournament?.maxPlayers || 2
+        : 2);
     
     // Check if this is a team challenge with teamOnly restriction
     if (data.challengeType === 'team' && data.teamOnly === true) {
@@ -392,7 +586,7 @@ export const joinChallenge = async (challengeId: string, wallet: string, isFound
       // If challenger is not part of a team, they can accept as solo player (isTeam remains false)
     }
     
-    if (data.players && data.players.length >= data.maxPlayers) {
+    if (data.players && data.players.length >= maxPlayers) {
       throw new Error("Challenge already full");
     }
 
@@ -402,20 +596,46 @@ export const joinChallenge = async (challengeId: string, wallet: string, isFound
     }
 
     const newPlayers = data.players ? [...data.players, wallet] : [wallet];
-    const isFull = newPlayers.length >= data.maxPlayers;
+    const isFull = newPlayers.length >= maxPlayers;
 
-    // If challenge is now full, start result submission phase (2-hour timer)
     const updates: any = {
       players: newPlayers,
-      status: isFull ? "in-progress" : "active",
       joinedBy: arrayUnion(wallet),
       updatedAt: serverTimestamp(),
+      maxPlayers,
     };
 
-    if (isFull) {
-      // Set deadline to 2 hours from now for result submission
-      updates.resultDeadline = Timestamp.fromDate(new Date(Date.now() + 2 * 60 * 60 * 1000));
-      console.log('⏰ Challenge is full! Result submission phase started (2-hour deadline)');
+    if (format === 'tournament') {
+      const tournamentState = ensureTournamentState(
+        data.tournament,
+        maxPlayers
+      );
+      tournamentState.bracket = seedPlayersIntoBracket(
+        tournamentState.bracket,
+        newPlayers
+      );
+      tournamentState.stage = isFull
+        ? 'round_in_progress'
+        : 'waiting_for_players';
+      tournamentState.currentRound = tournamentState.currentRound || 1;
+
+      if (isFull) {
+        tournamentState.bracket = activateRoundMatches(
+          tournamentState.bracket,
+          tournamentState.currentRound
+        );
+      }
+
+      updates.tournament = sanitizeTournamentState(tournamentState);
+      updates.status = 'active';
+    } else {
+      updates.status = isFull ? "in-progress" : "active";
+
+      if (isFull) {
+        // Set deadline to 2 hours from now for result submission
+        updates.resultDeadline = Timestamp.fromDate(new Date(Date.now() + 2 * 60 * 60 * 1000));
+        console.log('⏰ Challenge is full! Result submission phase started (2-hour deadline)');
+      }
     }
 
     await updateDoc(challengeRef, updates);
