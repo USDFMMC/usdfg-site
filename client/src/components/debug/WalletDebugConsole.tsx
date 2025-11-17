@@ -41,6 +41,15 @@ export const WalletDebugConsole: React.FC = () => {
   // Add initial log to confirm component is rendering
   useEffect(() => {
     addLog('info', '🐛 Debug console initialized');
+    console.log('✅ WalletDebugConsole component mounted and visible');
+    // Force a visual indicator
+    if (typeof window !== 'undefined') {
+      const indicator = document.createElement('div');
+      indicator.id = 'debug-console-indicator';
+      indicator.style.cssText = 'position:fixed;top:0;left:0;width:100px;height:100px;background:red;z-index:9999999;pointer-events:none;opacity:0.3;';
+      document.body.appendChild(indicator);
+      setTimeout(() => indicator.remove(), 2000);
+    }
   }, []);
 
   // Monitor wallet state changes
