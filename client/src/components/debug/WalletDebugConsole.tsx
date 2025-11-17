@@ -23,7 +23,13 @@ export const WalletDebugConsole: React.FC = () => {
     };
   }
   
-  const { wallets, wallet, connected, connecting, publicKey } = walletContext;
+  const { wallets, wallet, connected, connecting, publicKey } = walletContext || {
+    wallets: [],
+    wallet: null,
+    connected: false,
+    connecting: false,
+    publicKey: null,
+  };
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isOpen, setIsOpen] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -42,13 +48,23 @@ export const WalletDebugConsole: React.FC = () => {
   useEffect(() => {
     addLog('info', '🐛 Debug console initialized');
     console.log('✅ WalletDebugConsole component mounted and visible');
-    // Force a visual indicator
+    
+    // Force a visual indicator - make it VERY obvious
     if (typeof window !== 'undefined') {
+      // Remove any existing indicator
+      const existing = document.getElementById('debug-console-indicator');
+      if (existing) existing.remove();
+      
       const indicator = document.createElement('div');
       indicator.id = 'debug-console-indicator';
-      indicator.style.cssText = 'position:fixed;top:0;left:0;width:100px;height:100px;background:red;z-index:9999999;pointer-events:none;opacity:0.3;';
+      indicator.innerHTML = '🐛 DEBUG CONSOLE LOADED';
+      indicator.style.cssText = 'position:fixed!important;top:0!important;left:0!important;width:200px!important;height:60px!important;background:red!important;color:white!important;z-index:99999999!important;pointer-events:none!important;opacity:0.9!important;display:flex!important;align-items:center!important;justify-content:center!important;font-weight:bold!important;font-size:14px!important;border:3px solid yellow!important;';
       document.body.appendChild(indicator);
-      setTimeout(() => indicator.remove(), 2000);
+      setTimeout(() => {
+        if (indicator.parentNode) {
+          indicator.remove();
+        }
+      }, 5000);
     }
   }, []);
 
