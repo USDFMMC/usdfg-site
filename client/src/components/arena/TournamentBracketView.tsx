@@ -32,16 +32,32 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   const findMatchForPlayer = (wallet?: string | null) => {
     if (!wallet) return null;
     const lower = wallet.toLowerCase();
+    
+    // First, try to find match in the current round (active match)
+    const currentRoundData = bracket.find(r => r.roundNumber === currentRound);
+    if (currentRoundData) {
+      for (const match of currentRoundData.matches) {
+        if (
+          (match.player1?.toLowerCase() === lower || match.player2?.toLowerCase() === lower) &&
+          match.status !== 'completed'
+        ) {
+          return { round: currentRoundData, match };
+        }
+      }
+    }
+    
+    // If no active match in current round, find any non-completed match
     for (const round of bracket) {
       for (const match of round.matches) {
         if (
-          match.player1?.toLowerCase() === lower ||
-          match.player2?.toLowerCase() === lower
+          (match.player1?.toLowerCase() === lower || match.player2?.toLowerCase() === lower) &&
+          match.status !== 'completed'
         ) {
           return { round, match };
         }
       }
     }
+    
     return null;
   };
 
@@ -53,12 +69,52 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
       ? playerMatch.match.player2
       : playerMatch.match.player1);
 
+  // Debug logging
+  if (playerMatch) {
+    console.log('🔍 Tournament Match Debug:', {
+      roundNumber: playerMatch.round.roundNumber,
+      matchId: playerMatch.match.id,
+      status: playerMatch.match.status,
+      player1: playerMatch.match.player1,
+      player2: playerMatch.match.player2,
+      currentWallet,
+      opponentWallet,
+      isFinal: playerMatch.round.roundNumber === bracket.length,
+      bracketLength: bracket.length
+    });
+  }
+
   const maxPlayers = tournament.maxPlayers || players.length;
   const currentPlayers = players.length;
   const isWaitingForPlayers = stage === 'waiting_for_players';
+  const isCompleted = stage === 'completed';
+  const champion = tournament.champion;
+  const isChampion = currentWallet && champion && currentWallet.toLowerCase() === champion.toLowerCase();
 
   return (
     <div className="space-y-4">
+      {isCompleted && champion && (
+        <div className="rounded-xl border border-amber-400/50 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 p-6 text-center">
+          <div className="text-4xl mb-2">🏆</div>
+          <div className="text-lg font-bold text-amber-200 mb-1">
+            Tournament Complete!
+          </div>
+          <div className="text-sm text-amber-100/90 mb-3">
+            Champion: <span className="font-semibold text-white">{champion.slice(0, 8)}...{champion.slice(-8)}</span>
+          </div>
+          {isChampion && (
+            <div className="mt-4 p-3 rounded-lg bg-emerald-500/20 border border-emerald-400/40">
+              <div className="text-sm font-semibold text-emerald-200 mb-1">
+                🎉 You Won!
+              </div>
+              <div className="text-xs text-emerald-100/80">
+                Return to the challenge list to claim your prize!
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {isWaitingForPlayers && (
         <div className="rounded-xl border border-blue-400/30 bg-blue-500/10 p-4 text-sm text-blue-100">
           <div className="text-xs uppercase tracking-widest text-blue-300">
@@ -73,28 +129,40 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
         </div>
       )}
 
-      {playerMatch && stage === 'round_in_progress' && (
+      {playerMatch && 
+       playerMatch.match.status !== 'completed' && 
+       opponentWallet && (
         <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">
           <div className="text-xs uppercase tracking-widest text-amber-300">
-            You're locked in
+            {playerMatch.round.roundNumber === bracket.length ? '🏆 FINAL MATCH' : "You're locked in"}
           </div>
           <div className="mt-2 text-base font-semibold text-white">
-            Round {playerMatch.round.roundNumber}:{" "}
+            {playerMatch.round.roundNumber === bracket.length ? 'Final' : `Round ${playerMatch.round.roundNumber}`}:{" "}
             {opponentWallet
               ? `${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}`
               : "Waiting for opponent"}
           </div>
           <p className="mt-1 text-xs text-amber-100/80">
-            Chat with your opponent and start the match. Submit results once
-            you finish—winner advances automatically.
+            {playerMatch.round.roundNumber === bracket.length 
+              ? "🏆 This is the FINAL! Winner takes the entire prize pool. Submit your result when ready."
+              : "Chat with your opponent and start the match. Submit results once you finish—winner advances automatically."}
           </p>
-          {opponentWallet && onOpenSubmitResult && playerMatch.match.status !== 'completed' && (
+          {onOpenSubmitResult ? (
             <button
-              onClick={() => onOpenSubmitResult(playerMatch.match.id, opponentWallet)}
+              onClick={() => {
+                console.log('🎯 Submit button clicked:', {
+                  matchId: playerMatch.match.id,
+                  opponentWallet,
+                  roundNumber: playerMatch.round.roundNumber
+                });
+                onOpenSubmitResult(playerMatch.match.id, opponentWallet);
+              }}
               className="mt-3 w-full rounded-lg bg-amber-400/20 px-4 py-2 text-sm font-semibold text-amber-200 transition-all hover:bg-amber-400/30 hover:shadow-[0_0_12px_rgba(255,215,130,0.3)] border border-amber-400/40"
             >
-              Submit Result
+              {playerMatch.round.roundNumber === bracket.length ? '🏆 Submit Final Result' : 'Submit Result'}
             </button>
+          ) : (
+            <div className="mt-3 text-xs text-red-400">⚠️ Submit handler not available</div>
           )}
         </div>
       )}

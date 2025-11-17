@@ -554,3 +554,105 @@ export async function resolveChallenge(
   
   return signature;
 }
+
+/**
+ * Transfer USDFG directly to escrow for tournament entry (bypasses AcceptChallenge)
+ * This is used when multiple players need to join the same challenge
+ */
+export async function transferTournamentEntryFee(
+  wallet: any,
+  connection: Connection,
+  challengePDA: string,
+  entryFeeUsdfg: number
+): Promise<string> {
+  if (!wallet || !wallet.publicKey) {
+    throw new Error('Wallet not connected');
+  }
+
+  const payer = new PublicKey(wallet.publicKey.toString());
+  const challengeAddress = new PublicKey(challengePDA);
+  
+  // Derive escrow token account PDA from challenge PDA (matches contract derivation)
+  const [escrowTokenAccountPDA] = PublicKey.findProgramAddressSync(
+    [SEEDS.ESCROW_WALLET, challengeAddress.toBuffer(), USDFG_MINT.toBuffer()],
+    PROGRAM_ID
+  );
+
+  // Get payer's token account
+  const payerTokenAccount = await getAssociatedTokenAddress(USDFG_MINT, payer);
+  
+  // Convert USDFG to lamports
+  const entryFeeLamports = Math.floor(entryFeeUsdfg * Math.pow(10, 9));
+  
+  // Check if payer's token account exists, create if it doesn't
+  const { getAccount, createAssociatedTokenAccountInstruction } = await import('@solana/spl-token');
+  const transaction = new Transaction();
+  let accountExists = false;
+  
+  try {
+    await getAccount(connection, payerTokenAccount);
+    accountExists = true;
+    console.log('✅ Payer token account exists');
+  } catch (error: any) {
+    // Token account doesn't exist, create it
+    if (error.name === 'TokenAccountNotFoundError' || error.message?.includes('could not find account')) {
+      console.log('📝 Creating payer token account...');
+      const createATAInstruction = createAssociatedTokenAccountInstruction(
+        payer,              // payer
+        payerTokenAccount,  // ata
+        payer,              // owner
+        USDFG_MINT          // mint
+      );
+      transaction.add(createATAInstruction);
+      accountExists = false; // Will exist after transaction
+    } else {
+      throw error;
+    }
+  }
+  
+  // Check payer's balance (only if account already exists)
+  // If we're creating the account, balance will be 0, so we'll check after creation
+  if (accountExists) {
+    try {
+      const accountInfo = await connection.getTokenAccountBalance(payerTokenAccount);
+      const balance = accountInfo.value.amount;
+      if (BigInt(balance) < BigInt(entryFeeLamports)) {
+        throw new Error(`Insufficient USDFG balance. Required: ${entryFeeUsdfg} USDFG, Available: ${Number(balance) / Math.pow(10, 9)} USDFG. Please acquire USDFG tokens first.`);
+      }
+      console.log(`✅ Payer has sufficient balance: ${Number(balance) / Math.pow(10, 9)} USDFG`);
+    } catch (error: any) {
+      if (error.message?.includes('Insufficient USDFG balance')) {
+        throw error; // Re-throw balance errors
+      }
+      throw new Error(`Failed to check token balance: ${error.message}`);
+    }
+  } else {
+    // Account is being created - user needs to have USDFG tokens first
+    // We can't check balance until after account creation, so we'll let the transfer fail if insufficient
+    console.log('⚠️ Token account will be created. User must have USDFG tokens to complete the transfer.');
+  }
+  
+  // Create transfer instruction
+  const { createTransferInstruction } = await import('@solana/spl-token');
+  const transferInstruction = createTransferInstruction(
+    payerTokenAccount,      // source
+    escrowTokenAccountPDA,  // destination (escrow)
+    payer,                  // owner
+    entryFeeLamports        // amount
+  );
+  
+  transaction.add(transferInstruction);
+  
+  const { blockhash } = await connection.getLatestBlockhash();
+  transaction.recentBlockhash = blockhash;
+  transaction.feePayer = payer;
+
+  const signedTransaction = await wallet.signTransaction(transaction);
+  const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+  await connection.confirmTransaction(signature);
+  
+  console.log('✅ Tournament entry fee transferred to escrow!');
+  console.log('🔗 Transaction:', `https://explorer.solana.com/tx/${signature}?cluster=devnet`);
+  
+  return signature;
+}

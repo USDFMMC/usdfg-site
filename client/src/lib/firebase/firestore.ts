@@ -364,11 +364,12 @@ export const submitTournamentMatchResult = async (
         'tournament.champion': winnerWallet,
         'tournament.stage': 'completed',
         'status': 'completed',
+        'canClaim': true, // Enable prize claiming for the champion
         updatedAt: serverTimestamp(),
       };
       
       await updateDoc(challengeRef, updates);
-      console.log('✅ Tournament completed! Champion:', winnerWallet);
+      console.log('✅ Tournament completed! Champion:', winnerWallet, '- Prize claiming enabled');
       return;
     }
 
@@ -502,11 +503,12 @@ export const advanceBracketWinner = async (
         'tournament.champion': winnerWallet,
         'tournament.stage': 'completed',
         'status': 'completed',
+        'canClaim': true, // Enable prize claiming for the champion
         updatedAt: serverTimestamp(),
       };
       
       await updateDoc(challengeRef, updates);
-      console.log('✅ Tournament completed! Champion:', winnerWallet);
+      console.log('✅ Tournament completed! Champion:', winnerWallet, '- Prize claiming enabled');
       return;
     }
 

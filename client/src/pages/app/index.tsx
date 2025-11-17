@@ -196,6 +196,16 @@ const ArenaHome: React.FC = () => {
       return '/assets/categories/sports.png'; // Default fallback
     }
     
+    // Check for FIFA or FC games - use soccer.png (check this FIRST before category check)
+    const lowerGame = game.toLowerCase().trim();
+    if (lowerGame.includes('fifa') || 
+        lowerGame.startsWith('fc') || 
+        lowerGame.includes('fc 26') || 
+        lowerGame.includes('fc26') || 
+        lowerGame.includes('fc ')) {
+      return '/assets/categories/soccer.png';
+    }
+    
     const category = getGameCategory(game);
     
     switch (category) {
@@ -1464,11 +1474,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Create connection to devnet
       const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
       
-      // Small delay for mobile Phantom to fully initialize
-      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-      
       // Get the most up-to-date wallet state
       const phantomWallet = wallet.wallets.find(w => w.adapter.name === 'Phantom');
       const adapterPublicKey = phantomWallet?.adapter?.publicKey;
@@ -1498,12 +1503,28 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       }
       
-      // Calculate prize pool (for Founder Challenges, admin sets prize pool manually)
+      // Calculate prize pool
+      // For Founder Challenges: admin sets prize pool manually (no platform fee)
+      // For tournaments: entryFee * maxPlayers minus 5% platform fee
       // For regular challenges: 2x entry fee minus 5% platform fee
-      // For Founder Challenges: prize pool is set separately by admin
+      const isTournament = challengeData.format === 'tournament' || challengeData.tournament;
       const platformFee = 0.05; // 5% platform fee
-      const totalPrize = isFounderChallenge ? (challengeData.prizePool || 0) : challengeData.entryFee * 2;
-      const prizePool = isFounderChallenge ? (challengeData.prizePool || 0) : totalPrize - (totalPrize * platformFee);
+      
+      let totalPrize: number;
+      if (isFounderChallenge) {
+        totalPrize = challengeData.prizePool || 0;
+      } else if (isTournament) {
+        // Tournament: all entry fees collected
+        totalPrize = challengeData.entryFee * maxPlayers;
+      } else {
+        // Regular 1v1 challenge: 2x entry fee
+        totalPrize = challengeData.entryFee * 2;
+      }
+      
+      // Apply platform fee to all challenges except Founder Challenges
+      const prizePool = isFounderChallenge 
+        ? totalPrize 
+        : totalPrize - (totalPrize * platformFee);
       
       
       // Create Firestore challenge data
@@ -2886,6 +2907,56 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           )}
                         </div>
                         
+                        {/* Show tournament champion for completed tournaments - placed prominently after status */}
+                        {challenge.status === "completed" && (() => {
+                          const format = challenge.rawData?.format || (challenge.rawData?.tournament ? 'tournament' : 'standard');
+                          const isTournament = format === 'tournament';
+                          const champion = challenge.rawData?.tournament?.champion;
+                          
+                          if (isTournament && champion) {
+                            const isCurrentUser = currentWallet && champion.toLowerCase() === currentWallet.toLowerCase();
+                            return (
+                              <div className="mb-2 px-3 py-2 rounded border border-amber-400/30 bg-amber-500/5 relative z-10">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <span className="text-sm">🏆</span>
+                                    <span className="text-xs font-medium text-amber-200/90">Champion:</span>
+                                    <span className="text-xs text-gray-300 truncate">
+                                      {isCurrentUser ? (
+                                        <span className="text-emerald-400 font-semibold">You</span>
+                                      ) : (
+                                        <span>{champion.slice(0, 6)}...{champion.slice(-4)}</span>
+                                      )}
+                                    </span>
+                                  </div>
+                                  {isCurrentUser && challenge.rawData?.canClaim && !challenge.rawData?.payoutTriggered && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleClaimPrize(challenge);
+                                      }}
+                                      disabled={claimingPrize === challenge.id}
+                                      className={`px-3 py-1 text-xs font-semibold text-white rounded transition-all flex-shrink-0 ${
+                                        claimingPrize === challenge.id
+                                          ? 'bg-gray-500 cursor-not-allowed'
+                                          : 'bg-gradient-to-r from-green-600 to-emerald-500 hover:brightness-110'
+                                      }`}
+                                    >
+                                      {claimingPrize === challenge.id ? '⏳' : `Claim ${challenge.prizePool} USDFG`}
+                                    </button>
+                                  )}
+                                  {isCurrentUser && challenge.rawData?.payoutTriggered && (
+                                    <span className="px-2 py-1 text-xs bg-green-600/20 text-green-400 border border-green-600/30 rounded flex-shrink-0">
+                                      ✅ Claimed
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                        
                         <div className="relative z-10 grid grid-cols-3 gap-2 mb-2">
                           <div className="text-center">
                             <div className={`font-bold text-sm drop-shadow-[0_0_8px_rgba(255,215,130,0.2)] ${
@@ -3005,9 +3076,26 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                     return null;
                                   })()}
                                   
-                                  {challenge.rawData.winner?.toString()?.toLowerCase() === publicKey?.toString().toLowerCase() && (
-                                    <>
-                                      <p className="text-green-400 font-semibold mt-1.5 text-sm">🎉 You Won!</p>
+                                  {(() => {
+                                    // Check if user is winner (for tournaments, check champion; for regular, check winner)
+                                    const format = challenge.rawData?.format || (challenge.rawData?.tournament ? 'tournament' : 'standard');
+                                    const isTournament = format === 'tournament';
+                                    const tournamentChampion = challenge.rawData?.tournament?.champion;
+                                    const regularWinner = challenge.rawData?.winner;
+                                    const currentWalletLower = publicKey?.toString().toLowerCase();
+                                    
+                                    const isWinner = currentWalletLower && (
+                                      (isTournament && tournamentChampion?.toLowerCase() === currentWalletLower) ||
+                                      (!isTournament && regularWinner?.toLowerCase() === currentWalletLower)
+                                    );
+                                    
+                                    if (!isWinner) return null;
+                                    
+                                    return (
+                                      <>
+                                        <p className="text-green-400 font-semibold mt-1.5 text-sm">
+                                          {isTournament ? '🏆 Tournament Champion!' : '🎉 You Won!'}
+                                        </p>
                                       {/* Claim Reward Button - Hide for Founder Challenges */}
                                       {(() => {
                                         const founderChallenge = isFounderChallenge(challenge);
@@ -3060,7 +3148,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                         return null;
                                       })()}
                                     </>
-                                  )}
+                                    );
+                                  })()}
                                 </>
                               )}
                             </div>
@@ -3314,7 +3403,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
                           if (challenge.status === "completed") {
                             // Check if current user is the winner and can claim prize
-                            const isWinner = currentWallet && challenge.rawData?.winner?.toLowerCase() === currentWallet;
+                            // For tournaments, check tournament.champion; for regular challenges, check winner
+                            const format = challenge.rawData?.format || (challenge.rawData?.tournament ? 'tournament' : 'standard');
+                            const isTournament = format === 'tournament';
+                            const tournamentChampion = challenge.rawData?.tournament?.champion;
+                            const regularWinner = challenge.rawData?.winner;
+                            
+                            const isWinner = currentWallet && (
+                              (isTournament && tournamentChampion?.toLowerCase() === currentWallet) ||
+                              (!isTournament && regularWinner?.toLowerCase() === currentWallet)
+                            );
                             const founderChallenge = isFounderChallenge(challenge);
                             
                             // For Founder Challenges, prizes are transferred manually - don't show claim button
@@ -4110,65 +4208,24 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           <CreateChallengeForm
             isConnected={isConnected}
             onConnect={async () => {
-              // Check if mobile
-              const isMobile = typeof window !== 'undefined' && (
-                /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-                window.innerWidth < 768 ||
-                'ontouchstart' in window
-              );
-              
-              const isPhantomInjected = typeof window !== 'undefined' && (
-                (window as any).phantom?.solana?.isPhantom ||
-                (window as any).solana?.isPhantom ||
-                (window as any).solflare?.isSolflare ||
-                typeof (window as any).solana !== 'undefined'
-              );
-              
-              // Find Phantom wallet
-              let phantomWallet = wallet.wallets.find(w => w.adapter.name === 'Phantom');
-              
-              // On mobile, wait for wallets to load if needed
-              if (isMobile && !phantomWallet && wallet.wallets.length === 0) {
-                for (let i = 0; i < 6; i++) {
-                  await new Promise(resolve => setTimeout(resolve, 500));
-                  phantomWallet = wallet.wallets.find(w => w.adapter.name === 'Phantom');
-                  if (phantomWallet) break;
-                }
-              }
-              
-              if (phantomWallet) {
-                wallet.select(phantomWallet.adapter.name);
-                try {
-                  await phantomWallet.adapter.connect();
-                  
-                  // Wait for state to update (both hook and adapter state)
-                  let attempts = 0;
-                  while (attempts < 30) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    const adapterConnected = phantomWallet.adapter.connected || phantomWallet.adapter.publicKey !== null;
-                    const hookConnected = connected || publicKey !== null;
-                    if (adapterConnected && hookConnected) {
-                      // Force a state update by triggering a re-render
-                      // The useEffect hooks will pick up the new state
-                      break;
-                    }
-                    attempts++;
+              // Use standard wallet adapter connection
+              // Wallet adapter will handle mobile/desktop automatically
+              try {
+                // Try to find a wallet (prefer Phantom, then Mobile, then first available)
+                const walletToConnect = wallet.wallets.find(w => w.adapter.name === 'Phantom') ||
+                                       wallet.wallets.find(w => w.adapter.name === 'Mobile Wallet Adapter') ||
+                                       wallet.wallets[0];
+                
+                if (walletToConnect) {
+                  wallet.select(walletToConnect.adapter.name);
+                  if (wallet.connect) {
+                    await wallet.connect();
+                  } else {
+                    await walletToConnect.adapter.connect();
                   }
-                  
-                  // Additional wait for React state to propagate
-                  await new Promise(resolve => setTimeout(resolve, 300));
+                }
                 } catch (error) {
                   console.error('Connection error:', error);
-                  // On mobile, try redirecting to Phantom app if connection fails
-                  if (isMobile && !isPhantomInjected) {
-                    const currentUrl = window.location.href;
-                    window.location.href = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}`;
-                  }
-                }
-              } else if (isMobile && !isPhantomInjected) {
-                // Redirect to Phantom app on mobile if wallet not found
-                const currentUrl = window.location.href;
-                window.location.href = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}`;
               }
             }}
             onCreateChallenge={handleCreateChallenge}
@@ -5432,16 +5489,9 @@ const JoinChallengeModal: React.FC<{
   const [connecting, setConnecting] = useState(false);
 
   const handleConnect = () => {
-    // Check if mobile
-    const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    if (isMobile) {
-      // Open in Phantom app on mobile
-      window.open('https://phantom.app/ul/browse/' + encodeURIComponent(window.location.href), '_blank');
-    } else {
-      // Desktop: close modal and let user connect via main button
+    // Close modal and let user connect via main button
+    // Wallet adapter will handle mobile/desktop connection automatically
       onClose();
-    }
   };
 
   const handleJoin = async () => {
@@ -5485,13 +5535,53 @@ const JoinChallengeModal: React.FC<{
         // (via recordFounderChallengeReward function called after token transfer)
         await joinChallenge(challenge.id, walletAddress, true);
       } else {
-        // Regular challenge - require on-chain transaction
+        // Regular challenge or tournament - require on-chain transaction for entry fee
+        if (!signTransaction) {
+          throw new Error('Wallet does not support transaction signing');
+        }
+      
+        // Step 1: Join on-chain (Solana transaction) - ALL players must pay entry fee
+      // Use the PDA from the challenge data, not the Firestore ID
+      const challengePDA = challenge.rawData?.pda || challenge.pda;
+      if (!challengePDA) {
+        throw new Error('Challenge has no on-chain PDA. Cannot join this challenge.');
+      }
+      
         const format = ((challenge.rawData as any)?.format) || ((challenge.rawData as any)?.tournament ? 'tournament' : 'standard');
         const isTournament = format === 'tournament';
-
+        
+        // For tournaments, use direct transfer to escrow (bypasses AcceptChallenge limitation)
+        // For regular challenges, use the standard AcceptChallenge instruction
         if (isTournament) {
-          await joinChallenge(challenge.id, walletAddress);
-
+          // Tournament: Transfer USDFG directly to escrow
+          const { Connection, clusterApiUrl } = await import('@solana/web3.js');
+          const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
+          const { transferTournamentEntryFee } = await import('@/lib/chain/contract');
+          
+          await transferTournamentEntryFee(
+            { signTransaction, publicKey },
+            connection,
+            challengePDA,
+            challenge.entryFee
+          );
+        } else {
+          // Regular challenge: Use standard AcceptChallenge instruction
+          try {
+      await joinChallengeOnChain(challengePDA, challenge.entryFee, walletAddress, {
+        signTransaction: signTransaction,
+        publicKey: publicKey
+      });
+          } catch (onChainError: any) {
+            // Re-throw errors for regular challenges
+            throw onChainError;
+          }
+        }
+      
+      // Step 2: Update Firestore
+      await joinChallenge(challenge.id, walletAddress);
+        
+        // Step 3: For tournaments, open the tournament lobby
+        if (isTournament) {
           try {
             const refreshed = await fetchChallengeById(challenge.id);
             const merged = mergeChallengeDataForModal(challenge, refreshed);
@@ -5506,25 +5596,6 @@ const JoinChallengeModal: React.FC<{
             }, 1500);
             return; // Exit early since we've already handled success
           }
-        } else {
-        if (!signTransaction) {
-          throw new Error('Wallet does not support transaction signing');
-        }
-      
-      // Step 1: Join on-chain (Solana transaction)
-      // Use the PDA from the challenge data, not the Firestore ID
-      const challengePDA = challenge.rawData?.pda || challenge.pda;
-      if (!challengePDA) {
-        throw new Error('Challenge has no on-chain PDA. Cannot join this challenge.');
-      }
-      
-      await joinChallengeOnChain(challengePDA, challenge.entryFee, walletAddress, {
-        signTransaction: signTransaction,
-        publicKey: publicKey
-      });
-      
-      // Step 2: Update Firestore
-      await joinChallenge(challenge.id, walletAddress);
         }
       }
       
@@ -5552,8 +5623,10 @@ const JoinChallengeModal: React.FC<{
         errorMessage = 'This challenge has expired and is no longer available to join.';
       } else if (err.message?.includes('Challenge has expired')) {
         errorMessage = 'This challenge has expired and is no longer available to join.';
-      } else if (err.message?.includes('InsufficientFunds')) {
-        errorMessage = 'You don\'t have enough USDFG tokens to join this challenge.';
+      } else if (err.message?.includes('InsufficientFunds') || err.message?.includes('Insufficient USDFG balance')) {
+        errorMessage = 'You don\'t have enough USDFG tokens to join this challenge. Please acquire USDFG tokens first.';
+      } else if (err.message?.includes('no record of a prior credit') || err.message?.includes('Attempt to debit an account')) {
+        errorMessage = 'Your USDFG token account needs to be set up and funded. Please ensure you have USDFG tokens in your wallet before joining.';
       } else if (err.message?.includes('SelfChallenge')) {
         errorMessage = 'You cannot join your own challenge.';
       } else if (err.message?.includes('NotOpen')) {
@@ -5561,7 +5634,12 @@ const JoinChallengeModal: React.FC<{
       } else if (err.message?.includes('already been processed')) {
         errorMessage = 'This challenge has already been joined or processed. Please refresh the page to see the latest status.';
       } else if (err.message?.includes('Transaction simulation failed')) {
+        // Check for specific simulation errors
+        if (err.message?.includes('no record of a prior credit') || err.message?.includes('Attempt to debit')) {
+          errorMessage = 'Your wallet needs USDFG tokens to join. Please acquire USDFG tokens first.';
+        } else {
         errorMessage = 'Transaction failed. This challenge may have already been joined or is no longer available.';
+        }
       } else if (err.message) {
         errorMessage = err.message;
       }
