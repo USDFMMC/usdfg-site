@@ -92,12 +92,13 @@ export const MWAProvider: FC<{ children: ReactNode }> = ({ children }) => {
   }, []);
 
   // Configure wallet adapters
-  // SolanaMobileWalletAdapter enables smooth Safari → Phantom → Safari flow on mobile browsers
-  // PhantomWalletAdapter and SolflareWalletAdapter handle desktop and mobile browser wallets
+  // CRITICAL: SolanaMobileWalletAdapter MUST be first to enable Safari → Phantom → Safari flow
+  // This prevents deep link fallback and ensures MWA is used on mobile browsers
   const wallets = useMemo(() => {
     const adapters = [];
     
-    // Add Mobile Wallet Adapter for seamless mobile browser experience
+    // Add Mobile Wallet Adapter FIRST for seamless mobile browser experience
+    // MWA must be first in the array to take priority over Phantom's deep link fallback
     try {
       const mobileAdapter = new SolanaMobileWalletAdapter({
         addressSelector: createDefaultAddressSelector(),
@@ -111,16 +112,23 @@ export const MWAProvider: FC<{ children: ReactNode }> = ({ children }) => {
         onWalletNotFound: createDefaultWalletNotFoundHandler(),
       });
       adapters.push(mobileAdapter);
+      console.log('✅ Mobile Wallet Adapter initialized:', mobileAdapter.name);
     } catch (error) {
       console.warn('⚠️ Mobile Wallet Adapter initialization failed (non-fatal):', error);
       // Continue without MWA - Phantom/Solflare will still work
     }
     
-    // Add standard wallet adapters
-    adapters.push(
-      new PhantomWalletAdapter(),
-      new SolflareWalletAdapter(),
-    );
+    // Add standard wallet adapters AFTER MWA
+    // These will be used as fallbacks if MWA is not available
+    const phantomAdapter = new PhantomWalletAdapter();
+    const solflareAdapter = new SolflareWalletAdapter();
+    adapters.push(phantomAdapter, solflareAdapter);
+    
+    // Log all adapter names for debugging
+    console.log('📋 Available wallet adapters (in priority order):');
+    adapters.forEach((adapter, index) => {
+      console.log(`  ${index + 1}. ${adapter.name} (readyState: ${adapter.readyState})`);
+    });
     
     return adapters;
   }, []);

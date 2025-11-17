@@ -81,16 +81,26 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   }, [connected, publicKey, onConnect, onDisconnect, connection]);
 
   // Handle wallet selection and connection
+  // CRITICAL: MWA must be selected first to enable Safari → Phantom → Safari flow
+  // Selecting Phantom first triggers deep link fallback, which breaks the flow
   const handleConnect = async () => {
     if (connected) return;
     if (connecting) return;
 
     try {
-      // Try to find a wallet (prefer Phantom, then Mobile Wallet Adapter, then first available)
-      let walletToConnect = wallets.find(w => w.adapter.name === 'Phantom') ||
-                           wallets.find(w => w.adapter.name === 'Solana Mobile Wallet Adapter') ||
-                           wallets.find(w => w.adapter.name === 'Mobile Wallet Adapter') ||
-                           wallets[0];
+      // Log all available adapters for debugging
+      console.log('🔍 Available wallets for connection:');
+      wallets.forEach((w, i) => {
+        console.log(`  ${i + 1}. ${w.adapter.name} (readyState: ${w.adapter.readyState})`);
+      });
+      
+      // CRITICAL: Prioritize MWA first to prevent deep link fallback
+      // MWA enables Safari → Phantom → Safari flow on mobile browsers
+      // Only fall back to Phantom if MWA is not available
+      let walletToConnect = wallets.find(w => 
+        w.adapter.name === 'Solana Mobile Wallet Adapter' || 
+        w.adapter.name === 'Mobile Wallet Adapter'
+      ) || wallets.find(w => w.adapter.name === 'Phantom') || wallets[0];
 
       if (!walletToConnect) {
         logWalletEvent('error', { message: 'No wallet adapter available' });
@@ -98,6 +108,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         return;
       }
 
+      console.log(`🎯 Selected wallet: ${walletToConnect.adapter.name}`);
       logWalletEvent('selecting', { adapter: walletToConnect.adapter.name });
       
       // Select the wallet first

@@ -4208,20 +4208,27 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           <CreateChallengeForm
             isConnected={isConnected}
             onConnect={async () => {
-              // Use standard wallet adapter connection
-              // Wallet adapter will handle mobile/desktop automatically
+              // CRITICAL: Prioritize MWA first to enable Safari → Phantom → Safari flow
+              // Selecting Phantom first triggers deep link fallback, which breaks the flow
               try {
-                // Try to find a wallet (prefer Phantom, then Mobile Wallet Adapter, then first available)
-                const walletToConnect = wallet.wallets.find(w => w.adapter.name === 'Phantom') ||
-                                       wallet.wallets.find(w => w.adapter.name === 'Solana Mobile Wallet Adapter') ||
-                                       wallet.wallets.find(w => w.adapter.name === 'Mobile Wallet Adapter') ||
-                                       wallet.wallets[0];
+                // Log all available adapters for debugging
+                console.log('🔍 Available wallets for connection:');
+                wallet.wallets.forEach((w, i) => {
+                  console.log(`  ${i + 1}. ${w.adapter.name} (readyState: ${w.adapter.readyState})`);
+                });
+                
+                // CRITICAL: Prioritize MWA first to prevent deep link fallback
+                const walletToConnect = wallet.wallets.find(w => 
+                  w.adapter.name === 'Solana Mobile Wallet Adapter' || 
+                  w.adapter.name === 'Mobile Wallet Adapter'
+                ) || wallet.wallets.find(w => w.adapter.name === 'Phantom') || wallet.wallets[0];
                 
                 if (walletToConnect) {
+                  console.log(`🎯 Selected wallet: ${walletToConnect.adapter.name}`);
                   wallet.select(walletToConnect.adapter.name);
                   
                   // Wait for selection to complete
-                    await new Promise(resolve => setTimeout(resolve, 100));
+                  await new Promise(resolve => setTimeout(resolve, 100));
                   
                   // Connect using the adapter's connect method directly
                   await walletToConnect.adapter.connect();
@@ -4229,7 +4236,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                   alert('No wallet detected. Please install Phantom or another Solana wallet.');
                 }
               } catch (error: any) {
-                  console.error('Connection error:', error);
+                console.error('Connection error:', error);
                 if (!error.message?.includes('User rejected') && !error.message?.includes('User cancelled')) {
                   alert(`Connection failed: ${error.message || 'Unknown error'}`);
                 }
