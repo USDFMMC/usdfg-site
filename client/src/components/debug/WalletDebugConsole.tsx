@@ -106,11 +106,11 @@ export const WalletDebugConsole: React.FC = () => {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 z-[999999] bg-amber-600 text-white px-4 py-3 rounded-lg text-sm font-bold border-2 border-amber-400 shadow-lg"
+        className="fixed top-4 left-4 z-[999999] bg-red-600 text-white px-4 py-3 rounded-lg text-sm font-bold border-2 border-red-400 shadow-lg"
         style={{ 
           position: 'fixed',
-          bottom: '16px',
-          right: '16px',
+          top: '16px',
+          left: '16px',
           zIndex: 999999
         }}
       >
@@ -121,18 +121,18 @@ export const WalletDebugConsole: React.FC = () => {
 
   return (
     <div 
-      className="fixed bottom-4 right-4 z-[999999] w-[90vw] max-w-[400px] max-h-[60vh] bg-black/98 border-2 border-amber-500 rounded-lg shadow-2xl flex flex-col text-xs"
+      className="fixed top-4 left-4 z-[999999] w-[90vw] max-w-[400px] max-h-[60vh] bg-black/98 border-2 border-red-500 rounded-lg shadow-2xl flex flex-col text-xs"
       style={{ 
         position: 'fixed',
-        bottom: '16px',
-        right: '16px',
+        top: '16px',
+        left: '16px',
         zIndex: 999999
       }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-2 border-b border-amber-500/30">
+      <div className="flex items-center justify-between p-2 border-b border-red-500/30 bg-red-900/20">
         <div className="flex items-center gap-2">
-          <span className="text-amber-400 font-bold">🐛 Wallet Debug</span>
+          <span className="text-red-400 font-bold text-sm">🐛 Wallet Debug</span>
           <span className="text-gray-400 text-[10px]">
             {connected ? '🟢' : connecting ? '🔄' : '⚪'}
           </span>
@@ -157,11 +157,11 @@ export const WalletDebugConsole: React.FC = () => {
       {!isMinimized && (
         <>
           {/* Current State */}
-          <div className="p-2 border-b border-amber-500/20 bg-black/50">
+          <div className="p-2 border-b border-red-500/20 bg-black/50">
             <div className="text-gray-300 space-y-1">
               <div>
                 <span className="text-gray-500">Selected:</span>{' '}
-                <span className="text-amber-400">
+                <span className="text-red-400 font-semibold">
                   {wallet?.adapter.name || 'None'}
                 </span>
               </div>
@@ -207,7 +207,7 @@ export const WalletDebugConsole: React.FC = () => {
           </div>
 
           {/* Footer */}
-          <div className="p-2 border-t border-amber-500/20 text-[10px] text-gray-500 text-center">
+          <div className="p-2 border-t border-red-500/20 text-[10px] text-gray-500 text-center">
             {logs.length} logs
           </div>
         </>
