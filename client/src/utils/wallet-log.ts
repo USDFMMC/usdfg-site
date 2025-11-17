@@ -44,6 +44,13 @@ export function logWalletEvent(
 
   console.log(`${emoji} [Wallet] ${event}`, logEntry);
 
+  // Dispatch custom event for debug console
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('walletEvent', {
+      detail: { type: event, data: logEntry }
+    }));
+  }
+
   // Detect adapter type
   if (data.adapter) {
     const isMobile = data.adapter === 'Mobile Wallet Adapter' || 
