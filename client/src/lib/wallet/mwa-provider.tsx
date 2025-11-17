@@ -4,6 +4,12 @@ import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { clusterApiUrl } from '@solana/web3.js';
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
 import { SolflareWalletAdapter } from '@solana/wallet-adapter-solflare';
+import {
+  SolanaMobileWalletAdapter,
+  createDefaultAddressSelector,
+  createDefaultAuthorizationResultCache,
+  createDefaultWalletNotFoundHandler,
+} from '@solana-mobile/wallet-adapter-mobile';
 
 // Import wallet adapter styles
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -86,12 +92,38 @@ export const MWAProvider: FC<{ children: ReactNode }> = ({ children }) => {
   }, []);
 
   // Configure wallet adapters
-  // PhantomWalletAdapter and SolflareWalletAdapter handle both desktop and mobile browser wallets
-  // They automatically detect and work with mobile wallet browser extensions
-  const wallets = useMemo(() => [
-    new PhantomWalletAdapter(),
-    new SolflareWalletAdapter(),
-  ], []);
+  // SolanaMobileWalletAdapter enables smooth Safari → Phantom → Safari flow on mobile browsers
+  // PhantomWalletAdapter and SolflareWalletAdapter handle desktop and mobile browser wallets
+  const wallets = useMemo(() => {
+    const adapters = [];
+    
+    // Add Mobile Wallet Adapter for seamless mobile browser experience
+    try {
+      const mobileAdapter = new SolanaMobileWalletAdapter({
+        addressSelector: createDefaultAddressSelector(),
+        appIdentity: {
+          name: 'USDFG',
+          uri: typeof window !== 'undefined' ? window.location.origin : 'https://usdfg.pro',
+          icon: '/favicon.png',
+        },
+        authorizationResultCache: createDefaultAuthorizationResultCache(),
+        chain: 'devnet',
+        onWalletNotFound: createDefaultWalletNotFoundHandler(),
+      });
+      adapters.push(mobileAdapter);
+    } catch (error) {
+      console.warn('⚠️ Mobile Wallet Adapter initialization failed (non-fatal):', error);
+      // Continue without MWA - Phantom/Solflare will still work
+    }
+    
+    // Add standard wallet adapters
+    adapters.push(
+      new PhantomWalletAdapter(),
+      new SolflareWalletAdapter(),
+    );
+    
+    return adapters;
+  }, []);
 
   return (
     <ConnectionProvider endpoint={endpoint}>
