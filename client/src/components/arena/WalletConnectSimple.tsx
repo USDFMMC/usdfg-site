@@ -86,8 +86,9 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     if (connecting) return;
 
     try {
-      // Try to find a wallet (prefer Phantom, then Mobile, then first available)
+      // Try to find a wallet (prefer Phantom, then Mobile Wallet Adapter, then first available)
       let walletToConnect = wallets.find(w => w.adapter.name === 'Phantom') ||
+                           wallets.find(w => w.adapter.name === 'Solana Mobile Wallet Adapter') ||
                            wallets.find(w => w.adapter.name === 'Mobile Wallet Adapter') ||
                            wallets[0];
 
@@ -98,23 +99,44 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       }
 
       logWalletEvent('selecting', { adapter: walletToConnect.adapter.name });
+      
+      // Select the wallet first
       select(walletToConnect.adapter.name);
       
-      // Connect using the adapter
-      if (connect) {
-        await connect();
-        logWalletEvent('connect_called', { adapter: walletToConnect.adapter.name });
-      } else {
-        // Fallback: use adapter's connect method directly
-        await walletToConnect.adapter.connect();
-        logWalletEvent('connect_direct', { adapter: walletToConnect.adapter.name });
+      // Wait for the selection to complete and wallet to be ready
+      // Check if wallet is ready, with a timeout
+      let attempts = 0;
+      const maxAttempts = 10;
+      while (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        // Check if the selected wallet is ready
+        const selectedWallet = wallets.find(w => w.adapter.name === walletToConnect.adapter.name);
+        if (selectedWallet && selectedWallet.adapter.readyState === 'Installed') {
+          break;
+        }
+        attempts++;
       }
+      
+      // Connect using the adapter's connect method directly
+      // This is more reliable than using the hook's connect() function
+      await walletToConnect.adapter.connect();
+      logWalletEvent('connect_called', { adapter: walletToConnect.adapter.name });
     } catch (error: any) {
       logWalletEvent('error', { 
         message: error.message || 'Connection failed',
         error: String(error)
       });
       console.error('Connection error:', error);
+      
+      // Show user-friendly error message
+      if (error.message?.includes('WalletNotSelectedError') || error.name === 'WalletNotSelectedError') {
+        alert('Please select a wallet from the list and try again.');
+      } else if (error.message?.includes('User rejected') || error.message?.includes('User cancelled')) {
+        // User cancelled - don't show error, just log it
+        console.log('User cancelled wallet connection');
+      } else {
+        alert(`Connection failed: ${error.message || 'Unknown error'}`);
+      }
     }
   };
 

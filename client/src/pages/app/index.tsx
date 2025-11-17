@@ -4211,21 +4211,28 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               // Use standard wallet adapter connection
               // Wallet adapter will handle mobile/desktop automatically
               try {
-                // Try to find a wallet (prefer Phantom, then Mobile, then first available)
+                // Try to find a wallet (prefer Phantom, then Mobile Wallet Adapter, then first available)
                 const walletToConnect = wallet.wallets.find(w => w.adapter.name === 'Phantom') ||
+                                       wallet.wallets.find(w => w.adapter.name === 'Solana Mobile Wallet Adapter') ||
                                        wallet.wallets.find(w => w.adapter.name === 'Mobile Wallet Adapter') ||
                                        wallet.wallets[0];
                 
                 if (walletToConnect) {
                   wallet.select(walletToConnect.adapter.name);
-                  if (wallet.connect) {
-                    await wallet.connect();
-                  } else {
-                    await walletToConnect.adapter.connect();
-                  }
+                  
+                  // Wait for selection to complete
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                  
+                  // Connect using the adapter's connect method directly
+                  await walletToConnect.adapter.connect();
+                } else {
+                  alert('No wallet detected. Please install Phantom or another Solana wallet.');
                 }
-                } catch (error) {
+              } catch (error: any) {
                   console.error('Connection error:', error);
+                if (!error.message?.includes('User rejected') && !error.message?.includes('User cancelled')) {
+                  alert(`Connection failed: ${error.message || 'Unknown error'}`);
+                }
               }
             }}
             onCreateChallenge={handleCreateChallenge}
