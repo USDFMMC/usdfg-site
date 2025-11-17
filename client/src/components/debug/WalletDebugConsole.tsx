@@ -8,10 +8,30 @@ interface LogEntry {
 }
 
 export const WalletDebugConsole: React.FC = () => {
-  const { wallets, wallet, connected, connecting, publicKey } = useWallet();
+  // Wrap in try-catch to ensure component always renders even if wallet context fails
+  let walletContext;
+  try {
+    walletContext = useWallet();
+  } catch (error) {
+    console.error('Wallet context error:', error);
+    walletContext = {
+      wallets: [],
+      wallet: null,
+      connected: false,
+      connecting: false,
+      publicKey: null,
+    };
+  }
+  
+  const { wallets, wallet, connected, connecting, publicKey } = walletContext;
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isOpen, setIsOpen] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
+  
+  // Add initial log to confirm component is rendering
+  useEffect(() => {
+    addLog('info', '🐛 Debug console initialized');
+  }, []);
 
   // Add log entry
   const addLog = (level: LogEntry['level'], message: string) => {
@@ -86,7 +106,13 @@ export const WalletDebugConsole: React.FC = () => {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 z-[99999] bg-black/80 text-white px-3 py-2 rounded-lg text-xs border border-amber-500/50"
+        className="fixed bottom-4 right-4 z-[999999] bg-amber-600 text-white px-4 py-3 rounded-lg text-sm font-bold border-2 border-amber-400 shadow-lg"
+        style={{ 
+          position: 'fixed',
+          bottom: '16px',
+          right: '16px',
+          zIndex: 999999
+        }}
       >
         🐛 Debug
       </button>
@@ -94,7 +120,15 @@ export const WalletDebugConsole: React.FC = () => {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-[99999] w-[320px] max-h-[400px] bg-black/95 border border-amber-500/50 rounded-lg shadow-2xl flex flex-col text-xs">
+    <div 
+      className="fixed bottom-4 right-4 z-[999999] w-[90vw] max-w-[400px] max-h-[60vh] bg-black/98 border-2 border-amber-500 rounded-lg shadow-2xl flex flex-col text-xs"
+      style={{ 
+        position: 'fixed',
+        bottom: '16px',
+        right: '16px',
+        zIndex: 999999
+      }}
+    >
       {/* Header */}
       <div className="flex items-center justify-between p-2 border-b border-amber-500/30">
         <div className="flex items-center gap-2">
