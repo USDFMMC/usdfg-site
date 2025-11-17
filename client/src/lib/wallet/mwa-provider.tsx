@@ -2,7 +2,6 @@ import React, { FC, ReactNode, useMemo, useEffect, useState } from 'react';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { clusterApiUrl } from '@solana/web3.js';
-import { MobileWalletAdapter } from '@solana-mobile/wallet-adapter-mobile';
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
 import { SolflareWalletAdapter } from '@solana/wallet-adapter-solflare';
 
@@ -87,10 +86,9 @@ export const MWAProvider: FC<{ children: ReactNode }> = ({ children }) => {
   }, []);
 
   // Configure wallet adapters
-  // MobileWalletAdapter handles mobile wallet connections (iOS/Android)
-  // PhantomWalletAdapter and SolflareWalletAdapter handle desktop browser wallets
+  // PhantomWalletAdapter and SolflareWalletAdapter handle both desktop and mobile browser wallets
+  // They automatically detect and work with mobile wallet browser extensions
   const wallets = useMemo(() => [
-    new MobileWalletAdapter(),
     new PhantomWalletAdapter(),
     new SolflareWalletAdapter(),
   ], []);
