@@ -27,11 +27,6 @@ export const WalletDebugConsole: React.FC = () => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isOpen, setIsOpen] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
-  
-  // Add initial log to confirm component is rendering
-  useEffect(() => {
-    addLog('info', '🐛 Debug console initialized');
-  }, []);
 
   // Add log entry
   const addLog = (level: LogEntry['level'], message: string) => {
@@ -42,6 +37,11 @@ export const WalletDebugConsole: React.FC = () => {
     };
     setLogs(prev => [...prev.slice(-49), entry]); // Keep last 50 logs
   };
+
+  // Add initial log to confirm component is rendering
+  useEffect(() => {
+    addLog('info', '🐛 Debug console initialized');
+  }, []);
 
   // Monitor wallet state changes
   useEffect(() => {
