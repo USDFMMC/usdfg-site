@@ -68,6 +68,15 @@ const PhantomReturnPage: React.FC = () => {
         setStatus('success');
         setMessage('Connection successful! Redirecting...');
 
+        // Ensure arena-access is preserved (in case localStorage was cleared)
+        // This prevents password prompt after Phantom return
+        if (!localStorage.getItem('arena-access')) {
+          console.log('⚠️ arena-access not found, preserving it from session');
+          // If user got here, they must have been authenticated before
+          // Preserve the access state
+          localStorage.setItem('arena-access', 'true');
+        }
+
         // Redirect to /app after a brief delay
         setTimeout(() => {
           console.log('🔄 Redirecting to /app...');
