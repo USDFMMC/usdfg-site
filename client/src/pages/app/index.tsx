@@ -6,7 +6,7 @@ import WalletConnectSimple from "@/components/arena/WalletConnectSimple";
 import { useWallet } from '@solana/wallet-adapter-react';
 // Removed legacy wallet import - using MWA hooks instead
 import { joinChallengeOnChain } from "@/lib/chain/events";
-import { handlePhantomReturn, isPhantomReturn } from '@/lib/wallet/phantom-deeplink';
+import { handlePhantomReturn, isPhantomReturn, SESSION_STORAGE_NONCE } from '@/lib/wallet/phantom-deeplink';
 import TournamentBracketView from "@/components/arena/TournamentBracketView";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
@@ -130,6 +130,20 @@ const ArenaHome: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     
+    // Handle user cancellation - Phantom may redirect without params
+    // If we're on /app with no params and we have a pending deep link, user likely cancelled
+    if (!params.has("phantom_encryption_public_key") && window.location.pathname === "/app") {
+      const hasPendingNonce = sessionStorage.getItem(SESSION_STORAGE_NONCE);
+      if (hasPendingNonce) {
+        console.log("⚠️ Phantom deep link cancelled by user - staying on /app");
+        // Clear the pending nonce
+        sessionStorage.removeItem(SESSION_STORAGE_NONCE);
+        // Ensure we stay on /app (don't redirect anywhere)
+        window.history.replaceState({}, "", "/app");
+        return;
+      }
+    }
+    
     if (params.has("phantom_encryption_public_key")) {
       console.log("🔥🔥🔥 Safari deep link return activated");
       console.log("🔎 Full URL:", window.location.href);
@@ -157,16 +171,19 @@ const ArenaHome: React.FC = () => {
             // Ensure arena-access is preserved
             localStorage.setItem('arena-access', 'true');
             
-            // Clean query params from URL
+            // Clean query params from URL immediately
             window.history.replaceState({}, "", "/app");
             
-            // Reload page to trigger wallet connection with restored session
-            console.log("🔄 Reloading page to connect wallet...");
-            window.location.reload();
+            // For mobile deep links, we can't use adapter.connect() - the public key is enough
+            // The wallet adapter will pick it up on next render via restorePhantomSession
+            // Don't reload - let the restore logic handle it
+            console.log("✅ Phantom session saved - wallet will connect automatically");
           } else {
-            console.error("❌ Failed to decrypt Phantom payload");
+            console.error("❌ Failed to decrypt Phantom payload - user may have cancelled");
             // Clean URL even on error
             window.history.replaceState({}, "", "/app");
+            // Clear any pending nonce
+            sessionStorage.removeItem(SESSION_STORAGE_NONCE);
           }
         } catch (error: any) {
           console.error("❌ Error processing Phantom return:", error);
@@ -174,55 +191,80 @@ const ArenaHome: React.FC = () => {
           console.error("❌ Error stack:", error?.stack);
           // Clean URL even on error
           window.history.replaceState({}, "", "/app");
+          // Clear any pending nonce
+          sessionStorage.removeItem(SESSION_STORAGE_NONCE);
         }
+      } else {
+        // Invalid return - clean up
+        console.warn("⚠️ Invalid Phantom return - missing required params");
+        window.history.replaceState({}, "", "/app");
+        sessionStorage.removeItem(SESSION_STORAGE_NONCE);
       }
     }
   }, []); // Run once on mount
 
-  // Restore Phantom session from sessionStorage (after page reload)
+  // Restore Phantom session from sessionStorage
+  // For mobile deep links, we can't programmatically connect via adapter
+  // Instead, we store the public key and the app should work with it
+  // The wallet adapter connection state is mainly for desktop browser extensions
   useEffect(() => {
     const restorePhantomSession = async () => {
+      // Skip if already connected
+      if (connected) {
+        console.log('✅ Already connected, skipping session restore');
+        return;
+      }
+
       try {
         const sessionData = sessionStorage.getItem('phantomSession');
         if (sessionData) {
           const payload = JSON.parse(sessionData);
-          console.log('🔑 Restored Phantom session:', payload);
+          console.log('🔑 Found Phantom session in storage:', payload);
           
           if (payload.public_key) {
-            // Find Phantom adapter and connect
-            const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
-            if (phantomWallet) {
-              console.log('🔗 Connecting to Phantom adapter with restored session...');
-              select('Phantom');
-              
-              // Wait a bit for adapter to be ready
-              setTimeout(async () => {
-                try {
-                  if (connect) {
-                    await connect();
-                    console.log('✅ Connected via restored Phantom session');
-                    
-                    // Clear the session data after successful connection
-                    sessionStorage.removeItem('phantomSession');
-                  }
-                } catch (error) {
-                  console.error('❌ Error connecting with restored session:', error);
-                }
-              }, 500);
+            // For mobile deep links, we have the public key but can't connect via adapter
+            // The public key is stored and can be used for transactions
+            // We'll try to connect once, but if it fails (mobile), that's OK
+            console.log('📱 Mobile deep link session - public key available:', payload.public_key);
+            
+            // Try to connect via adapter (works on desktop, may fail on mobile)
+            const phantomWallet = wallets.find(w => 
+              w.adapter.name === 'Phantom' || 
+              w.adapter.name === 'Solana Mobile Wallet Adapter'
+            );
+            
+            if (phantomWallet && connect) {
+              try {
+                console.log('🔗 Attempting to connect via adapter...');
+                select(phantomWallet.adapter.name);
+                
+                // Wait for adapter to be ready
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
+                await connect();
+                console.log('✅ Connected via adapter');
+                
+                // Clear session after successful connection
+                sessionStorage.removeItem('phantomSession');
+              } catch (error: any) {
+                // On mobile, adapter.connect() may fail - that's OK
+                // The public key is still available for use
+                console.log('ℹ️ Adapter connect failed (expected on mobile):', error?.message);
+                console.log('ℹ️ Public key is still available for transactions:', payload.public_key);
+                // Don't clear session - keep it for transaction signing
+              }
             } else {
-              console.warn('⚠️ Phantom adapter not found in wallets list');
+              console.log('ℹ️ No Phantom adapter available - using stored public key');
             }
           }
-        } else {
-          console.log('❌ No phantomSession found in storage');
         }
       } catch (error) {
         console.error('❌ Error restoring Phantom session:', error);
       }
     };
 
-    // Only restore if not already connected
-    if (!connected && wallets.length > 0) {
+    // Only restore if wallets are loaded
+    if (wallets.length > 0) {
       restorePhantomSession();
     }
   }, [wallets, select, connect, connected]);

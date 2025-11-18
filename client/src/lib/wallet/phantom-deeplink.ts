@@ -12,7 +12,7 @@ import bs58 from 'bs58';
 
 const PHANTOM_DEEPLINK_BASE = 'https://phantom.app/ul/v1/connect';
 const SESSION_STORAGE_KEY = 'phantom_dapp_keypair';
-const SESSION_STORAGE_NONCE = 'phantom_dapp_nonce';
+export const SESSION_STORAGE_NONCE = 'phantom_dapp_nonce';
 
 /**
  * Generate a DApp keypair for encryption
