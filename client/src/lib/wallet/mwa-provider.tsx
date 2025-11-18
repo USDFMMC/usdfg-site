@@ -100,6 +100,17 @@ export const MWAProvider: FC<{ children: ReactNode }> = ({ children }) => {
     // Add Mobile Wallet Adapter FIRST for seamless mobile browser experience
     // MWA must be first in the array to take priority over Phantom's deep link fallback
     try {
+      // Check if we're on mobile before initializing MWA
+      const isMobile = typeof window !== 'undefined' && 
+        (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 
+         (window as any).navigator?.userAgentData?.mobile === true);
+      
+      console.log('🔍 MWA initialization check:', {
+        isMobile,
+        userAgent: typeof window !== 'undefined' ? navigator.userAgent : 'N/A',
+        hasSolanaMobile: typeof window !== 'undefined' ? 'solanaMobile' in window : false,
+      });
+      
       const mobileAdapter = new SolanaMobileWalletAdapter({
         addressSelector: createDefaultAddressSelector(),
         appIdentity: {
@@ -111,10 +122,17 @@ export const MWAProvider: FC<{ children: ReactNode }> = ({ children }) => {
         chain: 'devnet',
         onWalletNotFound: createDefaultWalletNotFoundHandler(),
       });
+      
+      console.log('✅ Mobile Wallet Adapter initialized:', {
+        name: mobileAdapter.name,
+        readyState: mobileAdapter.readyState,
+        isMobile,
+      });
+      
       adapters.push(mobileAdapter);
-      console.log('✅ Mobile Wallet Adapter initialized:', mobileAdapter.name);
     } catch (error) {
       console.warn('⚠️ Mobile Wallet Adapter initialization failed (non-fatal):', error);
+      console.error('MWA Error details:', error);
       // Continue without MWA - Phantom/Solflare will still work
     }
     

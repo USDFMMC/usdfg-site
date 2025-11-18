@@ -67,9 +67,20 @@ export function logWalletEvent(
   // Check if MWA is available (for mobile)
   if (typeof window !== 'undefined') {
     const hasMWA = 'solanaMobile' in window || 
-                   typeof (window as any).solanaMobile !== 'undefined';
+                   typeof (window as any).solanaMobile !== 'undefined' ||
+                   (window as any).navigator?.userAgentData?.mobile === true;
+    
+    // More detailed MWA detection
+    const mwaDetails = {
+      hasSolanaMobile: 'solanaMobile' in window,
+      hasWindowSolanaMobile: typeof (window as any).solanaMobile !== 'undefined',
+      isMobile: /iPhone|iPad|iPod|Android/i.test(navigator.userAgent),
+      userAgent: navigator.userAgent,
+    };
+    
     if (event === 'selecting' || event === 'connect_called') {
       console.log(`   MWA available: ${hasMWA}`);
+      console.log(`   MWA details:`, mwaDetails);
     }
   }
 }
