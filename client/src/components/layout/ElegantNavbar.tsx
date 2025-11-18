@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { SimpleDebugButton } from '@/components/debug/SimpleDebugButton';
 
 interface ElegantNavbarProps {
   children?: React.ReactNode;
@@ -51,6 +52,8 @@ const ElegantNavbar: React.FC<ElegantNavbarProps> = ({ children }) => {
 
           {/* Right side content */}
           <div className="flex items-center space-x-4">
+            {/* Debug Console - Always visible in navbar */}
+            <SimpleDebugButton />
             {children}
           </div>
         </div>
