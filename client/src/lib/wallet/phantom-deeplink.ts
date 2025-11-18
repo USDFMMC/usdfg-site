@@ -65,20 +65,28 @@ export function launchPhantomDeepLink(): void {
     console.log('💾 Stored nonce in sessionStorage:', nonce);
 
     const dappPublicKey = dappKeypair.publicKey.toBase58();
-    const redirectLink = encodeURIComponent(`${window.location.origin}${window.location.pathname}`);
+    
+    // CRITICAL: redirect_link MUST be properly URI-encoded
+    // If not encoded, Phantom will not open and Safari will load it as a webpage
+    const redirect = encodeURIComponent(`${window.location.origin}${window.location.pathname}`);
     const appUrl = encodeURIComponent(window.location.origin);
 
-    const deepLinkUrl = `${PHANTOM_DEEPLINK_BASE}?` +
-      `dapp_encryption_public_key=${dappPublicKey}&` +
-      `redirect_link=${redirectLink}&` +
-      `app_url=${appUrl}&` +
-      `nonce=${nonce}`;
+    // Build URL using URLSearchParams for proper encoding
+    const params = new URLSearchParams({
+      dapp_encryption_public_key: dappPublicKey,
+      redirect_link: redirect,
+      app_url: appUrl,
+      nonce: nonce,
+    });
 
-    console.log('🔗 Phantom deep link URL:', deepLinkUrl);
+    const deepLinkUrl = `${PHANTOM_DEEPLINK_BASE}?${params.toString()}`;
+
+    console.log('🔗 Deep Link URL:', deepLinkUrl);
     console.log('📱 Redirecting to Phantom NOW...');
     console.log('📍 DApp Public Key:', dappPublicKey);
-    console.log('📍 Redirect Link:', redirectLink);
-    console.log('📍 App URL:', appUrl);
+    console.log('📍 Redirect Link (encoded):', redirect);
+    console.log('📍 App URL (encoded):', appUrl);
+    console.log('📍 Nonce:', nonce);
 
     // CRITICAL: Redirect to Phantom immediately
     // This MUST execute for the deep link to work
