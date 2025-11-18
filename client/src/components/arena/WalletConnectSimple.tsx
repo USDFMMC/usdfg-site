@@ -92,7 +92,16 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       if (shouldUseDeepLink()) {
         console.log('📱 Mobile Safari detected - using Phantom deep link');
         logWalletEvent('selecting', { adapter: 'Phantom (Deep Link)' });
-        launchPhantomDeepLink();
+        
+        // Launch Phantom deep link - this will redirect immediately
+        try {
+          launchPhantomDeepLink();
+          // If we get here, the redirect didn't happen (shouldn't happen)
+          console.warn('⚠️ Deep link launch returned - redirect may have failed');
+        } catch (error) {
+          console.error('❌ Error launching Phantom deep link:', error);
+          alert('Failed to open Phantom. Please make sure Phantom is installed.');
+        }
         return; // Deep link will redirect, so we return here
       }
 

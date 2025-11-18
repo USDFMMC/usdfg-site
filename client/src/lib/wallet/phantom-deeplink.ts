@@ -62,6 +62,7 @@ export function launchPhantomDeepLink(): void {
     
     // Store nonce for verification
     sessionStorage.setItem(SESSION_STORAGE_NONCE, nonce);
+    console.log('💾 Stored nonce in sessionStorage:', nonce);
 
     const dappPublicKey = dappKeypair.publicKey.toBase58();
     const redirectLink = encodeURIComponent(`${window.location.origin}${window.location.pathname}`);
@@ -74,12 +75,20 @@ export function launchPhantomDeepLink(): void {
       `nonce=${nonce}`;
 
     console.log('🔗 Phantom deep link URL:', deepLinkUrl);
-    console.log('📱 Redirecting to Phantom...');
+    console.log('📱 Redirecting to Phantom NOW...');
+    console.log('📍 DApp Public Key:', dappPublicKey);
+    console.log('📍 Redirect Link:', redirectLink);
+    console.log('📍 App URL:', appUrl);
 
-    // Redirect to Phantom
+    // CRITICAL: Redirect to Phantom immediately
+    // This MUST execute for the deep link to work
     window.location.href = deepLinkUrl;
+    
+    // If we somehow get here, log a warning
+    console.warn('⚠️ window.location.href was set but redirect may not have occurred');
   } catch (error) {
     console.error('❌ Error launching Phantom deep link:', error);
+    console.error('Error details:', error);
     throw error;
   }
 }
