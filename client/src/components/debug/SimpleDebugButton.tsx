@@ -42,8 +42,7 @@ export const SimpleDebugButton: React.FC = () => {
     <div
       className="fixed top-16 right-4 z-[999999] bg-black/98 text-white p-4 rounded-lg text-xs border-2 border-red-500 shadow-2xl"
       style={{
-        maxWidth: '90vw',
-        maxWidth: '400px',
+        maxWidth: 'min(90vw, 400px)',
         maxHeight: '80vh',
         overflow: 'auto',
       }}
