@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useConnection } from '@solana/wallet-adapter-react';
-import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddress } from '@solana/spl-token';
 import { USDFG_MINT } from '@/lib/chain/config';
 import { logWalletEvent } from '@/utils/wallet-log';
+import { launchPhantomDeepLink, shouldUseDeepLink } from '@/lib/wallet/phantom-deeplink';
 
 interface WalletConnectSimpleProps {
   isConnected: boolean;
@@ -81,22 +82,27 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   }, [connected, publicKey, onConnect, onDisconnect, connection]);
 
   // Handle wallet selection and connection
-  // CRITICAL: MWA must be selected first to enable Safari → Phantom → Safari flow
-  // Selecting Phantom first triggers deep link fallback, which breaks the flow
+  // On mobile Safari, use Phantom deep link flow (like tools.smithii.io)
   const handleConnect = async () => {
     if (connected) return;
     if (connecting) return;
 
     try {
-      // Log all available adapters for debugging
+      // Check if we should use deep link (mobile Safari)
+      if (shouldUseDeepLink()) {
+        console.log('📱 Mobile Safari detected - using Phantom deep link');
+        logWalletEvent('selecting', { adapter: 'Phantom (Deep Link)' });
+        launchPhantomDeepLink();
+        return; // Deep link will redirect, so we return here
+      }
+
+      // Desktop or non-Safari mobile - use standard adapter flow
       console.log('🔍 Available wallets for connection:');
       wallets.forEach((w, i) => {
         console.log(`  ${i + 1}. ${w.adapter.name} (readyState: ${w.adapter.readyState})`);
       });
       
-      // CRITICAL: Prioritize MWA first to prevent deep link fallback
-      // MWA enables Safari → Phantom → Safari flow on mobile browsers
-      // Only fall back to Phantom if MWA is not available
+      // Try MWA first, then Phantom, then first available
       let walletToConnect = wallets.find(w => 
         w.adapter.name === 'Solana Mobile Wallet Adapter' || 
         w.adapter.name === 'Mobile Wallet Adapter'
@@ -115,12 +121,10 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       select(walletToConnect.adapter.name);
       
       // Wait for the selection to complete and wallet to be ready
-      // Check if wallet is ready, with a timeout
       let attempts = 0;
       const maxAttempts = 10;
       while (attempts < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, 50));
-        // Check if the selected wallet is ready
         const selectedWallet = wallets.find(w => w.adapter.name === walletToConnect.adapter.name);
         if (selectedWallet && selectedWallet.adapter.readyState === 'Installed') {
           break;
@@ -129,7 +133,6 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       }
       
       // Connect using the adapter's connect method directly
-      // This is more reliable than using the hook's connect() function
       await walletToConnect.adapter.connect();
       logWalletEvent('connect_called', { adapter: walletToConnect.adapter.name });
     } catch (error: any) {
@@ -143,7 +146,6 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       if (error.message?.includes('WalletNotSelectedError') || error.name === 'WalletNotSelectedError') {
         alert('Please select a wallet from the list and try again.');
       } else if (error.message?.includes('User rejected') || error.message?.includes('User cancelled')) {
-        // User cancelled - don't show error, just log it
         console.log('User cancelled wallet connection');
       } else {
         alert(`Connection failed: ${error.message || 'Unknown error'}`);

@@ -6,6 +6,7 @@ import WalletConnectSimple from "@/components/arena/WalletConnectSimple";
 import { useWallet } from '@solana/wallet-adapter-react';
 // Removed legacy wallet import - using MWA hooks instead
 import { joinChallengeOnChain } from "@/lib/chain/events";
+import { handlePhantomReturn, isPhantomReturn } from '@/lib/wallet/phantom-deeplink';
 import TournamentBracketView from "@/components/arena/TournamentBracketView";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
@@ -120,9 +121,45 @@ const AdRotationBox: React.FC = () => {
 const ArenaHome: React.FC = () => {
   const wallet = useWallet();
   const { connection } = useConnection();
-  const { connected, signTransaction, publicKey, connect, signAllTransactions } = wallet;
+  const { connected, signTransaction, publicKey, connect, signAllTransactions, select, wallets } = wallet;
   // Use MWA connection state
   const isConnected = connected;
+
+  // Handle Phantom deep link return (mobile Safari)
+  useEffect(() => {
+    if (isPhantomReturn()) {
+      console.log('🔄 Detected Phantom return - processing...');
+      const result = handlePhantomReturn();
+      
+      if (result && result.publicKey) {
+        console.log('✅ Phantom returned with public key:', result.publicKey);
+        
+        // Find Phantom adapter and connect with the returned public key
+        const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
+        if (phantomWallet) {
+          console.log('🔗 Connecting to Phantom adapter with returned public key...');
+          select('Phantom');
+          
+          // The adapter should handle the connection, but we may need to manually set it
+          // For now, try to connect normally - the adapter should detect the session
+          setTimeout(async () => {
+            try {
+              if (connect) {
+                await connect();
+                console.log('✅ Connected via Phantom deep link return');
+              }
+            } catch (error) {
+              console.error('❌ Error connecting after Phantom return:', error);
+            }
+          }, 500);
+        } else {
+          console.warn('⚠️ Phantom adapter not found in wallets list');
+        }
+      } else {
+        console.warn('⚠️ Failed to process Phantom return');
+      }
+    }
+  }, [wallets, select, connect]);
 
   const normalizedCurrentWallet = useMemo(() => {
     return publicKey?.toString()?.toLowerCase() || null;
