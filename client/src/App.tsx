@@ -33,10 +33,12 @@ function RoutesWithLogging() {
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/whitepaper" element={<Whitepaper />} />
+      {/* CRITICAL: Phantom return route MUST be before /app route */}
+      {/* React Router matches routes in order, so more specific routes must come first */}
       <Route path="/app/phantom-return" element={<PhantomReturn />} />
-      <Route path="/app" element={<ArenaRoute />} />
       <Route path="/app/challenge/new" element={<CreateChallenge />} />
       <Route path="/app/profile/:address" element={<PlayerProfile />} />
+      <Route path="/app" element={<ArenaRoute />} />
       <Route path="/login" element={<Home />} />
       <Route path="*" element={<NotFound />} />
     </Routes>

@@ -15,8 +15,11 @@ const PhantomReturnPage: React.FC = () => {
   const [message, setMessage] = useState('Processing Phantom connection...');
 
   useEffect(() => {
+    console.log('🔥🔥🔥 PHANTOM RETURN PAGE COMPONENT MOUNTED 🔥🔥🔥');
     console.log('🔄 Phantom Return Page Loaded');
     console.log('🔎 Full URL:', window.location.href);
+    console.log('🔎 Pathname:', window.location.pathname);
+    console.log('🔎 Search params:', window.location.search);
     
     const params = new URLSearchParams(window.location.search);
     console.log('🔎 phantom_encryption_public_key:', params.get('phantom_encryption_public_key'));
