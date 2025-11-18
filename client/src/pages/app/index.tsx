@@ -125,7 +125,61 @@ const ArenaHome: React.FC = () => {
   // Use MWA connection state
   const isConnected = connected;
 
-  // Restore Phantom session from sessionStorage (after /phantom-return redirects here)
+  // CRITICAL: Handle Phantom deep link return on same page (Smithii-style)
+  // Phantom returns to /app with query params, we decrypt and restore session here
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    
+    if (params.has("phantom_encryption_public_key")) {
+      console.log("🔥🔥🔥 Safari deep link return activated");
+      console.log("🔎 Full URL:", window.location.href);
+      console.log("🔎 Search params:", window.location.search);
+      
+      // Check if this is a valid Phantom return
+      if (isPhantomReturn()) {
+        try {
+          console.log("🔍 Processing Phantom return on /app page...");
+          const result = handlePhantomReturn();
+          
+          if (result && result.publicKey) {
+            console.log("🔑 Decrypted Phantom session:", result);
+            
+            // Save the session to sessionStorage
+            const sessionData = {
+              public_key: result.publicKey,
+              session: result.session,
+              connected_at: new Date().toISOString(),
+            };
+            
+            sessionStorage.setItem('phantomSession', JSON.stringify(sessionData));
+            console.log("✅ Saved Phantom session to sessionStorage");
+            
+            // Ensure arena-access is preserved
+            localStorage.setItem('arena-access', 'true');
+            
+            // Clean query params from URL
+            window.history.replaceState({}, "", "/app");
+            
+            // Reload page to trigger wallet connection with restored session
+            console.log("🔄 Reloading page to connect wallet...");
+            window.location.reload();
+          } else {
+            console.error("❌ Failed to decrypt Phantom payload");
+            // Clean URL even on error
+            window.history.replaceState({}, "", "/app");
+          }
+        } catch (error: any) {
+          console.error("❌ Error processing Phantom return:", error);
+          console.error("❌ Error message:", error?.message);
+          console.error("❌ Error stack:", error?.stack);
+          // Clean URL even on error
+          window.history.replaceState({}, "", "/app");
+        }
+      }
+    }
+  }, []); // Run once on mount
+
+  // Restore Phantom session from sessionStorage (after page reload)
   useEffect(() => {
     const restorePhantomSession = async () => {
       try {

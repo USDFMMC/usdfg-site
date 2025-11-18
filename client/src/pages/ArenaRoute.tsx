@@ -4,13 +4,12 @@ import ArenaHome from "./app/index";
 export default function ArenaRoute() {
   const location = useLocation();
   
-  // CRITICAL: Phantom return must NOT be handled by ArenaRoute
-  // Use startsWith to catch all variants: /app/phantom-return, /app/phantom-return/, etc.
-  const isPhantomReturn = location.pathname.startsWith("/app/phantom-return");
-
-  if (isPhantomReturn) {
-    console.log("🔥 Phantom return — bypassing ArenaRoute completely");
-    return null; // Let App.tsx render <PhantomReturn />
+  // CRITICAL: If Phantom params are present — bypass password gate
+  // Phantom returns to same page (/app) with query params, so we need to allow it
+  const params = new URLSearchParams(window.location.search);
+  if (params.has("phantom_encryption_public_key")) {
+    console.log("🔥 Bypassing password for Phantom return");
+    return <ArenaHome />; // Let ArenaHome handle the Phantom return
   }
 
   console.log("🔓 Password gate temporarily DISABLED for testing");

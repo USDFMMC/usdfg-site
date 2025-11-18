@@ -12,7 +12,6 @@ import PlayerProfile from "@/pages/app/profile/[address]";
 import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
 import Whitepaper from "@/pages/whitepaper";
-import PhantomReturn from "@/pages/phantom-return";
 import { Helmet } from "react-helmet";
 import { startVersionMonitoring } from "@/lib/version";
 import UpdateBanner from "@/components/ui/UpdateBanner";
@@ -33,9 +32,6 @@ function RoutesWithLogging() {
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/whitepaper" element={<Whitepaper />} />
-      {/* CRITICAL: Phantom return route MUST be before /app route */}
-      {/* React Router matches routes in order, so more specific routes must come first */}
-      <Route path="/app/phantom-return" element={<PhantomReturn />} />
       <Route path="/app/challenge/new" element={<CreateChallenge />} />
       <Route path="/app/profile/:address" element={<PlayerProfile />} />
       <Route path="/app" element={<ArenaRoute />} />

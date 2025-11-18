@@ -73,11 +73,14 @@ export function launchPhantomDeepLink(): void {
 
     const dappPublicKey = dappKeypair.publicKey.toBase58();
     
-    // CRITICAL: redirect_link MUST point to /app/phantom-return (not /phantom-return)
-    // The app routing is inside /app, so the return handler must be at /app/phantom-return
-    // The /app/phantom-return page will decrypt the payload and save it, then redirect to /app
-    const redirectLink = `${window.location.origin}/app/phantom-return`;
+    // CRITICAL: redirect_link MUST be the current page URL (same-page return)
+    // This ensures Phantom returns to the SAME TAB, avoiding loops
+    // This is how tools.smithii.io works - same-page return, no separate route
+    const redirectLink = window.location.href; // Current page URL
     const appUrl = `${window.location.origin}/app`;
+    
+    console.log('🔗 Redirect link (current page):', redirectLink);
+    console.log('🔗 App URL:', appUrl);
     
     // Build URL using URLSearchParams for proper encoding
     const params = new URLSearchParams({
