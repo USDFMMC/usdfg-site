@@ -206,10 +206,21 @@ export function handlePhantomReturn(): {
  * Check if we should use deep link (mobile Safari)
  */
 export function shouldUseDeepLink(): boolean {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === 'undefined') {
+    console.log('🔍 shouldUseDeepLink: window is undefined');
+    return false;
+  }
   
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  const userAgent = navigator.userAgent;
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(userAgent);
+  const isSafari = /^((?!chrome|android).)*safari/i.test(userAgent);
+  
+  console.log('🔍 shouldUseDeepLink check:', {
+    userAgent,
+    isMobile,
+    isSafari,
+    shouldUse: isMobile && isSafari
+  });
   
   return isMobile && isSafari;
 }
