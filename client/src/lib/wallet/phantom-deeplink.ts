@@ -72,9 +72,6 @@ export function launchPhantomDeepLink(): void {
     const redirectLink = `${window.location.origin}/app/phantom-return`;
     const appUrl = `${window.location.origin}/app`;
     
-    console.log('🔗 Redirecting Phantom to:', redirectLink);
-    console.log('🔗 App URL:', appUrl);
-
     // Build URL using URLSearchParams for proper encoding
     const params = new URLSearchParams({
       dapp_encryption_public_key: dappPublicKey,
@@ -85,13 +82,14 @@ export function launchPhantomDeepLink(): void {
 
     const deepLinkUrl = `${PHANTOM_DEEPLINK_BASE}?${params.toString()}`;
 
-    console.log('🔗 Deep Link URL:', deepLinkUrl);
+    // CRITICAL LOG - This shows EXACTLY what redirect URL is being sent to Phantom
+    console.log('🔗 Redirecting Phantom to:', redirectLink);
+    console.log('🔗 Redirect Link (encoded in deep link):', params.get('redirect_link'));
+    console.log('🔗 App URL:', appUrl);
+    console.log('🔗 App URL (encoded in deep link):', params.get('app_url'));
+    console.log('🔗 Full Deep Link URL:', deepLinkUrl);
     console.log('📱 Redirecting to Phantom NOW...');
     console.log('📍 DApp Public Key:', dappPublicKey);
-    console.log('📍 Redirect Link (raw):', redirectLink);
-    console.log('📍 Redirect Link (encoded in URL):', params.get('redirect_link'));
-    console.log('📍 App URL (raw):', appUrl);
-    console.log('📍 App URL (encoded in URL):', params.get('app_url'));
     console.log('📍 Nonce:', nonce);
 
     // CRITICAL: Redirect to Phantom immediately
