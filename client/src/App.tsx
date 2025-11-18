@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -17,21 +17,42 @@ import { Helmet } from "react-helmet";
 import { startVersionMonitoring } from "@/lib/version";
 import UpdateBanner from "@/components/ui/UpdateBanner";
 
+function RoutesWithLogging() {
+  const location = useLocation();
+  
+  useEffect(() => {
+    console.log('🔍 RoutesWithLogging mounted');
+    console.log('🔍 Current URL:', window.location.href);
+    console.log('🔍 Current pathname:', window.location.pathname);
+    console.log('🔍 React Router location:', location.pathname);
+  }, [location]);
+
+  return (
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/whitepaper" element={<Whitepaper />} />
+      <Route path="/app/phantom-return" element={<PhantomReturn />} />
+      <Route path="/app" element={<ArenaRoute />} />
+      <Route path="/app/challenge/new" element={<CreateChallenge />} />
+      <Route path="/app/profile/:address" element={<PlayerProfile />} />
+      <Route path="/login" element={<Home />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+}
+
 function AppRouter() {
+  useEffect(() => {
+    console.log('🔍 AppRouter component mounted');
+    console.log('🔍 Current URL:', window.location.href);
+    console.log('🔍 Current pathname:', window.location.pathname);
+  }, []);
+
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/privacy" element={<Privacy />} />
-        <Route path="/terms" element={<Terms />} />
-        <Route path="/whitepaper" element={<Whitepaper />} />
-        <Route path="/app/phantom-return" element={<PhantomReturn />} />
-        <Route path="/app" element={<ArenaRoute />} />
-        <Route path="/app/challenge/new" element={<CreateChallenge />} />
-        <Route path="/app/profile/:address" element={<PlayerProfile />} />
-        <Route path="/login" element={<Home />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <RoutesWithLogging />
     </Router>
   );
 }

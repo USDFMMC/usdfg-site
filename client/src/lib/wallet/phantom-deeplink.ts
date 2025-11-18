@@ -4,6 +4,8 @@
  * Similar to tools.smithii.io implementation
  */
 
+console.log('🔍 DEEPLINK MODULE LOADED - phantom-deeplink.ts imported');
+
 import { Keypair, PublicKey } from '@solana/web3.js';
 import nacl from 'tweetnacl';
 import bs58 from 'bs58';
@@ -50,6 +52,11 @@ function generateNonce(): string {
  * Launch Phantom deep link for connection
  */
 export function launchPhantomDeepLink(): void {
+  console.log('🔍 launchPhantomDeepLink() CALLED');
+  console.log('🔍 Current URL:', window.location.href);
+  console.log('🔍 Current pathname:', window.location.pathname);
+  console.log('🔍 Stack trace:', new Error().stack);
+  
   if (typeof window === 'undefined') {
     throw new Error('Window is not available');
   }
@@ -241,6 +248,10 @@ export function handlePhantomReturn(): {
  * Check if we should use deep link (mobile Safari)
  */
 export function shouldUseDeepLink(): boolean {
+  console.log('🔍 shouldUseDeepLink() CALLED');
+  console.log('🔍 Current URL:', typeof window !== 'undefined' ? window.location.href : 'window undefined');
+  console.log('🔍 Current pathname:', typeof window !== 'undefined' ? window.location.pathname : 'window undefined');
+  
   if (typeof window === 'undefined') {
     console.log('🔍 shouldUseDeepLink: window is undefined');
     return false;
@@ -249,13 +260,22 @@ export function shouldUseDeepLink(): boolean {
   const userAgent = navigator.userAgent;
   const isMobile = /iPhone|iPad|iPod|Android/i.test(userAgent);
   const isSafari = /^((?!chrome|android).)*safari/i.test(userAgent);
+  const currentPath = window.location.pathname;
+  const isOnAppRoute = currentPath.startsWith('/app');
   
   console.log('🔍 shouldUseDeepLink check:', {
     userAgent,
     isMobile,
     isSafari,
+    currentPath,
+    isOnAppRoute,
     shouldUse: isMobile && isSafari
   });
+  
+  if (isMobile && isSafari && !isOnAppRoute) {
+    console.warn('⚠️ Mobile Safari detected but NOT on /app route! Current path:', currentPath);
+    console.warn('⚠️ Deep link will still work, but user should be on /app route');
+  }
   
   return isMobile && isSafari;
 }

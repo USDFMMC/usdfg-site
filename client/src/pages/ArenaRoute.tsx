@@ -10,6 +10,10 @@ export default function ArenaRoute() {
 
   // Check if password was already entered in this session
   useEffect(() => {
+    console.log('🔍 ArenaRoute component mounted');
+    console.log('🔍 Current URL:', window.location.href);
+    console.log('🔍 Current pathname:', window.location.pathname);
+    
     const savedEntry = localStorage.getItem('arena-access');
     if (savedEntry === 'true') {
       setEntered(true);

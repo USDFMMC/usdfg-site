@@ -84,22 +84,40 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   // Handle wallet selection and connection
   // On mobile Safari, use Phantom deep link flow (like tools.smithii.io)
   const handleConnect = async () => {
-    if (connected) return;
-    if (connecting) return;
+    console.log('🔍 CONNECT BUTTON CLICKED');
+    console.log('🔍 Current URL:', window.location.href);
+    console.log('🔍 Current pathname:', window.location.pathname);
+    console.log('🔍 Component: WalletConnectSimple');
+    console.log('🔍 Stack trace:', new Error().stack);
+    
+    if (connected) {
+      console.log('🔍 Already connected, returning');
+      return;
+    }
+    if (connecting) {
+      console.log('🔍 Already connecting, returning');
+      return;
+    }
 
     try {
       // Check if we should use deep link (mobile Safari)
-      if (shouldUseDeepLink()) {
+      const shouldUse = shouldUseDeepLink();
+      console.log('🔍 shouldUseDeepLink() returned:', shouldUse);
+      
+      if (shouldUse) {
         console.log('📱 Mobile Safari detected - using Phantom deep link');
         logWalletEvent('selecting', { adapter: 'Phantom (Deep Link)' });
         
         // Launch Phantom deep link - this will redirect immediately
         try {
+          console.log('🔍 About to call launchPhantomDeepLink()...');
           launchPhantomDeepLink();
+          console.log('🔍 launchPhantomDeepLink() returned (should not happen if redirect worked)');
           // If we get here, the redirect didn't happen (shouldn't happen)
           console.warn('⚠️ Deep link launch returned - redirect may have failed');
         } catch (error) {
           console.error('❌ Error launching Phantom deep link:', error);
+          console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
           alert('Failed to open Phantom. Please make sure Phantom is installed.');
         }
         return; // Deep link will redirect, so we return here
