@@ -125,41 +125,53 @@ const ArenaHome: React.FC = () => {
   // Use MWA connection state
   const isConnected = connected;
 
-  // Handle Phantom deep link return (mobile Safari)
+  // Restore Phantom session from sessionStorage (after /phantom-return redirects here)
   useEffect(() => {
-    if (isPhantomReturn()) {
-      console.log('🔄 Detected Phantom return - processing...');
-      const result = handlePhantomReturn();
-      
-      if (result && result.publicKey) {
-        console.log('✅ Phantom returned with public key:', result.publicKey);
-        
-        // Find Phantom adapter and connect with the returned public key
-        const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
-        if (phantomWallet) {
-          console.log('🔗 Connecting to Phantom adapter with returned public key...');
-          select('Phantom');
+    const restorePhantomSession = async () => {
+      try {
+        const sessionData = sessionStorage.getItem('phantomSession');
+        if (sessionData) {
+          const payload = JSON.parse(sessionData);
+          console.log('🔑 Restored Phantom session:', payload);
           
-          // The adapter should handle the connection, but we may need to manually set it
-          // For now, try to connect normally - the adapter should detect the session
-          setTimeout(async () => {
-            try {
-              if (connect) {
-                await connect();
-                console.log('✅ Connected via Phantom deep link return');
-              }
-            } catch (error) {
-              console.error('❌ Error connecting after Phantom return:', error);
+          if (payload.public_key) {
+            // Find Phantom adapter and connect
+            const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
+            if (phantomWallet) {
+              console.log('🔗 Connecting to Phantom adapter with restored session...');
+              select('Phantom');
+              
+              // Wait a bit for adapter to be ready
+              setTimeout(async () => {
+                try {
+                  if (connect) {
+                    await connect();
+                    console.log('✅ Connected via restored Phantom session');
+                    
+                    // Clear the session data after successful connection
+                    sessionStorage.removeItem('phantomSession');
+                  }
+                } catch (error) {
+                  console.error('❌ Error connecting with restored session:', error);
+                }
+              }, 500);
+            } else {
+              console.warn('⚠️ Phantom adapter not found in wallets list');
             }
-          }, 500);
+          }
         } else {
-          console.warn('⚠️ Phantom adapter not found in wallets list');
+          console.log('❌ No phantomSession found in storage');
         }
-      } else {
-        console.warn('⚠️ Failed to process Phantom return');
+      } catch (error) {
+        console.error('❌ Error restoring Phantom session:', error);
       }
+    };
+
+    // Only restore if not already connected
+    if (!connected && wallets.length > 0) {
+      restorePhantomSession();
     }
-  }, [wallets, select, connect]);
+  }, [wallets, select, connect, connected]);
 
   const normalizedCurrentWallet = useMemo(() => {
     return publicKey?.toString()?.toLowerCase() || null;

@@ -66,11 +66,12 @@ export function launchPhantomDeepLink(): void {
 
     const dappPublicKey = dappKeypair.publicKey.toBase58();
     
-    // CRITICAL: redirect_link MUST be properly URI-encoded
-    // If not encoded, Phantom will not open and Safari will load it as a webpage
-    // URLSearchParams will automatically encode the values
-    const redirectLink = `${window.location.origin}${window.location.pathname}`;
+    // CRITICAL: redirect_link MUST point to /phantom-return, not /app
+    // The /phantom-return page will decrypt the payload and save it, then redirect to /app
+    const redirectLink = `${window.location.origin}/phantom-return`;
     const appUrl = window.location.origin;
+    
+    console.log('🔗 Redirecting Phantom to:', redirectLink);
 
     // Build URL using URLSearchParams for proper encoding
     const params = new URLSearchParams({
