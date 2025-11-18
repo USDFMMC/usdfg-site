@@ -74,34 +74,28 @@ export function launchPhantomDeepLink(): void {
 
     const dappPublicKey = dappKeypair.publicKey.toBase58();
     
-    // CRITICAL: redirect_link MUST ALWAYS be /app (not current page URL)
-    // This ensures Phantom ALWAYS returns to /app, regardless of where user clicked Connect
-    // This is how tools.smithii.io works - always return to the app route
-    const redirectLink = `${window.location.origin}/app`;
-    const appUrl = `${window.location.origin}/app`;
+    // CRITICAL: Hardcoded redirect URL - matches Smithii behavior
+    // Phantom ALWAYS returns to /app, regardless of where user clicked Connect
+    // This is stable, consistent, and matches tools.smithii.io exactly
+    const redirectLink = encodeURIComponent("https://usdfg.pro/app");
+    const appUrl = encodeURIComponent("https://usdfg.pro");
     
     // Store redirect URL globally for debugging
-    (window as any).__phantom_debug_redirect = redirectLink;
+    (window as any).__phantom_debug_redirect = "https://usdfg.pro/app";
     
-    console.log('🔗 Redirect link (ALWAYS /app):', redirectLink);
-    console.log('🔗 App URL:', appUrl);
-    console.log('🔍 DEBUG: window.__phantom_debug_redirect =', redirectLink);
+    console.log('🔗 Redirect link (HARDCODED /app):', "https://usdfg.pro/app");
+    console.log('🔗 App URL (HARDCODED):', "https://usdfg.pro");
+    console.log('🔍 DEBUG: window.__phantom_debug_redirect =', "https://usdfg.pro/app");
     
-    // Build URL using URLSearchParams for proper encoding
-    const params = new URLSearchParams({
-      dapp_encryption_public_key: dappPublicKey,
-      redirect_link: redirectLink, // URLSearchParams will encode this
-      app_url: appUrl, // URLSearchParams will encode this
-      nonce: nonce,
-    });
-
-    const deepLinkUrl = `${PHANTOM_DEEPLINK_BASE}?${params.toString()}`;
+    // Build deep link URL with properly encoded parameters
+    // Format matches Phantom's expected structure exactly
+    const deepLinkUrl = `https://phantom.app/ul/v1/connect?app_url=${appUrl}&redirect_link=${redirectLink}&dapp_encryption_public_key=${dappPublicKey}&nonce=${nonce}&cluster=devnet`;
 
     // CRITICAL LOG - This shows EXACTLY what redirect URL is being sent to Phantom
-    console.log('🔗 Redirecting Phantom to:', redirectLink);
-    console.log('🔗 Redirect Link (encoded in deep link):', params.get('redirect_link'));
-    console.log('🔗 App URL:', appUrl);
-    console.log('🔗 App URL (encoded in deep link):', params.get('app_url'));
+    console.log('🔗 Redirecting Phantom to (HARDCODED):', "https://usdfg.pro/app");
+    console.log('🔗 Redirect Link (encoded):', redirectLink);
+    console.log('🔗 App URL (HARDCODED):', "https://usdfg.pro");
+    console.log('🔗 App URL (encoded):', appUrl);
     console.log('🔗 Full Deep Link URL:', deepLinkUrl);
     console.log('📱 Redirecting to Phantom NOW...');
     console.log('📍 DApp Public Key:', dappPublicKey);
