@@ -73,14 +73,18 @@ export function launchPhantomDeepLink(): void {
 
     const dappPublicKey = dappKeypair.publicKey.toBase58();
     
-    // CRITICAL: redirect_link MUST be the current page URL (same-page return)
-    // This ensures Phantom returns to the SAME TAB, avoiding loops
-    // This is how tools.smithii.io works - same-page return, no separate route
-    const redirectLink = window.location.href; // Current page URL
+    // CRITICAL: redirect_link MUST ALWAYS be /app (not current page URL)
+    // This ensures Phantom ALWAYS returns to /app, regardless of where user clicked Connect
+    // This is how tools.smithii.io works - always return to the app route
+    const redirectLink = `${window.location.origin}/app`;
     const appUrl = `${window.location.origin}/app`;
     
-    console.log('🔗 Redirect link (current page):', redirectLink);
+    // Store redirect URL globally for debugging
+    (window as any).__phantom_debug_redirect = redirectLink;
+    
+    console.log('🔗 Redirect link (ALWAYS /app):', redirectLink);
     console.log('🔗 App URL:', appUrl);
+    console.log('🔍 DEBUG: window.__phantom_debug_redirect =', redirectLink);
     
     // Build URL using URLSearchParams for proper encoding
     const params = new URLSearchParams({
