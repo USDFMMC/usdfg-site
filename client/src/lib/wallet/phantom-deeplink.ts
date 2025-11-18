@@ -140,6 +140,7 @@ export function handlePhantomReturn(): {
 
   console.log('✅ Phantom returned with payload');
   console.log('🔍 Phantom public key:', phantomPublicKey);
+  console.log('🔍 Encrypted data length:', encryptedData?.length);
   console.log('🔍 Nonce:', nonce);
 
   try {
@@ -147,11 +148,18 @@ export function handlePhantomReturn(): {
     const stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (!stored) {
       console.error('❌ DApp keypair not found in sessionStorage');
+      console.error('❌ Available sessionStorage keys:', Object.keys(sessionStorage));
       return null;
     }
 
-    const secretKey = JSON.parse(stored);
-    const dappKeypair = Keypair.fromSecretKey(new Uint8Array(secretKey));
+    console.log('🧪 Attempting to decrypt using stored dappKeyPair');
+    const secretKeyArray = JSON.parse(stored);
+    console.log('🧪 Secret key array type:', Array.isArray(secretKeyArray) ? 'Array' : typeof secretKeyArray);
+    console.log('🧪 Secret key array length:', Array.isArray(secretKeyArray) ? secretKeyArray.length : 'N/A');
+    
+    const secretKey = new Uint8Array(secretKeyArray);
+    const dappKeypair = Keypair.fromSecretKey(secretKey);
+    console.log('✅ DApp keypair loaded successfully');
 
     // Verify nonce
     const storedNonce = sessionStorage.getItem(SESSION_STORAGE_NONCE);
@@ -161,11 +169,19 @@ export function handlePhantomReturn(): {
     }
 
     // Decrypt the payload
+    console.log('🔐 Starting decryption...');
     const phantomPubKey = new PublicKey(phantomPublicKey);
+    console.log('🔐 Phantom public key bytes length:', phantomPubKey.toBytes().length);
+    
     const encryptedBytes = bs58.decode(encryptedData);
+    console.log('🔐 Encrypted bytes length:', encryptedBytes.length);
+    
     const nonceBytes = bs58.decode(nonce);
+    console.log('🔐 Nonce bytes length:', nonceBytes.length);
+    console.log('🔐 DApp secret key length:', dappKeypair.secretKey.length);
     
     // Decrypt using nacl.box.open (Phantom's format)
+    console.log('🔐 Attempting nacl.box.open...');
     const decrypted = nacl.box.open(
       encryptedBytes,
       nonceBytes,
@@ -174,9 +190,16 @@ export function handlePhantomReturn(): {
     );
 
     if (!decrypted) {
-      console.error('❌ Failed to decrypt Phantom payload');
+      console.error('❌ Failed to decrypt Phantom payload - nacl.box.open returned null');
+      console.error('❌ This usually means:');
+      console.error('   1. Secret key is incorrect');
+      console.error('   2. Encrypted data is corrupted');
+      console.error('   3. Nonce mismatch');
+      console.error('   4. Public key mismatch');
       return null;
     }
+    
+    console.log('✅ Decryption successful, decrypted bytes length:', decrypted.length);
 
     // Parse the decrypted data
     const payload = JSON.parse(new TextDecoder().decode(decrypted));

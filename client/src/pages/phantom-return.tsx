@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { handlePhantomReturn, isPhantomReturn } from '@/lib/wallet/phantom-deeplink';
 
+const SESSION_STORAGE_KEY = 'phantom_dapp_keypair';
+
 /**
  * Phantom Return Page
  * Handles the return from Phantom deep link connection
@@ -14,7 +16,13 @@ const PhantomReturnPage: React.FC = () => {
 
   useEffect(() => {
     console.log('🔄 Phantom Return Page Loaded');
-    console.log('🔎 URL Search Params:', window.location.search);
+    console.log('🔎 Full URL:', window.location.href);
+    
+    const params = new URLSearchParams(window.location.search);
+    console.log('🔎 phantom_encryption_public_key:', params.get('phantom_encryption_public_key'));
+    console.log('🔎 data:', params.get('data'));
+    console.log('🔎 nonce:', params.get('nonce'));
+    console.log('🔎 All search params:', Object.fromEntries(params.entries()));
 
     if (!isPhantomReturn()) {
       console.warn('⚠️ Not a Phantom return - redirecting to /app');
@@ -23,6 +31,23 @@ const PhantomReturnPage: React.FC = () => {
     }
 
     try {
+      // Check if dappKeyPair exists in sessionStorage
+      const storedKeypair = sessionStorage.getItem(SESSION_STORAGE_KEY);
+      if (storedKeypair) {
+        try {
+          const kpRaw = JSON.parse(storedKeypair);
+          console.log('🧪 Stored dappKeyPair found:', {
+            hasSecretKey: !!kpRaw,
+            secretKeyType: Array.isArray(kpRaw) ? 'Array' : typeof kpRaw,
+            secretKeyLength: Array.isArray(kpRaw) ? kpRaw.length : 'N/A'
+          });
+        } catch (e) {
+          console.error('❌ Failed to parse stored keypair:', e);
+        }
+      } else {
+        console.error('❌ No dappKeyPair found in sessionStorage');
+      }
+
       console.log('🔍 Processing Phantom return...');
       const result = handlePhantomReturn();
 
@@ -56,8 +81,11 @@ const PhantomReturnPage: React.FC = () => {
           navigate('/app');
         }, 2000);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error processing Phantom return:', error);
+      console.error('❌ Decryption Error:', error);
+      console.error('❌ Error message:', error?.message);
+      console.error('❌ Error stack:', error?.stack);
       setStatus('error');
       setMessage('Connection error. Redirecting...');
       setTimeout(() => {
