@@ -6,11 +6,14 @@ const CACHE_NAME = `usdfg-arena-v${CACHE_VERSION}`;
 
 // Safari compatibility check
 const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+// CRITICAL: DO NOT cache JS bundles - they must always be fresh
+// Only cache static assets, not application code
 const urlsToCache = [
   '/',
-  '/app',
-  '/assets/index.css',
-  '/assets/index.js'
+  '/app'
+  // NOTE: Removed /assets/index.css and /assets/index.js from cache
+  // JS bundles must always load fresh to ensure latest deep link code runs
 ];
 
 // Install event - cache resources
@@ -81,6 +84,15 @@ self.addEventListener('fetch', (event) => {
     }
   }
   
+  // CRITICAL: Never cache JS bundles - always fetch fresh
+  // This ensures deep link code updates are immediately available
+  if (url.pathname.startsWith('/assets/') && url.pathname.endsWith('.js')) {
+    console.log('🚫 ServiceWorker: Bypassing cache for JS bundle:', url.pathname);
+    return fetch(event.request).catch(() => {
+      return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+    });
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then((response) => {

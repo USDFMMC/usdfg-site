@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Deep Link Debug</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: monospace;
+      background: #000;
+      color: #0f0;
+      padding: 20px;
+      font-size: 14px;
+    }
+    .section {
+      margin: 20px 0;
+      padding: 15px;
+      border: 1px solid #0f0;
+      border-radius: 5px;
+    }
+    button {
+      background: #0f0;
+      color: #000;
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 5px;
+      margin: 5px;
+    }
+    button:hover {
+      background: #0a0;
+    }
+    pre {
+      background: #111;
+      padding: 10px;
+      border-radius: 5px;
+      overflow-x: auto;
+    }
+    .error { color: #f00; }
+    .success { color: #0f0; }
+    .warning { color: #ff0; }
+  </style>
+</head>
+<body>
+  <h1>🔍 Deep Link Debug Console</h1>
+  
+  <div class="section">
+    <h2>1. Check Current Page</h2>
+    <button onclick="checkPage()">Check Page</button>
+    <pre id="pageInfo"></pre>
+  </div>
+
+  <div class="section">
+    <h2>2. Check Debug Variables</h2>
+    <button onclick="checkDebugVars()">Check Debug Variables</button>
+    <pre id="debugVars"></pre>
+  </div>
+
+  <div class="section">
+    <h2>3. List All Scripts</h2>
+    <button onclick="listScripts()">List Scripts</button>
+    <pre id="scriptsList"></pre>
+  </div>
+
+  <div class="section">
+    <h2>4. Test Deep Link Function</h2>
+    <button onclick="testDeepLink()">Test launchPhantomDeepLink()</button>
+    <pre id="deepLinkTest"></pre>
+  </div>
+
+  <div class="section">
+    <h2>5. Check Service Worker</h2>
+    <button onclick="checkServiceWorker()">Check Service Worker</button>
+    <pre id="swInfo"></pre>
+  </div>
+
+  <div class="section">
+    <h2>6. Clear All Caches</h2>
+    <button onclick="clearCaches()">Clear Caches</button>
+    <pre id="cacheInfo"></pre>
+  </div>
+
+  <script>
+    function checkPage() {
+      const info = {
+        href: window.location.href,
+        origin: window.location.origin,
+        pathname: window.location.pathname,
+        search: window.location.search,
+        hash: window.location.hash,
+        userAgent: navigator.userAgent,
+        isSafari: /^((?!chrome|android).)*safari/i.test(navigator.userAgent),
+        isMobile: /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+      };
+      document.getElementById('pageInfo').textContent = JSON.stringify(info, null, 2);
+    }
+
+    function checkDebugVars() {
+      const vars = {
+        '__phantom_debug_redirect': window.__phantom_debug_redirect,
+        '__phantom_redirect_debug': window.__phantom_redirect_debug, // Check both spellings
+        'launchPhantomDeepLink': typeof window.launchPhantomDeepLink,
+        'shouldUseDeepLink': typeof window.shouldUseDeepLink
+      };
+      document.getElementById('debugVars').textContent = JSON.stringify(vars, null, 2);
+    }
+
+    function listScripts() {
+      const scripts = Array.from(document.querySelectorAll('script')).map((script, index) => ({
+        index: index + 1,
+        src: script.src || 'inline',
+        type: script.type || 'text/javascript',
+        async: script.async,
+        defer: script.defer
+      }));
+      document.getElementById('scriptsList').textContent = JSON.stringify(scripts, null, 2);
+    }
+
+    async function testDeepLink() {
+      const output = [];
+      output.push('Testing deep link function...\n');
+      
+      try {
+        // Check if function exists
+        if (typeof window.launchPhantomDeepLink === 'function') {
+          output.push('✅ launchPhantomDeepLink() exists');
+          output.push('Calling function...\n');
+          window.launchPhantomDeepLink();
+          output.push('✅ Function called (should redirect)');
+        } else {
+          output.push('❌ launchPhantomDeepLink() NOT FOUND');
+          output.push('Checking for alternative locations...');
+          
+          // Check if it's in a module
+          if (window.__PHANTOM_DEEPLINK_MODULE) {
+            output.push('✅ Found __PHANTOM_DEEPLINK_MODULE');
+          } else {
+            output.push('❌ No __PHANTOM_DEEPLINK_MODULE found');
+          }
+        }
+      } catch (error) {
+        output.push('❌ Error: ' + error.message);
+        output.push('Stack: ' + error.stack);
+      }
+      
+      document.getElementById('deepLinkTest').textContent = output.join('\n');
+    }
+
+    async function checkServiceWorker() {
+      const output = [];
+      
+      if ('serviceWorker' in navigator) {
+        output.push('✅ Service Worker supported');
+        
+        try {
+          const registration = await navigator.serviceWorker.getRegistration();
+          if (registration) {
+            output.push('✅ Service Worker registered');
+            output.push('Scope: ' + registration.scope);
+            output.push('Active: ' + (registration.active ? 'Yes' : 'No'));
+            output.push('Waiting: ' + (registration.waiting ? 'Yes' : 'No'));
+            output.push('Installing: ' + (registration.installing ? 'Yes' : 'No'));
+          } else {
+            output.push('❌ No Service Worker registered');
+          }
+        } catch (error) {
+          output.push('❌ Error checking Service Worker: ' + error.message);
+        }
+      } else {
+        output.push('❌ Service Worker not supported');
+      }
+      
+      document.getElementById('swInfo').textContent = output.join('\n');
+    }
+
+    async function clearCaches() {
+      const output = [];
+      output.push('Clearing caches...\n');
+      
+      try {
+        if ('caches' in window) {
+          const cacheNames = await caches.keys();
+          output.push('Found ' + cacheNames.length + ' caches:');
+          for (const name of cacheNames) {
+            output.push('  - ' + name);
+            await caches.delete(name);
+            output.push('    ✅ Deleted');
+          }
+        } else {
+          output.push('❌ Cache API not supported');
+        }
+        
+        // Clear service worker
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (const registration of registrations) {
+            await registration.unregister();
+            output.push('✅ Unregistered Service Worker: ' + registration.scope);
+          }
+        }
+        
+        output.push('\n✅ All caches cleared!');
+        output.push('Please reload the page.');
+      } catch (error) {
+        output.push('❌ Error: ' + error.message);
+      }
+      
+      document.getElementById('cacheInfo').textContent = output.join('\n');
+    }
+
+    // Auto-run on load
+    window.addEventListener('load', () => {
+      checkPage();
+      checkDebugVars();
+      listScripts();
+      checkServiceWorker();
+    });
+  </script>
+</body>
+</html>
+
