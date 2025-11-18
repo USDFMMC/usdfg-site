@@ -1,1 +1,5 @@
-/*    /index.html   200 
+# All /app routes (React Router handles client-side routing)
+/app/*                /index.html   200
+
+# Catch-all for all other routes (homepage, privacy, terms, etc.)
+/*                    /index.html   200 

@@ -52,6 +52,7 @@ function generateNonce(): string {
  * Launch Phantom deep link for connection
  */
 export function launchPhantomDeepLink(): void {
+  console.log('🔥 USING DEEPLINK FROM FILE: phantom-deeplink.ts');
   console.log('🔍 launchPhantomDeepLink() CALLED');
   console.log('🔍 Current URL:', window.location.href);
   console.log('🔍 Current pathname:', window.location.pathname);
