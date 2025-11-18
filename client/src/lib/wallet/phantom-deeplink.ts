@@ -66,12 +66,14 @@ export function launchPhantomDeepLink(): void {
 
     const dappPublicKey = dappKeypair.publicKey.toBase58();
     
-    // CRITICAL: redirect_link MUST point to /phantom-return, not /app
-    // The /phantom-return page will decrypt the payload and save it, then redirect to /app
-    const redirectLink = `${window.location.origin}/phantom-return`;
-    const appUrl = window.location.origin;
+    // CRITICAL: redirect_link MUST point to /app/phantom-return (not /phantom-return)
+    // The app routing is inside /app, so the return handler must be at /app/phantom-return
+    // The /app/phantom-return page will decrypt the payload and save it, then redirect to /app
+    const redirectLink = `${window.location.origin}/app/phantom-return`;
+    const appUrl = `${window.location.origin}/app`;
     
     console.log('🔗 Redirecting Phantom to:', redirectLink);
+    console.log('🔗 App URL:', appUrl);
 
     // Build URL using URLSearchParams for proper encoding
     const params = new URLSearchParams({
