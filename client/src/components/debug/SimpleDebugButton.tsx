@@ -26,46 +26,26 @@ export const SimpleDebugButton: React.FC = () => {
 
   if (!isOpen) {
     return (
-      <div
+      <button
         onClick={() => setIsOpen(true)}
+        className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-md text-xs font-bold border-2 border-yellow-400 shadow-lg"
         style={{
-          position: 'fixed',
-          top: '10px',
-          left: '10px',
-          zIndex: 99999999,
-          background: 'red',
-          color: 'white',
-          padding: '12px 16px',
-          borderRadius: '8px',
-          fontSize: '14px',
-          fontWeight: 'bold',
-          border: '3px solid yellow',
           cursor: 'pointer',
-          boxShadow: '0 0 20px rgba(255,0,0,0.8)',
         }}
       >
         🐛 DEBUG
-      </div>
+      </button>
     );
   }
 
   return (
     <div
+      className="fixed top-16 right-4 z-[999999] bg-black/98 text-white p-4 rounded-lg text-xs border-2 border-red-500 shadow-2xl"
       style={{
-        position: 'fixed',
-        top: '10px',
-        left: '10px',
-        zIndex: 99999999,
-        background: 'black',
-        color: 'white',
-        padding: '16px',
-        borderRadius: '8px',
-        fontSize: '12px',
-        border: '3px solid red',
         maxWidth: '90vw',
+        maxWidth: '400px',
         maxHeight: '80vh',
         overflow: 'auto',
-        boxShadow: '0 0 30px rgba(255,0,0,0.9)',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
