@@ -11,16 +11,37 @@ export const SimpleDebugButton: React.FC = () => {
     
     // Listen for console logs
     const originalLog = console.log;
+    const originalWarn = console.warn;
+    const originalError = console.error;
+    
     console.log = (...args) => {
       originalLog(...args);
       const message = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ');
-      if (message.includes('Wallet') || message.includes('MWA') || message.includes('adapter')) {
-        setLogs(prev => [...prev.slice(-19), message]);
+      if (message.includes('Wallet') || message.includes('MWA') || message.includes('adapter') || message.includes('Mobile Wallet') || message.includes('Available wallet')) {
+        setLogs(prev => [...prev.slice(-29), `[LOG] ${message}`]);
+      }
+    };
+    
+    console.warn = (...args) => {
+      originalWarn(...args);
+      const message = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ');
+      if (message.includes('Wallet') || message.includes('MWA') || message.includes('adapter') || message.includes('Mobile Wallet')) {
+        setLogs(prev => [...prev.slice(-29), `[WARN] ${message}`]);
+      }
+    };
+    
+    console.error = (...args) => {
+      originalError(...args);
+      const message = args.map(a => typeof a === 'string' ? a : JSON.stringify(a)).join(' ');
+      if (message.includes('Wallet') || message.includes('MWA') || message.includes('adapter') || message.includes('Mobile Wallet')) {
+        setLogs(prev => [...prev.slice(-29), `[ERROR] ${message}`]);
       }
     };
 
     return () => {
       console.log = originalLog;
+      console.warn = originalWarn;
+      console.error = originalError;
     };
   }, []);
 
