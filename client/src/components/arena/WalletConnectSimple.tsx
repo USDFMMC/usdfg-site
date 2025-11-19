@@ -305,13 +305,30 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     );
   }
 
+  // Don't show connect button if we have a stored connection (even if adapter isn't connected)
+  const hasStoredConnection = typeof window !== 'undefined' && 
+    localStorage.getItem('phantom_connected') === 'true' && 
+    localStorage.getItem('phantom_public_key');
+  
+  if (hasStoredConnection && !actuallyConnected) {
+    // We have a stored connection but adapter isn't connected yet
+    // Show a "Connecting..." state or wait for state to update
+    return (
+      <div className="flex flex-col space-y-2">
+        <div className="px-3 py-2 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-lg text-sm text-center">
+          Connecting...
+        </div>
+      </div>
+    );
+  }
+
   // Show connection button
   return (
     <div className="flex flex-col space-y-2">
       {compact ? (
         <button
           onClick={handleConnect}
-          disabled={connecting}
+          disabled={connecting || hasStoredConnection}
           className="px-2.5 py-1.5 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-md text-xs font-medium hover:bg-amber-600/30 transition-colors disabled:opacity-50"
         >
           {connecting ? 'Connecting...' : 'Connect Wallet'}
@@ -319,7 +336,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       ) : (
         <button
           onClick={handleConnect}
-          disabled={connecting}
+          disabled={connecting || hasStoredConnection}
           className="px-3 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50 border border-amber-400/50 shadow-lg shadow-amber-500/20 text-sm"
         >
           {connecting ? 'Connecting...' : 'Connect Wallet'}
