@@ -123,10 +123,19 @@ const ArenaHome: React.FC = () => {
   const { connection } = useConnection();
   const { connected, signTransaction, publicKey, connect, signAllTransactions, select, wallets } = wallet;
   
+  // State to track stored Phantom connection (forces re-render when changed)
+  const [phantomConnectionState, setPhantomConnectionState] = useState(() => {
+    if (typeof window === 'undefined') return { connected: false, publicKey: null };
+    return {
+      connected: localStorage.getItem('phantom_connected') === 'true',
+      publicKey: localStorage.getItem('phantom_public_key')
+    };
+  });
+  
   // Check for stored Phantom connection (mobile deep link)
   // On mobile Safari, adapter.connect() doesn't work, so we use stored public key
-  const hasStoredPhantomConnection = localStorage.getItem('phantom_connected') === 'true';
-  const storedPhantomPublicKey = localStorage.getItem('phantom_public_key');
+  const hasStoredPhantomConnection = phantomConnectionState.connected || localStorage.getItem('phantom_connected') === 'true';
+  const storedPhantomPublicKey = phantomConnectionState.publicKey || localStorage.getItem('phantom_public_key');
   
   // Use adapter connection OR stored Phantom connection
   // This allows mobile deep links to work even if adapter.connect() fails
@@ -183,6 +192,12 @@ const ArenaHome: React.FC = () => {
             localStorage.setItem('phantom_connected', 'true');
             localStorage.setItem('phantom_public_key', result.publicKey);
             
+            // Update state immediately to trigger re-render
+            setPhantomConnectionState({
+              connected: true,
+              publicKey: result.publicKey
+            });
+            
             // Ensure arena-access is preserved
             localStorage.setItem('arena-access', 'true');
             
@@ -191,7 +206,7 @@ const ArenaHome: React.FC = () => {
             
             // DON'T reload - use the public key directly
             // On mobile Safari, adapter.connect() doesn't work, so we use the stored public key
-            console.log("✅ Phantom session saved - using public key directly (no reload needed)");
+            console.log("✅ Phantom session saved - state updated, wallet should show as connected");
             
             // Trigger a state update to reflect the connection
             window.dispatchEvent(new Event('phantomConnected'));
