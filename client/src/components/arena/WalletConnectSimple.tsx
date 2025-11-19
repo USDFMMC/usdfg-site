@@ -20,14 +20,20 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   onDisconnect,
   compact = false
 }) => {
-  const { publicKey, connected, connecting, disconnect, select, wallets, connect } = useWallet();
+  const { publicKey: adapterPublicKey, connected, connecting, disconnect, select, wallets, connect } = useWallet();
   const { connection } = useConnection();
+  
+  // For mobile deep links, use stored public key if adapter doesn't have one
+  const storedPhantomPublicKey = typeof window !== 'undefined' ? localStorage.getItem('phantom_public_key') : null;
+  const publicKey = adapterPublicKey || (storedPhantomPublicKey ? new PublicKey(storedPhantomPublicKey) : null);
   const [balance, setBalance] = useState<number | null>(null);
   const [usdfgBalance, setUsdfgBalance] = useState<number | null>(null);
 
   // Handle connection state changes
   useEffect(() => {
-    if (connected && publicKey) {
+    // Use prop isConnected for mobile deep links
+    const actuallyConnected = isConnected || (connected && publicKey);
+    if (actuallyConnected && publicKey) {
       // Clear disconnect flag when user successfully connects
       localStorage.removeItem('wallet_disconnected');
       onConnect();
@@ -74,7 +80,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       fetchUSDFGBalance().catch(() => {
         setUsdfgBalance(0);
       });
-    } else if (!connected) {
+    } else if (!actuallyConnected) {
       setBalance(null);
       setUsdfgBalance(null);
       onDisconnect();
@@ -189,6 +195,11 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         await disconnect();
       }
       
+      // Clear stored Phantom connection (mobile deep link)
+      localStorage.removeItem('phantom_connected');
+      localStorage.removeItem('phantom_public_key');
+      sessionStorage.removeItem('phantomSession');
+      
       // Set disconnect flag
       localStorage.setItem('wallet_disconnected', 'true');
       window.dispatchEvent(new Event('walletDisconnected'));
@@ -220,12 +231,20 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       console.error('Disconnect error:', error);
       // Force reload even on error
       localStorage.setItem('wallet_disconnected', 'true');
+      // Clear Phantom connection
+      localStorage.removeItem('phantom_connected');
+      localStorage.removeItem('phantom_public_key');
+      sessionStorage.removeItem('phantomSession');
       window.location.reload();
     }
   };
 
-  // If connected, show connected state
-  if (connected && publicKey) {
+  // If connected (via prop OR adapter), show connected state
+  // Use prop isConnected for mobile deep links, fallback to adapter connected
+  const actuallyConnected = isConnected || (connected && publicKey);
+  const displayPublicKey = publicKey; // Use adapter's publicKey if available
+  
+  if (actuallyConnected && displayPublicKey) {
     // Compact mode for mobile
     if (compact) {
       return (
