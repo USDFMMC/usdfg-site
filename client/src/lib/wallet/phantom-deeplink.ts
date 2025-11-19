@@ -78,13 +78,14 @@ export function launchPhantomDeepLink(): void {
     // Phantom ALWAYS returns to /app, regardless of where user clicked Connect
     // This is stable, consistent, and matches tools.smithii.io exactly
     const redirectLink = encodeURIComponent("https://usdfg.pro/app");
-    const appUrl = encodeURIComponent("https://usdfg.pro");
+    // app_url is what Phantom displays in connected accounts - use full app path
+    const appUrl = encodeURIComponent("https://usdfg.pro/app");
     
     // Store redirect URL globally for debugging
     (window as any).__phantom_debug_redirect = "https://usdfg.pro/app";
     
     console.log('🔗 Redirect link (HARDCODED /app):', "https://usdfg.pro/app");
-    console.log('🔗 App URL (HARDCODED):', "https://usdfg.pro");
+    console.log('🔗 App URL (HARDCODED - what Phantom displays):', "https://usdfg.pro/app");
     console.log('🔍 DEBUG: window.__phantom_debug_redirect =', "https://usdfg.pro/app");
     
     // Build deep link URL with properly encoded parameters
@@ -94,7 +95,7 @@ export function launchPhantomDeepLink(): void {
     // CRITICAL LOG - This shows EXACTLY what redirect URL is being sent to Phantom
     console.log('🔗 Redirecting Phantom to (HARDCODED):', "https://usdfg.pro/app");
     console.log('🔗 Redirect Link (encoded):', redirectLink);
-    console.log('🔗 App URL (HARDCODED):', "https://usdfg.pro");
+    console.log('🔗 App URL (HARDCODED - displayed in Phantom):', "https://usdfg.pro/app");
     console.log('🔗 App URL (encoded):', appUrl);
     console.log('🔗 Full Deep Link URL:', deepLinkUrl);
     console.log('📱 Redirecting to Phantom NOW...');
