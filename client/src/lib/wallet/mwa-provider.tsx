@@ -2,7 +2,7 @@ import React, { FC, ReactNode, useMemo, useEffect, useState } from 'react';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { clusterApiUrl } from '@solana/web3.js';
-import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
+import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets';
 
 // Import wallet adapter styles
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -72,17 +72,26 @@ export const MWAProvider: FC<{ children: ReactNode }> = ({ children }) => {
   })();
 
   // Configure wallet adapters
-  // Simplified to Phantom only for Safari compatibility
-  // Phantom adapter handles deep links automatically on iOS Safari
+  // CRITICAL: Use @solana/wallet-adapter-wallets for mobile-capable Phantom adapter
+  // This package includes the mobile Safari deep link support
   const wallets = useMemo(() => {
     const phantomAdapter = new PhantomWalletAdapter({
       pollInterval: 1000,
       pollTimeout: 15000,
     });
     
-    console.log('✅ Phantom Wallet Adapter initialized:', {
+    console.log('✅ Phantom Wallet Adapter initialized (from @solana/wallet-adapter-wallets):', {
       name: phantomAdapter.name,
       readyState: phantomAdapter.readyState,
+      adapterClass: phantomAdapter.constructor.name,
+      adapterPackage: '@solana/wallet-adapter-wallets',
+    });
+    
+    // Log adapter details for debugging
+    console.log('🔍 Adapter details:', {
+      hasConnect: typeof phantomAdapter.connect === 'function',
+      hasDisconnect: typeof phantomAdapter.disconnect === 'function',
+      adapter: phantomAdapter,
     });
     
     return [phantomAdapter];
