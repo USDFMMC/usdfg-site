@@ -1,107 +1,39 @@
-import { useEffect, useState, useCallback } from "react";
-import {
-  Connection,
-  PublicKey,
-  clusterApiUrl,
-} from "@solana/web3.js";
-import {
-  PhantomWalletAdapter,
-} from "@solana/wallet-adapter-phantom";
-
-const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-const isSafari = /^((?!chrome|android).)*safari/i.test(
-  navigator.userAgent
-);
-const skipAutoConnect = isIOS && isSafari;
-const RPC = clusterApiUrl("devnet");
+import { useCallback } from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useConnection } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
 
 export function usePhantom() {
-  const [adapter] = useState(() => new PhantomWalletAdapter());
-  const [publicKey, setPublicKey] = useState<PublicKey | null>(null);
-  const [connected, setConnected] = useState(false);
-  const [connecting, setConnecting] = useState(false);
+  const wallet = useWallet();
+  const { connection } = useConnection();
 
-  // ---------- CLEAN NONCE BEFORE CONNECT ----------
-  const resetNonce = () => {
-    try {
-      localStorage.removeItem("walletAdapterMobileNonce");
-    } catch (e) {}
-  };
-
-  // ---------- CONNECT ----------
+  // Clear stale nonce before connecting (Phantom iOS fix)
   const connect = useCallback(async () => {
     try {
-      resetNonce();
-      setConnecting(true);
-      await adapter.connect({
-        onlyIfTrusted: false,
-        allowRedirect: true,
-      });
-      // Wait for Phantom to return without looping
-    } catch (err) {
-      console.log("Connect canceled:", err);
-    } finally {
-      setConnecting(false);
+      // Clear stale nonce (Phantom iOS fix)
+      localStorage.removeItem("walletAdapterMobileNonce");
+      
+      await wallet.connect();
+    } catch (e) {
+      console.log("Phantom connect canceled:", e);
     }
-  }, [adapter]);
+  }, [wallet]);
 
-  // ---------- DISCONNECT ----------
   const disconnect = useCallback(async () => {
     try {
-      await adapter.disconnect();
-    } catch (err) {
-      console.log(err);
+      await wallet.disconnect();
+    } catch (e) {
+      console.log("Disconnect error:", e);
     }
-    setPublicKey(null);
-    setConnected(false);
-  }, [adapter]);
-
-  // ---------- PHANTOM EVENTS ----------
-  useEffect(() => {
-    const handleConnect = () => {
-      setPublicKey(adapter.publicKey);
-      setConnected(true);
-    };
-
-    const handleDisconnect = () => {
-      setPublicKey(null);
-      setConnected(false);
-    };
-
-    adapter.on("connect", handleConnect);
-    adapter.on("disconnect", handleDisconnect);
-
-    return () => {
-      adapter.off("connect", handleConnect);
-      adapter.off("disconnect", handleDisconnect);
-    };
-  }, [adapter]);
-
-  // ---------- RESTORE SESSION (SAFE) ----------
-  useEffect(() => {
-    if (skipAutoConnect) {
-      console.log("iOS Safari detected — skipping auto-connect.");
-      return;
-    }
-
-    // Try restore once
-    if (!adapter.connected) {
-      adapter
-        .connect({ onlyIfTrusted: true })
-        .catch(() => {
-          /* fail silently without looping */
-        });
-    }
-  }, [adapter]);
+  }, [wallet]);
 
   return {
-    adapter,
-    publicKey,
-    connected,
-    connecting,
     connect,
     disconnect,
-    connection: new Connection(RPC),
+    publicKey: wallet.publicKey as PublicKey | null,
+    connected: wallet.connected,
+    connecting: wallet.connecting,
+    connection,
   };
 }
 

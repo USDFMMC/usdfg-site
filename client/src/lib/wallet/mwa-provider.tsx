@@ -3,13 +3,6 @@ import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { clusterApiUrl } from '@solana/web3.js';
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
-import { SolflareWalletAdapter } from '@solana/wallet-adapter-solflare';
-import {
-  SolanaMobileWalletAdapter,
-  createDefaultAddressSelector,
-  createDefaultAuthorizationResultCache,
-  createDefaultWalletNotFoundHandler,
-} from '@solana-mobile/wallet-adapter-mobile';
 
 // Import wallet adapter styles
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -31,17 +24,27 @@ export const MWAProvider: FC<{ children: ReactNode }> = ({ children }) => {
     return endpoints[0];
   }, [network]);
   
-  // Auto-connect by default, UNLESS user explicitly disconnected
-  // Check localStorage SYNCHRONOUSLY before any state initialization
-  // This must happen before WalletProvider initializes
+  // Disable auto-connect on iOS Safari to prevent loops
+  // This is critical for Safari deep link flow
+  const isIOS = typeof window !== 'undefined' && /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isSafari = typeof window !== 'undefined' && /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  const skipAutoConnect = isIOS && isSafari;
+  
+  // Auto-connect by default, UNLESS on iOS Safari OR user explicitly disconnected
   const initialAutoConnect = (() => {
-    if (typeof window === 'undefined') return true;
+    if (typeof window === 'undefined') return !skipAutoConnect;
     
-    // Check disconnect flag first
+    // Never auto-connect on iOS Safari (prevents loops)
+    if (skipAutoConnect) {
+      console.log('🍎 iOS Safari detected - skipping auto-connect');
+      return false;
+    }
+    
+    // Check disconnect flag
     const userDisconnected = localStorage.getItem('wallet_disconnected') === 'true';
     console.log('🔍 WalletProvider init - userDisconnected:', userDisconnected);
     
-    // If user disconnected, also clear any wallet adapter keys that might have been created
+    // If user disconnected, clear any wallet adapter keys
     if (userDisconnected) {
       try {
         const allKeys = Object.keys(localStorage);
@@ -67,93 +70,27 @@ export const MWAProvider: FC<{ children: ReactNode }> = ({ children }) => {
     console.log('✅ WalletProvider autoConnect set to:', shouldAutoConnect);
     return shouldAutoConnect;
   })();
-  
-  const [shouldAutoConnect, setShouldAutoConnect] = useState(initialAutoConnect);
-
-  // Check if user has explicitly disconnected
-  useEffect(() => {
-    const checkDisconnect = () => {
-      const userDisconnected = typeof window !== 'undefined' && localStorage.getItem('wallet_disconnected') === 'true';
-      setShouldAutoConnect(!userDisconnected);
-    };
-
-    checkDisconnect();
-    
-    // Listen for storage changes (in case user disconnects in another tab)
-    if (typeof window !== 'undefined') {
-      window.addEventListener('storage', checkDisconnect);
-      // Also listen for custom events
-      window.addEventListener('walletDisconnected', checkDisconnect);
-      return () => {
-        window.removeEventListener('storage', checkDisconnect);
-        window.removeEventListener('walletDisconnected', checkDisconnect);
-      };
-    }
-  }, []);
 
   // Configure wallet adapters
-  // CRITICAL: SolanaMobileWalletAdapter MUST be first to enable Safari → Phantom → Safari flow
-  // This prevents deep link fallback and ensures MWA is used on mobile browsers
+  // Simplified to Phantom only for Safari compatibility
+  // Phantom adapter handles deep links automatically on iOS Safari
   const wallets = useMemo(() => {
-    const adapters = [];
-    
-    // Add Mobile Wallet Adapter FIRST for seamless mobile browser experience
-    // MWA must be first in the array to take priority over Phantom's deep link fallback
-    try {
-      // Check if we're on mobile before initializing MWA
-      const isMobile = typeof window !== 'undefined' && 
-        (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 
-         (window as any).navigator?.userAgentData?.mobile === true);
-      
-      console.log('🔍 MWA initialization check:', {
-        isMobile,
-        userAgent: typeof window !== 'undefined' ? navigator.userAgent : 'N/A',
-        hasSolanaMobile: typeof window !== 'undefined' ? 'solanaMobile' in window : false,
-      });
-      
-      const mobileAdapter = new SolanaMobileWalletAdapter({
-        addressSelector: createDefaultAddressSelector(),
-        appIdentity: {
-          name: 'USDFG',
-          uri: typeof window !== 'undefined' ? window.location.origin : 'https://usdfg.pro',
-          icon: '/favicon.png',
-        },
-        authorizationResultCache: createDefaultAuthorizationResultCache(),
-        chain: 'devnet',
-        onWalletNotFound: createDefaultWalletNotFoundHandler(),
-      });
-      
-      console.log('✅ Mobile Wallet Adapter initialized:', {
-        name: mobileAdapter.name,
-        readyState: mobileAdapter.readyState,
-        isMobile,
-      });
-      
-      adapters.push(mobileAdapter);
-    } catch (error) {
-      console.warn('⚠️ Mobile Wallet Adapter initialization failed (non-fatal):', error);
-      console.error('MWA Error details:', error);
-      // Continue without MWA - Phantom/Solflare will still work
-    }
-    
-    // Add standard wallet adapters AFTER MWA
-    // These will be used as fallbacks if MWA is not available
-    const phantomAdapter = new PhantomWalletAdapter();
-    const solflareAdapter = new SolflareWalletAdapter();
-    adapters.push(phantomAdapter, solflareAdapter);
-    
-    // Log all adapter names for debugging
-    console.log('📋 Available wallet adapters (in priority order):');
-    adapters.forEach((adapter, index) => {
-      console.log(`  ${index + 1}. ${adapter.name} (readyState: ${adapter.readyState})`);
+    const phantomAdapter = new PhantomWalletAdapter({
+      pollInterval: 1000,
+      pollTimeout: 15000,
     });
     
-    return adapters;
+    console.log('✅ Phantom Wallet Adapter initialized:', {
+      name: phantomAdapter.name,
+      readyState: phantomAdapter.readyState,
+    });
+    
+    return [phantomAdapter];
   }, []);
 
   return (
     <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect={shouldAutoConnect}>
+      <WalletProvider wallets={wallets} autoConnect={initialAutoConnect}>
         <WalletModalProvider>
           {children}
         </WalletModalProvider>
