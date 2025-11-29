@@ -147,26 +147,47 @@ const ArenaHome: React.FC = () => {
   // CRITICAL: Handle Phantom deep link return on same page (Smithii-style)
   // Phantom returns to /app with query params, we decrypt and restore session here
   useEffect(() => {
+    // Check if this is a redirect from a new tab that was closed
     const params = new URLSearchParams(window.location.search);
+    if (params.get('phantom_connected') === 'true') {
+      console.log("📨 Detected redirect from closed new tab - checking for connection state");
+      const hasConnection = localStorage.getItem('phantom_connected') === 'true';
+      if (hasConnection) {
+        const publicKey = localStorage.getItem('phantom_public_key');
+        if (publicKey) {
+          console.log("✅ Found connection state - updating UI");
+          setPhantomConnectionState({
+            connected: true,
+            publicKey: publicKey
+          });
+          window.history.replaceState({}, "", "/app");
+        }
+      }
+      return;
+    }
+    
+    const params2 = new URLSearchParams(window.location.search);
     
     // Handle user cancellation - Phantom may redirect without params
     // If we're on /app with no params and we have a pending deep link, user likely cancelled
-    if (!params.has("phantom_encryption_public_key") && window.location.pathname === "/app") {
+    if (!params2.has("phantom_encryption_public_key") && window.location.pathname === "/app") {
       const hasPendingNonce = sessionStorage.getItem(SESSION_STORAGE_NONCE);
       if (hasPendingNonce) {
         console.log("⚠️ Phantom deep link cancelled by user - staying on /app");
         // Clear the pending nonce
         sessionStorage.removeItem(SESSION_STORAGE_NONCE);
+        sessionStorage.removeItem('phantom_original_tab');
         // Ensure we stay on /app (don't redirect anywhere)
         window.history.replaceState({}, "", "/app");
         return;
       }
     }
     
-    if (params.has("phantom_encryption_public_key")) {
+    if (params2.has("phantom_encryption_public_key")) {
       console.log("🔥🔥🔥 Safari deep link return activated");
       console.log("🔎 Full URL:", window.location.href);
       console.log("🔎 Search params:", window.location.search);
+      console.log("🔎 Is original tab:", sessionStorage.getItem('phantom_original_tab') === 'true');
       
       // Check if this is a valid Phantom return
       if (isPhantomReturn()) {
@@ -193,13 +214,20 @@ const ArenaHome: React.FC = () => {
             localStorage.setItem('phantom_public_key', result.publicKey);
             
             // Check if we're in a new tab (Phantom opened new tab)
-            // If original tab had a nonce, and this tab doesn't have sessionStorage from before navigation,
-            // we're likely in a new tab
-            const hadNonceBefore = sessionStorage.getItem('phantom_original_tab') === 'true';
-            const isNewTab = !hadNonceBefore && sessionStorage.getItem(SESSION_STORAGE_NONCE) === null;
+            // The original tab would have 'phantom_original_tab' marker
+            // If this tab doesn't have it, we're likely in a new tab
+            const isOriginalTab = sessionStorage.getItem('phantom_original_tab') === 'true';
             
-            if (isNewTab) {
+            if (!isOriginalTab) {
               console.log("⚠️ Phantom returned in NEW TAB - syncing with original tab");
+              
+              // Save connection state (will be picked up by original tab)
+              localStorage.setItem('phantom_connected', 'true');
+              localStorage.setItem('phantom_public_key', result.publicKey);
+              localStorage.setItem('phantom_connection_sync', JSON.stringify({
+                publicKey: result.publicKey,
+                timestamp: Date.now()
+              }));
               
               // Use BroadcastChannel to notify original tab
               try {
@@ -210,23 +238,26 @@ const ArenaHome: React.FC = () => {
                   session: result.session
                 });
                 console.log("✅ Sent connection message to original tab via BroadcastChannel");
-                
-                // Also trigger storage event (for browsers that don't support BroadcastChannel)
-                localStorage.setItem('phantom_connection_sync', JSON.stringify({
-                  publicKey: result.publicKey,
-                  timestamp: Date.now()
-                }));
-                
-                // Show message to user
-                alert("✅ Wallet connected! Please return to the original tab to continue.");
-                
-                // Try to close this tab (may not work due to browser security)
-                setTimeout(() => {
-                  window.close();
-                }, 1000);
+                channel.close();
               } catch (error) {
-                console.error("❌ Error syncing with original tab:", error);
+                console.error("❌ Error with BroadcastChannel:", error);
               }
+              
+              // Clean URL
+              window.history.replaceState({}, "", "/app");
+              
+              // Show message and try to close this tab
+              alert("✅ Wallet connected! Closing this tab - please use the original tab.");
+              
+              // Try multiple methods to close/redirect
+              setTimeout(() => {
+                try {
+                  window.close();
+                } catch (e) {
+                  // If we can't close, redirect to a simple page that tells user to go back
+                  window.location.href = '/app?phantom_connected=true';
+                }
+              }, 500);
             } else {
               // We're in the original tab - update state normally
               console.log("✅ Phantom returned in ORIGINAL TAB");
