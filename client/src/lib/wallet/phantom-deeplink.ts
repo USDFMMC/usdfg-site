@@ -103,11 +103,18 @@ export function launchPhantomDeepLink(): void {
     console.log('📍 Nonce:', nonce);
 
     // CRITICAL: Redirect to Phantom immediately
-    // This MUST execute for the deep link to work
-    window.location.href = deepLinkUrl;
+    // Use window.location.replace() instead of href to prevent new tab
+    // This ensures Phantom returns to the same tab instead of opening a new one
+    try {
+      window.location.replace(deepLinkUrl);
+    } catch (error) {
+      // Fallback to href if replace fails
+      console.warn('⚠️ window.location.replace() failed, using href:', error);
+      window.location.href = deepLinkUrl;
+    }
     
     // If we somehow get here, log a warning
-    console.warn('⚠️ window.location.href was set but redirect may not have occurred');
+    console.warn('⚠️ Redirect may not have occurred');
   } catch (error) {
     console.error('❌ Error launching Phantom deep link:', error);
     console.error('Error details:', error);

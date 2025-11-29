@@ -252,7 +252,13 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const actuallyConnected = isConnected || (connected && publicKey);
   const displayPublicKey = publicKey; // Use adapter's publicKey if available
   
-  if (actuallyConnected && displayPublicKey) {
+  // Also check for stored Phantom connection
+  const hasStoredPhantomConnection = typeof window !== 'undefined' && 
+    localStorage.getItem('phantom_connected') === 'true' && 
+    localStorage.getItem('phantom_public_key');
+  
+  // Show connected state if adapter is connected OR we have stored connection
+  if ((actuallyConnected && displayPublicKey) || hasStoredPhantomConnection) {
     // Compact mode for mobile
     if (compact) {
       return (
@@ -267,7 +273,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
             className="px-2 py-1.5 bg-green-500/20 text-green-400 border border-green-500/30 rounded-md text-xs font-medium hover:bg-green-500/30 transition-colors flex items-center gap-1"
           >
             <span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
-            <span className="hidden sm:inline">{publicKey.toString().slice(0, 4)}...</span>
+            <span className="hidden sm:inline">{(displayPublicKey || (hasStoredPhantomConnection && new PublicKey(localStorage.getItem('phantom_public_key')!)))?.toString().slice(0, 4)}...</span>
             <span className="sm:hidden">Connected</span>
           </button>
         </div>
@@ -279,7 +285,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       <div className="flex items-center space-x-3">
         <div className="text-right">
           <div className="text-sm text-gray-400">
-            {publicKey.toString().slice(0, 8)}...{publicKey.toString().slice(-8)}
+            {(displayPublicKey || (hasStoredPhantomConnection && new PublicKey(localStorage.getItem('phantom_public_key')!)))?.toString().slice(0, 8)}...{(displayPublicKey || (hasStoredPhantomConnection && new PublicKey(localStorage.getItem('phantom_public_key')!)))?.toString().slice(-8)}
           </div>
           <div className="flex items-center gap-3">
             <div>
