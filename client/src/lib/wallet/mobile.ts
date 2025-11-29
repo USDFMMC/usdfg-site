@@ -1,14 +1,21 @@
 /**
- * Mobile Safari → DIRECT Phantom deep link method
+ * Mobile Safari → DIRECT Phantom universal link method
  * This bypasses wallet adapter completely on mobile Safari
- * Uses the same deep link system as phantom-deeplink.ts for consistency
+ * Uses official Phantom universal link (https://phantom.app/ul/v1/connect)
+ * so Safari returns to the same tab instead of opening a new one
  */
 
-import { launchPhantomDeepLink } from './phantom-deeplink';
+export function phantomMobileConnect() {
+  const appUrl = encodeURIComponent("https://usdfg.pro/app");
+  const redirect = encodeURIComponent("https://usdfg.pro/app");
 
-export async function phantomMobileConnect() {
-  console.log("📱 Mobile Safari → using direct Phantom deep link");
-  // Use the existing deep link function which handles encryption, nonce, etc.
-  launchPhantomDeepLink();
+  const url =
+    `https://phantom.app/ul/v1/connect?` +
+    `app_url=${appUrl}` +
+    `&redirect_link=${redirect}` +
+    `&cluster=devnet`;
+
+  console.log("📱 Mobile Safari → using Phantom universal link:", url);
+  window.location.href = url;
 }
 
