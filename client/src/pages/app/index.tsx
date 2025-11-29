@@ -321,6 +321,8 @@ const ArenaHome: React.FC = () => {
       
       if (isPhantomConnected && storedPublicKey) {
         console.log('📱 Found stored Phantom connection - public key:', storedPublicKey);
+        // Clear connecting flag since we're now connected
+        sessionStorage.removeItem('phantom_connecting');
         // Update state to trigger re-render
         setPhantomConnectionState({
           connected: true,
@@ -347,6 +349,8 @@ const ArenaHome: React.FC = () => {
           // Update connection state
           localStorage.setItem('phantom_connected', 'true');
           localStorage.setItem('phantom_public_key', event.data.publicKey);
+          // Clear connecting flag since connection is complete
+          sessionStorage.removeItem('phantom_connecting');
           checkPhantomConnection();
         }
       };
@@ -370,6 +374,8 @@ const ArenaHome: React.FC = () => {
           localStorage.setItem('phantom_connected', 'true');
           localStorage.setItem('phantom_public_key', data.publicKey);
           localStorage.removeItem('phantom_connection_sync'); // Clear after reading
+          // Clear connecting flag since connection is complete
+          sessionStorage.removeItem('phantom_connecting');
           checkPhantomConnection();
         } catch (error) {
           console.error('❌ Error parsing sync data:', error);
