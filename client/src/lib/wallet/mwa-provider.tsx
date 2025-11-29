@@ -75,24 +75,35 @@ export const MWAProvider: FC<{ children: ReactNode }> = ({ children }) => {
   // CRITICAL: Use @solana/wallet-adapter-wallets for mobile-capable Phantom adapter
   // This package includes the mobile Safari deep link support
   const wallets = useMemo(() => {
+    console.log('🔍 Creating Phantom adapter from @solana/wallet-adapter-wallets');
+    
     const phantomAdapter = new PhantomWalletAdapter({
       pollInterval: 1000,
       pollTimeout: 15000,
     });
     
-    console.log('✅ Phantom Wallet Adapter initialized (from @solana/wallet-adapter-wallets):', {
+    // CRITICAL DEBUG: Verify which adapter we actually got
+    console.log('✅ Phantom Wallet Adapter initialized:', {
       name: phantomAdapter.name,
       readyState: phantomAdapter.readyState,
       adapterClass: phantomAdapter.constructor.name,
       adapterPackage: '@solana/wallet-adapter-wallets',
+      adapterInstance: phantomAdapter,
     });
     
-    // Log adapter details for debugging
-    console.log('🔍 Adapter details:', {
+    // Log adapter methods to verify mobile support
+    console.log('🔍 Adapter methods check:', {
       hasConnect: typeof phantomAdapter.connect === 'function',
       hasDisconnect: typeof phantomAdapter.disconnect === 'function',
-      adapter: phantomAdapter,
+      hasSignTransaction: typeof phantomAdapter.signTransaction === 'function',
+      hasSignMessage: typeof phantomAdapter.signMessage === 'function',
+      // Check for mobile-specific methods
+      adapterPrototype: Object.getPrototypeOf(phantomAdapter),
+      adapterKeys: Object.keys(phantomAdapter),
     });
+    
+    // Log the full adapter to see all properties
+    console.log('🔍 Full adapter object:', phantomAdapter);
     
     return [phantomAdapter];
   }, []);
