@@ -19,8 +19,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   onDisconnect,
   compact = false
 }) => {
-  const { publicKey, connected, connecting, connect, disconnect, mobile } = useUSDFGWallet();
-  const { connection } = useConnection();
+  const { publicKey, connected, connecting, connect, disconnect, mobile, connection } = useUSDFGWallet();
   const [balance, setBalance] = useState<number | null>(null);
   const [usdfgBalance, setUsdfgBalance] = useState<number | null>(null);
 

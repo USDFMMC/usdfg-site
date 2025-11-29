@@ -1,11 +1,21 @@
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { isMobileSafari } from "../utils/isMobileSafari";
 import { phantomMobileConnect } from "./mobile";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, Connection, clusterApiUrl } from "@solana/web3.js";
 
 export function useUSDFGWallet() {
   const wallet = useWallet();
+  // On mobile, ConnectionProvider might not be available, so create our own connection
   const mobile = isMobileSafari();
+  let connection: Connection;
+  
+  try {
+    const walletConnection = useConnection();
+    connection = walletConnection.connection;
+  } catch (e) {
+    // On mobile, ConnectionProvider might not be available
+    connection = new Connection(clusterApiUrl("devnet"));
+  }
 
   async function connect() {
     if (mobile) {
@@ -55,6 +65,7 @@ export function useUSDFGWallet() {
       : (wallet.publicKey as PublicKey | null),
     mobile,
     connecting: mobile ? false : wallet.connecting,
+    connection,
   };
 }
 
