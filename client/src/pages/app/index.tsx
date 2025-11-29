@@ -174,8 +174,9 @@ const ArenaHome: React.FC = () => {
       const hasPendingNonce = sessionStorage.getItem(SESSION_STORAGE_NONCE);
       if (hasPendingNonce) {
         console.log("⚠️ Phantom deep link cancelled by user - staying on /app");
-        // Clear the pending nonce
+        // Clear the pending nonce and connecting flag
         sessionStorage.removeItem(SESSION_STORAGE_NONCE);
+        sessionStorage.removeItem('phantom_connecting');
         sessionStorage.removeItem('phantom_original_tab');
         // Ensure we stay on /app (don't redirect anywhere)
         window.history.replaceState({}, "", "/app");
