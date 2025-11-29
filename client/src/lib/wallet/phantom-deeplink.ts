@@ -70,7 +70,10 @@ export function launchPhantomDeepLink(): void {
     
     // Store nonce for verification
     sessionStorage.setItem(SESSION_STORAGE_NONCE, nonce);
+    // Mark this as the original tab (so we can detect if Phantom opens a new tab)
+    sessionStorage.setItem('phantom_original_tab', 'true');
     console.log('💾 Stored nonce in sessionStorage:', nonce);
+    console.log('💾 Marked as original tab');
 
     const dappPublicKey = dappKeypair.publicKey.toBase58();
     

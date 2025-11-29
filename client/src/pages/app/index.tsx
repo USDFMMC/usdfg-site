@@ -192,24 +192,60 @@ const ArenaHome: React.FC = () => {
             localStorage.setItem('phantom_connected', 'true');
             localStorage.setItem('phantom_public_key', result.publicKey);
             
-            // Update state immediately to trigger re-render
-            setPhantomConnectionState({
-              connected: true,
-              publicKey: result.publicKey
-            });
+            // Check if we're in a new tab (Phantom opened new tab)
+            // If original tab had a nonce, and this tab doesn't have sessionStorage from before navigation,
+            // we're likely in a new tab
+            const hadNonceBefore = sessionStorage.getItem('phantom_original_tab') === 'true';
+            const isNewTab = !hadNonceBefore && sessionStorage.getItem(SESSION_STORAGE_NONCE) === null;
             
-            // Ensure arena-access is preserved
-            localStorage.setItem('arena-access', 'true');
-            
-            // Clean query params from URL immediately
-            window.history.replaceState({}, "", "/app");
-            
-            // DON'T reload - use the public key directly
-            // On mobile Safari, adapter.connect() doesn't work, so we use the stored public key
-            console.log("✅ Phantom session saved - state updated, wallet should show as connected");
-            
-            // Trigger a state update to reflect the connection
-            window.dispatchEvent(new Event('phantomConnected'));
+            if (isNewTab) {
+              console.log("⚠️ Phantom returned in NEW TAB - syncing with original tab");
+              
+              // Use BroadcastChannel to notify original tab
+              try {
+                const channel = new BroadcastChannel('phantom_connection');
+                channel.postMessage({
+                  type: 'phantom_connected',
+                  publicKey: result.publicKey,
+                  session: result.session
+                });
+                console.log("✅ Sent connection message to original tab via BroadcastChannel");
+                
+                // Also trigger storage event (for browsers that don't support BroadcastChannel)
+                localStorage.setItem('phantom_connection_sync', JSON.stringify({
+                  publicKey: result.publicKey,
+                  timestamp: Date.now()
+                }));
+                
+                // Show message to user
+                alert("✅ Wallet connected! Please return to the original tab to continue.");
+                
+                // Try to close this tab (may not work due to browser security)
+                setTimeout(() => {
+                  window.close();
+                }, 1000);
+              } catch (error) {
+                console.error("❌ Error syncing with original tab:", error);
+              }
+            } else {
+              // We're in the original tab - update state normally
+              console.log("✅ Phantom returned in ORIGINAL TAB");
+              
+              // Update state immediately to trigger re-render
+              setPhantomConnectionState({
+                connected: true,
+                publicKey: result.publicKey
+              });
+              
+              // Ensure arena-access is preserved
+              localStorage.setItem('arena-access', 'true');
+              
+              // Clean query params from URL immediately
+              window.history.replaceState({}, "", "/app");
+              
+              // Trigger a state update to reflect the connection
+              window.dispatchEvent(new Event('phantomConnected'));
+            }
           } else {
             console.error("❌ Failed to decrypt Phantom payload - user may have cancelled");
             // Clean URL even on error
