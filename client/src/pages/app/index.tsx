@@ -156,6 +156,8 @@ const ArenaHome: React.FC = () => {
         const publicKey = localStorage.getItem('phantom_public_key');
         if (publicKey) {
           console.log("✅ Found connection state - updating UI");
+          // Clear connecting flag since connection is complete
+          sessionStorage.removeItem('phantom_connecting');
           setPhantomConnectionState({
             connected: true,
             publicKey: publicKey
