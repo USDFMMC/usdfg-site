@@ -262,6 +262,9 @@ const ArenaHome: React.FC = () => {
               // We're in the original tab - update state normally
               console.log("✅ Phantom returned in ORIGINAL TAB");
               
+              // Clear connecting flag
+              sessionStorage.removeItem('phantom_connecting');
+              
               // Update state immediately to trigger re-render
               setPhantomConnectionState({
                 connected: true,
@@ -281,8 +284,10 @@ const ArenaHome: React.FC = () => {
             console.error("❌ Failed to decrypt Phantom payload - user may have cancelled");
             // Clean URL even on error
             window.history.replaceState({}, "", "/app");
-            // Clear any pending nonce
+            // Clear any pending nonce and connecting flag
             sessionStorage.removeItem(SESSION_STORAGE_NONCE);
+            sessionStorage.removeItem('phantom_connecting');
+            sessionStorage.removeItem('phantom_original_tab');
           }
         } catch (error: any) {
           console.error("❌ Error processing Phantom return:", error);
@@ -290,14 +295,18 @@ const ArenaHome: React.FC = () => {
           console.error("❌ Error stack:", error?.stack);
           // Clean URL even on error
           window.history.replaceState({}, "", "/app");
-          // Clear any pending nonce
+          // Clear any pending nonce and connecting flag
           sessionStorage.removeItem(SESSION_STORAGE_NONCE);
+          sessionStorage.removeItem('phantom_connecting');
+          sessionStorage.removeItem('phantom_original_tab');
         }
       } else {
         // Invalid return - clean up
         console.warn("⚠️ Invalid Phantom return - missing required params");
         window.history.replaceState({}, "", "/app");
         sessionStorage.removeItem(SESSION_STORAGE_NONCE);
+        sessionStorage.removeItem('phantom_connecting');
+        sessionStorage.removeItem('phantom_original_tab');
       }
     }
   }, []); // Run once on mount

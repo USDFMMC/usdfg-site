@@ -103,6 +103,15 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     console.log('🔍 Component: WalletConnectSimple');
     console.log('🔍 Stack trace:', new Error().stack);
     
+    // Check if already connecting (prevent duplicate clicks)
+    const isPhantomConnecting = typeof window !== 'undefined' && 
+      sessionStorage.getItem('phantom_connecting') === 'true';
+    
+    if (isPhantomConnecting) {
+      console.log('🔍 Phantom connection already in progress, returning');
+      return;
+    }
+    
     // Check if already connected (adapter OR stored Phantom connection)
     const hasStoredConnection = typeof window !== 'undefined' && 
       localStorage.getItem('phantom_connected') === 'true' && 

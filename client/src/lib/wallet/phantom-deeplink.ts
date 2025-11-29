@@ -64,7 +64,17 @@ export function launchPhantomDeepLink(): void {
 
   console.log('🚀 Launching Phantom deep link...');
 
+  // Check if we're already connecting (prevent multiple attempts)
+  const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
+  if (isConnecting) {
+    console.warn('⚠️ Already connecting to Phantom - ignoring duplicate request');
+    return;
+  }
+
   try {
+    // Mark that we're connecting (prevents duplicate clicks)
+    sessionStorage.setItem('phantom_connecting', 'true');
+    
     const dappKeypair = getOrCreateDAppKeypair();
     const nonce = generateNonce();
     
@@ -74,6 +84,7 @@ export function launchPhantomDeepLink(): void {
     sessionStorage.setItem('phantom_original_tab', 'true');
     console.log('💾 Stored nonce in sessionStorage:', nonce);
     console.log('💾 Marked as original tab');
+    console.log('💾 Marked as connecting (prevents duplicates)');
 
     const dappPublicKey = dappKeypair.publicKey.toBase58();
     
