@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddress } from '@solana/spl-token';
+import { useConnection } from '@solana/wallet-adapter-react';
 import { USDFG_MINT } from '@/lib/chain/config';
 import { logWalletEvent } from '@/utils/wallet-log';
-import { usePhantom } from '@/lib/wallet/phantom-provider';
+import { useUSDFGWallet } from '@/lib/wallet/useUSDFGWallet';
 
 interface WalletConnectSimpleProps {
   isConnected: boolean;
@@ -18,13 +19,17 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   onDisconnect,
   compact = false
 }) => {
-  const { publicKey, connected, connecting, connect, disconnect, connection } = usePhantom();
+  const { publicKey, connected, connecting, connect, disconnect, mobile } = useUSDFGWallet();
+  const { connection } = useConnection();
   const [balance, setBalance] = useState<number | null>(null);
   const [usdfgBalance, setUsdfgBalance] = useState<number | null>(null);
 
   // Handle connection state changes
   useEffect(() => {
-    const actuallyConnected = isConnected || (connected && publicKey);
+    // On mobile, use stored connection; on desktop, use adapter connection
+    const actuallyConnected = mobile 
+      ? (connected && publicKey) // Mobile uses stored connection
+      : (isConnected || (connected && publicKey)); // Desktop uses adapter
     
     if (actuallyConnected && publicKey) {
       // Clear disconnect flag when user successfully connects
@@ -81,7 +86,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   }, [connected, publicKey, isConnected, onConnect, onDisconnect, connection]);
 
   // Handle wallet connection
-  // The usePhantom hook handles iOS Safari properly (no auto-connect, clean nonce)
+  // useUSDFGWallet automatically handles mobile vs desktop
   const handleConnect = async () => {
     if (connected || isConnected) {
       console.log('Already connected');
@@ -94,9 +99,9 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     }
 
     try {
-      logWalletEvent('selecting', { adapter: 'Phantom' });
+      logWalletEvent('selecting', { adapter: mobile ? 'Phantom (Mobile)' : 'Phantom' });
       await connect();
-      logWalletEvent('connect_called', { adapter: 'Phantom' });
+      logWalletEvent('connect_called', { adapter: mobile ? 'Phantom (Mobile)' : 'Phantom' });
     } catch (error: any) {
       logWalletEvent('error', { 
         message: error.message || 'Connection failed',

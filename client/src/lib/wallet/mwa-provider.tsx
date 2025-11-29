@@ -1,13 +1,32 @@
-import React, { FC, ReactNode, useMemo, useEffect, useState } from 'react';
-import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
+import React, { FC, ReactNode } from 'react';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
-import { clusterApiUrl } from '@solana/web3.js';
-import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets';
+import { DesktopWalletProvider } from './desktop';
+import { isMobileSafari } from '../utils/isMobileSafari';
 
 // Import wallet adapter styles
 import '@solana/wallet-adapter-react-ui/styles.css';
 
 export const MWAProvider: FC<{ children: ReactNode }> = ({ children }) => {
+  const mobile = isMobileSafari();
+  
+  // On mobile Safari, bypass wallet adapter completely
+  // Use direct deep link instead (handled in useUSDFGWallet)
+  if (mobile) {
+    return (
+      <WalletModalProvider>
+        {children}
+      </WalletModalProvider>
+    );
+  }
+  
+  // On desktop, use normal wallet adapter
+  return (
+    <DesktopWalletProvider>
+      <WalletModalProvider>
+        {children}
+      </WalletModalProvider>
+    </DesktopWalletProvider>
+  );
   const network = 'devnet';
   // Use a more reliable RPC endpoint
   // Try multiple fallback endpoints for better reliability
