@@ -10,8 +10,19 @@ export function usePhantom() {
   // Clear stale nonce before connecting (Phantom iOS fix)
   const connect = useCallback(async () => {
     try {
+      console.log("🚀 usePhantom.connect() called");
+      console.log("🔍 Current URL:", window.location.href);
+      console.log("🔍 Wallet state:", {
+        wallet: wallet.wallet?.adapter.name,
+        connected: wallet.connected,
+        connecting: wallet.connecting,
+        walletsCount: wallet.wallets.length,
+        wallets: wallet.wallets.map(w => w.adapter.name)
+      });
+      
       // Clear stale nonce (Phantom iOS fix)
       localStorage.removeItem("walletAdapterMobileNonce");
+      console.log("✅ Cleared walletAdapterMobileNonce");
       
       // CRITICAL: Select Phantom wallet first before connecting
       // This prevents WalletNotSelectedError on Safari
@@ -23,18 +34,29 @@ export function usePhantom() {
         
         if (phantomWallet) {
           console.log("🔍 Selecting Phantom wallet before connect");
+          console.log("🔍 Phantom adapter readyState:", phantomWallet.adapter.readyState);
           await wallet.select(phantomWallet.adapter.name);
+          console.log("✅ Phantom wallet selected");
           // Wait a bit for selection to complete
           await new Promise((resolve) => setTimeout(resolve, 100));
         } else {
           console.error("❌ Phantom wallet not found in wallets list");
+          console.error("❌ Available wallets:", wallet.wallets.map(w => w.adapter.name));
           throw new Error("Phantom wallet not available");
         }
+      } else {
+        console.log("✅ Wallet already selected:", wallet.wallet.adapter.name);
       }
       
-      // Now connect
+      // Now connect - this should trigger deep link generation
+      console.log("🔗 Calling wallet.connect() - this should generate deep link");
       await wallet.connect();
-    } catch (e) {
+      console.log("✅ wallet.connect() completed");
+    } catch (e: any) {
+      console.error("❌ Phantom connect error:", e);
+      console.error("❌ Error name:", e?.name);
+      console.error("❌ Error message:", e?.message);
+      console.error("❌ Error stack:", e?.stack);
       console.log("Phantom connect canceled:", e);
       throw e; // Re-throw so UI can handle it
     }
