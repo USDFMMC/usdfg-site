@@ -327,11 +327,26 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     );
   }
 
-  // Don't show connect button if we have a stored connection (even if adapter isn't connected)
+  // Check for connecting state FIRST (before showing button)
+  const isPhantomConnecting = typeof window !== 'undefined' && 
+    sessionStorage.getItem('phantom_connecting') === 'true';
+  
+  // Don't show connect button if we have a stored connection OR if we're connecting
   // Check this BEFORE rendering anything
   const hasStoredConnection = typeof window !== 'undefined' && 
     localStorage.getItem('phantom_connected') === 'true' && 
     localStorage.getItem('phantom_public_key');
+  
+  // If connecting, show connecting state
+  if (isPhantomConnecting && !hasStoredConnection) {
+    return (
+      <div className="flex flex-col space-y-2">
+        <div className={`px-${compact ? '2.5' : '3'} py-${compact ? '1.5' : '2'} bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-${compact ? 'md' : 'lg'} text-${compact ? 'xs' : 'sm'} text-center`}>
+          Connecting to Phantom...
+        </div>
+      </div>
+    );
+  }
   
   // If we have stored connection, show connected state (even if adapter isn't connected)
   if (hasStoredConnection) {
