@@ -30,10 +30,17 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const [usdfgBalance, setUsdfgBalance] = useState<number | null>(null);
 
   // Handle connection state changes
+  // Also check for stored Phantom connection
   useEffect(() => {
-    // Use prop isConnected for mobile deep links
-    const actuallyConnected = isConnected || (connected && publicKey);
-    if (actuallyConnected && publicKey) {
+    // Check for stored connection first
+    const hasStored = typeof window !== 'undefined' && 
+      localStorage.getItem('phantom_connected') === 'true' && 
+      localStorage.getItem('phantom_public_key');
+    
+    // Use prop isConnected for mobile deep links OR stored connection
+    const actuallyConnected = isConnected || (connected && publicKey) || hasStored;
+    
+    if (actuallyConnected && (publicKey || hasStored)) {
       // Clear disconnect flag when user successfully connects
       localStorage.removeItem('wallet_disconnected');
       onConnect();
@@ -312,20 +319,52 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   }
 
   // Don't show connect button if we have a stored connection (even if adapter isn't connected)
+  // Check this BEFORE rendering anything
   const hasStoredConnection = typeof window !== 'undefined' && 
     localStorage.getItem('phantom_connected') === 'true' && 
     localStorage.getItem('phantom_public_key');
   
-  if (hasStoredConnection && !actuallyConnected) {
-    // We have a stored connection but adapter isn't connected yet
-    // Show a "Connecting..." state or wait for state to update
-    return (
-      <div className="flex flex-col space-y-2">
-        <div className="px-3 py-2 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-lg text-sm text-center">
-          Connecting...
+  // If we have stored connection, show connected state (even if adapter isn't connected)
+  if (hasStoredConnection) {
+    const storedKey = localStorage.getItem('phantom_public_key');
+    const displayKey = publicKey || (storedKey ? new PublicKey(storedKey) : null);
+    
+    if (displayKey) {
+      // Show connected state with stored public key
+      if (compact) {
+        return (
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={handleDisconnect}
+              className="px-2 py-1.5 bg-green-500/20 text-green-400 border border-green-500/30 rounded-md text-xs font-medium hover:bg-green-500/30 transition-colors flex items-center gap-1"
+            >
+              <span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
+              <span className="hidden sm:inline">{displayKey.toString().slice(0, 4)}...</span>
+              <span className="sm:hidden">Connected</span>
+            </button>
+          </div>
+        );
+      }
+      
+      return (
+        <div className="flex items-center space-x-3">
+          <div className="text-right">
+            <div className="text-sm text-gray-400">
+              {displayKey.toString().slice(0, 8)}...{displayKey.toString().slice(-8)}
+            </div>
+          </div>
+          <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
+            🟢 Connected
+          </span>
+          <button
+            onClick={handleDisconnect}
+            className="px-3 py-1 border border-gray-600 text-white rounded hover:bg-gray-800 transition-colors"
+          >
+            Disconnect
+          </button>
         </div>
-      </div>
-    );
+      );
+    }
   }
 
   // Show connection button

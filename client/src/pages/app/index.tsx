@@ -370,8 +370,12 @@ const ArenaHome: React.FC = () => {
     // Check for sync data on mount
     handleStorageSync();
     
-    // Poll for sync data (since storage event doesn't fire in same tab)
-    const syncInterval = setInterval(handleStorageSync, 500);
+    // Poll for sync data more aggressively (since storage event doesn't fire in same tab)
+    // Check every 100ms to catch connection state quickly
+    const syncInterval = setInterval(() => {
+      handleStorageSync();
+      checkPhantomConnection(); // Also check connection state
+    }, 100);
     
     return () => {
       window.removeEventListener('phantomConnected', checkPhantomConnection);
