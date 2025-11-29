@@ -272,26 +272,83 @@ const ArenaHome: React.FC = () => {
   }, []); // Run once on mount
 
   // Check for stored Phantom connection (mobile deep link)
-  // On mobile Safari, adapter.connect() doesn't work, so we use stored public key
+  // Also listen for BroadcastChannel messages from new tabs opened by Phantom
   useEffect(() => {
     const checkPhantomConnection = () => {
       const isPhantomConnected = localStorage.getItem('phantom_connected') === 'true';
       const storedPublicKey = localStorage.getItem('phantom_public_key');
-      const sessionData = sessionStorage.getItem('phantomSession');
       
-      if (isPhantomConnected && storedPublicKey && sessionData) {
+      if (isPhantomConnected && storedPublicKey) {
         console.log('📱 Found stored Phantom connection - public key:', storedPublicKey);
-        // The public key is available for use even if adapter isn't "connected"
-        // This is normal for mobile deep links
+        // Update state to trigger re-render
+        setPhantomConnectionState({
+          connected: true,
+          publicKey: storedPublicKey
+        });
+      } else {
+        // Clear state if connection is gone
+        setPhantomConnectionState({
+          connected: false,
+          publicKey: null
+        });
       }
     };
 
     checkPhantomConnection();
     
+    // Listen for BroadcastChannel messages (from new tabs opened by Phantom)
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('phantom_connection');
+      channel.onmessage = (event) => {
+        if (event.data.type === 'phantom_connected') {
+          console.log('📨 Received connection message from new tab:', event.data);
+          // Update connection state
+          localStorage.setItem('phantom_connected', 'true');
+          localStorage.setItem('phantom_public_key', event.data.publicKey);
+          checkPhantomConnection();
+        }
+      };
+    } catch (error) {
+      console.warn('⚠️ BroadcastChannel not supported:', error);
+    }
+    
     // Listen for connection events
     window.addEventListener('phantomConnected', checkPhantomConnection);
+    
+    // Also listen for storage changes (in case connection is cleared elsewhere)
+    window.addEventListener('storage', checkPhantomConnection);
+    
+    // Listen for localStorage sync events (fallback for cross-tab communication)
+    const handleStorageSync = () => {
+      const syncData = localStorage.getItem('phantom_connection_sync');
+      if (syncData) {
+        try {
+          const data = JSON.parse(syncData);
+          console.log('📨 Received connection sync from storage:', data);
+          localStorage.setItem('phantom_connected', 'true');
+          localStorage.setItem('phantom_public_key', data.publicKey);
+          localStorage.removeItem('phantom_connection_sync'); // Clear after reading
+          checkPhantomConnection();
+        } catch (error) {
+          console.error('❌ Error parsing sync data:', error);
+        }
+      }
+    };
+    
+    // Check for sync data on mount
+    handleStorageSync();
+    
+    // Poll for sync data (since storage event doesn't fire in same tab)
+    const syncInterval = setInterval(handleStorageSync, 500);
+    
     return () => {
       window.removeEventListener('phantomConnected', checkPhantomConnection);
+      window.removeEventListener('storage', checkPhantomConnection);
+      if (channel) {
+        channel.close();
+      }
+      clearInterval(syncInterval);
     };
   }, []);
 
