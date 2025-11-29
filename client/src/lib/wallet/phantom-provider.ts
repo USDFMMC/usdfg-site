@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
+import { launchPhantomDeepLink, shouldUseDeepLink } from "@/lib/wallet/phantom-deeplink";
 
 export function usePhantom() {
   const wallet = useWallet();
@@ -48,7 +49,19 @@ export function usePhantom() {
         console.log("✅ Wallet already selected:", wallet.wallet.adapter.name);
       }
       
-      // Now connect - this should trigger deep link generation
+      // On mobile Safari, use manual deep link (adapter doesn't always generate it)
+      const shouldUseManualDeepLink = shouldUseDeepLink();
+      
+      if (shouldUseManualDeepLink) {
+        console.log("📱 Mobile Safari detected - using manual deep link");
+        console.log("🔗 Launching manual Phantom deep link...");
+        launchPhantomDeepLink();
+        // Deep link redirects immediately, so we don't await
+        return;
+      }
+      
+      // Desktop or non-Safari mobile - use adapter's connect
+      // This should trigger deep link generation automatically
       console.log("🔗 Calling wallet.connect() - this should generate deep link");
       await wallet.connect();
       console.log("✅ wallet.connect() completed");
