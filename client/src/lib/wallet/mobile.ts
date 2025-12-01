@@ -45,7 +45,10 @@ export function phantomMobileConnect() {
   }
   
   isNavigating = true;
-  const appUrl = "https://usdfg.pro/app";
+  // CRITICAL: Phantom on iOS requires full file path, not directory path
+  // Safari doesn't return correctly to folder URLs like /app
+  // Must use /app/index.html for proper universal link return
+  const appUrl = "https://usdfg.pro/app/index.html";
   
   const dappKeyPair = nacl.box.keyPair();
   const nonce = nacl.randomBytes(24);
