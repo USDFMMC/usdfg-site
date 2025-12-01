@@ -9,6 +9,7 @@
  * - nonce (for encryption)
  * - redirect_link (where to return)
  * - cluster (devnet/mainnet)
+ * - scope (permissions)
  * 
  * CRITICAL: Must use browser-native base64 encoding (btoa) not Buffer
  * Safari doesn't handle Node.js Buffer polyfills correctly
@@ -88,4 +89,3 @@ export function phantomMobileConnect() {
   console.log("🚀 Navigating to Phantom universal link...");
   window.location.href = url;
 }
-
