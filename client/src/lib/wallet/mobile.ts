@@ -79,6 +79,11 @@ export function phantomMobileConnect() {
   (window as any).__phantom_debug_url = safeUrl;
   console.log("💡 To inspect full URL, check window.__phantom_debug_url or network tab");
   
+  // Store timestamp for debugging
+  sessionStorage.setItem('phantom_connect_attempt', new Date().toISOString());
+  console.log("⏰ Connect attempt timestamp stored");
+  
+  console.log("🚀 Navigating to Phantom universal link...");
   window.location.href = url;
 }
 

@@ -186,11 +186,32 @@ const ArenaHome: React.FC = () => {
       }
     }
     
-    if (params2.has("phantom_encryption_public_key")) {
+    // Check for Phantom return (success or error)
+    if (params2.has("phantom_encryption_public_key") || params2.has("error") || params2.has("errorCode") || params2.has("errorMessage")) {
       console.log("🔥🔥🔥 Safari deep link return activated");
       console.log("🔎 Full URL:", window.location.href);
       console.log("🔎 Search params:", window.location.search);
+      console.log("🔎 All URL params:", Object.fromEntries(params2.entries()));
       console.log("🔎 Is original tab:", sessionStorage.getItem('phantom_original_tab') === 'true');
+      
+      // Check for Phantom errors first
+      const error = params2.get("error") || params2.get("errorCode") || params2.get("errorMessage");
+      if (error) {
+        console.error("❌ Phantom returned with error:", error);
+        console.error("❌ Error code:", params2.get("errorCode"));
+        console.error("❌ Error message:", params2.get("errorMessage"));
+        console.error("❌ This usually means:");
+        console.error("   1. Phantom doesn't recognize the app_url");
+        console.error("   2. The app is not registered in Phantom's connected apps");
+        console.error("   3. The universal link association is broken");
+        console.error("   4. Phantom cache needs to be cleared");
+        
+        // Clean up URL
+        const url = new URL(window.location.href);
+        url.search = '';
+        window.history.replaceState({}, '', url.toString());
+        return;
+      }
       
       // Check if this is a valid Phantom return
       if (isPhantomReturn()) {
