@@ -1,3 +1,7 @@
+# CRITICAL: Phantom returns to /app/index.html (full file path required for iOS Safari)
+# Redirect /app/index.html to /app so React Router can handle it
+/app/index.html        /app          200
+
 # All /app routes (React Router handles client-side routing)
 /app/*                /index.html   200
 
