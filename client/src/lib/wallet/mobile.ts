@@ -41,6 +41,19 @@ export function phantomMobileConnect() {
     `&redirect_link=${encodeURIComponent(appUrl)}` +
     `&cluster=devnet`;
 
+  // Store keypair in sessionStorage for decryption on return
+  // The return handler expects it in sessionStorage with key from SESSION_STORAGE_KEY
+  // Format: Array of numbers (secret key bytes)
+  sessionStorage.setItem(
+    "phantom_dapp_keypair",
+    JSON.stringify(Array.from(dappKeyPair.secretKey))
+  );
+  
+  // Store nonce in sessionStorage for verification
+  // The return handler expects it with key from SESSION_STORAGE_NONCE
+  sessionStorage.setItem("phantom_dapp_nonce", nonceBase64);
+  
+  // Also store in localStorage as backup (for debugging)
   localStorage.setItem(
     "phantom_dapp_handshake",
     JSON.stringify({
