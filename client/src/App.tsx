@@ -15,6 +15,7 @@ import Whitepaper from "@/pages/whitepaper";
 import { Helmet } from "react-helmet";
 import { startVersionMonitoring } from "@/lib/version";
 import UpdateBanner from "@/components/ui/UpdateBanner";
+import nacl from "tweetnacl";
 
 function RoutesWithLogging() {
   const location = useLocation();
@@ -27,17 +28,17 @@ function RoutesWithLogging() {
   }, [location]);
 
   return (
-    <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/privacy" element={<Privacy />} />
-      <Route path="/terms" element={<Terms />} />
-      <Route path="/whitepaper" element={<Whitepaper />} />
-      <Route path="/app/challenge/new" element={<CreateChallenge />} />
-      <Route path="/app/profile/:address" element={<PlayerProfile />} />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/whitepaper" element={<Whitepaper />} />
+        <Route path="/app/challenge/new" element={<CreateChallenge />} />
+        <Route path="/app/profile/:address" element={<PlayerProfile />} />
       <Route path="/app" element={<ArenaRoute />} />
-      <Route path="/login" element={<Home />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+        <Route path="/login" element={<Home />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
   );
 }
 
@@ -57,6 +58,60 @@ function AppRouter() {
 
 function App() {
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
+
+  // Phantom return handler - decrypts payload when Phantom returns
+  useEffect(() => {
+    function base64ToUint8Array(b64: string) {
+      return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    }
+
+    const url = new URL(window.location.href);
+    const phantomPubKey = url.searchParams.get("phantom_encryption_public_key");
+    const nonceB64 = url.searchParams.get("nonce");
+    const dataB64 = url.searchParams.get("data");
+
+    if (!phantomPubKey || !nonceB64 || !dataB64) return;
+
+    const stored = localStorage.getItem("phantom_dapp_handshake");
+    if (!stored) return;
+
+    try {
+      const { dappSecretKey } = JSON.parse(stored);
+      const secretKeyBytes = base64ToUint8Array(dappSecretKey);
+      const nonceBytes = base64ToUint8Array(nonceB64);
+      const dataBytes = base64ToUint8Array(dataB64);
+      const phantomPubKeyBytes = base64ToUint8Array(phantomPubKey);
+
+      const decrypted = nacl.box.open(
+        dataBytes,
+        nonceBytes,
+        phantomPubKeyBytes,
+        secretKeyBytes
+      );
+
+      if (!decrypted) {
+        console.error("❌ Failed to decrypt Phantom payload");
+        return;
+      }
+
+      const payload = JSON.parse(new TextDecoder().decode(decrypted));
+      console.log("🔥 Phantom payload decrypted:", payload);
+
+      if (payload.public_key) {
+        localStorage.setItem("publicKey", payload.public_key);
+        localStorage.setItem("phantom_connected", "true");
+        localStorage.setItem("phantom_public_key", payload.public_key);
+        console.log("✅ Phantom public key stored:", payload.public_key);
+      }
+
+      // Cleanup
+      localStorage.removeItem("phantom_dapp_handshake");
+      // Remove Phantom params from URL
+      window.history.replaceState({}, "", "/app");
+    } catch (error) {
+      console.error("❌ Error decrypting Phantom payload:", error);
+    }
+  }, []);
 
   // Safari compatibility check and error handling
   useEffect(() => {
@@ -136,3 +191,4 @@ function App() {
 }
 
 export default App;
+
