@@ -48,7 +48,21 @@ export function phantomMobileConnect() {
     })
   );
 
-  console.log("📱 Mobile Safari → using Phantom universal link with Phantom-compatible base64 encoding");
+  // DEBUG: Log the generated URL (safe - only first few params, not full sensitive data)
+  const urlParts = link.split('&');
+  const safeUrl = urlParts.slice(0, 3).join('&') + '&...';
+  console.log("📱 Mobile Safari → Generated Phantom universal link:");
+  console.log("🔗 URL (first 3 params):", safeUrl);
+  console.log("📏 Full URL length:", link.length, "characters");
+  console.log("🔑 dapp_encryption_public_key length:", dappPublicKeyBase64.length);
+  console.log("🔢 nonce length:", nonceBase64.length);
+  console.log("🌐 redirect_link:", redirect);
+  console.log("⚙️ cluster: devnet");
+  
+  // Also log to window for easy copy-paste (first part only)
+  (window as any).__phantom_debug_url = safeUrl;
+  console.log("💡 To inspect full URL, check window.__phantom_debug_url or network tab");
+  
   window.location.href = link;
 }
 
