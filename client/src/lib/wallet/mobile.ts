@@ -45,9 +45,10 @@ export function phantomMobileConnect() {
   }
   
   isNavigating = true;
-  // Phantom returns to /app - React Router handles this route
-  // The return handler in App.tsx will catch query params on /app
-  const appUrl = "https://usdfg.pro/app";
+  // CRITICAL: Phantom on iOS requires trailing slash for folder-based URLs
+  // Without trailing slash, Phantom fails routing and instantly closes
+  // Must use https://usdfg.pro/app/ (with trailing slash)
+  const appUrl = "https://usdfg.pro/app/";
   
   const dappKeyPair = nacl.box.keyPair();
   const nonce = nacl.randomBytes(24);
