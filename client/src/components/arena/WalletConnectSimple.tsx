@@ -5,6 +5,7 @@ import { useConnection } from '@solana/wallet-adapter-react';
 import { USDFG_MINT } from '@/lib/chain/config';
 import { logWalletEvent } from '@/utils/wallet-log';
 import { useUSDFGWallet } from '@/lib/wallet/useUSDFGWallet';
+import nacl from "tweetnacl";
 
 interface WalletConnectSimpleProps {
   isConnected: boolean;
@@ -84,37 +85,90 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     }
   }, [connected, publicKey, isConnected, onConnect, onDisconnect, connection]);
 
+  // CRITICAL: Pure synchronous function for mobile Safari Phantom deep link
+  // Must be called directly from onClick with NO async, NO logging, NO conditions
+  // This ensures Safari treats it as a trusted user gesture
+  const openPhantomNow = (url: string) => {
+    window.location.href = url;
+  };
+
   // Handle wallet connection
-  // useUSDFGWallet automatically handles mobile vs desktop
-  const handleConnect = async () => {
-    if (connected || isConnected) {
-      console.log('Already connected');
-      return;
-    }
-    
-    if (connecting) {
-      console.log('Already connecting');
+  // On mobile Safari: use pure synchronous deep link (no async, no logging)
+  // On desktop: use normal async adapter flow
+  const handleConnect = () => {
+    // Prevent double-clicks
+    if (connected || isConnected || connecting) {
       return;
     }
 
-    try {
-      logWalletEvent('selecting', { adapter: mobile ? 'Phantom (Mobile)' : 'Phantom' });
-      await connect();
-      logWalletEvent('connect_called', { adapter: mobile ? 'Phantom (Mobile)' : 'Phantom' });
-    } catch (error: any) {
-      logWalletEvent('error', { 
-        message: error.message || 'Connection failed',
-        error: String(error)
-      });
-      console.error('Connection error:', error);
+    // CRITICAL: On mobile Safari, generate URL synchronously and navigate immediately
+    // NO async, NO logging, NO conditions - just pure synchronous navigation
+    if (mobile) {
+      // Generate Phantom URL synchronously (must be done before navigation)
+      const appUrl = "https://usdfg.pro/app/";
+      const dappKeyPair = (window as any).__phantom_keypair || (() => {
+        // Generate keypair synchronously using crypto API
+        const keyPair = nacl.box.keyPair();
+        (window as any).__phantom_keypair = keyPair;
+        return keyPair;
+      })();
       
-      // Show user-friendly error message
-      if (error.message?.includes('User rejected') || error.message?.includes('User cancelled')) {
-        console.log('User cancelled wallet connection');
-      } else {
-        alert(`Connection failed: ${error.message || 'Unknown error'}`);
+      const nonce = nacl.randomBytes(24);
+      
+      // Encode synchronously
+      function encodeBase64(u8: Uint8Array): string {
+        let binary = "";
+        u8.forEach((b) => (binary += String.fromCharCode(b)));
+        return btoa(binary);
       }
+      
+      const dappPublicKeyBase64 = encodeBase64(dappKeyPair.publicKey);
+      const nonceBase64 = encodeBase64(nonce);
+      
+      // Store for return handler (synchronously)
+      sessionStorage.setItem("phantom_dapp_keypair", JSON.stringify(Array.from(dappKeyPair.secretKey)));
+      sessionStorage.setItem("phantom_dapp_nonce", nonceBase64);
+      localStorage.setItem("phantom_dapp_handshake", JSON.stringify({
+        dappSecretKey: encodeBase64(dappKeyPair.secretKey),
+        nonce: nonceBase64,
+      }));
+      
+      // Build URL synchronously
+      const appMetadataUrl = "https://usdfg.pro/phantom/manifest.json";
+      const url = "https://phantom.app/ul/v1/connect" +
+        `?app_url=${encodeURIComponent(appUrl)}` +
+        `&dapp_encryption_public_key=${encodeURIComponent(dappPublicKeyBase64)}` +
+        `&nonce=${encodeURIComponent(nonceBase64)}` +
+        `&redirect_link=${encodeURIComponent(appUrl)}` +
+        `&cluster=devnet` +
+        `&scope=${encodeURIComponent("wallet:sign,wallet:signMessage,wallet:decrypt")}` +
+        `&app_metadata_url=${encodeURIComponent(appMetadataUrl)}`;
+      
+      // Navigate IMMEDIATELY - no async, no logging, no delays
+      openPhantomNow(url);
+      return;
     }
+
+    // Desktop: use normal async flow
+    (async () => {
+      try {
+        logWalletEvent('selecting', { adapter: 'Phantom' });
+        await connect();
+        logWalletEvent('connect_called', { adapter: 'Phantom' });
+      } catch (error: any) {
+        logWalletEvent('error', { 
+          message: error.message || 'Connection failed',
+          error: String(error)
+        });
+        console.error('Connection error:', error);
+        
+        if (error.message?.includes('User rejected') || error.message?.includes('User cancelled')) {
+          console.log('User cancelled wallet connection');
+        } else {
+          alert(`Connection failed: ${error.message || 'Unknown error'}`);
+        }
+      }
+    })();
   };
 
   // Handle disconnect
@@ -122,7 +176,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     try {
       logWalletEvent('disconnecting', {});
       await disconnect();
-      
+  
       // Clear disconnect flag
       localStorage.setItem('wallet_disconnected', 'true');
       window.dispatchEvent(new Event('walletDisconnected'));
@@ -137,7 +191,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
 
   // If connected (via prop OR adapter), show connected state
   const actuallyConnected = isConnected || (connected && publicKey);
-  
+
   // Show connected state if connected
   if (actuallyConnected && publicKey) {
     // Compact mode for mobile
@@ -153,9 +207,9 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
             onClick={handleDisconnect}
           className="px-2 py-1.5 bg-green-500/20 text-green-400 border border-green-500/30 rounded-md text-xs font-medium hover:bg-green-500/30 transition-colors flex items-center gap-1"
         >
-            <span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
+          <span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
             <span className="hidden sm:inline">{publicKey.toString().slice(0, 4)}...</span>
-            <span className="sm:hidden">Connected</span>
+          <span className="sm:hidden">Connected</span>
         </button>
         </div>
       );
@@ -201,27 +255,27 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         </div>
       </div>
     );
-  }
+      }
   
   // Show connection button
   return (
     <div className="flex flex-col space-y-2">
       {compact ? (
-        <button
+          <button
           onClick={handleConnect}
           disabled={connecting || connected}
-          className="px-2.5 py-1.5 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-md text-xs font-medium hover:bg-amber-600/30 transition-colors disabled:opacity-50"
-        >
+            className="px-2.5 py-1.5 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-md text-xs font-medium hover:bg-amber-600/30 transition-colors disabled:opacity-50"
+          >
           Connect Wallet
-        </button>
-      ) : (
-        <button
+          </button>
+        ) : (
+          <button
           onClick={handleConnect}
           disabled={connecting || connected}
-          className="px-3 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50 border border-amber-400/50 shadow-lg shadow-amber-500/20 text-sm"
-        >
+                className="px-3 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50 border border-amber-400/50 shadow-lg shadow-amber-500/20 text-sm"
+              >
           Connect Wallet
-        </button>
+              </button>
       )}
     </div>
   );
