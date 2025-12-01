@@ -32,8 +32,9 @@ export function phantomMobileConnect() {
   const dappPublicKeyBase64 = encodeBase64(dappKeyPair.publicKey);
   const nonceBase64 = encodeBase64(nonce);
 
-  // CRITICAL: All 6 parameters MUST be included for Phantom to accept the request
+  // CRITICAL: All 7 parameters MUST be included for Phantom to accept the request
   // Format: base URL + query params with proper encoding
+  const appMetadataUrl = "https://usdfg.pro/phantom/manifest.json";
   const url =
     "https://phantom.app/ul/v1/connect" +
     `?app_url=${encodeURIComponent(appUrl)}` +
@@ -41,7 +42,8 @@ export function phantomMobileConnect() {
     `&nonce=${encodeURIComponent(nonceBase64)}` +
     `&redirect_link=${encodeURIComponent(appUrl)}` +
     `&cluster=devnet` +
-    `&scope=${encodeURIComponent("wallet:sign,wallet:signMessage,wallet:decrypt")}`;
+    `&scope=${encodeURIComponent("wallet:sign,wallet:signMessage,wallet:decrypt")}` +
+    `&app_metadata_url=${encodeURIComponent(appMetadataUrl)}`;
 
   // Store keypair in sessionStorage for decryption on return
   // The return handler expects it in sessionStorage with key from SESSION_STORAGE_KEY
@@ -76,7 +78,8 @@ export function phantomMobileConnect() {
   console.log("✅ redirect_link:", appUrl);
   console.log("✅ cluster: devnet");
   console.log("✅ scope: wallet:sign,wallet:signMessage,wallet:decrypt");
-  console.log("✅ All 6 required parameters included");
+  console.log("✅ app_metadata_url:", appMetadataUrl);
+  console.log("✅ All 7 required parameters included");
   
   // Also log to window for easy copy-paste (first part only)
   (window as any).__phantom_debug_url = safeUrl;
