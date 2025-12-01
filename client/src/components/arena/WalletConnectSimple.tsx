@@ -86,70 +86,65 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   }, [connected, publicKey, isConnected, onConnect, onDisconnect, connection]);
 
   // CRITICAL: Pure synchronous function for mobile Safari Phantom deep link
-  // Must be called directly from onClick with NO async, NO logging, NO conditions
+  // This function is OUTSIDE React's render cycle - no hooks, no state, no conditions
+  // Must be called directly from onClick with ZERO async, ZERO logging, ZERO React batching
   // This ensures Safari treats it as a trusted user gesture
-  const openPhantomNow = (url: string) => {
+  const openPhantomMobile = () => {
+    // Generate X25519 keypair synchronously
+    const kp = nacl.box.keyPair();
+    // Generate 24-byte nonce synchronously
+    const nonce = nacl.randomBytes(24);
+    
+    // Encode to base64 synchronously
+    function encodeBase64(u8: Uint8Array): string {
+      let binary = "";
+      u8.forEach((b) => (binary += String.fromCharCode(b)));
+      return btoa(binary);
+    }
+    
+    const dappPublicKeyBase64 = encodeBase64(kp.publicKey);
+    const nonceBase64 = encodeBase64(nonce);
+    
+    // Store for return handler (synchronously, before navigation)
+    sessionStorage.setItem("phantom_dapp_keypair", JSON.stringify(Array.from(kp.secretKey)));
+    sessionStorage.setItem("phantom_dapp_nonce", nonceBase64);
+    localStorage.setItem("phantom_dapp_handshake", JSON.stringify({
+      dappSecretKey: encodeBase64(kp.secretKey),
+      nonce: nonceBase64,
+    }));
+    
+    // Build URL synchronously
+    const url =
+      "https://phantom.app/ul/v1/connect" +
+      `?app_url=${encodeURIComponent("https://usdfg.pro/app/")}` +
+      `&dapp_encryption_public_key=${encodeURIComponent(dappPublicKeyBase64)}` +
+      `&nonce=${encodeURIComponent(nonceBase64)}` +
+      `&redirect_link=${encodeURIComponent("https://usdfg.pro/app/")}` +
+      `&cluster=devnet` +
+      `&scope=${encodeURIComponent("wallet:sign,wallet:signMessage,wallet:decrypt")}` +
+      `&app_metadata_url=${encodeURIComponent("https://usdfg.pro/phantom/manifest.json")}`;
+    
+    // Navigate IMMEDIATELY - no async, no logging, no delays, no React batching
     window.location.href = url;
   };
 
   // Handle wallet connection
-  // On mobile Safari: use pure synchronous deep link (no async, no logging)
+  // On mobile Safari: use pure synchronous deep link (no async, no logging, no React)
   // On desktop: use normal async adapter flow
   const handleConnect = () => {
+    // CRITICAL: On mobile Safari, use pure synchronous function with NO React logic
+    if (mobile) {
+      // Call raw synchronous function - NO hooks, NO state, NO conditions
+      openPhantomMobile();
+      return;
+    }
+
+    // Desktop: use normal async flow
     // Prevent double-clicks
     if (connected || isConnected || connecting) {
       return;
     }
 
-    // CRITICAL: On mobile Safari, generate URL synchronously and navigate immediately
-    // NO async, NO logging, NO conditions - just pure synchronous navigation
-    if (mobile) {
-      // Generate Phantom URL synchronously (must be done before navigation)
-      const appUrl = "https://usdfg.pro/app/";
-      const dappKeyPair = (window as any).__phantom_keypair || (() => {
-        // Generate keypair synchronously using crypto API
-        const keyPair = nacl.box.keyPair();
-        (window as any).__phantom_keypair = keyPair;
-        return keyPair;
-      })();
-      
-      const nonce = nacl.randomBytes(24);
-      
-      // Encode synchronously
-      function encodeBase64(u8: Uint8Array): string {
-        let binary = "";
-        u8.forEach((b) => (binary += String.fromCharCode(b)));
-        return btoa(binary);
-      }
-      
-      const dappPublicKeyBase64 = encodeBase64(dappKeyPair.publicKey);
-      const nonceBase64 = encodeBase64(nonce);
-      
-      // Store for return handler (synchronously)
-      sessionStorage.setItem("phantom_dapp_keypair", JSON.stringify(Array.from(dappKeyPair.secretKey)));
-      sessionStorage.setItem("phantom_dapp_nonce", nonceBase64);
-      localStorage.setItem("phantom_dapp_handshake", JSON.stringify({
-        dappSecretKey: encodeBase64(dappKeyPair.secretKey),
-        nonce: nonceBase64,
-      }));
-      
-      // Build URL synchronously
-      const appMetadataUrl = "https://usdfg.pro/phantom/manifest.json";
-      const url = "https://phantom.app/ul/v1/connect" +
-        `?app_url=${encodeURIComponent(appUrl)}` +
-        `&dapp_encryption_public_key=${encodeURIComponent(dappPublicKeyBase64)}` +
-        `&nonce=${encodeURIComponent(nonceBase64)}` +
-        `&redirect_link=${encodeURIComponent(appUrl)}` +
-        `&cluster=devnet` +
-        `&scope=${encodeURIComponent("wallet:sign,wallet:signMessage,wallet:decrypt")}` +
-        `&app_metadata_url=${encodeURIComponent(appMetadataUrl)}`;
-      
-      // Navigate IMMEDIATELY - no async, no logging, no delays
-      openPhantomNow(url);
-      return;
-    }
-
-    // Desktop: use normal async flow
     (async () => {
       try {
         logWalletEvent('selecting', { adapter: 'Phantom' });
