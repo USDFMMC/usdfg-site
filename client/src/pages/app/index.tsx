@@ -171,8 +171,8 @@ const ArenaHome: React.FC = () => {
     const params2 = new URLSearchParams(window.location.search);
     
     // Handle user cancellation - Phantom may redirect without params
-    // If we're on /app with no params and we have a pending deep link, user likely cancelled
-    if (!params2.has("phantom_encryption_public_key") && window.location.pathname === "/app") {
+    // If we're on /app or /app/ with no params and we have a pending deep link, user likely cancelled
+    if (!params2.has("phantom_encryption_public_key") && (window.location.pathname === "/app" || window.location.pathname === "/app/")) {
       const hasPendingNonce = sessionStorage.getItem(SESSION_STORAGE_NONCE);
       if (hasPendingNonce) {
         console.log("⚠️ Phantom deep link cancelled by user - staying on /app");
