@@ -16,19 +16,17 @@ export const MWAProvider: FC<{ children: ReactNode }> = ({ children }) => {
   // On mobile Safari: empty array (no adapters, but provider exists for useWallet hooks)
   // On desktop: Phantom adapter (normal flow)
   const wallets = useMemo(() => {
-    // CRITICAL: Always include PhantomWalletAdapter
-      console.log("🟢 Loading Phantom adapter for all platforms");
-      // Adapter must exist to prevent WalletNotSelectedError
-    }
-
-    // Deep link flow works alongside adapter
+    // CRITICAL: Always include PhantomWalletAdapter - even on mobile Safari
+    // The adapter must exist to prevent WalletNotSelectedError
+    // Deep link flow works alongside adapter, not instead of it
+    console.log("🟢 Loading Phantom adapter for all platforms");
     return [
       new PhantomWalletAdapter({
         pollInterval: 1000,
         pollTimeout: 15000,
       }),
     ];
-  }, [mobile]);
+  }, []);
 
   // ALWAYS wrap with WalletProvider - even on mobile
   // This prevents "You have tried to read publicKey on a WalletContext without providing one" errors
