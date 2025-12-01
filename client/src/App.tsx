@@ -107,6 +107,7 @@ function App() {
       // Cleanup
       localStorage.removeItem("phantom_dapp_handshake");
       // Remove Phantom params from URL
+      // Redirect to /app (React Router will handle it)
       window.history.replaceState({}, "", "/app");
     } catch (error) {
       console.error("❌ Error decrypting Phantom payload:", error);

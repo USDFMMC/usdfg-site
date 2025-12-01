@@ -96,11 +96,11 @@ export function launchPhantomDeepLink(): void {
     const appUrl = encodeURIComponent("https://usdfg.pro/app");
     
     // Store redirect URL globally for debugging
-    (window as any).__phantom_debug_redirect = "https://usdfg.pro/app";
-    
-    console.log('🔗 Redirect link (HARDCODED /app):', "https://usdfg.pro/app");
-    console.log('🔗 App URL (HARDCODED - what Phantom displays):', "https://usdfg.pro/app");
-    console.log('🔍 DEBUG: window.__phantom_debug_redirect =', "https://usdfg.pro/app");
+    (window as any).__phantom_debug_redirect = "https://usdfg.pro/app/index.html";
+
+    console.log('🔗 Redirect link (HARDCODED /app/index.html):', "https://usdfg.pro/app/index.html");
+    console.log('🔗 App URL (HARDCODED - what Phantom displays):', "https://usdfg.pro/app/index.html");
+    console.log('🔍 DEBUG: window.__phantom_debug_redirect =', "https://usdfg.pro/app/index.html");
     
     // Build deep link URL with properly encoded parameters
     // Format matches Phantom's expected structure exactly
