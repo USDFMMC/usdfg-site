@@ -107,9 +107,9 @@ export function launchPhantomDeepLink(): void {
     const deepLinkUrl = `https://phantom.app/ul/v1/connect?app_url=${appUrl}&redirect_link=${redirectLink}&dapp_encryption_public_key=${dappPublicKey}&nonce=${nonce}&cluster=devnet`;
 
     // CRITICAL LOG - This shows EXACTLY what redirect URL is being sent to Phantom
-    console.log('🔗 Redirecting Phantom to (HARDCODED):', "https://usdfg.pro/app");
+    console.log('🔗 Redirecting Phantom to (HARDCODED):', "https://usdfg.pro/app/index.html");
     console.log('🔗 Redirect Link (encoded):', redirectLink);
-    console.log('🔗 App URL (HARDCODED - displayed in Phantom):', "https://usdfg.pro/app");
+    console.log('🔗 App URL (HARDCODED - displayed in Phantom):', "https://usdfg.pro/app/index.html");
     console.log('🔗 App URL (encoded):', appUrl);
     console.log('🔗 Full Deep Link URL:', deepLinkUrl);
     console.log('📱 Redirecting to Phantom NOW...');
