@@ -257,16 +257,16 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     <div className="flex flex-col space-y-2">
       {compact ? (
           <button
-          onClick={handleConnect}
-          disabled={connecting || connected}
+          onClick={mobile ? openPhantomMobile : handleConnect}
+          disabled={!mobile && (connecting || connected)}
             className="px-2.5 py-1.5 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-md text-xs font-medium hover:bg-amber-600/30 transition-colors disabled:opacity-50"
           >
           Connect Wallet
           </button>
         ) : (
           <button
-          onClick={handleConnect}
-          disabled={connecting || connected}
+          onClick={mobile ? openPhantomMobile : handleConnect}
+          disabled={!mobile && (connecting || connected)}
                 className="px-3 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50 border border-amber-400/50 shadow-lg shadow-amber-500/20 text-sm"
               >
           Connect Wallet
