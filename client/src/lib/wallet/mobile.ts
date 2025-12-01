@@ -23,7 +23,28 @@ function encodeBase64(u8: Uint8Array): string {
   return btoa(binary);
 }
 
+// Guard to prevent double navigation
+let isNavigating = false;
+
 export function phantomMobileConnect() {
+  // Prevent double navigation - if already navigating, ignore
+  if (isNavigating) {
+    console.warn("⚠️ Phantom deep link already in progress - ignoring duplicate call");
+    return;
+  }
+  
+  // Check if we recently navigated (within last 2 seconds)
+  const lastAttempt = sessionStorage.getItem('phantom_connect_attempt');
+  if (lastAttempt) {
+    const lastAttemptTime = new Date(lastAttempt).getTime();
+    const now = Date.now();
+    if (now - lastAttemptTime < 2000) {
+      console.warn("⚠️ Phantom connect called too soon after last attempt - ignoring");
+      return;
+    }
+  }
+  
+  isNavigating = true;
   const appUrl = "https://usdfg.pro/app";
   
   const dappKeyPair = nacl.box.keyPair();
@@ -90,5 +111,12 @@ export function phantomMobileConnect() {
   console.log("⏰ Connect attempt timestamp stored");
   
   console.log("🚀 Navigating to Phantom universal link...");
+  
+  // Navigate - this will redirect to Phantom
+  // Reset flag after a delay (in case navigation is cancelled)
+  setTimeout(() => {
+    isNavigating = false;
+  }, 5000);
+  
   window.location.href = url;
 }
