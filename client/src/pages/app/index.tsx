@@ -327,7 +327,7 @@ const ArenaHome: React.FC = () => {
       } else {
         // Invalid return - clean up
         console.warn("⚠️ Invalid Phantom return - missing required params");
-        window.history.replaceState({}, "", "/app");
+        window.history.replaceState({}, "", "/");
         sessionStorage.removeItem(SESSION_STORAGE_NONCE);
         sessionStorage.removeItem('phantom_connecting');
         sessionStorage.removeItem('phantom_original_tab');
