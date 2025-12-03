@@ -71,6 +71,26 @@ function App() {
     console.log("📥 Current URL:", window.location.href);
     console.log("📥 Current pathname:", window.location.pathname);
     console.log("📥 Current search:", window.location.search);
+    
+    // Check if we just attempted to connect (detect silent Phantom rejection)
+    const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
+    const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
+    if (connectTimestamp && isConnecting && !window.location.search) {
+      const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
+      if (timeSinceConnect < 5000) { // Within 5 seconds of connect attempt
+        console.warn("⚠️⚠️⚠️ PHANTOM SILENT REJECTION DETECTED ⚠️⚠️⚠️");
+        console.warn("⚠️ Phantom opened but returned immediately without params");
+        console.warn("⚠️ This indicates Phantom silently rejected the connection");
+        console.warn("⚠️ Possible causes:");
+        console.warn("   1. Safari compatibility issue (Phantom prefers in-app browser)");
+        console.warn("   2. Manifest.json format is incorrect");
+        console.warn("   3. app_url doesn't match manifest.json url");
+        console.warn("   4. Phantom cache has old/stale data");
+        console.warn("   5. Missing required manifest fields");
+        console.warn("⚠️ SOLUTION: Clear Phantom cache and try again");
+        console.warn("   Settings → Connected Apps → Remove USDFG");
+      }
+    }
     console.log("📥 Full window.location:", {
       href: window.location.href,
       pathname: window.location.pathname,
