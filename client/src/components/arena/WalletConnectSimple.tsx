@@ -232,6 +232,11 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const isMobile = isMobileSafari();
   const hasWindowSolana = typeof window !== "undefined" && !!(window as any).solana;
   
+  // CRITICAL: Also check if Phantom connection is in progress (prevents multiple clicks)
+  const isPhantomConnecting = typeof window !== "undefined" && 
+    sessionStorage.getItem('phantom_connecting') === 'true';
+  const isButtonDisabled = connecting || connected || isPhantomConnecting;
+  
   // Log detection for debugging
   if (isMobile) {
     console.log("🔍 Connection method detection:", {
@@ -239,6 +244,8 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       hasWindowSolana,
       willUseAdapter: hasWindowSolana,
       willUseDeepLink: !hasWindowSolana,
+      isPhantomConnecting,
+      isButtonDisabled,
       userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
       solanaIsPhantom: typeof window !== "undefined" && !!(window as any).solana?.isPhantom
     });
@@ -249,7 +256,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       {compact ? (
           <button
           onClick={handleConnect}
-          disabled={connecting || connected}
+          disabled={isButtonDisabled}
             className="px-2.5 py-1.5 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-md text-xs font-medium hover:bg-amber-600/30 transition-colors disabled:opacity-50"
           >
           Connect Wallet
@@ -257,7 +264,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         ) : (
           <button
           onClick={handleConnect}
-          disabled={connecting || connected}
+          disabled={isButtonDisabled}
                 className="px-3 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50 border border-amber-400/50 shadow-lg shadow-amber-500/20 text-sm"
               >
           Connect Wallet
