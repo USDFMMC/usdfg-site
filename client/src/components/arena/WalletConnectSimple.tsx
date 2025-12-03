@@ -41,18 +41,25 @@ function openPhantomMobile(): void {
   const rootUrl = "https://usdfg.pro/";
   const manifestUrl = "https://usdfg.pro/phantom/manifest.json";
   
+  // Mark that we're connecting (for return handler to detect)
+  sessionStorage.setItem('phantom_connecting', 'true');
+  
   // Verify manifest is accessible before navigating
   // This helps diagnose if Phantom is rejecting due to missing manifest
   fetch(manifestUrl, { method: 'HEAD', cache: 'no-cache' })
     .then((response) => {
       if (!response.ok) {
         console.error('❌ Manifest.json not accessible:', response.status, response.statusText);
+        console.error('❌ This will cause Phantom to reject the connection');
+        sessionStorage.removeItem('phantom_connecting');
       } else {
         console.log('✅ Manifest.json is accessible');
       }
     })
     .catch((error) => {
       console.error('❌ Error checking manifest.json:', error);
+      console.error('❌ This will cause Phantom to reject the connection');
+      sessionStorage.removeItem('phantom_connecting');
     });
   
   const url =

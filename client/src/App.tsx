@@ -71,6 +71,32 @@ function App() {
     console.log("📥 Current URL:", window.location.href);
     console.log("📥 Current pathname:", window.location.pathname);
     console.log("📥 Current search:", window.location.search);
+    console.log("📥 All URL params:", Object.fromEntries(new URLSearchParams(window.location.search)));
+    
+    // Check if we were trying to connect (detect if Phantom closed without returning)
+    const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
+    const hasPendingNonce = sessionStorage.getItem('phantom_dapp_nonce');
+    const currentPath = window.location.pathname.replace(/\/+$/, "") || "/";
+    
+    // If we're on root path with no params but have a pending connection, Phantom might have closed silently
+    if (isConnecting && hasPendingNonce && currentPath === "/" && !window.location.search) {
+      console.warn("⚠️ Phantom opened but closed without returning - possible silent rejection");
+      console.warn("⚠️ This usually means:");
+      console.warn("   1. Phantom couldn't read the manifest.json");
+      console.warn("   2. The deep link parameters are invalid");
+      console.warn("   3. Phantom cache has old data");
+      console.warn("   4. User cancelled in Phantom");
+      
+      // Clear connecting state after a delay (give Phantom time to return if it's slow)
+      setTimeout(() => {
+        const stillConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
+        if (stillConnecting) {
+          console.log("🧹 Clearing stale connecting state");
+          sessionStorage.removeItem('phantom_connecting');
+          sessionStorage.removeItem('phantom_dapp_nonce');
+        }
+      }, 3000); // Wait 3 seconds for Phantom to return
+    }
     
     function base64ToUint8Array(b64: string) {
       return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
