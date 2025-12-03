@@ -304,7 +304,9 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       isMobile,
       isPhantom,
       shouldUseDeepLink,
-      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown"
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
+      hasWindowSolana: typeof window !== "undefined" && !!(window as any).solana,
+      solanaIsPhantom: typeof window !== "undefined" && !!(window as any).solana?.isPhantom
     });
   }
   
