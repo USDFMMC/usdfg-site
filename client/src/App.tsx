@@ -75,11 +75,21 @@ function App() {
     // Check if we just attempted to connect (detect silent Phantom rejection)
     const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
     const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
-    if (connectTimestamp && isConnecting && !window.location.search) {
+    const hasSearchParams = window.location.search.length > 0;
+    
+    console.log("📥 Connection state:", {
+      connectTimestamp,
+      isConnecting,
+      hasSearchParams,
+      timeSinceConnect: connectTimestamp ? Date.now() - parseInt(connectTimestamp) : null
+    });
+    
+    if (connectTimestamp && isConnecting && !hasSearchParams) {
       const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
-      if (timeSinceConnect < 5000) { // Within 5 seconds of connect attempt
+      if (timeSinceConnect < 10000) { // Within 10 seconds of connect attempt
         console.warn("⚠️⚠️⚠️ PHANTOM SILENT REJECTION DETECTED ⚠️⚠️⚠️");
         console.warn("⚠️ Phantom opened but returned immediately without params");
+        console.warn("⚠️ Time since connect:", timeSinceConnect, "ms");
         console.warn("⚠️ This indicates Phantom silently rejected the connection");
         console.warn("⚠️ Possible causes:");
         console.warn("   1. Safari compatibility issue (Phantom prefers in-app browser)");

@@ -43,24 +43,8 @@ function openPhantomMobile(): void {
   
   // Mark that we're connecting (for return handler to detect)
   sessionStorage.setItem('phantom_connecting', 'true');
-  
-  // Verify manifest is accessible before navigating
-  // This helps diagnose if Phantom is rejecting due to missing manifest
-  fetch(manifestUrl, { method: 'HEAD', cache: 'no-cache' })
-    .then((response) => {
-      if (!response.ok) {
-        console.error('❌ Manifest.json not accessible:', response.status, response.statusText);
-        console.error('❌ This will cause Phantom to reject the connection');
-        sessionStorage.removeItem('phantom_connecting');
-      } else {
-        console.log('✅ Manifest.json is accessible');
-      }
-    })
-    .catch((error) => {
-      console.error('❌ Error checking manifest.json:', error);
-      console.error('❌ This will cause Phantom to reject the connection');
-      sessionStorage.removeItem('phantom_connecting');
-    });
+  // Store timestamp for silent rejection detection
+  sessionStorage.setItem('phantom_connect_timestamp', Date.now().toString());
   
   const url =
     "https://phantom.app/ul/v1/connect" +
@@ -72,16 +56,9 @@ function openPhantomMobile(): void {
     `&scope=${encodeURIComponent("wallet:sign,wallet:signMessage,wallet:decrypt")}` +
     `&app_metadata_url=${encodeURIComponent(manifestUrl)}`;
   
-  // Log the URL for debugging (before navigation)
-  console.log('🚀 Opening Phantom deep link...');
-  console.log('🔗 URL:', url.substring(0, 200) + '...');
-  console.log('🔗 app_url:', rootUrl);
-  console.log('🔗 redirect_link:', rootUrl);
-  console.log('🔗 app_metadata_url:', manifestUrl);
-  console.log('🔑 dapp_encryption_public_key length:', dappPublicKeyBase64.length);
-  console.log('🔑 nonce length:', nonceBase64.length);
-  
   // Navigate IMMEDIATELY - no async, no logging, no delays, no React batching
+  // CRITICAL: Any async operations (like fetch) MUST happen AFTER navigation
+  // Safari requires pure synchronous user gesture for deep links
   window.location.href = url;
 }
 
