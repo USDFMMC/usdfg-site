@@ -7,10 +7,24 @@ export function isPhantomBrowser(): boolean {
   
   const ua = navigator.userAgent.toLowerCase();
   
-  // Phantom's in-app browser typically includes "phantom" in the user agent
-  // or we can check for specific Phantom browser indicators
-  return ua.includes("phantom") || 
-         (typeof window !== "undefined" && 
-          (window as any).phantom?.solana !== undefined);
+  // Check for Phantom's injected object (most reliable)
+  if (typeof window !== "undefined" && (window as any).phantom?.solana !== undefined) {
+    console.log("🔍 Phantom browser detected via window.phantom.solana");
+    return true;
+  }
+  
+  // Check user agent for "phantom" (less reliable, but backup)
+  if (ua.includes("phantom")) {
+    console.log("🔍 Phantom browser detected via user agent");
+    return true;
+  }
+  
+  // Check for Phantom-specific window properties
+  if (typeof window !== "undefined" && (window as any).solana?.isPhantom) {
+    console.log("🔍 Phantom browser detected via window.solana.isPhantom");
+    return true;
+  }
+  
+  return false;
 }
 

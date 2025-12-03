@@ -95,11 +95,6 @@ function openPhantomMobile(): void {
   // CRITICAL: Any async operations (like fetch) MUST happen AFTER navigation
   // Safari requires pure synchronous user gesture for deep links
   window.location.href = url;
-  
-  // Reset guard after a delay (in case navigation fails)
-  setTimeout(() => {
-    isConnecting = false;
-  }, 5000);
 }
 
 interface WalletConnectSimpleProps {
@@ -302,6 +297,16 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const isMobile = isMobileSafari();
   const isPhantom = isPhantomBrowser();
   const shouldUseDeepLink = isMobile && !isPhantom; // Mobile Safari but NOT Phantom browser
+  
+  // Log detection for debugging
+  if (isMobile || isPhantom) {
+    console.log("🔍 Connection method detection:", {
+      isMobile,
+      isPhantom,
+      shouldUseDeepLink,
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown"
+    });
+  }
   
   return (
     <div className="flex flex-col space-y-2">
