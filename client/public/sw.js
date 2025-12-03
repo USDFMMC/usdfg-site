@@ -92,7 +92,7 @@ self.addEventListener('fetch', (event) => {
       return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
     });
   }
-
+  
   event.respondWith(
     caches.match(event.request)
       .then((response) => {

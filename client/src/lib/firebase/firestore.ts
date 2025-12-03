@@ -1037,10 +1037,10 @@ export const joinChallenge = async (challengeId: string, wallet: string, isFound
     } else {
       updates.status = isFull ? "in-progress" : "active";
 
-      if (isFull) {
-        // Set deadline to 2 hours from now for result submission
-        updates.resultDeadline = Timestamp.fromDate(new Date(Date.now() + 2 * 60 * 60 * 1000));
-        console.log('⏰ Challenge is full! Result submission phase started (2-hour deadline)');
+    if (isFull) {
+      // Set deadline to 2 hours from now for result submission
+      updates.resultDeadline = Timestamp.fromDate(new Date(Date.now() + 2 * 60 * 60 * 1000));
+      console.log('⏰ Challenge is full! Result submission phase started (2-hour deadline)');
       }
     }
 

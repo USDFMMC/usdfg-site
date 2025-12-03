@@ -180,7 +180,7 @@ const TeamManagementModal: React.FC<TeamManagementModalProps> = ({ currentWallet
           <div className="p-4 bg-zinc-800/50 border border-zinc-700 rounded-lg">
             <div className="flex items-center gap-4 mb-4">
               <div>
-                <h3 className="text-lg font-semibold text-white mb-2">{userTeam.teamName}</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">{userTeam.teamName}</h3>
                 {userTeam.teamKey === currentWallet && (
                   <div className="mt-3">
                     <label className="text-xs text-zinc-400 mb-2 block">Team Logo</label>

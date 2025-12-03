@@ -112,17 +112,19 @@ export function launchPhantomDeepLink(): void {
     
     // CRITICAL: Hardcoded redirect URL - Phantom returns to /app/ (with trailing slash)
     // Phantom on iOS requires trailing slash for folder-based URLs
-    const redirectLink = encodeURIComponent("https://usdfg.pro/app/");
+    // CRITICAL: Use root / for iOS universal link compatibility
+    // iOS always treats root domain as valid universal link
+    const redirectLink = encodeURIComponent("https://usdfg.pro/");
     // app_url is what Phantom displays in connected accounts
-    const appUrl = encodeURIComponent("https://usdfg.pro/app/");
+    const appUrl = encodeURIComponent("https://usdfg.pro/");
     const appMetadataUrl = encodeURIComponent("https://usdfg.pro/phantom/manifest.json");
     
     // Store redirect URL globally for debugging
-    (window as any).__phantom_debug_redirect = "https://usdfg.pro/app/";
+    (window as any).__phantom_debug_redirect = "https://usdfg.pro/";
 
-    console.log('🔗 Redirect link (HARDCODED /app/):', "https://usdfg.pro/app/");
-    console.log('🔗 App URL (HARDCODED - what Phantom displays):', "https://usdfg.pro/app/");
-    console.log('🔍 DEBUG: window.__phantom_debug_redirect =', "https://usdfg.pro/app/");
+    console.log('🔗 Redirect link (ROOT /):', "https://usdfg.pro/");
+    console.log('🔗 App URL (ROOT - what Phantom displays):', "https://usdfg.pro/");
+    console.log('🔍 DEBUG: window.__phantom_debug_redirect =', "https://usdfg.pro/");
     console.log('🔑 DApp Public Key (base64):', dappPublicKeyBase64);
     console.log('🔑 Nonce (base64):', nonce);
     
@@ -131,10 +133,10 @@ export function launchPhantomDeepLink(): void {
     const deepLinkUrl = `https://phantom.app/ul/v1/connect?app_url=${appUrl}&redirect_link=${redirectLink}&dapp_encryption_public_key=${encodeURIComponent(dappPublicKeyBase64)}&nonce=${encodeURIComponent(nonce)}&cluster=devnet&scope=${encodeURIComponent("wallet:sign,wallet:signMessage,wallet:decrypt")}&app_metadata_url=${appMetadataUrl}`;
 
     // CRITICAL LOG - This shows EXACTLY what redirect URL is being sent to Phantom
-    console.log('🔗 Redirecting Phantom to (HARDCODED):', "https://usdfg.pro/app/");
-    console.log('🔗 Redirect Link (encoded):', redirectLink);
-    console.log('🔗 App URL (HARDCODED - displayed in Phantom):', "https://usdfg.pro/app/");
-    console.log('🔗 App URL (encoded):', appUrl);
+        console.log('🔗 Redirecting Phantom to (ROOT /):', "https://usdfg.pro/");
+        console.log('🔗 Redirect Link (encoded):', redirectLink);
+        console.log('🔗 App URL (ROOT - displayed in Phantom):', "https://usdfg.pro/");
+        console.log('🔗 App URL (encoded):', appUrl);
     console.log('🔗 Full Deep Link URL:', deepLinkUrl);
     console.log('📱 Redirecting to Phantom NOW...');
     console.log('📍 DApp Public Key (base64):', dappPublicKeyBase64);

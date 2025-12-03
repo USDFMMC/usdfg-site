@@ -45,10 +45,10 @@ export function phantomMobileConnect() {
   }
   
   isNavigating = true;
-  // CRITICAL: Phantom on iOS requires trailing slash for folder-based URLs
-  // Without trailing slash, Phantom fails routing and instantly closes
-  // Must use https://usdfg.pro/app/ (with trailing slash)
-  const appUrl = "https://usdfg.pro/app/";
+  // CRITICAL: Use root / for iOS universal link compatibility
+  // iOS always treats root domain as valid universal link (no subpath needed)
+  // This ensures Phantom returns to the same tab, not a new blank tab
+  const appUrl = "https://usdfg.pro/";
   
   const dappKeyPair = nacl.box.keyPair();
   const nonce = nacl.randomBytes(24);

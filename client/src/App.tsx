@@ -29,15 +29,15 @@ function RoutesWithLogging() {
 
   return (
       <Routes>
-        <Route path="/" element={<Home />} />
+        {/* CRITICAL: Root / is now the main app (for Phantom universal link compatibility) */}
+        <Route path="/" element={<ArenaRoute />} />
+        {/* Landing page moved to /home */}
+        <Route path="/home" element={<Home />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/whitepaper" element={<Whitepaper />} />
-        <Route path="/app/challenge/new" element={<CreateChallenge />} />
-        <Route path="/app/profile/:address" element={<PlayerProfile />} />
-        {/* CRITICAL: Match both /app and /app/ (Phantom returns to /app/ with trailing slash) */}
-        <Route path="/app" element={<ArenaRoute />} />
-        <Route path="/app/" element={<ArenaRoute />} />
+        <Route path="/challenge/new" element={<CreateChallenge />} />
+        <Route path="/profile/:address" element={<PlayerProfile />} />
         <Route path="/login" element={<Home />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
@@ -73,10 +73,10 @@ function App() {
       return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
     }
 
-    // Normalize path - handle both /app and /app/
-    const path = window.location.pathname.replace(/\/+$/, "");
-    if (path !== "/app") {
-      console.log("📥 Not on /app route, skipping handler");
+    // Normalize path - handle both / and / (root path)
+    const path = window.location.pathname.replace(/\/+$/, "") || "/";
+    if (path !== "/") {
+      console.log("📥 Not on root route, skipping handler");
       return;
     }
 
@@ -137,9 +137,9 @@ function App() {
 
       // Cleanup
       localStorage.removeItem("phantom_dapp_handshake");
-      // Remove Phantom params from URL - normalize to /app (no trailing slash)
-      window.history.replaceState({}, "", "/app");
-      console.log("✅ Cleaned URL, redirecting to /app");
+      // Remove Phantom params from URL - normalize to / (root)
+      window.history.replaceState({}, "", "/");
+      console.log("✅ Cleaned URL, redirecting to /");
     } catch (error) {
       console.error("❌ Error decrypting Phantom payload:", error);
     }

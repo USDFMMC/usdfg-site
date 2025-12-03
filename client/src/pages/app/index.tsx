@@ -162,7 +162,7 @@ const ArenaHome: React.FC = () => {
             connected: true,
             publicKey: publicKey
           });
-          window.history.replaceState({}, "", "/app");
+          window.history.replaceState({}, "", "/");
         }
       }
       return;
@@ -171,17 +171,17 @@ const ArenaHome: React.FC = () => {
     const params2 = new URLSearchParams(window.location.search);
     
     // Handle user cancellation - Phantom may redirect without params
-    // If we're on /app or /app/ with no params and we have a pending deep link, user likely cancelled
-    if (!params2.has("phantom_encryption_public_key") && (window.location.pathname === "/app" || window.location.pathname === "/app/")) {
+    // If we're on / with no params and we have a pending deep link, user likely cancelled
+    if (!params2.has("phantom_encryption_public_key") && (window.location.pathname === "/" || window.location.pathname === "")) {
       const hasPendingNonce = sessionStorage.getItem(SESSION_STORAGE_NONCE);
       if (hasPendingNonce) {
-        console.log("⚠️ Phantom deep link cancelled by user - staying on /app");
+        console.log("⚠️ Phantom deep link cancelled by user - staying on /");
         // Clear the pending nonce and connecting flag
         sessionStorage.removeItem(SESSION_STORAGE_NONCE);
         sessionStorage.removeItem('phantom_connecting');
         sessionStorage.removeItem('phantom_original_tab');
-        // Ensure we stay on /app (don't redirect anywhere)
-        window.history.replaceState({}, "", "/app");
+        // Ensure we stay on / (don't redirect anywhere)
+        window.history.replaceState({}, "", "/");
         return;
       }
     }
@@ -216,7 +216,7 @@ const ArenaHome: React.FC = () => {
       // Check if this is a valid Phantom return
       if (isPhantomReturn()) {
         try {
-          console.log("🔍 Processing Phantom return on /app page...");
+          console.log("🔍 Processing Phantom return on root / page...");
           const result = handlePhantomReturn();
           
           if (result && result.publicKey) {
@@ -268,7 +268,7 @@ const ArenaHome: React.FC = () => {
               }
               
               // Clean URL
-              window.history.replaceState({}, "", "/app");
+              window.history.replaceState({}, "", "/");
               
               // Show message and try to close this tab
               alert("✅ Wallet connected! Closing this tab - please use the original tab.");
@@ -279,7 +279,7 @@ const ArenaHome: React.FC = () => {
                   window.close();
                 } catch (e) {
                   // If we can't close, redirect to a simple page that tells user to go back
-                  window.location.href = '/app?phantom_connected=true';
+                  window.location.href = '/?phantom_connected=true';
                 }
               }, 500);
             } else {
@@ -299,7 +299,7 @@ const ArenaHome: React.FC = () => {
               localStorage.setItem('arena-access', 'true');
               
               // Clean query params from URL immediately
-              window.history.replaceState({}, "", "/app");
+              window.history.replaceState({}, "", "/");
               
               // Trigger a state update to reflect the connection
               window.dispatchEvent(new Event('phantomConnected'));
@@ -307,7 +307,7 @@ const ArenaHome: React.FC = () => {
           } else {
             console.error("❌ Failed to decrypt Phantom payload - user may have cancelled");
             // Clean URL even on error
-            window.history.replaceState({}, "", "/app");
+            window.history.replaceState({}, "", "/");
             // Clear any pending nonce and connecting flag
             sessionStorage.removeItem(SESSION_STORAGE_NONCE);
             sessionStorage.removeItem('phantom_connecting');
@@ -318,7 +318,7 @@ const ArenaHome: React.FC = () => {
           console.error("❌ Error message:", error?.message);
           console.error("❌ Error stack:", error?.stack);
           // Clean URL even on error
-          window.history.replaceState({}, "", "/app");
+          window.history.replaceState({}, "", "/");
           // Clear any pending nonce and connecting flag
           sessionStorage.removeItem(SESSION_STORAGE_NONCE);
           sessionStorage.removeItem('phantom_connecting');
@@ -1916,7 +1916,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   const handleShareChallenge = async (challenge: any) => {
     try {
       // Create shareable URL
-      const shareUrl = `${window.location.origin}/app?challenge=${challenge.id}`;
+      const shareUrl = `${window.location.origin}/?challenge=${challenge.id}`;
       
       // Create share text
       const shareText = `🎮 Join my USDFG Arena challenge!\n\n"${challenge.title}"\n💰 ${challenge.entryFee} USDFG Entry • 🏆 ${challenge.prizePool} USDFG Reward\n🎯 ${extractGameFromTitle(challenge.title)} • ${getGameCategory(extractGameFromTitle(challenge.title))}\n\nJoin now: ${shareUrl}`;
@@ -1936,7 +1936,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     } catch (error) {
       console.error('Error sharing challenge:', error);
       // Fallback: show share text in alert
-      const shareUrl = `${window.location.origin}/app?challenge=${challenge.id}`;
+      const shareUrl = `${window.location.origin}/?challenge=${challenge.id}`;
       const shareText = `🎮 Join my USDFG Arena challenge!\n\n"${challenge.title}"\n💰 ${challenge.entryFee} USDFG Entry • 🏆 ${challenge.prizePool} USDFG Reward\n🎯 ${extractGameFromTitle(challenge.title)} • ${getGameCategory(extractGameFromTitle(challenge.title))}\n\nJoin now: ${shareUrl}`;
       alert(`Share this challenge:\n\n${shareText}`);
     }

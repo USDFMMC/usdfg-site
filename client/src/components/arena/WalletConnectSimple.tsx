@@ -37,12 +37,14 @@ function openPhantomMobile(): void {
   }));
   
   // Build URL synchronously
+  // CRITICAL: Use root / for iOS universal link compatibility
+  const rootUrl = "https://usdfg.pro/";
   const url =
     "https://phantom.app/ul/v1/connect" +
-    `?app_url=${encodeURIComponent("https://usdfg.pro/app/")}` +
+    `?app_url=${encodeURIComponent(rootUrl)}` +
     `&dapp_encryption_public_key=${encodeURIComponent(dappPublicKeyBase64)}` +
     `&nonce=${encodeURIComponent(nonceBase64)}` +
-    `&redirect_link=${encodeURIComponent("https://usdfg.pro/app/")}` +
+    `&redirect_link=${encodeURIComponent(rootUrl)}` +
     `&cluster=devnet` +
     `&scope=${encodeURIComponent("wallet:sign,wallet:signMessage,wallet:decrypt")}` +
     `&app_metadata_url=${encodeURIComponent("https://usdfg.pro/phantom/manifest.json")}`;
