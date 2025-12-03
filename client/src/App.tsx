@@ -67,12 +67,39 @@ function App() {
   // Phantom return handler - decrypts payload when Phantom returns
   // CRITICAL: This runs BEFORE Router, so it catches /app/ and /app with query params
   useEffect(() => {
+    // CRITICAL: Detect if we're in a redirect loop (new tab that keeps redirecting)
+    const redirectCount = parseInt(sessionStorage.getItem('phantom_redirect_count') || '0');
+    if (redirectCount > 3) {
+      console.error("❌❌❌ REDIRECT LOOP DETECTED ❌❌❌");
+      console.error("❌ Tab has redirected more than 3 times - breaking loop");
+      console.error("❌ This means Phantom opened a new tab but universal link isn't working");
+      console.error("❌ Clearing all Phantom connection state");
+      
+      // Clear all connection state
+      sessionStorage.removeItem('phantom_connecting');
+      sessionStorage.removeItem('phantom_dapp_nonce');
+      sessionStorage.removeItem('phantom_original_tab');
+      sessionStorage.removeItem('phantom_redirect_count');
+      sessionStorage.removeItem('phantom_connect_timestamp');
+      
+      // Stop the redirect loop
+      window.stop();
+      return;
+    }
+    
+    // Increment redirect count if we're in a new tab
+    const isOriginalTab = sessionStorage.getItem('phantom_original_tab') === 'true';
+    if (!isOriginalTab) {
+      sessionStorage.setItem('phantom_redirect_count', (redirectCount + 1).toString());
+    }
+    
     console.log("📥 App.tsx Phantom return handler checking...");
     console.log("📥 Current URL:", window.location.href);
     console.log("📥 Current pathname:", window.location.pathname);
     console.log("📥 Current search:", window.location.search);
     console.log("📥 Search length:", window.location.search.length);
-    console.log("📥 Is this a NEW tab?", !sessionStorage.getItem('phantom_original_tab'));
+    console.log("📥 Is this a NEW tab?", !isOriginalTab);
+    console.log("📥 Redirect count:", redirectCount);
     console.log("📥 Document referrer:", document.referrer);
     console.log("📥 Window name:", window.name);
     
