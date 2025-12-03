@@ -8,11 +8,33 @@ import { useUSDFGWallet } from '@/lib/wallet/useUSDFGWallet';
 import nacl from "tweetnacl";
 import { isMobileSafari } from '@/lib/utils/isMobileSafari';
 
+// Guard to prevent multiple simultaneous connection attempts
+let isConnecting = false;
+
 // CRITICAL: Pure synchronous function OUTSIDE React component
 // This function has ZERO React logic, ZERO hooks, ZERO state
 // Must be called directly from onClick with NO conditions, NO async, NO logging
 // This ensures Safari treats it as a trusted user gesture
 function openPhantomMobile(): void {
+  // Prevent double-clicks and multiple simultaneous attempts
+  if (isConnecting) {
+    console.warn("⚠️ Phantom connection already in progress - ignoring duplicate click");
+    return;
+  }
+  
+  // Check if we recently attempted to connect (within last 2 seconds)
+  const lastAttempt = sessionStorage.getItem('phantom_last_attempt');
+  if (lastAttempt) {
+    const timeSinceLastAttempt = Date.now() - parseInt(lastAttempt);
+    if (timeSinceLastAttempt < 2000) {
+      console.warn("⚠️ Phantom connect called too soon after last attempt - ignoring");
+      return;
+    }
+  }
+  
+  isConnecting = true;
+  sessionStorage.setItem('phantom_last_attempt', Date.now().toString());
+  
   // Generate X25519 keypair synchronously
   const kp = nacl.box.keyPair();
   // Generate 24-byte nonce synchronously
@@ -73,6 +95,11 @@ function openPhantomMobile(): void {
   // CRITICAL: Any async operations (like fetch) MUST happen AFTER navigation
   // Safari requires pure synchronous user gesture for deep links
   window.location.href = url;
+  
+  // Reset guard after a delay (in case navigation fails)
+  setTimeout(() => {
+    isConnecting = false;
+  }, 5000);
 }
 
 interface WalletConnectSimpleProps {
