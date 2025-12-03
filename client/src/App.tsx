@@ -72,6 +72,9 @@ function App() {
     console.log("📥 Current pathname:", window.location.pathname);
     console.log("📥 Current search:", window.location.search);
     console.log("📥 Search length:", window.location.search.length);
+    console.log("📥 Is this a NEW tab?", !sessionStorage.getItem('phantom_original_tab'));
+    console.log("📥 Document referrer:", document.referrer);
+    console.log("📥 Window name:", window.name);
     
     // Check if we just attempted to connect (detect silent Phantom rejection)
     const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
