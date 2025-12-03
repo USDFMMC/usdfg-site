@@ -11,8 +11,31 @@ export function useUSDFGWallet() {
 
   async function connect() {
     if (mobile) {
-      console.log("📱 Mobile Safari detected → using Phantom deep link");
-      return phantomMobileConnect();
+      // On mobile Safari: check if window.solana exists (Phantom browser)
+      // If it exists, use wallet adapter (works in Phantom browser)
+      // If not, use deep link (works from Safari)
+      const hasWindowSolana = typeof window !== "undefined" && !!(window as any).solana;
+      
+      if (hasWindowSolana) {
+        console.log("📱 Mobile Safari + window.solana detected → using wallet adapter (Phantom browser)");
+        
+        // Select Phantom if not already selected
+        if (!wallet.wallet) {
+          const phantomWallet = wallet.wallets.find(
+            (w) => w.adapter.name === "Phantom"
+          );
+          
+          if (phantomWallet) {
+            await wallet.select(phantomWallet.adapter.name);
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+        }
+        
+        return wallet.connect();
+      } else {
+        console.log("📱 Mobile Safari detected → using Phantom deep link");
+        return phantomMobileConnect();
+      }
     }
 
     console.log("🖥 Desktop detected → using wallet adapter");
