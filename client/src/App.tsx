@@ -71,6 +71,17 @@ function App() {
     console.log("📥 Current URL:", window.location.href);
     console.log("📥 Current pathname:", window.location.pathname);
     console.log("📥 Current search:", window.location.search);
+    console.log("📥 Full window.location:", {
+      href: window.location.href,
+      pathname: window.location.pathname,
+      search: window.location.search,
+      hash: window.location.hash,
+      origin: window.location.origin
+    });
+    
+    // Log ALL query parameters
+    const allParams = new URLSearchParams(window.location.search);
+    console.log("📥 All URL parameters:", Object.fromEntries(allParams.entries()));
     console.log("📥 All URL params:", Object.fromEntries(new URLSearchParams(window.location.search)));
     
     // Check if we were trying to connect (detect if Phantom closed without returning)
