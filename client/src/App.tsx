@@ -62,9 +62,22 @@ function App() {
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
 
   // Phantom return handler - decrypts payload when Phantom returns
+  // CRITICAL: This runs BEFORE Router, so it catches /app/ and /app with query params
   useEffect(() => {
+    console.log("📥 App.tsx Phantom return handler checking...");
+    console.log("📥 Current URL:", window.location.href);
+    console.log("📥 Current pathname:", window.location.pathname);
+    console.log("📥 Current search:", window.location.search);
+    
     function base64ToUint8Array(b64: string) {
       return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    }
+
+    // Normalize path - handle both /app and /app/
+    const path = window.location.pathname.replace(/\/+$/, "");
+    if (path !== "/app") {
+      console.log("📥 Not on /app route, skipping handler");
+      return;
     }
 
     const url = new URL(window.location.href);
@@ -72,10 +85,24 @@ function App() {
     const nonceB64 = url.searchParams.get("nonce");
     const dataB64 = url.searchParams.get("data");
 
-    if (!phantomPubKey || !nonceB64 || !dataB64) return;
+    console.log("📥 Phantom params check:", {
+      hasPhantomPubKey: !!phantomPubKey,
+      hasNonce: !!nonceB64,
+      hasData: !!dataB64
+    });
+
+    if (!phantomPubKey || !nonceB64 || !dataB64) {
+      console.log("📥 Missing Phantom params, skipping");
+      return;
+    }
+
+    console.log("📥 ✅ Phantom return detected! Decrypting payload...");
 
     const stored = localStorage.getItem("phantom_dapp_handshake");
-    if (!stored) return;
+    if (!stored) {
+      console.error("❌ No phantom_dapp_handshake in localStorage");
+      return;
+    }
 
     try {
       const { dappSecretKey } = JSON.parse(stored);
@@ -83,6 +110,8 @@ function App() {
       const nonceBytes = base64ToUint8Array(nonceB64);
       const dataBytes = base64ToUint8Array(dataB64);
       const phantomPubKeyBytes = base64ToUint8Array(phantomPubKey);
+
+      console.log("🔐 Attempting decryption...");
 
       const decrypted = nacl.box.open(
         dataBytes,
@@ -97,7 +126,7 @@ function App() {
       }
 
       const payload = JSON.parse(new TextDecoder().decode(decrypted));
-      console.log("🔥 Phantom payload decrypted:", payload);
+      console.log("🔥 ✅ Phantom payload decrypted successfully:", payload);
 
       if (payload.public_key) {
         localStorage.setItem("publicKey", payload.public_key);
@@ -108,9 +137,9 @@ function App() {
 
       // Cleanup
       localStorage.removeItem("phantom_dapp_handshake");
-      // Remove Phantom params from URL
-      // Redirect to /app (React Router will handle it)
+      // Remove Phantom params from URL - normalize to /app (no trailing slash)
       window.history.replaceState({}, "", "/app");
+      console.log("✅ Cleaned URL, redirecting to /app");
     } catch (error) {
       console.error("❌ Error decrypting Phantom payload:", error);
     }
