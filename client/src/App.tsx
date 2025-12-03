@@ -71,34 +71,49 @@ function App() {
     console.log("📥 Current URL:", window.location.href);
     console.log("📥 Current pathname:", window.location.pathname);
     console.log("📥 Current search:", window.location.search);
+    console.log("📥 Search length:", window.location.search.length);
     
     // Check if we just attempted to connect (detect silent Phantom rejection)
     const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
     const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
     const hasSearchParams = window.location.search.length > 0;
+    const timeSinceConnect = connectTimestamp ? Date.now() - parseInt(connectTimestamp) : null;
     
     console.log("📥 Connection state:", {
       connectTimestamp,
       isConnecting,
       hasSearchParams,
-      timeSinceConnect: connectTimestamp ? Date.now() - parseInt(connectTimestamp) : null
+      timeSinceConnect,
+      searchString: window.location.search,
+      fullHref: window.location.href
     });
     
+    // Check EVERY possible Phantom return parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const allParams = Object.fromEntries(urlParams.entries());
+    console.log("📥 ALL URL parameters (including empty):", allParams);
+    console.log("📥 Parameter count:", urlParams.toString().split('&').filter(p => p).length);
+    
     if (connectTimestamp && isConnecting && !hasSearchParams) {
-      const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
-      if (timeSinceConnect < 10000) { // Within 10 seconds of connect attempt
-        console.warn("⚠️⚠️⚠️ PHANTOM SILENT REJECTION DETECTED ⚠️⚠️⚠️");
-        console.warn("⚠️ Phantom opened but returned immediately without params");
-        console.warn("⚠️ Time since connect:", timeSinceConnect, "ms");
-        console.warn("⚠️ This indicates Phantom silently rejected the connection");
-        console.warn("⚠️ Possible causes:");
-        console.warn("   1. Safari compatibility issue (Phantom prefers in-app browser)");
-        console.warn("   2. Manifest.json format is incorrect");
-        console.warn("   3. app_url doesn't match manifest.json url");
-        console.warn("   4. Phantom cache has old/stale data");
-        console.warn("   5. Missing required manifest fields");
-        console.warn("⚠️ SOLUTION: Clear Phantom cache and try again");
-        console.warn("   Settings → Connected Apps → Remove USDFG");
+      if (timeSinceConnect && timeSinceConnect < 10000) { // Within 10 seconds of connect attempt
+        console.error("❌❌❌ PHANTOM SILENT REJECTION DETECTED ❌❌❌");
+        console.error("❌ Phantom opened but returned immediately without ANY params");
+        console.error("❌ Time since connect:", timeSinceConnect, "ms");
+        console.error("❌ Current URL:", window.location.href);
+        console.error("❌ This indicates Phantom silently rejected the connection");
+        console.error("❌ Possible causes:");
+        console.error("   1. Manifest.json is not accessible from Phantom");
+        console.error("   2. Manifest.json format is incorrect");
+        console.error("   3. app_url doesn't match manifest.json url");
+        console.error("   4. Phantom cache has old/stale data");
+        console.error("   5. Missing required manifest fields");
+        console.error("   6. CORS issue preventing Phantom from reading manifest");
+        console.error("❌ ACTION REQUIRED:");
+        console.error("   1. Open https://usdfg.pro/phantom/manifest.json in Safari");
+        console.error("   2. Verify it loads correctly");
+        console.error("   3. Clear Phantom cache: Settings → Connected Apps → Remove USDFG");
+        console.error("   4. Clear Safari cache: Settings → Safari → Clear Website Data");
+        console.error("   5. Try connecting again");
       }
     }
     console.log("📥 Full window.location:", {

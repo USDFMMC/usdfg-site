@@ -56,6 +56,19 @@ function openPhantomMobile(): void {
     `&scope=${encodeURIComponent("wallet:sign,wallet:signMessage,wallet:decrypt")}` +
     `&app_metadata_url=${encodeURIComponent(manifestUrl)}`;
   
+  // Log the exact URL being sent to Phantom (for debugging)
+  console.log("🚀 Opening Phantom deep link...");
+  console.log("🔗 Full URL:", url);
+  console.log("🔗 Parameters:", {
+    app_url: rootUrl,
+    redirect_link: rootUrl,
+    app_metadata_url: manifestUrl,
+    dapp_encryption_public_key_length: dappPublicKeyBase64.length,
+    nonce_length: nonceBase64.length,
+    cluster: "devnet",
+    scope: "wallet:sign,wallet:signMessage,wallet:decrypt"
+  });
+  
   // Navigate IMMEDIATELY - no async, no logging, no delays, no React batching
   // CRITICAL: Any async operations (like fetch) MUST happen AFTER navigation
   // Safari requires pure synchronous user gesture for deep links
