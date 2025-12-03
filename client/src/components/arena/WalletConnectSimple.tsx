@@ -199,7 +199,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       <div className="flex items-center space-x-3">
         <div className="text-right">
           <div className="text-sm text-gray-400">
-            {publicKey.toString().slice(0, 8)}...{publicKey.toString().slice(-8)}
+            {effectivePublicKey.toString().slice(0, 8)}...{effectivePublicKey.toString().slice(-8)}
           </div>
           <div className="flex items-center gap-3">
             <div>
