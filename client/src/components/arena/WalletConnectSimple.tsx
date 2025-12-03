@@ -88,12 +88,31 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     }
   }, [connected, publicKey, isConnected, onConnect, onDisconnect, connection]);
 
-  // Handle wallet connection (desktop only)
-  // Mobile Safari uses openPhantomMobile() directly (defined outside component)
+  // Handle wallet connection
+  // CRITICAL: Check connection guard BEFORE doing anything
   const handleConnect = () => {
     // Prevent double-clicks
     if (connected || isConnected || connecting) {
+      console.warn("⚠️ Already connected or connecting - ignoring click");
       return;
+    }
+    
+    // CRITICAL: Check if Phantom connection is already in progress
+    const isPhantomConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
+    if (isPhantomConnecting) {
+      console.warn("⚠️ Phantom connection already in progress - ignoring click");
+      return;
+    }
+    
+    // Check if we recently attempted (within last 3 seconds)
+    const lastAttempt = sessionStorage.getItem('phantom_connect_attempt');
+    if (lastAttempt) {
+      const lastAttemptTime = new Date(lastAttempt).getTime();
+      const now = Date.now();
+      if (now - lastAttemptTime < 3000) {
+        console.warn("⚠️ Connect called too soon after last attempt - ignoring");
+        return;
+      }
     }
 
     (async () => {
@@ -107,6 +126,9 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           error: String(error)
         });
         console.error('Connection error:', error);
+        
+        // Clear connecting state on error
+        sessionStorage.removeItem('phantom_connecting');
         
         if (error.message?.includes('User rejected') || error.message?.includes('User cancelled')) {
           console.log('User cancelled wallet connection');

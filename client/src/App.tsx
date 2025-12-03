@@ -136,8 +136,35 @@ function App() {
     const hasPendingNonce = sessionStorage.getItem('phantom_dapp_nonce');
     const currentPath = window.location.pathname.replace(/\/+$/, "") || "/";
     
+    // Detect if Phantom opened a new tab (indicates universal link isn't working)
+    const isOriginalTab = sessionStorage.getItem('phantom_original_tab') === 'true';
+    const isNewTab = !isOriginalTab && document.referrer === "" && window.name === "";
+    
     // If we're on root path with no params but have a pending connection, Phantom might have closed silently
     if (isConnecting && hasPendingNonce && currentPath === "/" && !window.location.search) {
+      if (isNewTab) {
+        console.error("❌❌❌ PHANTOM OPENED NEW TAB - UNIVERSAL LINK NOT WORKING ❌❌❌");
+        console.error("❌ This tab was opened by Phantom but has no connection params");
+        console.error("❌ This means Phantom opened a new tab instead of returning to the original");
+        console.error("❌ Universal link association is broken");
+        console.error("❌ ACTION REQUIRED:");
+        console.error("   1. Clear Safari cache: Settings → Safari → Advanced → Website Data → usdfg.pro");
+        console.error("   2. Clear Phantom cache: Settings → Connected Apps → Remove USDFG");
+        console.error("   3. Restart both Safari and Phantom");
+        console.error("   4. Try connecting again");
+        
+        // Close this tab or redirect to original
+        setTimeout(() => {
+          try {
+            window.close();
+          } catch (e) {
+            // Can't close - redirect to home
+            window.location.href = '/';
+          }
+        }, 2000);
+        return;
+      }
+      
       console.warn("⚠️ Phantom opened but closed without returning - possible silent rejection");
       console.warn("⚠️ This usually means:");
       console.warn("   1. Phantom couldn't read the manifest.json");
@@ -152,8 +179,9 @@ function App() {
           console.log("🧹 Clearing stale connecting state");
           sessionStorage.removeItem('phantom_connecting');
           sessionStorage.removeItem('phantom_dapp_nonce');
+          sessionStorage.removeItem('phantom_original_tab');
         }
-      }, 3000); // Wait 3 seconds for Phantom to return
+      }, 5000); // Wait 5 seconds for Phantom to return
     }
     
     function base64ToUint8Array(b64: string) {

@@ -27,24 +27,35 @@ function encodeBase64(u8: Uint8Array): string {
 let isNavigating = false;
 
 export function phantomMobileConnect() {
+  // CRITICAL: Check if we're already connecting (persists across page reloads)
+  const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
+  if (isConnecting) {
+    console.warn("⚠️ Phantom connection already in progress - ignoring duplicate call");
+    return;
+  }
+  
   // Prevent double navigation - if already navigating, ignore
   if (isNavigating) {
     console.warn("⚠️ Phantom deep link already in progress - ignoring duplicate call");
     return;
   }
   
-  // Check if we recently navigated (within last 2 seconds)
+  // Check if we recently navigated (within last 5 seconds - increased from 2)
   const lastAttempt = sessionStorage.getItem('phantom_connect_attempt');
   if (lastAttempt) {
     const lastAttemptTime = new Date(lastAttempt).getTime();
     const now = Date.now();
-    if (now - lastAttemptTime < 2000) {
+    if (now - lastAttemptTime < 5000) {
       console.warn("⚠️ Phantom connect called too soon after last attempt - ignoring");
       return;
     }
   }
   
+  // Mark as navigating and connecting BEFORE doing anything else
   isNavigating = true;
+  sessionStorage.setItem('phantom_connecting', 'true');
+  // Mark this as the original tab (so we can detect if Phantom opens a new tab)
+  sessionStorage.setItem('phantom_original_tab', 'true');
   // CRITICAL: Use root / for iOS universal link compatibility
   // iOS always treats root domain as valid universal link (no subpath needed)
   // This ensures Phantom returns to the same tab, not a new blank tab
@@ -111,9 +122,11 @@ export function phantomMobileConnect() {
   
   // Store timestamp for debugging
   sessionStorage.setItem('phantom_connect_attempt', new Date().toISOString());
+  sessionStorage.setItem('phantom_connect_timestamp', Date.now().toString());
   console.log("⏰ Connect attempt timestamp stored");
   
   console.log("🚀 Navigating to Phantom universal link...");
+  console.log("🔒 Connection guard active - prevents duplicate clicks");
   
   // Navigate - this will redirect to Phantom
   // Reset flag after a delay (in case navigation is cancelled)
@@ -121,5 +134,12 @@ export function phantomMobileConnect() {
     isNavigating = false;
   }, 5000);
   
-  window.location.href = url;
+  // CRITICAL: Use window.location.replace() to prevent new tab
+  // This ensures Phantom returns to the same tab
+  try {
+    window.location.replace(url);
+  } catch (error) {
+    console.warn("⚠️ window.location.replace() failed, using href:", error);
+    window.location.href = url;
+  }
 }
