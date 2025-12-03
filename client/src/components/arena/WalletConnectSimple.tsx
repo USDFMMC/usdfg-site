@@ -5,97 +5,10 @@ import { useConnection } from '@solana/wallet-adapter-react';
 import { USDFG_MINT } from '@/lib/chain/config';
 import { logWalletEvent } from '@/utils/wallet-log';
 import { useUSDFGWallet } from '@/lib/wallet/useUSDFGWallet';
-import nacl from "tweetnacl";
 import { isMobileSafari } from '@/lib/utils/isMobileSafari';
-import { isPhantomBrowser } from '@/lib/utils/isPhantomBrowser';
 
-// CRITICAL: Pure synchronous function OUTSIDE React component
-// This function has ZERO React logic, ZERO hooks, ZERO state
-// Must be called directly from onClick with NO conditions, NO async, NO logging
-// This ensures Safari treats it as a trusted user gesture
-function openPhantomMobile(): void {
-  // ATOMIC check-and-set using sessionStorage (works across React re-renders)
-  const lastAttempt = sessionStorage.getItem('phantom_last_attempt');
-  const now = Date.now();
-  
-  if (lastAttempt) {
-    const timeSinceLastAttempt = now - parseInt(lastAttempt);
-    if (timeSinceLastAttempt < 2000) {
-      console.warn("⚠️ Phantom connect called too soon after last attempt - ignoring");
-      return;
-    }
-  }
-  
-  // Set timestamp IMMEDIATELY (atomic operation)
-  sessionStorage.setItem('phantom_last_attempt', now.toString());
-  
-  // Double-check: if we're already connecting, abort
-  if (sessionStorage.getItem('phantom_connecting') === 'true') {
-    console.warn("⚠️ Phantom connection already in progress - ignoring duplicate click");
-    return;
-  }
-  
-  // Generate X25519 keypair synchronously
-  const kp = nacl.box.keyPair();
-  // Generate 24-byte nonce synchronously
-  const nonce = nacl.randomBytes(24);
-  
-  // Encode to base64 synchronously
-  function encodeBase64(u8: Uint8Array): string {
-    let binary = "";
-    u8.forEach((b) => (binary += String.fromCharCode(b)));
-    return btoa(binary);
-  }
-  
-  const dappPublicKeyBase64 = encodeBase64(kp.publicKey);
-  const nonceBase64 = encodeBase64(nonce);
-  
-  // Store for return handler (synchronously, before navigation)
-  sessionStorage.setItem("phantom_dapp_keypair", JSON.stringify(Array.from(kp.secretKey)));
-  sessionStorage.setItem("phantom_dapp_nonce", nonceBase64);
-  localStorage.setItem("phantom_dapp_handshake", JSON.stringify({
-    dappSecretKey: encodeBase64(kp.secretKey),
-    nonce: nonceBase64,
-  }));
-  
-  // Build URL synchronously
-  // CRITICAL: Use root / for iOS universal link compatibility
-  const rootUrl = "https://usdfg.pro/";
-  const manifestUrl = "https://usdfg.pro/phantom/manifest.json";
-  
-  // Mark that we're connecting (for return handler to detect)
-  sessionStorage.setItem('phantom_connecting', 'true');
-  // Store timestamp for silent rejection detection
-  sessionStorage.setItem('phantom_connect_timestamp', Date.now().toString());
-  
-  const url =
-    "https://phantom.app/ul/v1/connect" +
-    `?app_url=${encodeURIComponent(rootUrl)}` +
-    `&dapp_encryption_public_key=${encodeURIComponent(dappPublicKeyBase64)}` +
-    `&nonce=${encodeURIComponent(nonceBase64)}` +
-    `&redirect_link=${encodeURIComponent(rootUrl)}` +
-    `&cluster=devnet` +
-    `&scope=${encodeURIComponent("wallet:sign,wallet:signMessage,wallet:decrypt")}` +
-    `&app_metadata_url=${encodeURIComponent(manifestUrl)}`;
-  
-  // Log the exact URL being sent to Phantom (for debugging)
-  console.log("🚀 Opening Phantom deep link...");
-  console.log("🔗 Full URL:", url);
-  console.log("🔗 Parameters:", {
-    app_url: rootUrl,
-    redirect_link: rootUrl,
-    app_metadata_url: manifestUrl,
-    dapp_encryption_public_key_length: dappPublicKeyBase64.length,
-    nonce_length: nonceBase64.length,
-    cluster: "devnet",
-    scope: "wallet:sign,wallet:signMessage,wallet:decrypt"
-  });
-  
-  // Navigate IMMEDIATELY - no async, no logging, no delays, no React batching
-  // CRITICAL: Any async operations (like fetch) MUST happen AFTER navigation
-  // Safari requires pure synchronous user gesture for deep links
-  window.location.href = url;
-}
+// NOTE: openPhantomMobile() function removed - connection logic now consolidated in useUSDFGWallet.connect()
+// This prevents conflicts between multiple connection paths
 
 interface WalletConnectSimpleProps {
   isConnected: boolean;
@@ -291,25 +204,19 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       }
   
   // Show connection button
-  // CRITICAL: On mobile Safari, check if window.solana exists first
-  // If it exists, use wallet adapter (works in Phantom browser)
-  // If not, use deep link (works from Safari)
-  // Use pure JavaScript check for mobile (not React hook) to avoid React batching
+  // CRITICAL: Always use handleConnect - it calls useUSDFGWallet.connect()
+  // which now handles the logic: checks window.solana on mobile, uses adapter if available, deep link otherwise
+  // This consolidates all connection logic in one place (useUSDFGWallet)
   const isMobile = isMobileSafari();
   const hasWindowSolana = typeof window !== "undefined" && !!(window as any).solana;
-  const isPhantom = isPhantomBrowser();
-  
-  // On mobile: if window.solana exists, use adapter (Phantom browser)
-  // Otherwise, use deep link (regular Safari)
-  const shouldUseDeepLink = isMobile && !hasWindowSolana;
   
   // Log detection for debugging
   if (isMobile) {
     console.log("🔍 Connection method detection:", {
       isMobile,
-      isPhantom,
       hasWindowSolana,
-      shouldUseDeepLink,
+      willUseAdapter: hasWindowSolana,
+      willUseDeepLink: !hasWindowSolana,
       userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
       solanaIsPhantom: typeof window !== "undefined" && !!(window as any).solana?.isPhantom
     });
@@ -319,16 +226,16 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     <div className="flex flex-col space-y-2">
       {compact ? (
           <button
-          onClick={shouldUseDeepLink ? openPhantomMobile : handleConnect}
-          disabled={!shouldUseDeepLink && (connecting || connected)}
+          onClick={handleConnect}
+          disabled={connecting || connected}
             className="px-2.5 py-1.5 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-md text-xs font-medium hover:bg-amber-600/30 transition-colors disabled:opacity-50"
           >
           Connect Wallet
           </button>
         ) : (
           <button
-          onClick={shouldUseDeepLink ? openPhantomMobile : handleConnect}
-          disabled={!shouldUseDeepLink && (connecting || connected)}
+          onClick={handleConnect}
+          disabled={connecting || connected}
                 className="px-3 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50 border border-amber-400/50 shadow-lg shadow-amber-500/20 text-sm"
               >
           Connect Wallet
