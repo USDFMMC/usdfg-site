@@ -112,10 +112,8 @@ function App() {
     // Log ALL query parameters
     const allParams = new URLSearchParams(window.location.search);
     console.log("📥 All URL parameters:", Object.fromEntries(allParams.entries()));
-    console.log("📥 All URL params:", Object.fromEntries(new URLSearchParams(window.location.search)));
     
     // Check if we were trying to connect (detect if Phantom closed without returning)
-    const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
     const hasPendingNonce = sessionStorage.getItem('phantom_dapp_nonce');
     const currentPath = window.location.pathname.replace(/\/+$/, "") || "/";
     
