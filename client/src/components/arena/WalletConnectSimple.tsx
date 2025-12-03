@@ -291,21 +291,26 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       }
   
   // Show connection button
-  // CRITICAL: On mobile Safari (NOT Phantom browser), use deep link
-  // On Phantom browser or desktop, use wallet adapter (normal async flow)
+  // CRITICAL: On mobile Safari, check if window.solana exists first
+  // If it exists, use wallet adapter (works in Phantom browser)
+  // If not, use deep link (works from Safari)
   // Use pure JavaScript check for mobile (not React hook) to avoid React batching
   const isMobile = isMobileSafari();
+  const hasWindowSolana = typeof window !== "undefined" && !!(window as any).solana;
   const isPhantom = isPhantomBrowser();
-  const shouldUseDeepLink = isMobile && !isPhantom; // Mobile Safari but NOT Phantom browser
+  
+  // On mobile: if window.solana exists, use adapter (Phantom browser)
+  // Otherwise, use deep link (regular Safari)
+  const shouldUseDeepLink = isMobile && !hasWindowSolana;
   
   // Log detection for debugging
-  if (isMobile || isPhantom) {
+  if (isMobile) {
     console.log("🔍 Connection method detection:", {
       isMobile,
       isPhantom,
+      hasWindowSolana,
       shouldUseDeepLink,
       userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
-      hasWindowSolana: typeof window !== "undefined" && !!(window as any).solana,
       solanaIsPhantom: typeof window !== "undefined" && !!(window as any).solana?.isPhantom
     });
   }
