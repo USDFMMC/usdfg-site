@@ -180,15 +180,30 @@ function App() {
         console.error("   3. Restart both Safari and Phantom");
         console.error("   4. Try connecting again");
         
-        // Close this tab or redirect to original
+        // CRITICAL: Clear all connection state immediately to prevent loops
+        sessionStorage.removeItem('phantom_connecting');
+        sessionStorage.removeItem('phantom_dapp_nonce');
+        sessionStorage.removeItem('phantom_original_tab');
+        sessionStorage.removeItem('phantom_redirect_count');
+        sessionStorage.removeItem('phantom_connect_timestamp');
+        
+        // Stop any pending redirects/navigation
+        try {
+          window.stop();
+        } catch (e) {
+          console.warn("Could not stop navigation:", e);
+        }
+        
+        // Close this tab or show message
         setTimeout(() => {
           try {
             window.close();
           } catch (e) {
-            // Can't close - redirect to home
-            window.location.href = '/';
+            // Can't close - show message and stay on page
+            console.log("⚠️ Cannot close tab - user should manually close this tab");
+            console.log("⚠️ Please return to the original tab");
           }
-        }, 2000);
+        }, 1000);
         return;
       }
       
