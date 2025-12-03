@@ -29,12 +29,18 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
 
   // Handle connection state changes
   useEffect(() => {
-    // On mobile, use stored connection; on desktop, use adapter connection
+    // On mobile, check BOTH the prop (from parent) AND the hook (for stored connection)
+    // On desktop, use adapter connection or prop
     const actuallyConnected = mobile 
-      ? (connected && publicKey) // Mobile uses stored connection
-      : (isConnected || (connected && publicKey)); // Desktop uses adapter
+      ? (isConnected || (connected && publicKey)) // Mobile: check prop first, then hook
+      : (isConnected || (connected && publicKey)); // Desktop uses adapter or prop
     
-    if (actuallyConnected && publicKey) {
+    // Get the effective public key (from hook or prop)
+    const effectivePublicKey = publicKey || (isConnected && typeof window !== 'undefined' 
+      ? (localStorage.getItem('phantom_public_key') ? new PublicKey(localStorage.getItem('phantom_public_key')!) : null)
+      : null);
+    
+    if (actuallyConnected && effectivePublicKey) {
       // Clear disconnect flag when user successfully connects
       localStorage.removeItem('wallet_disconnected');
       onConnect();
@@ -158,29 +164,34 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   };
 
   // If connected (via prop OR adapter), show connected state
-  const actuallyConnected = isConnected || (connected && publicKey);
+  // On mobile, also check localStorage for stored connection
+  const effectivePublicKey = publicKey || (mobile && typeof window !== 'undefined' && localStorage.getItem('phantom_public_key')
+    ? new PublicKey(localStorage.getItem('phantom_public_key')!)
+    : null);
+  const actuallyConnected = isConnected || (connected && effectivePublicKey) || 
+    (mobile && typeof window !== 'undefined' && localStorage.getItem('phantom_connected') === 'true' && effectivePublicKey);
 
   // Show connected state if connected
-  if (actuallyConnected && publicKey) {
+  if (actuallyConnected && effectivePublicKey) {
     // Compact mode for mobile
     if (compact) {
-      return (
-        <div className="flex flex-col items-end gap-1">
-          {usdfgBalance !== null && (
-            <div className="text-xs text-amber-300 font-semibold">
-              {usdfgBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDFG
-            </div>
-          )}
-        <button
-            onClick={handleDisconnect}
-          className="px-2 py-1.5 bg-green-500/20 text-green-400 border border-green-500/30 rounded-md text-xs font-medium hover:bg-green-500/30 transition-colors flex items-center gap-1"
-        >
-          <span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
-            <span className="hidden sm:inline">{publicKey.toString().slice(0, 4)}...</span>
-          <span className="sm:hidden">Connected</span>
-        </button>
-        </div>
-      );
+        return (
+          <div className="flex flex-col items-end gap-1">
+            {usdfgBalance !== null && (
+              <div className="text-xs text-amber-300 font-semibold">
+                {usdfgBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDFG
+              </div>
+            )}
+          <button
+              onClick={handleDisconnect}
+            className="px-2 py-1.5 bg-green-500/20 text-green-400 border border-green-500/30 rounded-md text-xs font-medium hover:bg-green-500/30 transition-colors flex items-center gap-1"
+          >
+            <span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
+              <span className="hidden sm:inline">{effectivePublicKey.toString().slice(0, 4)}...</span>
+            <span className="sm:hidden">Connected</span>
+          </button>
+          </div>
+        );
     }
     
     // Full mode for desktop
