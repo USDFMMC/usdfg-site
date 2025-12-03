@@ -85,6 +85,31 @@ function App() {
     }
 
     const url = new URL(window.location.href);
+    
+    // Check for Phantom errors first (user rejection, invalid request, etc.)
+    const error = url.searchParams.get("error");
+    const errorCode = url.searchParams.get("errorCode");
+    const errorMessage = url.searchParams.get("errorMessage");
+    
+    if (error || errorCode || errorMessage) {
+      console.error("❌ Phantom returned with error:");
+      console.error("   Error:", error);
+      console.error("   Error Code:", errorCode);
+      console.error("   Error Message:", errorMessage);
+      console.error("   This usually means:");
+      console.error("   1. User rejected the connection");
+      console.error("   2. Phantom couldn't read the manifest.json");
+      console.error("   3. Invalid deep link parameters");
+      console.error("   4. app_url doesn't match manifest.json url");
+      
+      // Clean up URL and clear connecting state
+      window.history.replaceState({}, "", "/");
+      sessionStorage.removeItem('phantom_connecting');
+      sessionStorage.removeItem('phantom_dapp_nonce');
+      localStorage.removeItem('phantom_dapp_handshake');
+      return;
+    }
+    
     const phantomPubKey = url.searchParams.get("phantom_encryption_public_key");
     const nonceB64 = url.searchParams.get("nonce");
     const dataB64 = url.searchParams.get("data");
@@ -92,11 +117,19 @@ function App() {
     console.log("📥 Phantom params check:", {
       hasPhantomPubKey: !!phantomPubKey,
       hasNonce: !!nonceB64,
-      hasData: !!dataB64
+      hasData: !!dataB64,
+      hasError: !!(error || errorCode || errorMessage)
     });
 
     if (!phantomPubKey || !nonceB64 || !dataB64) {
       console.log("📥 Missing Phantom params, skipping");
+      // Check if we were trying to connect (might be a cancellation)
+      const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
+      if (isConnecting) {
+        console.log("⚠️ Phantom connection was cancelled or failed");
+        sessionStorage.removeItem('phantom_connecting');
+        sessionStorage.removeItem('phantom_dapp_nonce');
+      }
       return;
     }
 

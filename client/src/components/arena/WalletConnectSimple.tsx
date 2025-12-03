@@ -39,6 +39,22 @@ function openPhantomMobile(): void {
   // Build URL synchronously
   // CRITICAL: Use root / for iOS universal link compatibility
   const rootUrl = "https://usdfg.pro/";
+  const manifestUrl = "https://usdfg.pro/phantom/manifest.json";
+  
+  // Verify manifest is accessible before navigating
+  // This helps diagnose if Phantom is rejecting due to missing manifest
+  fetch(manifestUrl, { method: 'HEAD', cache: 'no-cache' })
+    .then((response) => {
+      if (!response.ok) {
+        console.error('❌ Manifest.json not accessible:', response.status, response.statusText);
+      } else {
+        console.log('✅ Manifest.json is accessible');
+      }
+    })
+    .catch((error) => {
+      console.error('❌ Error checking manifest.json:', error);
+    });
+  
   const url =
     "https://phantom.app/ul/v1/connect" +
     `?app_url=${encodeURIComponent(rootUrl)}` +
@@ -47,7 +63,16 @@ function openPhantomMobile(): void {
     `&redirect_link=${encodeURIComponent(rootUrl)}` +
     `&cluster=devnet` +
     `&scope=${encodeURIComponent("wallet:sign,wallet:signMessage,wallet:decrypt")}` +
-    `&app_metadata_url=${encodeURIComponent("https://usdfg.pro/phantom/manifest.json")}`;
+    `&app_metadata_url=${encodeURIComponent(manifestUrl)}`;
+  
+  // Log the URL for debugging (before navigation)
+  console.log('🚀 Opening Phantom deep link...');
+  console.log('🔗 URL:', url.substring(0, 200) + '...');
+  console.log('🔗 app_url:', rootUrl);
+  console.log('🔗 redirect_link:', rootUrl);
+  console.log('🔗 app_metadata_url:', manifestUrl);
+  console.log('🔑 dapp_encryption_public_key length:', dappPublicKeyBase64.length);
+  console.log('🔑 nonce length:', nonceBase64.length);
   
   // Navigate IMMEDIATELY - no async, no logging, no delays, no React batching
   window.location.href = url;
