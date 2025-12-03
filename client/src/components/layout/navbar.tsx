@@ -1,19 +1,27 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { X, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { lockBodyScroll, unlockBodyScroll } from "@/lib/ui/scrollLock";
 
 const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
-    if (!mobileMenuOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
+    setMobileMenuOpen((prev) => !prev);
   };
+
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      lockBodyScroll();
+    } else {
+      unlockBodyScroll();
+    }
+
+    return () => {
+      unlockBodyScroll();
+    };
+  }, [mobileMenuOpen]);
 
   return (
     <>
@@ -55,7 +63,7 @@ const Navbar: React.FC = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-6" role="navigation" aria-label="Main Navigation">
-            <Link to="/app">
+            <Link to="/">
               <Button className="bg-gradient-to-r from-purple-600 to-pink-500 text-white px-5 py-2 rounded-full font-semibold shadow-[0_0_24px_#a78bfa99] hover:brightness-110 flex items-center gap-2 transition-all duration-200">
                 <span role="img" aria-label="controller">🎮</span> Enter the Arena
               </Button>
