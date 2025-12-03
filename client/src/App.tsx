@@ -164,7 +164,7 @@ function App() {
     const currentPath = window.location.pathname.replace(/\/+$/, "") || "/";
     
     // Detect if Phantom opened a new tab (indicates universal link isn't working)
-    const isOriginalTab = sessionStorage.getItem('phantom_original_tab') === 'true';
+    // Note: isOriginalTab is already declared above (line 91)
     const isNewTab = !isOriginalTab && document.referrer === "" && window.name === "";
     
     // If we're on root path with no params but have a pending connection, Phantom might have closed silently
