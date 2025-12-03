@@ -45,13 +45,13 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       localStorage.removeItem('wallet_disconnected');
       onConnect();
       
-      logWalletEvent('connected', { wallet: publicKey.toString() });
+      logWalletEvent('connected', { wallet: effectivePublicKey.toString() });
       
       // Fetch SOL balance (non-blocking, fail gracefully)
       const fetchSOLBalance = async (): Promise<void> => {
         try {
           const balanceLamports = await Promise.race([
-            connection.getBalance(publicKey, 'confirmed'),
+            connection.getBalance(effectivePublicKey, 'confirmed'),
             new Promise<never>((_, reject) => 
               setTimeout(() => reject(new Error('Timeout')), 5000)
             )
@@ -70,7 +70,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       // Fetch USDFG balance (non-blocking, fail gracefully)
       const fetchUSDFGBalance = async (): Promise<void> => {
         try {
-          const tokenAccount = await getAssociatedTokenAddress(USDFG_MINT, publicKey);
+          const tokenAccount = await getAssociatedTokenAddress(USDFG_MINT, effectivePublicKey);
           const tokenBalance = await Promise.race([
             connection.getTokenAccountBalance(tokenAccount, 'confirmed'),
             new Promise<never>((_, reject) => 
