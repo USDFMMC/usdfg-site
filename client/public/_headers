@@ -1,8 +1,12 @@
 # CRITICAL: Phantom manifest.json must be served with application/json Content-Type
 # This MUST be at the top to ensure it takes precedence
+# Also need CORS headers so Phantom can fetch the manifest from its app
 /phantom/manifest.json
   Content-Type: application/json; charset=utf-8
   Cache-Control: no-cache
+  Access-Control-Allow-Origin: *
+  Access-Control-Allow-Methods: GET, OPTIONS
+  Access-Control-Allow-Headers: Content-Type
 
 /*
   Content-Security-Policy: default-src 'self'; img-src 'self' https: data:; connect-src 'self' https://api.devnet.solana.com https://api.mainnet-beta.solana.com https://api.testnet.solana.com wss://api.devnet.solana.com wss://api.mainnet-beta.solana.com wss://api.testnet.solana.com https://firestore.googleapis.com https://firebase.googleapis.com https://firebaseinstallations.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://esm.sh; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://esm.sh; script-src-elem 'self' 'unsafe-inline' https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;

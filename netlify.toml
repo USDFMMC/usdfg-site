@@ -51,8 +51,12 @@
 
 # CRITICAL: Phantom manifest.json must be served with application/json Content-Type
 # Phantom rejects the manifest if it's served as text/plain, causing instant close
+# Also need CORS headers so Phantom can fetch the manifest from its app
 [[headers]]
   for = "/phantom/manifest.json"
   [headers.values]
     Content-Type = "application/json; charset=utf-8"
     Cache-Control = "no-cache"
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type"
