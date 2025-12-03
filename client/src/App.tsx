@@ -35,7 +35,9 @@ function RoutesWithLogging() {
         <Route path="/whitepaper" element={<Whitepaper />} />
         <Route path="/app/challenge/new" element={<CreateChallenge />} />
         <Route path="/app/profile/:address" element={<PlayerProfile />} />
-      <Route path="/app" element={<ArenaRoute />} />
+        {/* CRITICAL: Match both /app and /app/ (Phantom returns to /app/ with trailing slash) */}
+        <Route path="/app" element={<ArenaRoute />} />
+        <Route path="/app/" element={<ArenaRoute />} />
         <Route path="/login" element={<Home />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
