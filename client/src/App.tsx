@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -31,6 +31,9 @@ function RoutesWithLogging() {
       <Routes>
         {/* CRITICAL: Root / is now the main app (for Phantom universal link compatibility) */}
         <Route path="/" element={<ArenaRoute />} />
+        {/* Redirect /app to / for backwards compatibility */}
+        <Route path="/app" element={<Navigate to="/" replace />} />
+        <Route path="/app/" element={<Navigate to="/" replace />} />
         {/* Landing page moved to /home */}
         <Route path="/home" element={<Home />} />
         <Route path="/privacy" element={<Privacy />} />
@@ -73,10 +76,11 @@ function App() {
       return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
     }
 
-    // Normalize path - handle both / and / (root path)
+    // Normalize path - handle both / and /app (for backwards compatibility)
     const path = window.location.pathname.replace(/\/+$/, "") || "/";
-    if (path !== "/") {
-      console.log("📥 Not on root route, skipping handler");
+    // Accept both / and /app for Phantom return (backwards compatibility)
+    if (path !== "/" && path !== "/app") {
+      console.log("📥 Not on root or /app route, skipping handler");
       return;
     }
 
