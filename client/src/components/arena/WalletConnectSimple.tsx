@@ -7,33 +7,33 @@ import { logWalletEvent } from '@/utils/wallet-log';
 import { useUSDFGWallet } from '@/lib/wallet/useUSDFGWallet';
 import nacl from "tweetnacl";
 import { isMobileSafari } from '@/lib/utils/isMobileSafari';
-
-// Guard to prevent multiple simultaneous connection attempts
-let isConnecting = false;
+import { isPhantomBrowser } from '@/lib/utils/isPhantomBrowser';
 
 // CRITICAL: Pure synchronous function OUTSIDE React component
 // This function has ZERO React logic, ZERO hooks, ZERO state
 // Must be called directly from onClick with NO conditions, NO async, NO logging
 // This ensures Safari treats it as a trusted user gesture
 function openPhantomMobile(): void {
-  // Prevent double-clicks and multiple simultaneous attempts
-  if (isConnecting) {
-    console.warn("⚠️ Phantom connection already in progress - ignoring duplicate click");
-    return;
-  }
-  
-  // Check if we recently attempted to connect (within last 2 seconds)
+  // ATOMIC check-and-set using sessionStorage (works across React re-renders)
   const lastAttempt = sessionStorage.getItem('phantom_last_attempt');
+  const now = Date.now();
+  
   if (lastAttempt) {
-    const timeSinceLastAttempt = Date.now() - parseInt(lastAttempt);
+    const timeSinceLastAttempt = now - parseInt(lastAttempt);
     if (timeSinceLastAttempt < 2000) {
       console.warn("⚠️ Phantom connect called too soon after last attempt - ignoring");
       return;
     }
   }
   
-  isConnecting = true;
-  sessionStorage.setItem('phantom_last_attempt', Date.now().toString());
+  // Set timestamp IMMEDIATELY (atomic operation)
+  sessionStorage.setItem('phantom_last_attempt', now.toString());
+  
+  // Double-check: if we're already connecting, abort
+  if (sessionStorage.getItem('phantom_connecting') === 'true') {
+    console.warn("⚠️ Phantom connection already in progress - ignoring duplicate click");
+    return;
+  }
   
   // Generate X25519 keypair synchronously
   const kp = nacl.box.keyPair();
@@ -296,25 +296,27 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       }
   
   // Show connection button
-  // CRITICAL: On mobile Safari, button directly calls openPhantomMobile (module-level function, no React)
-  // On desktop, button calls handleConnect (normal async flow)
+  // CRITICAL: On mobile Safari (NOT Phantom browser), use deep link
+  // On Phantom browser or desktop, use wallet adapter (normal async flow)
   // Use pure JavaScript check for mobile (not React hook) to avoid React batching
   const isMobile = isMobileSafari();
+  const isPhantom = isPhantomBrowser();
+  const shouldUseDeepLink = isMobile && !isPhantom; // Mobile Safari but NOT Phantom browser
   
   return (
     <div className="flex flex-col space-y-2">
       {compact ? (
           <button
-          onClick={isMobile ? openPhantomMobile : handleConnect}
-          disabled={!isMobile && (connecting || connected)}
+          onClick={shouldUseDeepLink ? openPhantomMobile : handleConnect}
+          disabled={!shouldUseDeepLink && (connecting || connected)}
             className="px-2.5 py-1.5 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-md text-xs font-medium hover:bg-amber-600/30 transition-colors disabled:opacity-50"
           >
           Connect Wallet
           </button>
         ) : (
           <button
-          onClick={isMobile ? openPhantomMobile : handleConnect}
-          disabled={!isMobile && (connecting || connected)}
+          onClick={shouldUseDeepLink ? openPhantomMobile : handleConnect}
+          disabled={!shouldUseDeepLink && (connecting || connected)}
                 className="px-3 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50 border border-amber-400/50 shadow-lg shadow-amber-500/20 text-sm"
               >
           Connect Wallet
