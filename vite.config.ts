@@ -70,6 +70,8 @@ export default defineConfig({
     },
     commonjsOptions: {
       transformMixedEsModules: true,
+      strictRequires: true,
+      esmExternals: true,
     },
     rollupOptions: {
       output: {
@@ -82,18 +84,17 @@ export default defineConfig({
           if (id.includes('@radix-ui')) {
             return 'ui';
           }
-          // Solana wallet adapters - can be lazy loaded
+          // Solana wallet adapters - keep with vendor to avoid loading order issues
+          // Don't split wallet adapters separately as they depend on vendor modules
           if (id.includes('@solana/wallet-adapter') || id.includes('@solana/web3.js')) {
-            return 'wallet';
+            return 'vendor'; // Keep with vendor to ensure proper load order
           }
           // Firebase - can be lazy loaded
           if (id.includes('firebase')) {
             return 'firebase';
           }
-          // Large node_modules dependencies
-          if (id.includes('node_modules')) {
-            return 'vendor-deps';
-          }
+          // Don't create a separate vendor-deps chunk - it causes module loading issues
+          // Let Vite handle other node_modules automatically
         },
       },
     },
