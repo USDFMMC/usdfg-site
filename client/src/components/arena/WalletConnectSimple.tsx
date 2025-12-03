@@ -26,19 +26,65 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const { publicKey, connected, connecting, connect, disconnect, mobile, connection } = useUSDFGWallet();
   const [balance, setBalance] = useState<number | null>(null);
   const [usdfgBalance, setUsdfgBalance] = useState<number | null>(null);
+  
+  // CRITICAL: On mobile, check localStorage directly for Phantom connection
+  // This ensures we detect connections even if parent component state is stale
+  const [mobileConnectionState, setMobileConnectionState] = useState(() => {
+    if (!mobile || typeof window === 'undefined') return { connected: false, publicKey: null };
+    return {
+      connected: localStorage.getItem('phantom_connected') === 'true',
+      publicKey: localStorage.getItem('phantom_public_key')
+    };
+  });
+
+  // Listen for localStorage changes (when Phantom sets connection)
+  useEffect(() => {
+    if (!mobile || typeof window === 'undefined') return;
+    
+    const checkConnection = () => {
+      const isPhantomConnected = localStorage.getItem('phantom_connected') === 'true';
+      const storedPublicKey = localStorage.getItem('phantom_public_key');
+      setMobileConnectionState({
+        connected: isPhantomConnected,
+        publicKey: storedPublicKey
+      });
+    };
+    
+    // Check immediately
+    checkConnection();
+    
+    // Listen for storage events (from other tabs/windows)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'phantom_connected' || e.key === 'phantom_public_key') {
+        checkConnection();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also poll periodically (in case storage event doesn't fire)
+    const interval = setInterval(checkConnection, 1000);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [mobile]);
 
   // Handle connection state changes
   useEffect(() => {
-    // On mobile, check BOTH the prop (from parent) AND the hook (for stored connection)
+    // On mobile, check BOTH the prop (from parent) AND localStorage directly
     // On desktop, use adapter connection or prop
     const actuallyConnected = mobile 
-      ? (isConnected || (connected && publicKey)) // Mobile: check prop first, then hook
+      ? (isConnected || connected || mobileConnectionState.connected) // Mobile: check prop, hook, and localStorage
       : (isConnected || (connected && publicKey)); // Desktop uses adapter or prop
     
-    // Get the effective public key (from hook or prop)
-    const effectivePublicKey = publicKey || (isConnected && typeof window !== 'undefined' 
-      ? (localStorage.getItem('phantom_public_key') ? new PublicKey(localStorage.getItem('phantom_public_key')!) : null)
-      : null);
+    // Get the effective public key (from hook, localStorage, or prop)
+    const effectivePublicKey = publicKey || 
+      (mobile && mobileConnectionState.publicKey ? new PublicKey(mobileConnectionState.publicKey) : null) ||
+      (mobile && typeof window !== 'undefined' && localStorage.getItem('phantom_public_key') 
+        ? new PublicKey(localStorage.getItem('phantom_public_key')!) 
+        : null);
     
     if (actuallyConnected && effectivePublicKey) {
       // Clear disconnect flag when user successfully connects
@@ -165,11 +211,13 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
 
   // If connected (via prop OR adapter), show connected state
   // On mobile, also check localStorage for stored connection
-  const effectivePublicKey = publicKey || (mobile && typeof window !== 'undefined' && localStorage.getItem('phantom_public_key')
-    ? new PublicKey(localStorage.getItem('phantom_public_key')!)
-    : null);
+  const effectivePublicKey = publicKey || 
+    (mobile && mobileConnectionState.publicKey ? new PublicKey(mobileConnectionState.publicKey) : null) ||
+    (mobile && typeof window !== 'undefined' && localStorage.getItem('phantom_public_key')
+      ? new PublicKey(localStorage.getItem('phantom_public_key')!)
+      : null);
   const actuallyConnected = isConnected || (connected && effectivePublicKey) || 
-    (mobile && typeof window !== 'undefined' && localStorage.getItem('phantom_connected') === 'true' && effectivePublicKey);
+    (mobile && (mobileConnectionState.connected || (typeof window !== 'undefined' && localStorage.getItem('phantom_connected') === 'true')) && effectivePublicKey);
 
   // Show connected state if connected
   if (actuallyConnected && effectivePublicKey) {
