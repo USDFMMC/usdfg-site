@@ -51,6 +51,61 @@ export function phantomMobileConnect() {
     }
   }
   
+  // CRITICAL: Pre-flight check - verify manifest.json is accessible
+  // Phantom will silently reject if it can't fetch the manifest
+  const manifestUrl = "https://usdfg.pro/phantom/manifest.json";
+  console.log("🔍 Pre-flight check: Verifying manifest.json is accessible...");
+  
+  // Try to fetch manifest synchronously (this is a best-effort check)
+  // Note: This won't block navigation, but will log if there's an issue
+  fetch(manifestUrl, {
+    method: 'GET',
+    mode: 'cors',
+    cache: 'no-cache'
+  })
+    .then(response => {
+      if (!response.ok) {
+        console.error("❌ Manifest.json fetch failed:", response.status, response.statusText);
+        console.error("❌ This will cause Phantom to silently reject the connection");
+        return;
+      }
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error("❌ Manifest.json has wrong Content-Type:", contentType);
+        console.error("❌ Expected: application/json");
+        console.error("❌ This will cause Phantom to silently reject the connection");
+        return;
+      }
+      
+      return response.json();
+    })
+    .then(manifest => {
+      if (manifest) {
+        console.log("✅ Manifest.json is accessible and valid:", manifest);
+        
+        // Verify required fields
+        if (!manifest.name || !manifest.url) {
+          console.error("❌ Manifest.json missing required fields (name or url)");
+          console.error("❌ This will cause Phantom to silently reject the connection");
+        } else if (manifest.url !== "https://usdfg.pro/") {
+          console.error("❌ Manifest.json url doesn't match app_url:", manifest.url, "vs https://usdfg.pro/");
+          console.error("❌ Phantom requires exact match - this will cause silent rejection");
+        } else {
+          console.log("✅ Manifest.json validation passed - all required fields present");
+        }
+      }
+    })
+    .catch(error => {
+      console.error("❌ Failed to fetch manifest.json:", error);
+      console.error("❌ This will cause Phantom to silently reject the connection");
+      console.error("❌ Possible causes:");
+      console.error("   1. Network error");
+      console.error("   2. CORS issue");
+      console.error("   3. Manifest.json doesn't exist");
+      console.error("   4. Server error");
+    });
+  
   // Mark as navigating and connecting BEFORE doing anything else
   isNavigating = true;
   sessionStorage.setItem('phantom_connecting', 'true');
