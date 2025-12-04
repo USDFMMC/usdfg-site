@@ -284,8 +284,30 @@ const ArenaHome: React.FC = () => {
               // We're in the original tab - update state normally
               console.log("✅ Phantom returned in ORIGINAL TAB");
               
-              // Clear connecting flag
+              // CRITICAL: Clear all connecting flags so UI can update
               sessionStorage.removeItem('phantom_connecting');
+              sessionStorage.removeItem('phantom_connect_timestamp');
+              sessionStorage.removeItem('phantom_connect_attempt');
+              sessionStorage.removeItem('phantom_dapp_nonce');
+              
+              // Update connection state immediately
+              setPhantomConnectionState({
+                connected: true,
+                publicKey: result.publicKey
+              });
+              
+              // Ensure arena-access is preserved
+              localStorage.setItem('arena-access', 'true');
+              
+              // Clean query params from URL immediately
+              window.history.replaceState({}, "", "/");
+              
+              // Trigger events to notify components
+              window.dispatchEvent(new Event('storage'));
+              window.dispatchEvent(new Event('phantom_connected'));
+              window.dispatchEvent(new Event('phantomConnected'));
+              
+              console.log("✅ Connection state updated and events dispatched - user can now continue");
               
               // Update state immediately to trigger re-render
               setPhantomConnectionState({

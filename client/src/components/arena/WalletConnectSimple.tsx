@@ -80,6 +80,14 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     const checkConnection = () => {
       const isPhantomConnected = localStorage.getItem('phantom_connected') === 'true';
       const storedPublicKey = localStorage.getItem('phantom_public_key');
+      
+      // If connected, clear any connecting flags
+      if (isPhantomConnected && storedPublicKey) {
+        sessionStorage.removeItem('phantom_connecting');
+        sessionStorage.removeItem('phantom_connect_timestamp');
+        sessionStorage.removeItem('phantom_connect_attempt');
+      }
+      
       setMobileConnectionState({
         connected: isPhantomConnected,
         publicKey: storedPublicKey
@@ -96,13 +104,21 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       }
     };
     
+    // Listen for custom phantom_connected event
+    const handlePhantomConnected = () => {
+      console.log("📢 Received phantom_connected event");
+      checkConnection();
+    };
+    
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('phantom_connected', handlePhantomConnected);
     
     // Also poll periodically (in case storage event doesn't fire)
-    const interval = setInterval(checkConnection, 1000);
+    const interval = setInterval(checkConnection, 500);
     
     return () => {
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('phantom_connected', handlePhantomConnected);
       clearInterval(interval);
     };
   }, [mobile]);

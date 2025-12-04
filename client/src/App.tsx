@@ -332,6 +332,19 @@ function App() {
         localStorage.setItem("phantom_connected", "true");
         localStorage.setItem("phantom_public_key", payload.public_key);
         console.log("✅ Phantom public key stored:", payload.public_key);
+        
+        // CRITICAL: Clear all connecting flags so UI can update
+        sessionStorage.removeItem('phantom_connecting');
+        sessionStorage.removeItem('phantom_connect_timestamp');
+        sessionStorage.removeItem('phantom_connect_attempt');
+        sessionStorage.removeItem('phantom_dapp_nonce');
+        sessionStorage.removeItem('phantom_dapp_keypair');
+        
+        // Trigger a storage event to notify other components
+        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new Event('phantom_connected'));
+        
+        console.log("✅ Connection state cleared and events dispatched");
       }
 
       // Cleanup
@@ -339,6 +352,17 @@ function App() {
       // Remove Phantom params from URL - normalize to / (root)
       window.history.replaceState({}, "", "/");
       console.log("✅ Cleaned URL, redirecting to /");
+      
+      // Force a small delay then check if we need to redirect to /app
+      // This ensures the connection state is fully processed
+      setTimeout(() => {
+        const currentPath = window.location.pathname;
+        if (currentPath === "/" && payload.public_key) {
+          // If we're on root and connected, redirect to /app for better UX
+          console.log("🔄 Redirecting to /app after successful connection");
+          window.location.href = "/app";
+        }
+      }, 100);
     } catch (error) {
       console.error("❌ Error decrypting Phantom payload:", error);
     }
