@@ -497,7 +497,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           <button
           onClick={handleConnect}
           disabled={isButtonDisabled}
-            className="px-2.5 py-1.5 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-md text-xs font-medium hover:bg-amber-600/30 transition-colors disabled:opacity-50"
+            className="px-3 py-1 bg-amber-500/10 text-amber-300 border border-amber-500/40 rounded-md text-xs font-normal hover:bg-amber-500/20 hover:border-amber-500/60 transition-all disabled:opacity-50 backdrop-blur-sm"
           >
           Connect Wallet
           </button>
@@ -505,7 +505,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           <button
           onClick={handleConnect}
           disabled={isButtonDisabled}
-                className="px-3 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold rounded-lg hover:brightness-110 transition-all disabled:opacity-50 border border-amber-400/50 shadow-lg shadow-amber-500/20 text-sm"
+                className="px-4 py-1.5 bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-300 font-light tracking-wide rounded-md hover:from-amber-500/30 hover:to-amber-600/30 transition-all disabled:opacity-50 border border-amber-500/50 shadow-sm shadow-amber-500/10 text-sm backdrop-blur-sm"
               >
           Connect Wallet
               </button>
