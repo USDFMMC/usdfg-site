@@ -10,8 +10,27 @@ export function useUSDFGWallet() {
   const mobile = isMobileSafari();
 
   async function connect() {
-    // Clear any stuck connection states first
-    sessionStorage.removeItem('phantom_connecting');
+    // Only clear stuck connection states (older than 10 seconds)
+    // Don't clear fresh connection attempts set by the button
+    if (typeof window !== "undefined") {
+      const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
+      if (connectTimestamp) {
+        const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
+        if (timeSinceConnect > 10000) {
+          console.log("🧹 Clearing stuck connection state in connect()");
+          sessionStorage.removeItem('phantom_connecting');
+          sessionStorage.removeItem('phantom_connect_timestamp');
+          sessionStorage.removeItem('phantom_connect_attempt');
+        }
+      } else {
+        // No timestamp but marked as connecting - clear orphaned state
+        const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
+        if (isConnecting) {
+          console.log("🧹 Clearing orphaned connection state in connect()");
+          sessionStorage.removeItem('phantom_connecting');
+        }
+      }
+    }
     
     if (mobile) {
       // On mobile Safari: check if window.solana exists (Phantom browser)
@@ -98,20 +117,36 @@ export function useUSDFGWallet() {
       console.log("✅ Successfully connected to Phantom");
     } catch (error: any) {
       console.error("❌ Connection error:", error);
-      // Clear stuck state on error
-      sessionStorage.removeItem('phantom_connecting');
+      // Clear all connection state on error
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem('phantom_connecting');
+        sessionStorage.removeItem('phantom_connect_timestamp');
+        sessionStorage.removeItem('phantom_connect_attempt');
+      }
       throw error;
     }
   }
 
   async function disconnect() {
+    // Clear all connection-related state
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem('phantom_connecting');
+      sessionStorage.removeItem('phantom_connect_timestamp');
+      sessionStorage.removeItem('phantom_connect_attempt');
+      sessionStorage.removeItem('phantom_dapp_nonce');
+      sessionStorage.removeItem('phantom_dapp_keypair');
+      sessionStorage.removeItem('phantom_original_tab');
+      sessionStorage.removeItem('phantom_redirect_count');
+      localStorage.removeItem('phantom_connected');
+      localStorage.removeItem('phantom_public_key');
+      localStorage.removeItem('phantom_dapp_handshake');
+      sessionStorage.removeItem('phantomSession');
+    }
+    
     if (!mobile) {
       return wallet.disconnect();
     }
-    // On mobile, clear stored connection
-    localStorage.removeItem('phantom_connected');
-    localStorage.removeItem('phantom_public_key');
-    sessionStorage.removeItem('phantomSession');
+    // On mobile, connection state is already cleared above
   }
 
   // On mobile, check for stored connection from deep link return

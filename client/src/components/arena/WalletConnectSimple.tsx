@@ -41,15 +41,22 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    // Clear stuck connection states that are older than 30 seconds
+    // Clear stuck connection states that are older than 10 seconds
     const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
     if (connectTimestamp) {
       const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
-      if (timeSinceConnect > 30000) {
+      if (timeSinceConnect > 10000) {
         console.log("🧹 Clearing stuck connection state on mount");
         sessionStorage.removeItem('phantom_connecting');
         sessionStorage.removeItem('phantom_connect_timestamp');
         sessionStorage.removeItem('phantom_connect_attempt');
+      }
+    } else {
+      // No timestamp but marked as connecting - clear orphaned state
+      const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
+      if (isConnecting) {
+        console.log("🧹 Clearing orphaned connection state on mount");
+        sessionStorage.removeItem('phantom_connecting');
       }
     }
   }, []);
@@ -155,7 +162,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       setUsdfgBalance(null);
       onDisconnect();
     }
-  }, [connected, publicKey, isConnected, onConnect, onDisconnect, connection]);
+  }, [connected, publicKey, isConnected, mobile, mobileConnectionState, onConnect, onDisconnect, connection]);
 
   // Handle wallet connection
   // CRITICAL: Check connection guard BEFORE doing anything
@@ -185,19 +192,19 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     // CRITICAL: Check if Phantom connection is already in progress
     const isPhantomConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
     
-    // CRITICAL: Clear stuck connection states (if it's been more than 30 seconds)
+    // CRITICAL: Clear stuck connection states (if it's been more than 10 seconds)
     if (isPhantomConnecting) {
       const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
       if (connectTimestamp) {
         const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
-        if (timeSinceConnect > 30000) {
-          console.warn("⚠️ Clearing stuck connection state (older than 30 seconds)");
+        if (timeSinceConnect > 10000) {
+          console.warn("⚠️ Clearing stuck connection state (older than 10 seconds)");
           sessionStorage.removeItem('phantom_connecting');
           sessionStorage.removeItem('phantom_connect_timestamp');
           sessionStorage.removeItem('phantom_connect_attempt');
         } else {
-      console.warn("⚠️ Phantom connection already in progress - ignoring click");
-      return;
+          console.warn("⚠️ Phantom connection already in progress - ignoring click");
+          return;
         }
       } else {
         // No timestamp but marked as connecting - clear it

@@ -27,11 +27,30 @@ function encodeBase64(u8: Uint8Array): string {
 let isNavigating = false;
 
 export function phantomMobileConnect() {
-  // CRITICAL: Check if we're already connecting (persists across page reloads)
-  const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
-  if (isConnecting) {
-    console.warn("⚠️ Phantom connection already in progress - ignoring duplicate call");
-    return;
+  // CRITICAL: Check if we're already connecting, but only if it's recent (not stuck)
+  if (typeof window !== "undefined") {
+    const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
+    const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
+    
+    if (isConnecting) {
+      if (connectTimestamp) {
+        const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
+        // If connection state is older than 10 seconds, consider it stuck and clear it
+        if (timeSinceConnect > 10000) {
+          console.log("🧹 Clearing stuck connection state in phantomMobileConnect()");
+          sessionStorage.removeItem('phantom_connecting');
+          sessionStorage.removeItem('phantom_connect_timestamp');
+          sessionStorage.removeItem('phantom_connect_attempt');
+        } else {
+          console.warn("⚠️ Phantom connection already in progress - ignoring duplicate call");
+          return;
+        }
+      } else {
+        // No timestamp but marked as connecting - clear orphaned state
+        console.log("🧹 Clearing orphaned connection state in phantomMobileConnect()");
+        sessionStorage.removeItem('phantom_connecting');
+      }
+    }
   }
   
   // Prevent double navigation - if already navigating, ignore
