@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
   plugins: [
@@ -10,6 +11,72 @@ export default defineConfig({
       fastRefresh: true,
     }),
     runtimeErrorOverlay(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.ico', 'robots.txt', 'sitemap.xml'],
+      manifest: {
+        name: 'USDFG Arena - Gaming Platform',
+        short_name: 'USDFG Arena',
+        description: 'Skill-based crypto gaming platform. Compete, earn $USDFG, and prove your gaming prowess.',
+        theme_color: '#0B0F1A',
+        background_color: '#0B0F1A',
+        display: 'standalone',
+        orientation: 'portrait-primary',
+        scope: '/',
+        start_url: '/',
+        icons: [
+          {
+            src: '/assets/usdfg-144.png',
+            sizes: '144x144',
+            type: 'image/png',
+            purpose: 'any maskable'
+          },
+          {
+            src: '/assets/usdfg-logo-transparent.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: '/assets/usdfg-logo-transparent.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any'
+          }
+        ]
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2}'],
+        // Don't cache JS bundles aggressively - ensure fresh code loads
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/.*\.(js|css)$/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'js-css-cache',
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24 // 24 hours
+              }
+            }
+          },
+          {
+            urlPattern: /^https:\/\/.*\.(png|jpg|jpeg|svg|webp|woff|woff2)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'static-assets-cache',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              }
+            }
+          }
+        ]
+      },
+      devOptions: {
+        enabled: false // Disable in dev to avoid conflicts
+      }
+    }),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [

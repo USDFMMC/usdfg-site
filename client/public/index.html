@@ -55,45 +55,6 @@
   <body>
     <div id="root"></div>
     <script>
-      // CRITICAL: Permanently disable service workers to prevent cached builds
-      // Service workers were causing Safari to serve old /app routes
-      // This ensures fresh JS loads every time, no cached builds
-      (function() {
-        if ('serviceWorker' in navigator) {
-          // Immediately unregister ALL service workers
-          navigator.serviceWorker.getRegistrations().then((registrations) => {
-            registrations.forEach((registration) => {
-              registration.unregister().then((success) => {
-                console.log('✅ Service worker unregistered:', success);
-              }).catch((err) => {
-                console.error('❌ Error unregistering service worker:', err);
-              });
-            });
-          });
-          
-          // Clear all caches
-          if ('caches' in window) {
-            caches.keys().then((cacheNames) => {
-              return Promise.all(
-                cacheNames.map((cacheName) => {
-                  console.log('🗑️ Deleting cache:', cacheName);
-                  return caches.delete(cacheName);
-                })
-              );
-            }).then(() => {
-              console.log('✅ All caches cleared - fresh builds will load');
-            });
-          }
-          
-          // Prevent future service worker registration
-          const originalRegister = navigator.serviceWorker.register;
-          navigator.serviceWorker.register = function() {
-            console.warn('⚠️ Service worker registration blocked - using fresh builds only');
-            return Promise.reject(new Error('Service workers disabled'));
-          };
-        }
-      })();
-
       // Crosshair functionality - runs after DOM loads
       document.addEventListener('DOMContentLoaded', () => {
         let horizontal, vertical;
