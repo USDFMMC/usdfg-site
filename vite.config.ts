@@ -46,7 +46,18 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2}'],
+        // Exclude large image files from precaching (they'll be cached at runtime)
+        globPatterns: ['**/*.{js,css,html,ico,svg,woff,woff2}'],
+        // Exclude large PNG/WebP files from precaching
+        globIgnores: [
+          '**/usdfg-og-banner*.png',
+          '**/trophies/*.png',
+          '**/categories/*.png',
+          '**/ads/*.webp',
+          '**/ads/*.png'
+        ],
+        // Increase file size limit for precaching (for other assets)
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
         // Don't cache JS bundles aggressively - ensure fresh code loads
         runtimeCaching: [
           {
@@ -61,13 +72,25 @@ export default defineConfig({
             }
           },
           {
-            urlPattern: /^https:\/\/.*\.(png|jpg|jpeg|svg|webp|woff|woff2)$/,
+            // Cache large images at runtime (not precached)
+            urlPattern: /\.(png|jpg|jpeg|svg|webp)$/,
             handler: 'CacheFirst',
             options: {
               cacheName: 'static-assets-cache',
               expiration: {
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              }
+            }
+          },
+          {
+            urlPattern: /\.(woff|woff2|ttf|eot)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'fonts-cache',
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
               }
             }
           }
