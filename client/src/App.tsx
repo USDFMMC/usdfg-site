@@ -350,19 +350,10 @@ function App() {
       // Cleanup
       localStorage.removeItem("phantom_dapp_handshake");
       // Remove Phantom params from URL - normalize to / (root)
+      // CRITICAL: Stay on root / - app is now on root (like smithii.io)
+      // This allows Phantom to return to Safari properly
       window.history.replaceState({}, "", "/");
-      console.log("✅ Cleaned URL, redirecting to /");
-      
-      // Force a small delay then check if we need to redirect to /app
-      // This ensures the connection state is fully processed
-      setTimeout(() => {
-        const currentPath = window.location.pathname;
-        if (currentPath === "/" && payload.public_key) {
-          // If we're on root and connected, redirect to /app for better UX
-          console.log("🔄 Redirecting to /app after successful connection");
-          window.location.href = "/app";
-        }
-      }, 100);
+      console.log("✅ Cleaned URL, staying on root / (app is on root)");
     } catch (error) {
       console.error("❌ Error decrypting Phantom payload:", error);
     }
