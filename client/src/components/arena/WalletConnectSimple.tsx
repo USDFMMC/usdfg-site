@@ -372,17 +372,40 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const isMobile = isMobileSafari();
   const hasWindowSolana = typeof window !== "undefined" && !!(window as any).solana;
   
-  // CRITICAL: Also check if Phantom connection is in progress (prevents multiple clicks)
-  const isPhantomConnecting = typeof window !== "undefined" && 
-    sessionStorage.getItem('phantom_connecting') === 'true';
+  // CRITICAL: Check if Phantom connection is in progress, but only if it's recent (not stuck)
+  // Clear stuck states automatically
+  let isPhantomConnecting = false;
+  if (typeof window !== "undefined") {
+    const connectingFlag = sessionStorage.getItem('phantom_connecting') === 'true';
+    const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
+    
+    if (connectingFlag && connectTimestamp) {
+      const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
+      // If connection state is older than 10 seconds, consider it stuck and clear it
+      if (timeSinceConnect > 10000) {
+        console.log("🧹 Clearing stuck connection state (older than 10 seconds)");
+        sessionStorage.removeItem('phantom_connecting');
+        sessionStorage.removeItem('phantom_connect_timestamp');
+        sessionStorage.removeItem('phantom_connect_attempt');
+        isPhantomConnecting = false;
+      } else {
+        isPhantomConnecting = true;
+      }
+    } else if (connectingFlag && !connectTimestamp) {
+      // No timestamp but marked as connecting - clear it (orphaned state)
+      console.log("🧹 Clearing orphaned connection state");
+      sessionStorage.removeItem('phantom_connecting');
+      isPhantomConnecting = false;
+    }
+  }
   
   // CRITICAL: Only show warning if we're in a new tab AND there's evidence of a connection attempt
   // On first visit, there's no connection attempt, so don't show the warning
   const isOriginalTab = sessionStorage.getItem('phantom_original_tab') === 'true';
   const hasConnectionAttempt = isPhantomConnecting || 
-    sessionStorage.getItem('phantom_connect_timestamp') !== null ||
-    sessionStorage.getItem('phantom_redirect_count') !== null;
-  const isNewTab = !isOriginalTab && document.referrer === "" && window.name === "";
+    (typeof window !== "undefined" && sessionStorage.getItem('phantom_connect_timestamp') !== null) ||
+    (typeof window !== "undefined" && sessionStorage.getItem('phantom_redirect_count') !== null);
+  const isNewTab = typeof window !== "undefined" && !isOriginalTab && document.referrer === "" && window.name === "";
   // Only block if we're in a new tab AND there's evidence of a connection attempt
   const isNewTabBlocked = isNewTab && mobile && hasConnectionAttempt;
   
@@ -399,6 +422,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     );
   }
   
+  // Only disable button if actually connecting (not stuck)
   const isButtonDisabled = connecting || connected || isPhantomConnecting;
   
   // Log detection for debugging
