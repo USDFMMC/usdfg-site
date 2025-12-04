@@ -47,37 +47,16 @@
         };
       }
     </script>
-    <script type="module" crossorigin src="/assets/index-BrSNzN5S.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/vendor-DfNlvlkl.js">
-    <link rel="modulepreload" crossorigin href="/assets/ui-BgzjiUn6.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-BtqZJSZG.css">
-  </head>
+    <script type="module" crossorigin src="/assets/index-B19OKTEd.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/ui-D3hghNPx.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-Dm9JJ7XJ.js">
+    <link rel="modulepreload" crossorigin href="/assets/firebase-C99sqW5P.js">
+    <link rel="stylesheet" crossorigin href="/assets/vendor-BS3WYRrv.css">
+    <link rel="stylesheet" crossorigin href="/assets/index-CmW_9j1O.css">
+  <link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
   <body>
     <div id="root"></div>
     <script>
-      // Register service worker for PWA functionality (only in production)
-      if ('serviceWorker' in navigator && window.location.hostname !== 'localhost') {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-              console.log('SW registered: ', registration);
-            })
-            .catch((registrationError) => {
-              console.log('SW registration failed: ', registrationError);
-            });
-        });
-      } else if (window.location.hostname === 'localhost') {
-        // Unregister any existing service workers on localhost
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations().then((registrations) => {
-            for (let registration of registrations) {
-              registration.unregister();
-              console.log('SW unregistered for localhost');
-            }
-          });
-        }
-      }
-
       // Crosshair functionality - runs after DOM loads
       document.addEventListener('DOMContentLoaded', () => {
         let horizontal, vertical;

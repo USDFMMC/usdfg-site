@@ -16,6 +16,7 @@ import { Helmet } from "react-helmet";
 import { startVersionMonitoring } from "@/lib/version";
 import UpdateBanner from "@/components/ui/UpdateBanner";
 import nacl from "tweetnacl";
+import { resetNavigationGuard } from "@/lib/wallet/mobile";
 
 function RoutesWithLogging() {
   const location = useLocation();
@@ -339,6 +340,9 @@ function App() {
         sessionStorage.removeItem('phantom_connect_attempt');
         sessionStorage.removeItem('phantom_dapp_nonce');
         sessionStorage.removeItem('phantom_dapp_keypair');
+        
+        // CRITICAL: Reset navigation guard to allow future connections
+        resetNavigationGuard();
         
         // Trigger a storage event to notify other components
         window.dispatchEvent(new Event('storage'));

@@ -223,8 +223,9 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       return;
     }
     
-    // Prevent double-clicks
-    if (connected || isConnected || connecting) {
+    // Prevent double-clicks - check actual connected state (mobile-aware)
+    const actuallyConnected = mobile ? mobileConnectionState.connected : (connected || isConnected);
+    if (actuallyConnected || connecting) {
       console.warn("⚠️ Already connected or connecting - ignoring click");
       return;
     }
@@ -499,9 +500,13 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     );
   }
   
+  // Determine actual connected state - use mobileConnectionState on mobile
+  const actuallyConnected = mobile ? mobileConnectionState.connected : (connected || isConnected);
+  const effectivePublicKey = mobile ? (mobileConnectionState.publicKey ? new PublicKey(mobileConnectionState.publicKey) : null) : publicKey;
+  
   // Only disable button if actually connecting (not stuck) or already connected
   // On mobile Safari, be more lenient - only disable if very recent connection attempt
-  const isButtonDisabled = connecting || connected || (isPhantomConnecting && mobile);
+  const isButtonDisabled = connecting || actuallyConnected || (isPhantomConnecting && mobile);
   
   // Log detection for debugging - especially helpful for Safari issues
   if (isMobile || typeof window !== "undefined") {
@@ -511,6 +516,8 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       connecting,
       connected,
       isConnected,
+      mobileConnectionState,
+      actuallyConnected,
       isPhantomConnecting,
       isButtonDisabled,
       phantomConnectingFlag: typeof window !== "undefined" ? sessionStorage.getItem('phantom_connecting') : null,
@@ -518,6 +525,30 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
       solanaIsPhantom: typeof window !== "undefined" && !!(window as any).solana?.isPhantom
     });
+  }
+  
+  // Show connected state if connected
+  if (actuallyConnected && effectivePublicKey) {
+    const shortAddress = `${effectivePublicKey.toString().slice(0, 4)}...${effectivePublicKey.toString().slice(-4)}`;
+    return (
+      <div className="flex flex-col space-y-2">
+        {compact ? (
+          <button
+            onClick={handleDisconnect}
+            className="px-3 py-1 bg-green-500/10 text-green-300 border border-green-500/40 rounded-md text-xs font-normal hover:bg-green-500/20 hover:border-green-500/60 transition-all backdrop-blur-sm"
+          >
+            {shortAddress}
+          </button>
+        ) : (
+          <button
+            onClick={handleDisconnect}
+            className="px-4 py-1.5 bg-gradient-to-r from-green-500/20 to-green-600/20 text-green-300 font-light tracking-wide rounded-md hover:from-green-500/30 hover:to-green-600/30 transition-all border border-green-500/50 shadow-sm shadow-green-500/10 text-sm backdrop-blur-sm"
+          >
+            {shortAddress}
+          </button>
+        )}
+      </div>
+    );
   }
   
   return (
@@ -528,7 +559,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           disabled={isButtonDisabled}
             className="px-3 py-1 bg-amber-500/10 text-amber-300 border border-amber-500/40 rounded-md text-xs font-normal hover:bg-amber-500/20 hover:border-amber-500/60 transition-all disabled:opacity-50 backdrop-blur-sm"
           >
-          Connect Wallet
+          {connecting || isPhantomConnecting ? "Connecting..." : "Connect Wallet"}
           </button>
         ) : (
           <button
@@ -536,7 +567,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           disabled={isButtonDisabled}
                 className="px-4 py-1.5 bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-300 font-light tracking-wide rounded-md hover:from-amber-500/30 hover:to-amber-600/30 transition-all disabled:opacity-50 border border-amber-500/50 shadow-sm shadow-amber-500/10 text-sm backdrop-blur-sm"
               >
-          Connect Wallet
+          {connecting || isPhantomConnecting ? "Connecting..." : "Connect Wallet"}
               </button>
       )}
     </div>

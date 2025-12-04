@@ -23,10 +23,34 @@ function encodeBase64(u8: Uint8Array): string {
   return btoa(binary);
 }
 
-// Guard to prevent double navigation
+// Guard to prevent double navigation - STRONG guard
 let isNavigating = false;
+let navigationStartTime = 0;
+
+// Export function to reset navigation guard (called when Phantom returns)
+export function resetNavigationGuard() {
+  console.log("🧹 Resetting navigation guard (Phantom returned)");
+  isNavigating = false;
+  navigationStartTime = 0;
+  if (typeof window !== "undefined") {
+    sessionStorage.removeItem('phantom_navigation_start');
+  }
+}
 
 export function phantomMobileConnect() {
+  // CRITICAL: STRONG guard - prevent multiple navigations
+  if (isNavigating) {
+    const timeSinceNav = Date.now() - navigationStartTime;
+    if (timeSinceNav < 10000) { // Within 10 seconds of navigation
+      console.warn("⚠️ Navigation already in progress - BLOCKING duplicate call");
+      return;
+    } else {
+      // Navigation started more than 10 seconds ago - reset guard
+      console.log("🧹 Resetting navigation guard (stale)");
+      isNavigating = false;
+    }
+  }
+  
   // CRITICAL: Check if we're already connecting, but only if it's recent (not stuck)
   if (typeof window !== "undefined") {
     const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
@@ -35,14 +59,14 @@ export function phantomMobileConnect() {
     if (isConnecting) {
       if (connectTimestamp) {
         const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
-        // If connection state is older than 10 seconds, consider it stuck and clear it
-        if (timeSinceConnect > 10000) {
+        // If connection state is older than 5 seconds, consider it stuck and clear it
+        if (timeSinceConnect > 5000) {
           console.log("🧹 Clearing stuck connection state in phantomMobileConnect()");
           sessionStorage.removeItem('phantom_connecting');
           sessionStorage.removeItem('phantom_connect_timestamp');
           sessionStorage.removeItem('phantom_connect_attempt');
         } else {
-          console.warn("⚠️ Phantom connection already in progress - ignoring duplicate call");
+          console.warn("⚠️ Phantom connection already in progress (recent) - BLOCKING duplicate call");
           return;
         }
       } else {
@@ -53,22 +77,20 @@ export function phantomMobileConnect() {
     }
   }
   
-  // Prevent double navigation - if already navigating, ignore
-  if (isNavigating) {
-    console.warn("⚠️ Phantom deep link already in progress - ignoring duplicate call");
-    return;
-  }
-  
-  // Check if we recently navigated (within last 5 seconds - increased from 2)
+  // Check if we recently navigated (within last 3 seconds - STRICT)
   const lastAttempt = sessionStorage.getItem('phantom_connect_attempt');
   if (lastAttempt) {
     const lastAttemptTime = new Date(lastAttempt).getTime();
     const now = Date.now();
-    if (now - lastAttemptTime < 5000) {
-      console.warn("⚠️ Phantom connect called too soon after last attempt - ignoring");
+    if (now - lastAttemptTime < 3000) {
+      console.warn("⚠️ Phantom connect called too soon after last attempt (within 3s) - BLOCKING");
       return;
     }
   }
+  
+  // Set navigation guard BEFORE any async operations
+  isNavigating = true;
+  navigationStartTime = Date.now();
   
   // CRITICAL: Pre-flight check - verify manifest.json is accessible
   // Phantom will silently reject if it can't fetch the manifest
@@ -205,10 +227,18 @@ export function phantomMobileConnect() {
   console.log("🔒 Connection guard active - prevents duplicate clicks");
   
   // Navigate - this will redirect to Phantom
-  // Reset flag after a delay (in case navigation is cancelled)
+  // CRITICAL: Navigation guard will be reset when page loads (if user returns)
+  // If navigation is blocked/cancelled, reset after timeout
   setTimeout(() => {
-    isNavigating = false;
-  }, 5000);
+    // Only reset if we're still on the same page (navigation was blocked)
+    if (typeof window !== "undefined" && window.location.href.includes('usdfg.pro') && !window.location.href.includes('phantom.app')) {
+      console.log("🧹 Navigation was blocked - resetting guard");
+      isNavigating = false;
+    }
+  }, 3000);
+  
+  // Store navigation timestamp
+  sessionStorage.setItem('phantom_navigation_start', Date.now().toString());
   
   // CRITICAL: Use window.location.replace() to prevent new tab
   // This ensures Phantom returns to the same tab
