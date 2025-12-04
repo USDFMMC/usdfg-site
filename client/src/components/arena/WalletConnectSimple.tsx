@@ -143,6 +143,22 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   // Handle wallet connection
   // CRITICAL: Check connection guard BEFORE doing anything
   const handleConnect = () => {
+    // CRITICAL: Only block if we're in a new tab AND there's evidence of a connection attempt
+    // On first visit, there's no connection attempt, so allow connection
+    const isOriginalTab = sessionStorage.getItem('phantom_original_tab') === 'true';
+    const hasConnectionAttempt = sessionStorage.getItem('phantom_connecting') === 'true' || 
+      sessionStorage.getItem('phantom_connect_timestamp') !== null ||
+      sessionStorage.getItem('phantom_redirect_count') !== null;
+    const isNewTab = !isOriginalTab && document.referrer === "" && window.name === "";
+    
+    if (isNewTab && mobile && hasConnectionAttempt) {
+      console.warn("⚠️ Blocking connection attempt in new tab - this prevents infinite loops");
+      console.warn("⚠️ Phantom opened a new tab instead of returning to the original");
+      console.warn("⚠️ Please close this tab and use the original tab");
+      alert("⚠️ This is a new tab opened by Phantom. Please close this tab and use the original tab to connect.");
+      return;
+    }
+    
     // Prevent double-clicks
     if (connected || isConnected || connecting) {
       console.warn("⚠️ Already connected or connecting - ignoring click");
@@ -295,13 +311,17 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const isPhantomConnecting = typeof window !== "undefined" && 
     sessionStorage.getItem('phantom_connecting') === 'true';
   
-  // CRITICAL: If we're in a new tab (not the original), ALWAYS disable the button
-  // This prevents infinite loops when Phantom opens a new tab
+  // CRITICAL: Only show warning if we're in a new tab AND there's evidence of a connection attempt
+  // On first visit, there's no connection attempt, so don't show the warning
   const isOriginalTab = sessionStorage.getItem('phantom_original_tab') === 'true';
+  const hasConnectionAttempt = isPhantomConnecting || 
+    sessionStorage.getItem('phantom_connect_timestamp') !== null ||
+    sessionStorage.getItem('phantom_redirect_count') !== null;
   const isNewTab = !isOriginalTab && document.referrer === "" && window.name === "";
-  const isNewTabBlocked = isNewTab && mobile;
+  // Only block if we're in a new tab AND there's evidence of a connection attempt
+  const isNewTabBlocked = isNewTab && mobile && hasConnectionAttempt;
   
-  // If we're in a new tab on mobile, show a message instead of the button
+  // If we're in a new tab on mobile with connection attempt, show a message instead of the button
   if (isNewTabBlocked) {
     return (
       <div className="flex flex-col space-y-2">
