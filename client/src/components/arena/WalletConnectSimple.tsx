@@ -37,6 +37,23 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     };
   });
 
+  // Clean up stuck connection states on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    // Clear stuck connection states that are older than 30 seconds
+    const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
+    if (connectTimestamp) {
+      const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
+      if (timeSinceConnect > 30000) {
+        console.log("🧹 Clearing stuck connection state on mount");
+        sessionStorage.removeItem('phantom_connecting');
+        sessionStorage.removeItem('phantom_connect_timestamp');
+        sessionStorage.removeItem('phantom_connect_attempt');
+      }
+    }
+  }, []);
+
   // Listen for localStorage changes (when Phantom sets connection)
   useEffect(() => {
     if (!mobile || typeof window === 'undefined') return;
@@ -167,9 +184,26 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     
     // CRITICAL: Check if Phantom connection is already in progress
     const isPhantomConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
+    
+    // CRITICAL: Clear stuck connection states (if it's been more than 30 seconds)
     if (isPhantomConnecting) {
+      const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
+      if (connectTimestamp) {
+        const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
+        if (timeSinceConnect > 30000) {
+          console.warn("⚠️ Clearing stuck connection state (older than 30 seconds)");
+          sessionStorage.removeItem('phantom_connecting');
+          sessionStorage.removeItem('phantom_connect_timestamp');
+          sessionStorage.removeItem('phantom_connect_attempt');
+        } else {
       console.warn("⚠️ Phantom connection already in progress - ignoring click");
       return;
+        }
+      } else {
+        // No timestamp but marked as connecting - clear it
+        console.warn("⚠️ Clearing orphaned connection state");
+        sessionStorage.removeItem('phantom_connecting');
+      }
     }
     
     // Check if we recently attempted (within last 3 seconds)
@@ -184,11 +218,35 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     }
 
     (async () => {
+      // Set connecting state with timestamp
+      sessionStorage.setItem('phantom_connecting', 'true');
+      sessionStorage.setItem('phantom_connect_timestamp', Date.now().toString());
+      sessionStorage.setItem('phantom_connect_attempt', new Date().toISOString());
+      
+      // Set a timeout to clear stuck states (30 seconds)
+      const timeoutId = setTimeout(() => {
+        const stillConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
+        if (stillConnecting) {
+          console.warn("⚠️ Connection timeout - clearing stuck state");
+          sessionStorage.removeItem('phantom_connecting');
+          sessionStorage.removeItem('phantom_connect_timestamp');
+          alert("Connection timed out. Please try again. If Phantom didn't open, make sure it's installed from https://phantom.app");
+        }
+      }, 30000);
+      
       try {
         logWalletEvent('selecting', { adapter: 'Phantom' });
         await connect();
         logWalletEvent('connect_called', { adapter: 'Phantom' });
+        
+        // Clear timeout and connecting state on success
+        clearTimeout(timeoutId);
+        sessionStorage.removeItem('phantom_connecting');
+        sessionStorage.removeItem('phantom_connect_timestamp');
       } catch (error: any) {
+        // Clear timeout on error
+        clearTimeout(timeoutId);
+        
         logWalletEvent('error', { 
           message: error.message || 'Connection failed',
           error: String(error)
@@ -197,11 +255,18 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         
         // Clear connecting state on error
         sessionStorage.removeItem('phantom_connecting');
+        sessionStorage.removeItem('phantom_connect_timestamp');
         
         if (error.message?.includes('User rejected') || error.message?.includes('User cancelled')) {
           console.log('User cancelled wallet connection');
         } else {
-          alert(`Connection failed: ${error.message || 'Unknown error'}`);
+          // Show user-friendly error message
+          const errorMessage = error.message || 'Unknown error';
+          if (errorMessage.includes('not found') || errorMessage.includes('not detected') || errorMessage.includes('not available')) {
+            alert(`Phantom wallet not found. Please install Phantom from https://phantom.app and try again.`);
+          } else {
+            alert(`Connection failed: ${errorMessage}`);
+          }
         }
       }
     })();

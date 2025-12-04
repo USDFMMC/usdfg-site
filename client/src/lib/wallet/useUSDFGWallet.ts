@@ -10,6 +10,9 @@ export function useUSDFGWallet() {
   const mobile = isMobileSafari();
 
   async function connect() {
+    // Clear any stuck connection states first
+    sessionStorage.removeItem('phantom_connecting');
+    
     if (mobile) {
       // On mobile Safari: check if window.solana exists (Phantom browser)
       // If it exists, use wallet adapter (works in Phantom browser)
@@ -28,6 +31,8 @@ export function useUSDFGWallet() {
           if (phantomWallet) {
             await wallet.select(phantomWallet.adapter.name);
             await new Promise((resolve) => setTimeout(resolve, 100));
+          } else {
+            throw new Error("Phantom wallet not found. Please ensure Phantom is installed.");
           }
         }
         
@@ -40,19 +45,63 @@ export function useUSDFGWallet() {
 
     console.log("🖥 Desktop detected → using wallet adapter");
     
+    // CRITICAL: Check if Phantom extension is actually installed
+    const hasPhantomExtension = typeof window !== "undefined" && !!(window as any).solana?.isPhantom;
+    
+    if (!hasPhantomExtension) {
+      // Check if Phantom is in the wallets list (adapter might detect it)
+      const phantomWallet = wallet.wallets.find(
+        (w) => w.adapter.name === "Phantom"
+      );
+      
+      if (!phantomWallet) {
+        const errorMsg = "Phantom wallet extension not detected. Please install Phantom from https://phantom.app";
+        console.error("❌", errorMsg);
+        throw new Error(errorMsg);
+      }
+      
+      // Check adapter ready state
+      if (phantomWallet.adapter.readyState === "NotFound") {
+        const errorMsg = "Phantom wallet extension not found. Please install Phantom from https://phantom.app";
+        console.error("❌", errorMsg);
+        throw new Error(errorMsg);
+      }
+    }
+    
     // Select Phantom if not already selected
     if (!wallet.wallet) {
       const phantomWallet = wallet.wallets.find(
         (w) => w.adapter.name === "Phantom"
       );
       
-      if (phantomWallet) {
-        await wallet.select(phantomWallet.adapter.name);
-        await new Promise((resolve) => setTimeout(resolve, 100));
+      if (!phantomWallet) {
+        const errorMsg = "Phantom wallet not available. Please install Phantom from https://phantom.app";
+        console.error("❌", errorMsg);
+        throw new Error(errorMsg);
+      }
+      
+      console.log("🔍 Selecting Phantom wallet...");
+      await wallet.select(phantomWallet.adapter.name);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      
+      // Verify selection worked
+      if (!wallet.wallet) {
+        const errorMsg = "Failed to select Phantom wallet. Please try again.";
+        console.error("❌", errorMsg);
+        throw new Error(errorMsg);
       }
     }
     
-    return wallet.connect();
+    console.log("🔗 Connecting to Phantom...");
+    try {
+      await wallet.connect();
+      console.log("✅ Successfully connected to Phantom");
+    } catch (error: any) {
+      console.error("❌ Connection error:", error);
+      // Clear stuck state on error
+      sessionStorage.removeItem('phantom_connecting');
+      throw error;
+    }
   }
 
   async function disconnect() {
