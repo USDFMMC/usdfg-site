@@ -24,8 +24,6 @@ import ElegantButton from "@/components/ui/ElegantButton";
 import ElegantModal from "@/components/ui/ElegantModal";
 import CreateChallengeForm from "@/components/arena/CreateChallengeForm";
 import ElegantNavbar from "@/components/layout/ElegantNavbar";
-import { WalletDebugConsole } from "@/components/debug/WalletDebugConsole";
-import { SimpleDebugButton } from "@/components/debug/SimpleDebugButton";
 // Lazy load heavy modals for better performance on all devices
 const SubmitResultRoom = lazy(() => import("@/components/arena/SubmitResultRoom").then(module => ({ default: module.SubmitResultRoom })));
 const PlayerProfileModal = lazy(() => import("@/components/arena/PlayerProfileModal"));
@@ -6216,10 +6214,6 @@ const ProfileSettingsModal: React.FC<{
           </div>
         </div>
       </div>
-
-      {/* Wallet Debug Console - Shows on-page for mobile debugging */}
-      <SimpleDebugButton />
-      <WalletDebugConsole />
 
     </div>
   );
