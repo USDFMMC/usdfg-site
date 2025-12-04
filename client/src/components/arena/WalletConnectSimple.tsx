@@ -52,6 +52,8 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         sessionStorage.removeItem('phantom_connect_attempt');
         // Also clear redirect count if it's stale
         sessionStorage.removeItem('phantom_redirect_count');
+        // Clear original tab marker if connection is stale
+        sessionStorage.removeItem('phantom_original_tab');
       }
     } else {
       // No timestamp but marked as connecting - clear orphaned state
@@ -59,17 +61,20 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       if (isConnecting) {
         console.log("🧹 Clearing orphaned connection state on mount");
         sessionStorage.removeItem('phantom_connecting');
+        // If there's no timestamp, Phantom probably didn't open - clear original tab marker
+        sessionStorage.removeItem('phantom_original_tab');
       }
     }
     
     // If there's no active connection and no recent attempt, clear phantom_original_tab
     // This allows normal browsing without the "new tab" warning
     const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
-    const hasRecentTimestamp = connectTimestamp && (Date.now() - parseInt(connectTimestamp) < 30000);
+    const hasRecentTimestamp = connectTimestamp && (Date.now() - parseInt(connectTimestamp) < 10000);
     if (!isConnecting && !hasRecentTimestamp) {
       // Clear original tab marker if there's no active connection
       // This prevents false positives on normal visits
       sessionStorage.removeItem('phantom_original_tab');
+      sessionStorage.removeItem('phantom_redirect_count');
     }
   }, []);
 
@@ -434,48 +439,35 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     }
   }
   
-  // CRITICAL: Only show warning if we're in a new tab AND there's a RECENT connection attempt
-  // Don't show warning on normal visits - only when Phantom actually opened a new tab during connection
+  // CRITICAL: Only show warning if we have STRONG evidence that Phantom opened a new tab
+  // Don't show warning if Phantom didn't actually open or if we're on the original tab
   const isOriginalTab = sessionStorage.getItem('phantom_original_tab') === 'true';
+  const redirectCount = typeof window !== "undefined" ? 
+    parseInt(sessionStorage.getItem('phantom_redirect_count') || '0') : 0;
   
-  // Check for RECENT connection attempt (within last 30 seconds)
-  let hasRecentConnectionAttempt = false;
-  if (typeof window !== "undefined") {
-    // Must be actively connecting (not stuck)
-    if (isPhantomConnecting) {
-      hasRecentConnectionAttempt = true;
-    } else {
-      // Check if there's a recent timestamp (within 30 seconds)
-      const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
-      if (connectTimestamp) {
-        const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
-        if (timeSinceConnect < 30000) {
-          hasRecentConnectionAttempt = true;
-        } else {
-          // Stale timestamp - clear it
-          sessionStorage.removeItem('phantom_connect_timestamp');
-          sessionStorage.removeItem('phantom_redirect_count');
-        }
-      }
-    }
-  }
-  
-  // Only detect new tab if we're NOT the original tab AND there's no referrer
-  // But also check if we have URL params (Phantom return) - if so, it's not a blocked new tab
+  // Check if we have Phantom return params (successful connection)
   const hasPhantomParams = typeof window !== "undefined" && 
     (window.location.search.includes('phantom_encryption_public_key') || 
      window.location.search.includes('data') ||
      window.location.search.includes('nonce'));
   
+  // STRICT: Only show warning if redirect_count > 0 (Phantom actually opened a tab)
+  // This prevents false positives when Phantom doesn't open at all
+  const hasStrongEvidence = redirectCount > 0;
+  
+  // Detect if we're in a new tab (not original, no referrer, no params)
   const isNewTab = typeof window !== "undefined" && 
     !isOriginalTab && 
     document.referrer === "" && 
     window.name === "" &&
-    !hasPhantomParams; // Don't treat as blocked new tab if Phantom returned with params
+    !hasPhantomParams;
   
-  // Only block if we're in a new tab AND there's a RECENT connection attempt
-  // AND we're on mobile (where deep links are used)
-  const isNewTabBlocked = isNewTab && mobile && hasRecentConnectionAttempt;
+  // Only block if:
+  // 1. We're on mobile
+  // 2. We're in a new tab (not original)
+  // 3. We have STRONG evidence (redirect_count > 0) - means Phantom actually opened something
+  // This ensures we only show the warning when Phantom actually opened a new tab
+  const isNewTabBlocked = mobile && isNewTab && hasStrongEvidence;
   
   // If we're in a new tab on mobile with connection attempt, show a message instead of the button
   if (isNewTabBlocked) {
