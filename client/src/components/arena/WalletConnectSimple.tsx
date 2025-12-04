@@ -37,16 +37,16 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     };
   });
 
-  // Clean up stuck connection states on mount
+  // Clean up stuck connection states on mount - be aggressive on Safari
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    // Clear stuck connection states that are older than 10 seconds
+    // Clear stuck connection states that are older than 5 seconds (more aggressive)
     const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
     if (connectTimestamp) {
       const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
-      if (timeSinceConnect > 10000) {
-        console.log("🧹 Clearing stuck connection state on mount");
+      if (timeSinceConnect > 5000) {
+        console.log("🧹 Clearing stuck connection state on mount (older than 5 seconds)");
         sessionStorage.removeItem('phantom_connecting');
         sessionStorage.removeItem('phantom_connect_timestamp');
         sessionStorage.removeItem('phantom_connect_attempt');
@@ -56,26 +56,33 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         sessionStorage.removeItem('phantom_original_tab');
       }
     } else {
-      // No timestamp but marked as connecting - clear orphaned state
+      // No timestamp but marked as connecting - clear orphaned state immediately
       const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
       if (isConnecting) {
-        console.log("🧹 Clearing orphaned connection state on mount");
+        console.log("🧹 Clearing orphaned connection state on mount immediately");
         sessionStorage.removeItem('phantom_connecting');
         // If there's no timestamp, Phantom probably didn't open - clear original tab marker
         sessionStorage.removeItem('phantom_original_tab');
+        sessionStorage.removeItem('phantom_redirect_count');
       }
     }
     
     // If there's no active connection and no recent attempt, clear phantom_original_tab
     // This allows normal browsing without the "new tab" warning
     const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
-    const hasRecentTimestamp = connectTimestamp && (Date.now() - parseInt(connectTimestamp) < 10000);
+    const hasRecentTimestamp = connectTimestamp && (Date.now() - parseInt(connectTimestamp) < 5000);
     if (!isConnecting && !hasRecentTimestamp) {
       // Clear original tab marker if there's no active connection
       // This prevents false positives on normal visits
       sessionStorage.removeItem('phantom_original_tab');
       sessionStorage.removeItem('phantom_redirect_count');
     }
+    
+    // Force a re-render after cleanup to ensure button state updates
+    // This is especially important on Safari where state might be stale
+    setTimeout(() => {
+      window.dispatchEvent(new Event('storage'));
+    }, 100);
   }, []);
 
   // Listen for localStorage changes (when Phantom sets connection)
@@ -223,26 +230,31 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     }
     
     // CRITICAL: Check if Phantom connection is already in progress
+    // Be aggressive about clearing stale state on Safari
     const isPhantomConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
     
-    // CRITICAL: Clear stuck connection states (if it's been more than 10 seconds)
+    // CRITICAL: Clear stuck connection states (if it's been more than 5 seconds)
+    // More aggressive timeout for Safari to ensure button is clickable
     if (isPhantomConnecting) {
       const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
       if (connectTimestamp) {
         const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
-        if (timeSinceConnect > 10000) {
-          console.warn("⚠️ Clearing stuck connection state (older than 10 seconds)");
+        if (timeSinceConnect > 5000) {
+          console.warn("⚠️ Clearing stuck connection state (older than 5 seconds)");
           sessionStorage.removeItem('phantom_connecting');
           sessionStorage.removeItem('phantom_connect_timestamp');
           sessionStorage.removeItem('phantom_connect_attempt');
+          // Continue with connection attempt
         } else {
-          console.warn("⚠️ Phantom connection already in progress - ignoring click");
-          return;
+          // Very recent connection attempt - allow it to proceed (might be a retry)
+          console.log("ℹ️ Recent connection attempt detected, but allowing retry");
+          // Don't block - let the connection logic handle it
         }
       } else {
-        // No timestamp but marked as connecting - clear it
-        console.warn("⚠️ Clearing orphaned connection state");
+        // No timestamp but marked as connecting - clear it immediately
+        console.warn("⚠️ Clearing orphaned connection state immediately");
         sessionStorage.removeItem('phantom_connecting');
+        // Continue with connection attempt
       }
     }
     
@@ -413,7 +425,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const hasWindowSolana = typeof window !== "undefined" && !!(window as any).solana;
   
   // CRITICAL: Check if Phantom connection is in progress, but only if it's recent (not stuck)
-  // Clear stuck states automatically
+  // Clear stuck states automatically - be aggressive about clearing on Safari
   let isPhantomConnecting = false;
   if (typeof window !== "undefined") {
     const connectingFlag = sessionStorage.getItem('phantom_connecting') === 'true';
@@ -421,20 +433,25 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     
     if (connectingFlag && connectTimestamp) {
       const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
-      // If connection state is older than 10 seconds, consider it stuck and clear it
-      if (timeSinceConnect > 10000) {
-        console.log("🧹 Clearing stuck connection state (older than 10 seconds)");
+      // If connection state is older than 5 seconds, consider it stuck and clear it (more aggressive)
+      // This ensures button is clickable quickly on Safari
+      if (timeSinceConnect > 5000) {
+        console.log("🧹 Clearing stuck connection state (older than 5 seconds)");
         sessionStorage.removeItem('phantom_connecting');
         sessionStorage.removeItem('phantom_connect_timestamp');
         sessionStorage.removeItem('phantom_connect_attempt');
         isPhantomConnecting = false;
       } else {
+        // Only consider it connecting if it's very recent (within 5 seconds)
         isPhantomConnecting = true;
       }
     } else if (connectingFlag && !connectTimestamp) {
-      // No timestamp but marked as connecting - clear it (orphaned state)
-      console.log("🧹 Clearing orphaned connection state");
+      // No timestamp but marked as connecting - clear it immediately (orphaned state)
+      console.log("🧹 Clearing orphaned connection state immediately");
       sessionStorage.removeItem('phantom_connecting');
+      isPhantomConnecting = false;
+    } else {
+      // No connecting flag at all - ensure it's false
       isPhantomConnecting = false;
     }
   }
@@ -482,18 +499,22 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     );
   }
   
-  // Only disable button if actually connecting (not stuck)
-  const isButtonDisabled = connecting || connected || isPhantomConnecting;
+  // Only disable button if actually connecting (not stuck) or already connected
+  // On mobile Safari, be more lenient - only disable if very recent connection attempt
+  const isButtonDisabled = connecting || connected || (isPhantomConnecting && mobile);
   
-  // Log detection for debugging
-  if (isMobile) {
-    console.log("🔍 Connection method detection:", {
+  // Log detection for debugging - especially helpful for Safari issues
+  if (isMobile || typeof window !== "undefined") {
+    console.log("🔍 Button state check:", {
       isMobile,
       hasWindowSolana,
-      willUseAdapter: hasWindowSolana,
-      willUseDeepLink: !hasWindowSolana,
+      connecting,
+      connected,
+      isConnected,
       isPhantomConnecting,
       isButtonDisabled,
+      phantomConnectingFlag: typeof window !== "undefined" ? sessionStorage.getItem('phantom_connecting') : null,
+      connectTimestamp: typeof window !== "undefined" ? sessionStorage.getItem('phantom_connect_timestamp') : null,
       userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
       solanaIsPhantom: typeof window !== "undefined" && !!(window as any).solana?.isPhantom
     });
