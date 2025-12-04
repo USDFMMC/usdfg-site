@@ -50,6 +50,8 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         sessionStorage.removeItem('phantom_connecting');
         sessionStorage.removeItem('phantom_connect_timestamp');
         sessionStorage.removeItem('phantom_connect_attempt');
+        // Also clear redirect count if it's stale
+        sessionStorage.removeItem('phantom_redirect_count');
       }
     } else {
       // No timestamp but marked as connecting - clear orphaned state
@@ -58,6 +60,16 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         console.log("🧹 Clearing orphaned connection state on mount");
         sessionStorage.removeItem('phantom_connecting');
       }
+    }
+    
+    // If there's no active connection and no recent attempt, clear phantom_original_tab
+    // This allows normal browsing without the "new tab" warning
+    const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
+    const hasRecentTimestamp = connectTimestamp && (Date.now() - parseInt(connectTimestamp) < 30000);
+    if (!isConnecting && !hasRecentTimestamp) {
+      // Clear original tab marker if there's no active connection
+      // This prevents false positives on normal visits
+      sessionStorage.removeItem('phantom_original_tab');
     }
   }, []);
 
@@ -406,15 +418,48 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     }
   }
   
-  // CRITICAL: Only show warning if we're in a new tab AND there's evidence of a connection attempt
-  // On first visit, there's no connection attempt, so don't show the warning
+  // CRITICAL: Only show warning if we're in a new tab AND there's a RECENT connection attempt
+  // Don't show warning on normal visits - only when Phantom actually opened a new tab during connection
   const isOriginalTab = sessionStorage.getItem('phantom_original_tab') === 'true';
-  const hasConnectionAttempt = isPhantomConnecting || 
-    (typeof window !== "undefined" && sessionStorage.getItem('phantom_connect_timestamp') !== null) ||
-    (typeof window !== "undefined" && sessionStorage.getItem('phantom_redirect_count') !== null);
-  const isNewTab = typeof window !== "undefined" && !isOriginalTab && document.referrer === "" && window.name === "";
-  // Only block if we're in a new tab AND there's evidence of a connection attempt
-  const isNewTabBlocked = isNewTab && mobile && hasConnectionAttempt;
+  
+  // Check for RECENT connection attempt (within last 30 seconds)
+  let hasRecentConnectionAttempt = false;
+  if (typeof window !== "undefined") {
+    // Must be actively connecting (not stuck)
+    if (isPhantomConnecting) {
+      hasRecentConnectionAttempt = true;
+    } else {
+      // Check if there's a recent timestamp (within 30 seconds)
+      const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
+      if (connectTimestamp) {
+        const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
+        if (timeSinceConnect < 30000) {
+          hasRecentConnectionAttempt = true;
+        } else {
+          // Stale timestamp - clear it
+          sessionStorage.removeItem('phantom_connect_timestamp');
+          sessionStorage.removeItem('phantom_redirect_count');
+        }
+      }
+    }
+  }
+  
+  // Only detect new tab if we're NOT the original tab AND there's no referrer
+  // But also check if we have URL params (Phantom return) - if so, it's not a blocked new tab
+  const hasPhantomParams = typeof window !== "undefined" && 
+    (window.location.search.includes('phantom_encryption_public_key') || 
+     window.location.search.includes('data') ||
+     window.location.search.includes('nonce'));
+  
+  const isNewTab = typeof window !== "undefined" && 
+    !isOriginalTab && 
+    document.referrer === "" && 
+    window.name === "" &&
+    !hasPhantomParams; // Don't treat as blocked new tab if Phantom returned with params
+  
+  // Only block if we're in a new tab AND there's a RECENT connection attempt
+  // AND we're on mobile (where deep links are used)
+  const isNewTabBlocked = isNewTab && mobile && hasRecentConnectionAttempt;
   
   // If we're in a new tab on mobile with connection attempt, show a message instead of the button
   if (isNewTabBlocked) {
