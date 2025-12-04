@@ -214,18 +214,24 @@ function App() {
       console.warn("   3. Phantom cache has old data");
       console.warn("   4. User cancelled in Phantom");
       
-      // Clear connecting state after a delay (give Phantom time to return if it's slow)
-      // CRITICAL: Clear after 10 seconds to prevent button being stuck disabled forever
-      setTimeout(() => {
-        const stillConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
-        if (stillConnecting) {
-          console.log("🧹 Clearing stale connecting state after timeout");
-          console.log("🧹 This allows the button to be clicked again");
-          sessionStorage.removeItem('phantom_connecting');
-          sessionStorage.removeItem('phantom_dapp_nonce');
-          // Don't remove phantom_original_tab - we need it to detect new tabs
-        }
-      }, 10000); // Wait 10 seconds for Phantom to return, then clear
+      // CRITICAL: Clear connecting state immediately if we're on the original tab
+      // This allows the button to be clicked again after Phantom silently rejects
+      if (isOriginalTab) {
+        console.log("🧹 Clearing connecting state immediately (original tab)");
+        console.log("🧹 This allows the button to be clicked again");
+        sessionStorage.removeItem('phantom_connecting');
+        sessionStorage.removeItem('phantom_dapp_nonce');
+        sessionStorage.removeItem('phantom_connect_timestamp');
+        // Don't remove phantom_original_tab - we need it to detect new tabs
+      } else {
+        // If we're in a new tab, clear everything and show error
+        console.log("🧹 Clearing all connection state (new tab)");
+        sessionStorage.removeItem('phantom_connecting');
+        sessionStorage.removeItem('phantom_dapp_nonce');
+        sessionStorage.removeItem('phantom_original_tab');
+        sessionStorage.removeItem('phantom_connect_timestamp');
+        sessionStorage.removeItem('phantom_redirect_count');
+      }
     }
     
     function base64ToUint8Array(b64: string) {

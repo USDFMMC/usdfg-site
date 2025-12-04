@@ -295,13 +295,26 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const isPhantomConnecting = typeof window !== "undefined" && 
     sessionStorage.getItem('phantom_connecting') === 'true';
   
-  // CRITICAL: If we're in a new tab (not the original), disable the button
+  // CRITICAL: If we're in a new tab (not the original), ALWAYS disable the button
   // This prevents infinite loops when Phantom opens a new tab
   const isOriginalTab = sessionStorage.getItem('phantom_original_tab') === 'true';
   const isNewTab = !isOriginalTab && document.referrer === "" && window.name === "";
   const isNewTabBlocked = isNewTab && mobile;
   
-  const isButtonDisabled = connecting || connected || isPhantomConnecting || isNewTabBlocked;
+  // If we're in a new tab on mobile, show a message instead of the button
+  if (isNewTabBlocked) {
+    return (
+      <div className="flex flex-col space-y-2">
+        <div className={`px-${compact ? '2.5' : '3'} py-${compact ? '1.5' : '2'} bg-red-600/20 text-red-300 border border-red-500/30 rounded-${compact ? 'md' : 'lg'} text-${compact ? 'xs' : 'sm'} text-center`}>
+          ⚠️ New tab opened by Phantom
+          <br />
+          <span className="text-xs">Close this tab and use the original tab</span>
+        </div>
+      </div>
+    );
+  }
+  
+  const isButtonDisabled = connecting || connected || isPhantomConnecting;
   
   // Log detection for debugging
   if (isMobile) {
