@@ -500,10 +500,6 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     );
   }
   
-  // Determine actual connected state - use mobileConnectionState on mobile
-  const actuallyConnected = mobile ? mobileConnectionState.connected : (connected || isConnected);
-  const effectivePublicKey = mobile ? (mobileConnectionState.publicKey ? new PublicKey(mobileConnectionState.publicKey) : null) : publicKey;
-  
   // Only disable button if actually connecting (not stuck) or already connected
   // On mobile Safari, be more lenient - only disable if very recent connection attempt
   const isButtonDisabled = connecting || actuallyConnected || (isPhantomConnecting && mobile);
