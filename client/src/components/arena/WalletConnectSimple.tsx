@@ -205,68 +205,61 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   }, [connected, publicKey, isConnected, mobile, mobileConnectionState, onConnect, onDisconnect, connection]);
 
   // Handle wallet connection
-  // CRITICAL: Check connection guard BEFORE doing anything
+  // CRITICAL: On mobile, be VERY permissive - allow connection attempts
   const handleConnect = () => {
-    // CRITICAL: Only block if we're in a new tab AND there's evidence of a connection attempt
-    // On first visit, there's no connection attempt, so allow connection
-    const isOriginalTab = sessionStorage.getItem('phantom_original_tab') === 'true';
-    const hasConnectionAttempt = sessionStorage.getItem('phantom_connecting') === 'true' || 
-      sessionStorage.getItem('phantom_connect_timestamp') !== null ||
-      sessionStorage.getItem('phantom_redirect_count') !== null;
-    const isNewTab = !isOriginalTab && document.referrer === "" && window.name === "";
+    console.log("🔘 Connect button clicked", { mobile, actuallyConnected, connecting, isPhantomConnecting });
     
-    if (isNewTab && mobile && hasConnectionAttempt) {
-      console.warn("⚠️ Blocking connection attempt in new tab - this prevents infinite loops");
-      console.warn("⚠️ Phantom opened a new tab instead of returning to the original");
-      console.warn("⚠️ Please close this tab and use the original tab");
-      alert("⚠️ This is a new tab opened by Phantom. Please close this tab and use the original tab to connect.");
-      return;
-    }
-    
-    // Prevent double-clicks - check actual connected state (mobile-aware)
-    const actuallyConnected = mobile ? mobileConnectionState.connected : (connected || isConnected);
-    if (actuallyConnected || connecting) {
-      console.warn("⚠️ Already connected or connecting - ignoring click");
-      return;
-    }
-    
-    // CRITICAL: Check if Phantom connection is already in progress
-    // Be aggressive about clearing stale state on Safari
-    const isPhantomConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
-    
-    // CRITICAL: Clear stuck connection states (if it's been more than 5 seconds)
-    // More aggressive timeout for Safari to ensure button is clickable
-    if (isPhantomConnecting) {
+    // On mobile, be very permissive - only block if definitely connected
+    if (mobile) {
+      // Check if actually connected (check localStorage directly)
+      const isActuallyConnected = typeof window !== "undefined" && 
+        localStorage.getItem('phantom_connected') === 'true';
+      
+      if (isActuallyConnected) {
+        console.log("✅ Already connected on mobile - ignoring click");
+        return;
+      }
+      
+      // Clear any stale connection states before proceeding
       const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
       if (connectTimestamp) {
         const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
-        if (timeSinceConnect > 5000) {
-          console.warn("⚠️ Clearing stuck connection state (older than 5 seconds)");
+        // If older than 2 seconds, clear it (very aggressive on mobile)
+        if (timeSinceConnect > 2000) {
+          console.log("🧹 Clearing stale connection state on mobile (older than 2 seconds)");
           sessionStorage.removeItem('phantom_connecting');
           sessionStorage.removeItem('phantom_connect_timestamp');
           sessionStorage.removeItem('phantom_connect_attempt');
-          // Continue with connection attempt
-        } else {
-          // Very recent connection attempt - allow it to proceed (might be a retry)
-          console.log("ℹ️ Recent connection attempt detected, but allowing retry");
-          // Don't block - let the connection logic handle it
         }
       } else {
-        // No timestamp but marked as connecting - clear it immediately
-        console.warn("⚠️ Clearing orphaned connection state immediately");
+        // No timestamp - clear any orphaned state
         sessionStorage.removeItem('phantom_connecting');
-        // Continue with connection attempt
       }
-    }
-    
-    // Check if we recently attempted (within last 3 seconds)
-    const lastAttempt = sessionStorage.getItem('phantom_connect_attempt');
-    if (lastAttempt) {
-      const lastAttemptTime = new Date(lastAttempt).getTime();
-      const now = Date.now();
-      if (now - lastAttemptTime < 3000) {
-        console.warn("⚠️ Connect called too soon after last attempt - ignoring");
+      
+      // Allow connection to proceed on mobile (don't block)
+    } else {
+      // Desktop: Use normal checks
+      const actuallyConnected = connected || isConnected;
+      if (actuallyConnected || connecting) {
+        console.warn("⚠️ Already connected or connecting - ignoring click");
         return;
+      }
+      
+      // Clear stuck states on desktop too
+      const isPhantomConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
+      if (isPhantomConnecting) {
+        const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
+        if (connectTimestamp) {
+          const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
+          if (timeSinceConnect > 5000) {
+            console.warn("⚠️ Clearing stuck connection state (older than 5 seconds)");
+            sessionStorage.removeItem('phantom_connecting');
+            sessionStorage.removeItem('phantom_connect_timestamp');
+            sessionStorage.removeItem('phantom_connect_attempt');
+          }
+        } else {
+          sessionStorage.removeItem('phantom_connecting');
+        }
       }
     }
 
@@ -460,9 +453,38 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   // Removed new tab warning - if Phantom works correctly, it returns to same tab
   // If it opens a new tab, user can close it themselves (no need for warning)
   
-  // Only disable button if actually connecting (not stuck) or already connected
-  // On mobile Safari, be more lenient - only disable if very recent connection attempt
-  const isButtonDisabled = connecting || actuallyConnected || (isPhantomConnecting && mobile);
+  // CRITICAL: On mobile, be VERY lenient with button disabled state
+  // Only disable if we're CERTAIN we're connected or actively connecting (within 2 seconds)
+  // This ensures button is always clickable on mobile Safari
+  let isButtonDisabled = false;
+  if (mobile) {
+    // On mobile: Only disable if actually connected OR very recent connection (within 2 seconds)
+    const veryRecentConnection = isPhantomConnecting && typeof window !== "undefined";
+    if (veryRecentConnection) {
+      const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
+      if (connectTimestamp) {
+        const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
+        // Only disable if connection attempt is within last 2 seconds
+        if (timeSinceConnect > 2000) {
+          // Stale - don't disable
+          isButtonDisabled = false;
+        } else {
+          // Very recent - disable to prevent double-clicks
+          isButtonDisabled = true;
+        }
+      } else {
+        // No timestamp - don't disable
+        isButtonDisabled = false;
+      }
+    }
+    // Also disable if actually connected
+    if (actuallyConnected) {
+      isButtonDisabled = true;
+    }
+  } else {
+    // Desktop: Use normal logic
+    isButtonDisabled = connecting || actuallyConnected || isPhantomConnecting;
+  }
   
   // Log detection for debugging - especially helpful for Safari issues
   if (isMobile || typeof window !== "undefined") {
@@ -514,6 +536,10 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           onClick={handleConnect}
           disabled={isButtonDisabled}
             className="px-3 py-1 bg-amber-500/10 text-amber-300 border border-amber-500/40 rounded-md text-xs font-normal hover:bg-amber-500/20 hover:border-amber-500/60 transition-all disabled:opacity-50 backdrop-blur-sm"
+          style={{ 
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent'
+          }}
           >
           {connecting || isPhantomConnecting ? "Connecting..." : "Connect Wallet"}
           </button>
@@ -522,6 +548,10 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           onClick={handleConnect}
           disabled={isButtonDisabled}
                 className="px-4 py-1.5 bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-300 font-light tracking-wide rounded-md hover:from-amber-500/30 hover:to-amber-600/30 transition-all disabled:opacity-50 border border-amber-500/50 shadow-sm shadow-amber-500/10 text-sm backdrop-blur-sm"
+          style={{ 
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent'
+          }}
               >
           {connecting || isPhantomConnecting ? "Connecting..." : "Connect Wallet"}
               </button>
