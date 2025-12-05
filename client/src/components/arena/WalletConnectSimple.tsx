@@ -486,24 +486,22 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     isButtonDisabled = connecting || actuallyConnected || isPhantomConnecting;
   }
   
-  // Log detection for debugging - especially helpful for Safari issues
-  if (isMobile || typeof window !== "undefined") {
-    console.log("🔍 Button state check:", {
-      isMobile,
-      hasWindowSolana,
-      connecting,
-      connected,
-      isConnected,
-      mobileConnectionState,
-      actuallyConnected,
-      isPhantomConnecting,
-      isButtonDisabled,
-      phantomConnectingFlag: typeof window !== "undefined" ? sessionStorage.getItem('phantom_connecting') : null,
-      connectTimestamp: typeof window !== "undefined" ? sessionStorage.getItem('phantom_connect_timestamp') : null,
-      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "unknown",
-      solanaIsPhantom: typeof window !== "undefined" && !!(window as any).solana?.isPhantom
-    });
-  }
+  // Only log button state changes (not on every render) - reduces console spam
+  useEffect(() => {
+    if (isMobile && typeof window !== "undefined") {
+      const stateKey = `${actuallyConnected}-${connecting}-${isPhantomConnecting}-${isButtonDisabled}`;
+      const lastState = sessionStorage.getItem('last_button_state');
+      if (lastState !== stateKey) {
+        console.log("🔍 Button state changed:", {
+          actuallyConnected,
+          connecting,
+          isPhantomConnecting,
+          isButtonDisabled
+        });
+        sessionStorage.setItem('last_button_state', stateKey);
+      }
+    }
+  }, [actuallyConnected, connecting, isPhantomConnecting, isButtonDisabled, isMobile]);
   
   // Show connected state if connected
   if (actuallyConnected && effectivePublicKey) {

@@ -43,7 +43,7 @@ export function phantomMobileConnect() {
     const timeSinceNav = Date.now() - navigationStartTime;
     if (timeSinceNav < 10000) { // Within 10 seconds of navigation
       console.warn("⚠️ Navigation already in progress - BLOCKING duplicate call");
-      return;
+    return;
     } else {
       // Navigation started more than 10 seconds ago - reset guard
       console.log("🧹 Resetting navigation guard (stale)");
@@ -51,7 +51,8 @@ export function phantomMobileConnect() {
     }
   }
   
-  // CRITICAL: Check if we're already connecting, but only if it's recent (not stuck)
+  // CRITICAL: Check if we're already connecting, but only if it's very recent (not stuck)
+  // Be more lenient - allow retries if first attempt failed
   if (typeof window !== "undefined") {
     const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
     const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
@@ -59,20 +60,23 @@ export function phantomMobileConnect() {
     if (isConnecting) {
       if (connectTimestamp) {
         const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
-        // If connection state is older than 5 seconds, consider it stuck and clear it
-        if (timeSinceConnect > 5000) {
-          console.log("🧹 Clearing stuck connection state in phantomMobileConnect()");
+        // If connection state is older than 2 seconds, consider it stuck and clear it (more aggressive)
+        if (timeSinceConnect > 2000) {
+          console.log("🧹 Clearing stuck connection state in phantomMobileConnect() (older than 2s)");
           sessionStorage.removeItem('phantom_connecting');
           sessionStorage.removeItem('phantom_connect_timestamp');
           sessionStorage.removeItem('phantom_connect_attempt');
+          // Allow connection to proceed
         } else {
-          console.warn("⚠️ Phantom connection already in progress (recent) - BLOCKING duplicate call");
-          return;
+          // Very recent (within 2 seconds) - block to prevent double-clicks
+          console.warn("⚠️ Phantom connection very recent (within 2s) - blocking duplicate call");
+    return;
         }
       } else {
-        // No timestamp but marked as connecting - clear orphaned state
+        // No timestamp but marked as connecting - clear orphaned state immediately
         console.log("🧹 Clearing orphaned connection state in phantomMobileConnect()");
         sessionStorage.removeItem('phantom_connecting');
+        // Allow connection to proceed
       }
     }
   }
@@ -233,7 +237,7 @@ export function phantomMobileConnect() {
     // Only reset if we're still on the same page (navigation was blocked)
     if (typeof window !== "undefined" && window.location.href.includes('usdfg.pro') && !window.location.href.includes('phantom.app')) {
       console.log("🧹 Navigation was blocked - resetting guard");
-      isNavigating = false;
+    isNavigating = false;
     }
   }, 3000);
   

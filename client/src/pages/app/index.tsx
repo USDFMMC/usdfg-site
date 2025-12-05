@@ -4145,10 +4145,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                         // Get trust score - ensure it's a number and defaults to 0 if undefined
                         const trustScore = typeof player.trustScore === 'number' ? player.trustScore : 0;
                         
-                        // Debug log for first player to verify trust score is being fetched
-                        if (index === 0) {
-                          console.log(`🔍 Leaderboard player ${player.wallet.slice(0, 8)}... - trustScore: ${player.trustScore}, trustReviews: ${player.trustReviews || 0}`);
-                        }
+                        // Removed excessive logging - only log on initial load if needed for debugging
                         
                         return {
                           rank: index + 1,
