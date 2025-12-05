@@ -270,11 +270,34 @@ function App() {
       console.error("   3. Invalid deep link parameters");
       console.error("   4. app_url doesn't match manifest.json url");
       
-      // Clean up URL and clear connecting state
-      window.history.replaceState({}, "", "/");
+      // CRITICAL: Clear all connection state to prevent loops
       sessionStorage.removeItem('phantom_connecting');
+      sessionStorage.removeItem('phantom_connect_timestamp');
+      sessionStorage.removeItem('phantom_connect_attempt');
       sessionStorage.removeItem('phantom_dapp_nonce');
+      sessionStorage.removeItem('phantom_dapp_keypair');
+      sessionStorage.removeItem('phantom_original_tab');
+      sessionStorage.removeItem('phantom_redirect_count');
+      sessionStorage.removeItem('phantom_navigation_start');
       localStorage.removeItem('phantom_dapp_handshake');
+      
+      // Reset navigation guard
+      resetNavigationGuard();
+      
+      // If we're on root / with error, redirect to /app so user can try again
+      if (window.location.pathname === '/' && (error || errorCode || errorMessage)) {
+        console.log("🔄 Redirecting to /app after Phantom error");
+        window.history.replaceState({}, "", "/app");
+        // Trigger a page reload to clear the error state
+        window.location.href = "/app";
+        return;
+      }
+      
+      // If already on /app, just clean the URL
+      if (window.location.pathname.startsWith('/app')) {
+        window.history.replaceState({}, "", "/app");
+      }
+      
       return;
     }
     

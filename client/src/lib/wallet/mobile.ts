@@ -104,10 +104,9 @@ export function phantomMobileConnect() {
   sessionStorage.setItem('phantom_original_tab', 'true');
   // Reset redirect count (for detecting loops)
   sessionStorage.setItem('phantom_redirect_count', '0');
-  // CRITICAL: Use root / for iOS universal link compatibility
-  // iOS always treats root domain as valid universal link (no subpath needed)
-  // This ensures Phantom returns to the same tab, not a new blank tab
-  const appUrl = "https://usdfg.pro/";
+  // CRITICAL: Use /app/ for redirect (where React app lives)
+  // iOS universal links work with subpaths, and this ensures Phantom returns to the app
+  const appUrl = "https://usdfg.pro/app/";
   
   const dappKeyPair = nacl.box.keyPair();
   const nonce = nacl.randomBytes(24);
