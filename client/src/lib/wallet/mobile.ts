@@ -153,7 +153,10 @@ export function phantomMobileConnect() {
   
   // Mark as navigating and connecting BEFORE doing anything else
   isNavigating = true;
+  const now = Date.now();
   sessionStorage.setItem('phantom_connecting', 'true');
+  sessionStorage.setItem('phantom_connect_timestamp', now.toString());
+  sessionStorage.setItem('phantom_connect_attempt', new Date().toISOString());
   // Mark this as the original tab (so we can detect if Phantom opens a new tab)
   sessionStorage.setItem('phantom_original_tab', 'true');
   // Reset redirect count (for detecting loops)

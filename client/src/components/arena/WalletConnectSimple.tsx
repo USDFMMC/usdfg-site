@@ -264,10 +264,15 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     }
 
     (async () => {
-      // Set connecting state with timestamp
-      sessionStorage.setItem('phantom_connecting', 'true');
-      sessionStorage.setItem('phantom_connect_timestamp', Date.now().toString());
-      sessionStorage.setItem('phantom_connect_attempt', new Date().toISOString());
+      // CRITICAL: On mobile, DON'T set connecting state here
+      // Let phantomMobileConnect() set it when it actually navigates
+      // This prevents the guard from blocking the first call
+      if (!mobile) {
+        // Desktop: Set connecting state with timestamp
+        sessionStorage.setItem('phantom_connecting', 'true');
+        sessionStorage.setItem('phantom_connect_timestamp', Date.now().toString());
+        sessionStorage.setItem('phantom_connect_attempt', new Date().toISOString());
+      }
       
       // Set a timeout to clear stuck states (30 seconds)
       const timeoutId = setTimeout(() => {
@@ -287,8 +292,12 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         
         // Clear timeout and connecting state on success
         clearTimeout(timeoutId);
-        sessionStorage.removeItem('phantom_connecting');
-        sessionStorage.removeItem('phantom_connect_timestamp');
+        if (!mobile) {
+          // Desktop: Clear connecting state
+          sessionStorage.removeItem('phantom_connecting');
+          sessionStorage.removeItem('phantom_connect_timestamp');
+        }
+        // Mobile: phantomMobileConnect() handles its own state
       } catch (error: any) {
         // Clear timeout on error
         clearTimeout(timeoutId);
