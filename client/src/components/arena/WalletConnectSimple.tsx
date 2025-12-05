@@ -457,48 +457,8 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     }
   }
   
-  // CRITICAL: Only show warning if we have STRONG evidence that Phantom opened a new tab
-  // Don't show warning if Phantom didn't actually open or if we're on the original tab
-  const isOriginalTab = sessionStorage.getItem('phantom_original_tab') === 'true';
-  const redirectCount = typeof window !== "undefined" ? 
-    parseInt(sessionStorage.getItem('phantom_redirect_count') || '0') : 0;
-  
-  // Check if we have Phantom return params (successful connection)
-  const hasPhantomParams = typeof window !== "undefined" && 
-    (window.location.search.includes('phantom_encryption_public_key') || 
-     window.location.search.includes('data') ||
-     window.location.search.includes('nonce'));
-  
-  // STRICT: Only show warning if redirect_count > 0 (Phantom actually opened a tab)
-  // This prevents false positives when Phantom doesn't open at all
-  const hasStrongEvidence = redirectCount > 0;
-  
-  // Detect if we're in a new tab (not original, no referrer, no params)
-  const isNewTab = typeof window !== "undefined" && 
-    !isOriginalTab && 
-    document.referrer === "" && 
-    window.name === "" &&
-    !hasPhantomParams;
-  
-  // Only block if:
-  // 1. We're on mobile
-  // 2. We're in a new tab (not original)
-  // 3. We have STRONG evidence (redirect_count > 0) - means Phantom actually opened something
-  // This ensures we only show the warning when Phantom actually opened a new tab
-  const isNewTabBlocked = mobile && isNewTab && hasStrongEvidence;
-  
-  // If we're in a new tab on mobile with connection attempt, show a message instead of the button
-  if (isNewTabBlocked) {
-    return (
-      <div className="flex flex-col space-y-2">
-        <div className={`px-${compact ? '2.5' : '3'} py-${compact ? '1.5' : '2'} bg-red-600/20 text-red-300 border border-red-500/30 rounded-${compact ? 'md' : 'lg'} text-${compact ? 'xs' : 'sm'} text-center`}>
-          ⚠️ New tab opened by Phantom
-          <br />
-          <span className="text-xs">Close this tab and use the original tab</span>
-        </div>
-      </div>
-    );
-  }
+  // Removed new tab warning - if Phantom works correctly, it returns to same tab
+  // If it opens a new tab, user can close it themselves (no need for warning)
   
   // Only disable button if actually connecting (not stuck) or already connected
   // On mobile Safari, be more lenient - only disable if very recent connection attempt
