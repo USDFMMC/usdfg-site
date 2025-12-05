@@ -93,66 +93,9 @@ export function phantomMobileConnect() {
   }
   
   // Set navigation guard BEFORE any async operations
+  // CRITICAL: Do this synchronously, before any async operations
   isNavigating = true;
   navigationStartTime = Date.now();
-  
-  // CRITICAL: Pre-flight check - verify manifest.json is accessible
-  // Phantom will silently reject if it can't fetch the manifest
-  const manifestUrl = "https://usdfg.pro/phantom/manifest.json";
-  console.log("🔍 Pre-flight check: Verifying manifest.json is accessible...");
-  
-  // Try to fetch manifest synchronously (this is a best-effort check)
-  // Note: This won't block navigation, but will log if there's an issue
-  fetch(manifestUrl, {
-    method: 'GET',
-    mode: 'cors',
-    cache: 'no-cache'
-  })
-    .then(response => {
-      if (!response.ok) {
-        console.error("❌ Manifest.json fetch failed:", response.status, response.statusText);
-        console.error("❌ This will cause Phantom to silently reject the connection");
-        return;
-      }
-      
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.error("❌ Manifest.json has wrong Content-Type:", contentType);
-        console.error("❌ Expected: application/json");
-        console.error("❌ This will cause Phantom to silently reject the connection");
-        return;
-      }
-      
-      return response.json();
-    })
-    .then(manifest => {
-      if (manifest) {
-        console.log("✅ Manifest.json is accessible and valid:", manifest);
-        
-        // Verify required fields
-        if (!manifest.name || !manifest.url) {
-          console.error("❌ Manifest.json missing required fields (name or url)");
-          console.error("❌ This will cause Phantom to silently reject the connection");
-        } else if (manifest.url !== "https://usdfg.pro/") {
-          console.error("❌ Manifest.json url doesn't match app_url:", manifest.url, "vs https://usdfg.pro/");
-          console.error("❌ Phantom requires exact match - this will cause silent rejection");
-        } else {
-          console.log("✅ Manifest.json validation passed - all required fields present");
-        }
-      }
-    })
-    .catch(error => {
-      console.error("❌ Failed to fetch manifest.json:", error);
-      console.error("❌ This will cause Phantom to silently reject the connection");
-      console.error("❌ Possible causes:");
-      console.error("   1. Network error");
-      console.error("   2. CORS issue");
-      console.error("   3. Manifest.json doesn't exist");
-      console.error("   4. Server error");
-    });
-  
-  // Mark as navigating and connecting BEFORE doing anything else
-  isNavigating = true;
   const now = Date.now();
   sessionStorage.setItem('phantom_connecting', 'true');
   sessionStorage.setItem('phantom_connect_timestamp', now.toString());
@@ -225,34 +168,40 @@ export function phantomMobileConnect() {
   (window as any).__phantom_debug_url = safeUrl;
   console.log("💡 To inspect full URL, check window.__phantom_debug_url or network tab");
   
-  // Store timestamp for debugging
-  sessionStorage.setItem('phantom_connect_attempt', new Date().toISOString());
-  sessionStorage.setItem('phantom_connect_timestamp', Date.now().toString());
-  console.log("⏰ Connect attempt timestamp stored");
-  
   console.log("🚀 Navigating to Phantom universal link...");
   console.log("🔒 Connection guard active - prevents duplicate clicks");
-  
-  // Navigate - this will redirect to Phantom
-  // CRITICAL: Navigation guard will be reset when page loads (if user returns)
-  // If navigation is blocked/cancelled, reset after timeout
-  setTimeout(() => {
-    // Only reset if we're still on the same page (navigation was blocked)
-    if (typeof window !== "undefined" && window.location.href.includes('usdfg.pro') && !window.location.href.includes('phantom.app')) {
-      console.log("🧹 Navigation was blocked - resetting guard");
-    isNavigating = false;
-    }
-  }, 3000);
   
   // Store navigation timestamp
   sessionStorage.setItem('phantom_navigation_start', Date.now().toString());
   
-  // CRITICAL: Use window.location.replace() to prevent new tab
+  // CRITICAL: Navigate IMMEDIATELY and SYNCHRONOUSLY
+  // Safari requires navigation to happen in the direct user interaction context
+  // Any delay or async operation can cause Safari to block it as a popup
+  // On mobile Safari, use window.location.href (more reliable than replace)
   // This ensures Phantom returns to the same tab
   try {
-    window.location.replace(url);
-  } catch (error) {
-    console.warn("⚠️ window.location.replace() failed, using href:", error);
+    // Navigate immediately - this is synchronous and happens in user click context
+    // Use href instead of replace for better Safari mobile compatibility
     window.location.href = url;
+    // Code after this line won't execute if navigation succeeds
+  } catch (error) {
+    console.warn("⚠️ window.location.href failed, trying replace:", error);
+    try {
+      window.location.replace(url);
+    } catch (replaceError) {
+      console.error("❌ Both href and replace failed:", replaceError);
+    }
   }
+  
+  // If we somehow get here (navigation was blocked), reset guard after timeout
+  // This should rarely happen if navigation is called synchronously in user click handler
+  setTimeout(() => {
+    // Only reset if we're still on the same page (navigation was blocked)
+    if (typeof window !== "undefined" && window.location.href.includes('usdfg.pro') && !window.location.href.includes('phantom.app')) {
+      console.log("🧹 Navigation was blocked - resetting guard");
+      isNavigating = false;
+      sessionStorage.removeItem('phantom_connecting');
+      sessionStorage.removeItem('phantom_connect_timestamp');
+    }
+  }, 5000); // Increased to 5 seconds to give navigation more time
 }
