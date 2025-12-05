@@ -23,7 +23,7 @@ export default defineConfig({
         display: 'standalone',
         orientation: 'portrait-primary',
         scope: '/',
-        start_url: '/',
+        start_url: '/app',
         icons: [
           {
             src: '/assets/usdfg-144.png',

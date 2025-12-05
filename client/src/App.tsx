@@ -30,19 +30,24 @@ function RoutesWithLogging() {
 
   return (
       <Routes>
-        {/* CRITICAL: Root / is now the main app (for Phantom universal link compatibility) */}
-        <Route path="/" element={<ArenaRoute />} />
-        {/* Redirect /app to / for backwards compatibility */}
-        <Route path="/app" element={<Navigate to="/" replace />} />
-        <Route path="/app/" element={<Navigate to="/" replace />} />
-        {/* Landing page moved to /home */}
-        <Route path="/home" element={<Home />} />
+        {/* Root / serves the landing page (Home component) - no Phantom/Firestore initialization */}
+        <Route path="/" element={<Home />} />
+        
+        {/* App routes under /app - full React app with Phantom, Firestore, etc. */}
+        <Route path="/app" element={<ArenaRoute />} />
+        <Route path="/app/" element={<ArenaRoute />} />
+        <Route path="/app/challenge/new" element={<CreateChallenge />} />
+        <Route path="/app/profile/:address" element={<PlayerProfile />} />
+        
+        {/* Static pages */}
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/whitepaper" element={<Whitepaper />} />
-        <Route path="/challenge/new" element={<CreateChallenge />} />
-        <Route path="/profile/:address" element={<PlayerProfile />} />
-        <Route path="/login" element={<Home />} />
+        
+        {/* Legacy redirects for backwards compatibility */}
+        <Route path="/home" element={<Navigate to="/" replace />} />
+        <Route path="/login" element={<Navigate to="/" replace />} />
+        
         <Route path="*" element={<NotFound />} />
       </Routes>
   );
