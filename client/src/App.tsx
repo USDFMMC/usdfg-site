@@ -73,30 +73,41 @@ function App() {
   // Phantom return handler - decrypts payload when Phantom returns
   // CRITICAL: This runs BEFORE Router, so it catches /app/ and /app with query params
   useEffect(() => {
-    // CRITICAL: Detect if we're in a redirect loop (new tab that keeps redirecting)
-    const redirectCount = parseInt(sessionStorage.getItem('phantom_redirect_count') || '0');
-    if (redirectCount > 3) {
-      console.error("❌❌❌ REDIRECT LOOP DETECTED ❌❌❌");
-      console.error("❌ Tab has redirected more than 3 times - breaking loop");
-      console.error("❌ This means Phantom opened a new tab but universal link isn't working");
-      console.error("❌ Clearing all Phantom connection state");
-      
-      // Clear all connection state
-      sessionStorage.removeItem('phantom_connecting');
-      sessionStorage.removeItem('phantom_dapp_nonce');
-      sessionStorage.removeItem('phantom_original_tab');
-      sessionStorage.removeItem('phantom_redirect_count');
-      sessionStorage.removeItem('phantom_connect_timestamp');
-      
-      // Stop the redirect loop
-      window.stop();
-      return;
-    }
-    
-    // Increment redirect count if we're in a new tab
+    // CRITICAL: Only track redirects during an active Phantom connection attempt
+    // Don't increment counter during normal browsing
+    const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
     const isOriginalTab = sessionStorage.getItem('phantom_original_tab') === 'true';
-    if (!isOriginalTab) {
-      sessionStorage.setItem('phantom_redirect_count', (redirectCount + 1).toString());
+    
+    // Only check for redirect loops if we're actually connecting
+    if (isConnecting) {
+      const redirectCount = parseInt(sessionStorage.getItem('phantom_redirect_count') || '0');
+      if (redirectCount > 3) {
+        console.error("❌❌❌ REDIRECT LOOP DETECTED ❌❌❌");
+        console.error("❌ Tab has redirected more than 3 times - breaking loop");
+        console.error("❌ This means Phantom opened a new tab but universal link isn't working");
+        console.error("❌ Clearing all Phantom connection state");
+        
+        // Clear all connection state
+        sessionStorage.removeItem('phantom_connecting');
+        sessionStorage.removeItem('phantom_dapp_nonce');
+        sessionStorage.removeItem('phantom_original_tab');
+        sessionStorage.removeItem('phantom_redirect_count');
+        sessionStorage.removeItem('phantom_connect_timestamp');
+        
+        // Stop the redirect loop
+        window.stop();
+        return;
+      }
+      
+      // Only increment redirect count if:
+      // 1. We're actively connecting to Phantom AND
+      // 2. We're NOT in the original tab (Phantom opened a new tab)
+      if (!isOriginalTab) {
+        sessionStorage.setItem('phantom_redirect_count', (redirectCount + 1).toString());
+      }
+    } else {
+      // Not connecting - clear redirect count to allow normal browsing
+      sessionStorage.removeItem('phantom_redirect_count');
     }
     
     console.log("📥 App.tsx Phantom return handler checking...");
@@ -111,7 +122,7 @@ function App() {
     
     // Check if we just attempted to connect (detect silent Phantom rejection)
     const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
-    const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
+    // isConnecting already declared above, don't redeclare
     const hasSearchParams = window.location.search.length > 0;
     const timeSinceConnect = connectTimestamp ? Date.now() - parseInt(connectTimestamp) : null;
     
