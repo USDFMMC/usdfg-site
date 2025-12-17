@@ -25,11 +25,10 @@ const Navbar: React.FC = () => {
 
   return (
     <>
-      {/* Skip to main content link for accessibility */}
+      {/* Skip to main content link for accessibility - only visible on keyboard focus */}
       <a
         href="#main-content"
-        className="skip-link absolute left-2 top-2 z-[100] px-6 py-3 rounded-full bg-gradient-to-r from-cyan-400 via-purple-500 to-cyan-400 text-black font-bold text-lg shadow-[0_0_24px_#22d3ee99] focus:opacity-100 focus:translate-y-0 opacity-0 -translate-y-10 transition-all duration-300 outline-none border-2 border-cyan-400"
-        tabIndex={0}
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[100] focus:px-6 focus:py-3 focus:rounded-full focus:bg-gradient-to-r focus:from-cyan-400 focus:via-purple-500 focus:to-cyan-400 focus:text-black focus:font-bold focus:text-lg focus:shadow-[0_0_24px_#22d3ee99] transition-all duration-300 focus:outline-none focus:border-2 focus:border-cyan-400"
       >
         Skip to main content
       </a>

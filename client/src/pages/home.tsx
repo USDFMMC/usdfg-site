@@ -18,6 +18,13 @@ const Home: React.FC = () => {
   
   const handleExploreClick = () => {
     setContentRevealed(true);
+    // Smooth scroll to revealed content after a short delay (let animation start)
+    setTimeout(() => {
+      const firstSection = document.querySelector('[aria-label="About Section"]');
+      if (firstSection) {
+        firstSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 300); // 300ms delay - animation is 1000ms total
   };
 
   return (
