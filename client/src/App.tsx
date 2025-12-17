@@ -77,10 +77,10 @@ function App() {
     // Don't increment counter during normal browsing
     const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
     const isOriginalTab = sessionStorage.getItem('phantom_original_tab') === 'true';
+    const redirectCount = parseInt(sessionStorage.getItem('phantom_redirect_count') || '0');
     
     // Only check for redirect loops if we're actually connecting
     if (isConnecting) {
-      const redirectCount = parseInt(sessionStorage.getItem('phantom_redirect_count') || '0');
       if (redirectCount > 3) {
         console.error("❌❌❌ REDIRECT LOOP DETECTED ❌❌❌");
         console.error("❌ Tab has redirected more than 3 times - breaking loop");
