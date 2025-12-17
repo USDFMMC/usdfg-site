@@ -93,17 +93,25 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       const isPhantomConnected = localStorage.getItem('phantom_connected') === 'true';
       const storedPublicKey = localStorage.getItem('phantom_public_key');
       
+      console.log("🔍 [Mobile] Checking connection:", { isPhantomConnected, hasPublicKey: !!storedPublicKey });
+      
       // If connected, clear any connecting flags
       if (isPhantomConnected && storedPublicKey) {
         sessionStorage.removeItem('phantom_connecting');
         sessionStorage.removeItem('phantom_connect_timestamp');
         sessionStorage.removeItem('phantom_connect_attempt');
+        console.log("✅ [Mobile] Connection detected - updating state");
       }
       
       setMobileConnectionState({
         connected: isPhantomConnected,
         publicKey: storedPublicKey
       });
+      
+      // Force parent component re-render by calling onConnect if newly connected
+      if (isPhantomConnected && storedPublicKey) {
+        onConnect();
+      }
     };
     
     // Check immediately
@@ -112,28 +120,29 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     // Listen for storage events (from other tabs/windows)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'phantom_connected' || e.key === 'phantom_public_key') {
+        console.log("📢 [Mobile] Storage event detected:", e.key);
         checkConnection();
       }
     };
     
     // Listen for custom phantom_connected event
     const handlePhantomConnected = () => {
-      console.log("📢 Received phantom_connected event");
+      console.log("📢 [Mobile] Received phantom_connected event");
       checkConnection();
     };
     
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('phantom_connected', handlePhantomConnected);
     
-    // Also poll periodically (in case storage event doesn't fire)
-    const interval = setInterval(checkConnection, 500);
+    // Poll more aggressively on mobile (every 300ms instead of 500ms)
+    const interval = setInterval(checkConnection, 300);
     
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('phantom_connected', handlePhantomConnected);
       clearInterval(interval);
     };
-  }, [mobile]);
+  }, [mobile, onConnect]);
 
   // Handle connection state changes
   useEffect(() => {
