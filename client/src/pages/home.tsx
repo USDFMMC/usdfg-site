@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
 import HeroSection from "@/components/home/hero-section";
@@ -12,8 +12,13 @@ import CTASection from "@/components/home/cta-section";
 import { Helmet } from "react-helmet";
 
 const Home: React.FC = () => {
+  const [contentRevealed, setContentRevealed] = useState(false);
   const ogImage = "https://usdfg.pro/assets/usdfg-og-banner.webp"; // matches your file
   const canonical = "https://usdfg.pro/";
+  
+  const handleExploreClick = () => {
+    setContentRevealed(true);
+  };
 
   return (
     <>
@@ -83,31 +88,41 @@ const Home: React.FC = () => {
       <Navbar />
       <main id="main-content" role="main" aria-label="Homepage Main Content" className="min-h-screen bg-[#07080C] flex-1">
         <section aria-label="Hero Section">
-          <HeroSection />
+          <HeroSection onExploreClick={handleExploreClick} />
         </section>
-        <section aria-label="About Section">
-          <AboutSection />
-        </section>
-        <section aria-label="Platform Features Section">
-          <PlatformFeatures />
-        </section>
-        <section aria-label="Challenge System Section">
-          <ChallengeSystem />
-        </section>
-        <section aria-label="Leaderboard Preview Section">
-          <LeaderboardPreview />
-        </section>
-        <section aria-label="Tokenomics Section">
-          <Tokenomics />
-        </section>
-        <section aria-label="Game Categories Section">
-          <GameCategories />
-        </section>
-        <section aria-label="CTA Section">
-          <CTASection />
-        </section>
+        
+        {/* Fade in content sections when "EXPLORE PLATFORM" is clicked */}
+        <div 
+          className={`transition-all duration-1000 ease-in-out ${
+            contentRevealed 
+              ? 'opacity-100 translate-y-0' 
+              : 'opacity-0 translate-y-8 max-h-0 overflow-hidden pointer-events-none'
+          }`}
+        >
+          <section aria-label="About Section">
+            <AboutSection />
+          </section>
+          <section aria-label="Platform Features Section">
+            <PlatformFeatures />
+          </section>
+          <section aria-label="Challenge System Section">
+            <ChallengeSystem />
+          </section>
+          <section aria-label="Leaderboard Preview Section">
+            <LeaderboardPreview />
+          </section>
+          <section aria-label="Tokenomics Section">
+            <Tokenomics />
+          </section>
+          <section aria-label="Game Categories Section">
+            <GameCategories />
+          </section>
+          <section aria-label="CTA Section">
+            <CTASection />
+          </section>
+        </div>
       </main>
-      <Footer isRevealed={true} />
+      <Footer isRevealed={contentRevealed} />
     </>
   );
 };

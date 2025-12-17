@@ -8,7 +8,11 @@ const MASCOT_PNG  = "/assets/usdfg-mascot-trophy-illustration.png";
 // Last-resort absolute URL (works regardless of base path issues)
 const MASCOT_ABS  = "https://tangerine-valkyrie-b2552f.netlify.app/assets/usdfg-mascot-trophy-illustration.webp";
 
-const HeroSection: React.FC = () => {
+interface HeroSectionProps {
+  onExploreClick?: () => void;
+}
+
+const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
   const mascotRef = useScrollFadeIn<HTMLDivElement>();
   const imgRef = useRef<HTMLImageElement | null>(null);
 
@@ -50,18 +54,17 @@ USDFG
             </p>
 
             <div className="flex flex-col sm:flex-row justify-center lg:justify-start gap-2">
-              <a href="#platform">
-                <Button
-                  className="w-full sm:w-auto px-4 py-2 text-sm md:text-base transition-all btn-animation"
-                  style={{
-                    background: "var(--primary-color)",
-                    color: "var(--text-light)",
-                    boxShadow: "var(--primary-glow)",
-                  }}
-                >
-                  EXPLORE PLATFORM
-                </Button>
-              </a>
+              <Button
+                onClick={onExploreClick}
+                className="w-full sm:w-auto px-4 py-2 text-sm md:text-base transition-all btn-animation hover:scale-105"
+                style={{
+                  background: "var(--primary-color)",
+                  color: "var(--text-light)",
+                  boxShadow: "var(--primary-glow)",
+                }}
+              >
+                EXPLORE PLATFORM
+              </Button>
 
               <Link to="/whitepaper">
                 <Button
