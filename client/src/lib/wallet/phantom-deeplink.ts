@@ -112,17 +112,19 @@ export function launchPhantomDeepLink(): void {
     
     // CRITICAL: Phantom returns to /app (where the React app lives)
     // This ensures Phantom returns to the app, not the landing page
-    const redirectLink = encodeURIComponent("https://usdfg.pro/app");
+    // Use current origin to support all environments (usdfg.pro, usdfg-app.web.app, localhost)
+    const currentOrigin = window.location.origin;
+    const redirectLink = encodeURIComponent(`${currentOrigin}/app`);
     // app_url is what Phantom displays in connected accounts
-    const appUrl = encodeURIComponent("https://usdfg.pro/app");
-    const appMetadataUrl = encodeURIComponent("https://usdfg.pro/phantom/manifest.json");
+    const appUrl = encodeURIComponent(`${currentOrigin}/app`);
+    const appMetadataUrl = encodeURIComponent(`${currentOrigin}/phantom/manifest.json`);
     
     // Store redirect URL globally for debugging
-    (window as any).__phantom_debug_redirect = "https://usdfg.pro/app";
+    (window as any).__phantom_debug_redirect = `${currentOrigin}/app`;
 
-    console.log('🔗 Redirect link (/app):', "https://usdfg.pro/app");
-    console.log('🔗 App URL (/app - what Phantom displays):', "https://usdfg.pro/app");
-    console.log('🔍 DEBUG: window.__phantom_debug_redirect =', "https://usdfg.pro/app");
+    console.log('🔗 Redirect link (/app):', `${currentOrigin}/app`);
+    console.log('🔗 App URL (/app - what Phantom displays):', `${currentOrigin}/app`);
+    console.log('🔍 DEBUG: window.__phantom_debug_redirect =', `${currentOrigin}/app`);
     console.log('🔑 DApp Public Key (base64):', dappPublicKeyBase64);
     console.log('🔑 Nonce (base64):', nonce);
     
@@ -131,9 +133,9 @@ export function launchPhantomDeepLink(): void {
     const deepLinkUrl = `https://phantom.app/ul/v1/connect?app_url=${appUrl}&redirect_link=${redirectLink}&dapp_encryption_public_key=${encodeURIComponent(dappPublicKeyBase64)}&nonce=${encodeURIComponent(nonce)}&cluster=devnet&scope=${encodeURIComponent("wallet:sign,wallet:signMessage,wallet:decrypt")}&app_metadata_url=${appMetadataUrl}`;
 
     // CRITICAL LOG - This shows EXACTLY what redirect URL is being sent to Phantom
-        console.log('🔗 Redirecting Phantom to (/app):', "https://usdfg.pro/app");
+        console.log('🔗 Redirecting Phantom to (/app):', `${currentOrigin}/app`);
         console.log('🔗 Redirect Link (encoded):', redirectLink);
-        console.log('🔗 App URL (/app - displayed in Phantom):', "https://usdfg.pro/app");
+        console.log('🔗 App URL (/app - displayed in Phantom):', `${currentOrigin}/app`);
         console.log('🔗 App URL (encoded):', appUrl);
     console.log('🔗 Full Deep Link URL:', deepLinkUrl);
     console.log('📱 Redirecting to Phantom NOW...');
