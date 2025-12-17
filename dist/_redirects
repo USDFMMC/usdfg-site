@@ -1,7 +1,5 @@
-# Redirect /app to root / (for backwards compatibility)
-/app                  /             301
-/app/                 /             301
-/app/*                /             301
+# React Router: /app/* routes go to index.html (React Router handles routing)
+/app/*                /index.html   200
 
 # Catch-all for all other routes (homepage, privacy, terms, etc.)
 /*                    /index.html   200 

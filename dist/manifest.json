@@ -2,7 +2,7 @@
   "name": "USDFG Arena - Gaming Platform",
   "short_name": "USDFG Arena",
   "description": "Skill-based crypto gaming platform. Compete, earn $USDFG, and prove your gaming prowess.",
-  "start_url": "/",
+  "start_url": "/app",
   "display": "standalone",
   "background_color": "#0B0F1A",
   "theme_color": "#0B0F1A",
