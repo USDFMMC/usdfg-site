@@ -52,10 +52,17 @@ const Navbar: React.FC = () => {
             >USDFG</span>
           </Link>
 
-          {/* Mobile Menu Button */}
+          {/* Mobile "Enter the Arena" Button - Always Visible */}
+          <Link to="/app" className="lg:hidden">
+            <Button className="bg-gradient-to-r from-purple-600 to-pink-500 text-white px-4 py-2 rounded-full font-semibold shadow-[0_0_24px_#a78bfa99] hover:brightness-110 flex items-center gap-1.5 transition-all duration-200 text-sm">
+              <span role="img" aria-label="controller">🎮</span> Enter Arena
+            </Button>
+          </Link>
+
+          {/* Mobile Menu Button - Hidden (no longer needed but keeping for future links) */}
           <button
             onClick={toggleMobileMenu}
-            className="lg:hidden p-2 rounded-md text-muted-foreground hover:text-primary focus:outline-none"
+            className="hidden p-2 rounded-md text-muted-foreground hover:text-primary focus:outline-none"
             aria-label="Toggle menu"
           >
             <Menu className="w-6 h-6" />
