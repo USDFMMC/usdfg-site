@@ -1766,7 +1766,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
       // Proceeding with challenge creation
       const { createChallenge } = await import("@/lib/chain/contract");
-      const { Connection, clusterApiUrl } = await import("@solana/web3.js");
+      const { Connection } = await import("@solana/web3.js");
+      const { getRpcEndpoint } = await import("@/lib/chain/rpc");
       
       // Determine max players based on mode
       const getMaxPlayersForMode = (mode: string) => {
@@ -1812,8 +1813,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         challengeId = 'founder_' + Date.now().toString();
       } else {
         // Regular challenge - create on-chain
-      // Create connection to devnet
-      const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
+      // Create connection
+      const connection = new Connection(getRpcEndpoint(), 'confirmed');
       
       // Get the most up-to-date wallet state
       const phantomWallet = wallet.wallets.find(w => w.adapter.name === 'Phantom');
@@ -3699,7 +3700,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                     const { PROGRAM_ID } = await import('@/lib/chain/config');
                                     
                                     // Use the connection from the hook
-                                    const connection = new Connection('https://api.devnet.solana.com');
+                                    const { getRpcEndpoint } = await import('@/lib/chain/rpc');
+                                    const connection = new Connection(getRpcEndpoint());
                                     
                                     const accountInfo = await connection.getAccountInfo(new PublicKey(challengePDA));
                                     if (!accountInfo || !accountInfo.data) {
@@ -5956,8 +5958,9 @@ const JoinChallengeModal: React.FC<{
         // For regular challenges, use the standard AcceptChallenge instruction
         if (isTournament) {
           // Tournament: Transfer USDFG directly to escrow
-          const { Connection, clusterApiUrl } = await import('@solana/web3.js');
-          const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
+          const { Connection } = await import('@solana/web3.js');
+          const { getRpcEndpoint } = await import('@/lib/chain/rpc');
+          const connection = new Connection(getRpcEndpoint(), 'confirmed');
           const { transferTournamentEntryFee } = await import('@/lib/chain/contract');
           
           await transferTournamentEntryFee(

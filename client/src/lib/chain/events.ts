@@ -1,6 +1,7 @@
-import { Connection, PublicKey, Transaction, SystemProgram, clusterApiUrl, Keypair, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { Connection, PublicKey, Transaction, SystemProgram, Keypair, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { getRpcEndpoint } from './rpc';
 
-const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+const connection = new Connection(getRpcEndpoint(), "confirmed");
 
 // Registry account for cross-device challenge discovery
 // Using a valid Solana program ID format
@@ -535,8 +536,9 @@ export async function joinChallengeOnChain(
     const { acceptChallenge } = await import('./contract');
     
     // Create connection to devnet
-    const { Connection, clusterApiUrl } = await import('@solana/web3.js');
-    const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
+    const { Connection } = await import('@solana/web3.js');
+    const { getRpcEndpoint } = await import('./rpc');
+    const connection = new Connection(getRpcEndpoint(), 'confirmed');
     
     // Call the smart contract to accept the challenge
     console.log('🚀 Calling smart contract to accept challenge...');
