@@ -110,10 +110,13 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
 
   // Game categories and options
   const gameCategories = {
-    Sports: ["EA UFC 6", "FC 26", "Madden 26", "NBA 2K26"],
-    Racing: ["F1 2023", "Mario Kart", "Gran Turismo 7"],
-    Fighting: ["Mortal Kombat 1", "Street Fighter 6", "Tekken 8"],
-    Shooting: ["COD MW3", "Fortnite", "Valorant"]
+    Sports: ["FC 26", "NBA 2K26", "MLB The Show 25", "MLB The Show 24", "MLB The Show 23", "Super Mega Baseball 4", "RBI Baseball", "EA Sports PGA Tour", "PGA Tour 2K23", "PGA Tour 2K21", "The Golf Club", "Everybody's Golf", "TopSpin 2K25", "AO Tennis 2", "Tennis World Tour 2", "Matchpoint Tennis Championships", "NBA The Run", "NBA Street Vol. 2", "NBA Street Homecourt", "NBA Street V3", "NBA Playgrounds", "NBA 2K Playgrounds 2", "Street Hoops"],
+    Football: ["Madden NFL 26", "Madden NFL 24", "Madden NFL 23", "Madden NFL 22", "NFL Blitz", "Mutant Football League", "Retro Bowl", "Axis Football"],
+    UFC: ["EA Sports UFC 6", "EA Sports UFC 5", "EA Sports UFC 4", "EA Sports UFC 3"],
+    BoardGames: ["Chess.com", "Lichess", "Chess Ultra", "8 Ball Pool", "Pool Hall", "PBA Bowling Challenge", "Brunswick Pro Bowling", "Checkers", "Backgammon", "Monopoly Plus", "Uno", "Scrabble"],
+    Racing: ["F1 24", "F1 23", "Gran Turismo 7", "Forza Motorsport", "Forza Horizon 5", "Assetto Corsa", "Assetto Corsa Competizione", "Project Cars 3", "iRacing", "Need for Speed", "The Crew Motorfest", "Mario Kart"],
+    Fighting: ["Mortal Kombat 1", "Street Fighter 6", "Tekken 8", "Tekken 7", "Tekken 6", "Tekken 5", "Undisputed", "eSports Boxing Club", "Fight Night Champion", "Fight Night Round 4", "Creed Champions", "Big Rumble Boxing"],
+    Shooting: ["COD Black Ops 6", "COD MW3", "COD MW2", "COD Modern Warfare", "COD Warzone", "COD Black Ops Cold War", "COD Vanguard", "COD Black Ops 4", "COD Black Ops 3", "COD Black Ops 2", "COD Black Ops", "Fortnite", "Valorant", "Battlefield 2042", "Battlefield V", "Battlefield 1", "Battlefield 4", "Battlefield Hardline", "Battlefield 3", "Battlefield Bad Company 2", "Battlefield Bad Company", "GTA 6", "GTA V", "GTA IV", "GTA San Andreas", "GTA Vice City", "GTA III"]
   };
 
   // Available games for selection (flattened + Custom)
@@ -128,6 +131,25 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
       { label: "Full Match" },
       { label: "Quick Match (No halftime)" },
       { label: "2v2 Challenge" },
+      { label: "Custom Challenge", tooltip: "Manual review required. Use only when standard modes don't apply." }
+    ],
+    Football: [
+      { label: "Full Game" },
+      { label: "Half Game (2 Quarters)" },
+      { label: "Head-to-Head" },
+      { label: "Custom Challenge", tooltip: "Manual review required. Use only when standard modes don't apply." }
+    ],
+    UFC: [
+      { label: "3 Round Fight" },
+      { label: "5 Round Fight (Championship)" },
+      { label: "Best of 3 Fights" },
+      { label: "Custom Challenge", tooltip: "Manual review required. Use only when standard modes don't apply." }
+    ],
+    BoardGames: [
+      { label: "Best of 3 Games" },
+      { label: "Best of 5 Games" },
+      { label: "Single Game" },
+      { label: "First to 10 Points" },
       { label: "Custom Challenge", tooltip: "Manual review required. Use only when standard modes don't apply." }
     ],
     Racing: [
