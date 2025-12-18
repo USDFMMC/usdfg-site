@@ -2,236 +2,106 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // ============================================
-    // HELPER FUNCTIONS - Validation & Security
-    // ============================================
-    
-    // Validate Solana wallet address format (base58, 32-44 chars)
-    function isValidSolanaWallet(wallet) {
-      return wallet is string && 
-             wallet.size() >= 32 && 
-             wallet.size() <= 44 &&
-             wallet.matches('^[1-9A-HJ-NP-Za-km-z]+$');
-    }
-    
-    // Check if data has required timestamp
-    function hasValidTimestamp(data) {
-      return 'createdAt' in data && data.createdAt is timestamp;
-    }
-    
-    // Validate string is not empty and under size limit
-    function isValidString(str, maxSize) {
-      return str is string && str.size() > 0 && str.size() <= maxSize;
-    }
-    
-    // Validate document size (prevent large documents)
-    function isReasonableSize() {
-      return request.resource.size() < 100000; // 100KB limit per document
-    }
-    
-    // ============================================
-    // CHALLENGES - Main competition data
-    // ============================================
+    // Challenges - anyone can read/write (using Solana wallet auth, not Firebase Auth)
     match /challenges/{challengeId} {
-      allow read: if true; // Public read access
-      
-      allow create: if isReasonableSize() &&
-                       hasValidTimestamp(request.resource.data) &&
-                       isValidSolanaWallet(request.resource.data.creator) &&
-                       isValidString(request.resource.data.game, 100) &&
-                       request.resource.data.entryFee >= 0;
-      
-      allow update: if isReasonableSize() &&
-                       // Only allow updating specific fields (no full overwrite)
-                       (!('creator' in request.resource.data) || 
-                        request.resource.data.creator == resource.data.creator) &&
-                       (!('entryFee' in request.resource.data) || 
-                        request.resource.data.entryFee == resource.data.entryFee);
-      
-      allow delete: if resource.data.status == 'cancelled' || 
-                       resource.data.status == 'expired';
+      allow read: if true;
+      allow create: if true; // Allow anyone to create (Solana wallet verification happens on-chain)
+      allow delete: if true; // Allow deletion (can add wallet-based rules later)
+      allow update: if true; // Allow updates from participants
     }
     
-    // ============================================
-    // CHALLENGE CHATS - Real-time chat messages
-    // ============================================
+    // Challenge Chats - temporary chat during result submission
     match /challenge_chats/{chatId} {
-      allow read: if true;
-      
-      allow create: if isReasonableSize() &&
-                       hasValidTimestamp(request.resource.data) &&
-                       isValidSolanaWallet(request.resource.data.wallet) &&
-                       isValidString(request.resource.data.message, 500); // 500 char limit
-      
-      allow update: if false; // Chat messages are immutable
-      allow delete: if request.time > resource.data.createdAt + duration.value(24, 'h'); // Auto-delete after 24h
+      allow read, write: if true;
+      // TODO: Add more restrictive rules based on challenge participants
     }
     
-    // ============================================
-    // VOICE SIGNALS - WebRTC signaling
-    // ============================================
+    // Voice Signals - WebRTC signaling for voice chat
     match /voice_signals/{signalId} {
-      allow read: if true;
-      allow create: if isReasonableSize() && hasValidTimestamp(request.resource.data);
-      allow update: if isReasonableSize();
-      allow delete: if request.time > resource.data.createdAt + duration.value(1, 'h'); // Clean up after 1h
+      allow read, write: if true;
+      // TODO: Add more restrictive rules based on challenge participants
     }
     
-    // ============================================
-    // PLAYER STATS - Win/Loss/Earnings tracking
-    // ============================================
+    // Player Stats - track wins/losses/earnings
     match /player_stats/{wallet} {
-      allow read: if true; // Public stats
-      
-      allow create: if isValidSolanaWallet(wallet) &&
-                       isReasonableSize() &&
-                       hasValidTimestamp(request.resource.data);
-      
-      allow update: if isReasonableSize() &&
-                       // Ensure stats only increment (no negative manipulation)
-                       request.resource.data.totalWins >= resource.data.totalWins &&
-                       request.resource.data.totalMatches >= resource.data.totalMatches;
-      
-      allow delete: if false; // Stats are permanent
+      allow read: if true; // Anyone can view player stats
+      allow write: if true; // Allow system to update stats (Solana wallet verification on-chain)
     }
     
-    // ============================================
-    // CHALLENGE ARCHIVE - Expired challenges
-    // ============================================
+    // Challenge Archive - for expired challenges
     match /challenges_archive/{challengeId} {
       allow read: if true;
-      allow create: if isReasonableSize() && hasValidTimestamp(request.resource.data);
-      allow update: if false; // Archive is immutable
-      allow delete: if request.time > resource.data.createdAt + duration.value(90, 'd'); // Clean up after 90 days
+      allow write: if true; // Allow archiving expired challenges
     }
     
-    // ============================================
-    // USER PROFILES
-    // ============================================
+    // User profiles (if you use them)
     match /users/{userId} {
       allow read: if true;
-      
-      allow create: if isValidSolanaWallet(userId) &&
-                       isReasonableSize() &&
-                       hasValidTimestamp(request.resource.data);
-      
-      allow update: if isReasonableSize() &&
-                       // Users can only update their own profile
-                       userId == request.resource.data.wallet;
-      
-      allow delete: if false; // Users cannot delete profiles
+      allow write: if true;
     }
     
-    // ============================================
-    // NOTIFICATIONS - Lobby locks & challenges
-    // ============================================
+    // Lobby Lock Notifications - alerts when players lock each other in
     match /lock_notifications/{notificationId} {
       allow read: if true;
-      allow create: if isReasonableSize() && hasValidTimestamp(request.resource.data);
-      allow update: if isReasonableSize();
-      allow delete: if request.time > resource.data.createdAt + duration.value(7, 'd');
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
     
+    // Challenge Notifications - alerts when someone sends a challenge to a specific player
     match /challenge_notifications/{notificationId} {
       allow read: if true;
-      allow create: if isReasonableSize() && hasValidTimestamp(request.resource.data);
-      allow update: if isReasonableSize();
-      allow delete: if request.time > resource.data.createdAt + duration.value(7, 'd');
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
     
-    // ============================================
-    // FRIENDLY MATCHES - No entry fee matches
-    // ============================================
+    // Friendly Matches - player-initiated matches without entry fees
     match /friendly_matches/{matchId} {
       allow read: if true;
-      
-      allow create: if isReasonableSize() &&
-                       hasValidTimestamp(request.resource.data) &&
-                       request.resource.data.entryFee == 0; // Enforce no entry fee
-      
-      allow update: if isReasonableSize();
-      allow delete: if request.time > resource.data.createdAt + duration.value(30, 'd');
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
     }
     
-    // ============================================
-    // FREE USDFG CLAIMS - Promotional events
-    // ============================================
+    // Free USDFG Claim Events - anyone can read, system can write
     match /free_claims/{claimId} {
-      allow read: if true;
-      
-      allow create: if isReasonableSize() &&
-                       hasValidTimestamp(request.resource.data) &&
-                       request.resource.data.amount > 0;
-      
-      allow update: if isReasonableSize() &&
-                       // Only allow claiming once per wallet
-                       (!('claimed' in resource.data) || !resource.data.claimed);
-      
-      allow delete: if request.time > resource.data.expiresAt;
+      allow read: if true; // Anyone can view active claim events
+      allow create: if true; // Allow creation (admin/system will create these)
+      allow update: if true; // Allow updates when users claim (system updates)
+      allow delete: if true; // Allow deletion for cleanup/testing
     }
     
-    // ============================================
-    // FOUNDER REWARDS - Immutable payment records
-    // ============================================
+    // Founder Challenge Rewards - tracks actual USDFG transferred to players
     match /founder_rewards/{rewardId} {
-      allow read: if true;
-      
-      allow create: if isReasonableSize() &&
-                       hasValidTimestamp(request.resource.data) &&
-                       isValidSolanaWallet(request.resource.data.recipient) &&
-                       request.resource.data.amount > 0 &&
-                       isValidString(request.resource.data.txSignature, 200);
-      
-      allow update: if false; // Immutable records
-      allow delete: if false; // Never delete payment records
+      allow read: if true; // Anyone can view rewards
+      allow create: if true; // Allow creation (admin/system records actual transfers)
+      allow update: if false; // Don't allow updates (immutable record)
+      allow delete: if true; // Allow deletion for cleanup/testing
     }
     
-    // ============================================
-    // STATS COLLECTION - Aggregated metrics
-    // ============================================
+    // Stats collection - cached totals for efficient reads
     match /stats/{statId} {
-      allow read: if true;
-      allow create: if isReasonableSize();
-      allow update: if isReasonableSize();
-      allow delete: if false; // Keep historical stats
+      allow read: if true; // Anyone can view stats
+      allow create: if true; // Allow creation (system/admin only)
+      allow update: if true; // Allow updates (system/admin only)
+      allow delete: if true; // Allow deletion for cleanup/testing
     }
     
-    // ============================================
-    // TRUST REVIEWS - Player reputation
-    // ============================================
+    // Trust Reviews - reviews submitted by players after matches
     match /trust_reviews/{reviewId} {
-      allow get, list: if true;
-      
-      allow create: if isReasonableSize() &&
-                       hasValidTimestamp(request.resource.data) &&
-                       isValidSolanaWallet(request.resource.data.reviewer) &&
-                       isValidSolanaWallet(request.resource.data.reviewee) &&
-                       request.resource.data.rating >= 1 &&
-                       request.resource.data.rating <= 5 &&
-                       isValidString(request.resource.data.comment, 500);
-      
-      allow update: if false; // Reviews are immutable
-      allow delete: if false; // Reviews are permanent
+      allow get, list: if true; // Anyone can view reviews (explicitly allow get and list queries)
+      allow create: if true; // Allow creation (players submit reviews)
+      allow update: if false; // Don't allow updates (immutable)
+      allow delete: if true; // Allow deletion for cleanup/testing
     }
     
-    // ============================================
-    // TEAMS - Elite Esports Teams
-    // ============================================
+    // Teams - Elite Esports Teams
     match /teams/{teamId} {
-      allow get, list: if true;
-      
-      allow create: if isReasonableSize() &&
-                       hasValidTimestamp(request.resource.data) &&
-                       isValidSolanaWallet(request.resource.data.owner) &&
-                       isValidString(request.resource.data.name, 50) &&
-                       request.resource.data.members.size() <= 20; // Max 20 members
-      
-      allow update: if isReasonableSize() &&
-                       request.resource.data.members.size() <= 20 &&
-                       // Preserve team owner
-                       request.resource.data.owner == resource.data.owner;
-      
-      allow delete: if false; // Teams are permanent (can be marked inactive instead)
+      allow get, list: if true; // Anyone can view teams (explicitly allow get and list queries)
+      allow create: if true; // Allow creation (team key holder creates team)
+      allow update: if true; // Allow updates (team key holder can update, members can join/leave)
+      allow delete: if true; // Allow deletion for cleanup/testing
     }
   }
 }

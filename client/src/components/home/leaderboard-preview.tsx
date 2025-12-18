@@ -74,6 +74,7 @@ const LeaderboardPreview: React.FC = () => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [teams, setTeams] = useState<TeamLeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   
   const tabs: Tab[] = [
     { id: "most-wins", label: "Most Wins" },
@@ -93,7 +94,8 @@ const LeaderboardPreview: React.FC = () => {
         let sortBy: 'wins' | 'winRate' | 'totalEarned' = activeTab === 'most-wins' ? 'wins' : 'totalEarned';
 
         if (leaderboardType === 'team') {
-          const topTeams = await getTopTeams(10, sortBy);
+          const limit = isExpanded ? 50 : 5;
+          const topTeams = await getTopTeams(limit, sortBy);
           const transformedTeams: TeamLeaderboardEntry[] = topTeams.map((team: TeamStats, index: number) => {
             const winRateValue = Number.isFinite(team.winRate) ? team.winRate : 0;
             return {
@@ -115,7 +117,8 @@ const LeaderboardPreview: React.FC = () => {
           setTeams(transformedTeams);
           setPlayers([]);
         } else {
-          const topPlayers = await getTopPlayers(10, sortBy);
+          const limit = isExpanded ? 50 : 5;
+          const topPlayers = await getTopPlayers(limit, sortBy);
 
           // Transform Firestore data to Player interface
           const transformedPlayers: Player[] = topPlayers.map((p: PlayerStats, index: number) => ({
@@ -143,7 +146,7 @@ const LeaderboardPreview: React.FC = () => {
     };
     
     fetchLeaderboard();
-  }, [activeTab, leaderboardType]);
+  }, [activeTab, leaderboardType, isExpanded]);
   
   return (
     <section className="py-12 bg-[#07080C]">
@@ -392,15 +395,17 @@ const LeaderboardPreview: React.FC = () => {
             </Table>
           </div>
 
-          {/* Pagination */}
-          <div className="flex justify-center mt-4">
-            <div className="flex space-x-1.5">
-              <span className="w-6 h-6 flex items-center justify-center bg-primary text-background rounded-md text-xs">1</span>
-              <span className="w-6 h-6 flex items-center justify-center text-muted-foreground hover:text-white transition-colors rounded-md cursor-pointer text-xs">2</span>
-              <span className="w-6 h-6 flex items-center justify-center text-muted-foreground hover:text-white transition-colors rounded-md cursor-pointer text-xs">3</span>
-              <span className="w-6 h-6 flex items-center justify-center text-muted-foreground hover:text-white transition-colors rounded-md cursor-pointer text-xs">Next ›</span>
+          {/* Expand/Collapse Button */}
+          {!loading && ((leaderboardType === 'solo' && players.length > 0) || (leaderboardType === 'team' && teams.length > 0)) && (
+            <div className="flex justify-center mt-4">
+              <Button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="px-6 py-2 bg-gradient-to-r from-amber-400/90 to-orange-500/90 text-black font-semibold shadow-[0_0_12px_rgba(255,215,130,0.2)] border border-amber-400/30 hover:brightness-110 transition-all"
+              >
+                {isExpanded ? '▼ Show Less' : '▲ Show More'}
+              </Button>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </section>

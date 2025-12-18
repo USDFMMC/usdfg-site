@@ -520,14 +520,31 @@ const ArenaHome: React.FC = () => {
       return '/assets/categories/sports.png'; // Default fallback
     }
     
-    // Check for FIFA or FC games - use soccer.png (check this FIRST before category check)
+    // Check for specific games first (check this FIRST before category check)
     const lowerGame = game.toLowerCase().trim();
+    
+    // Fortnite - use specific Fortnite image
+    if (lowerGame.includes('fortnite')) {
+      return '/assets/categories/fortnite.png';
+    }
+    
+    // Basketball games - use basketball.png (NBA 2K, basketball, etc.)
+    if (lowerGame.includes('nba') || 
+        lowerGame.includes('2k') ||
+        lowerGame.includes('basketball')) {
+      return '/assets/categories/basketball.png';
+    }
+    
+    // Soccer games - use soccer.PNG (FIFA, FC, EA Sports FC, etc.)
     if (lowerGame.includes('fifa') || 
         lowerGame.startsWith('fc') || 
         lowerGame.includes('fc 26') || 
         lowerGame.includes('fc26') || 
-        lowerGame.includes('fc ')) {
-      return '/assets/categories/soccer.png';
+        lowerGame.includes('fc ') ||
+        lowerGame.includes('ea sports fc') ||
+        lowerGame.includes('soccer') ||
+        lowerGame.includes('football')) {
+      return '/assets/categories/soccer.PNG';
     }
     
     const category = getGameCategory(game);
@@ -3152,7 +3169,28 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                             {challenge.platform && (
                               <p className="text-text-dim/60 text-xs neocore-body">
                                 🖥️ {challenge.platform}
-                                {challenge.username && ` • 👤 ${challenge.username}`}
+                                {challenge.username && challenge.creator && (
+                                  <>
+                                    {' • 👤 '}
+                                    <button
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        try {
+                                          const creatorStats = await getPlayerStats(challenge.creator);
+                                          if (creatorStats) {
+                                            setSelectedPlayer(creatorStats);
+                                            setShowPlayerProfile(true);
+                                          }
+                                        } catch (error) {
+                                          console.error('Failed to load creator profile:', error);
+                                        }
+                                      }}
+                                      className="text-amber-300 hover:text-amber-200 underline transition-colors"
+                                    >
+                                      {challenge.username}
+                                    </button>
+                                  </>
+                                )}
                               </p>
                             )}
                             {/* Team Challenge Indicator */}
@@ -4464,19 +4502,31 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 )}
                 
                 {/* Show More/Less and Load More Buttons */}
-                {!isLoadingLeaderboard && currentLeaderboardItems.length > 0 && (
+                {currentLeaderboardItems.length > 0 && (
                   <div className="px-6 pb-6 space-y-2">
                     {showAllPlayers ? (
                       <>
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                             setShowAllPlayers(false);
                             setLeaderboardLimit(30); // Reset to default
                             setLeaderboardLoading(true);
+                            try {
+                              if (isTeamsView) {
+                                await refreshTopTeams();
+                              } else {
+                                await loadTopPlayers(5);
+                              }
+                            } catch (error) {
+                              console.error('Failed to load top 5:', error);
+                            } finally {
+                              setLeaderboardLoading(false);
+                            }
                       }}
-                      className="w-full py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-amber-400 text-sm font-semibold transition-colors"
+                      disabled={isLoadingLeaderboard}
+                      className="w-full py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-amber-400 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                          ← Show Less (Top 5)
+                          {isLoadingLeaderboard ? 'Loading...' : '← Show Less (Top 5)'}
                     </button>
                         {/* Load More button - only show if we got the full limit (meaning there might be more) */}
                         {currentLeaderboardItems.length === leaderboardLimit && (
@@ -4486,29 +4536,46 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                               const newLimit = leaderboardLimit + 30; // Load 30 more
                               setLeaderboardLimit(newLimit);
                               try {
-                                await loadTopPlayers(newLimit);
+                                if (isTeamsView) {
+                                  await refreshTopTeams();
+                                } else {
+                                  await loadTopPlayers(newLimit);
+                                }
                               } catch (error) {
                                 console.error('Failed to load more players:', error);
                               } finally {
                                 setLeaderboardLoading(false);
                               }
                             }}
-                            className="w-full py-2 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 text-sm font-semibold transition-colors"
+                            disabled={isLoadingLeaderboard}
+                            className="w-full py-2 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            Load More {leaderboardEntityLabel} (+30)
+                            {isLoadingLeaderboard ? 'Loading...' : `Load More ${leaderboardEntityLabel} (+30)`}
                           </button>
                         )}
                       </>
                     ) : (
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           setShowAllPlayers(true);
                           setLeaderboardLimit(30); // Start with 30
                           setLeaderboardLoading(true);
+                          try {
+                            if (isTeamsView) {
+                              await refreshTopTeams();
+                            } else {
+                              await loadTopPlayers(30);
+                            }
+                          } catch (error) {
+                            console.error('Failed to load all players:', error);
+                          } finally {
+                            setLeaderboardLoading(false);
+                          }
                         }}
-                        className="w-full py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-amber-400 text-sm font-semibold transition-colors"
+                        disabled={isLoadingLeaderboard}
+                        className="w-full py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-amber-400 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        View All {leaderboardEntityLabel} →
+                        {isLoadingLeaderboard ? 'Loading...' : `View All ${leaderboardEntityLabel} →`}
                       </button>
                     )}
                   </div>
@@ -6038,6 +6105,28 @@ const JoinChallengeModal: React.FC<{
                 <span className="text-gray-400">Game:</span>
                 <span className="text-white font-medium">{challenge.game || 'USDFG Arena'}</span>
               </div>
+              {challenge.creator && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Creator:</span>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try {
+                        const creatorStats = await getPlayerStats(challenge.creator);
+                        if (creatorStats) {
+                          setSelectedPlayer(creatorStats);
+                          setShowPlayerProfile(true);
+                        }
+                      } catch (error) {
+                        console.error('Failed to load creator profile:', error);
+                      }
+                    }}
+                    className="text-amber-300 hover:text-amber-200 underline transition-colors font-medium"
+                  >
+                    {challenge.username || `${challenge.creator.slice(0, 6)}...${challenge.creator.slice(-4)}`}
+                  </button>
+                </div>
+              )}
               {challenge.expiresAt && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Expires:</span>
