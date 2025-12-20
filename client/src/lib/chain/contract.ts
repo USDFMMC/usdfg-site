@@ -135,12 +135,7 @@ export async function createChallenge(
   const pdas = await derivePDAs(creator, challengeSeed.publicKey);
   console.log(`📍 Challenge PDA: ${pdas.challengePDA.toString()}`);
 
-  // Step 4: Get token account
-  console.log('🔧 Step 4: Getting token account...');
-  const creatorTokenAccount = await getAssociatedTokenAddress(USDFG_MINT, creator);
-  console.log(`💳 Token account: ${creatorTokenAccount.toString()}`);
-
-  // Step 5: Create instruction data
+  // Step 4: Create instruction data (NO PAYMENT - metadata only)
   console.log('💰 Entry fee (raw USDFG):', entryFeeUsdfg);
   // Convert USDFG to lamports (smallest units)
   const entryFeeLamports = Math.floor(entryFeeUsdfg * Math.pow(10, 9)); // 9 decimals
@@ -158,25 +153,17 @@ export async function createChallenge(
   entryFeeBuffer.copy(instructionData, 8);
   console.log('📦 Instruction data created', 'Discriminator:', discriminator.toString('hex'));
 
-  // Step 6: Create instruction (NEW CONTRACT - NO ORACLE NEEDED!)
-  console.log('✅ Creating instruction with NEW smart contract (oracle-free)...');
-  console.log('📍 Escrow Token Account PDA:', pdas.escrowTokenAccountPDA.toString());
+  // Step 5: Create instruction (NO ESCROW - metadata only!)
+  console.log('✅ Creating instruction - NO PAYMENT REQUIRED (metadata only)...');
   console.log('📍 Challenge PDA:', pdas.challengePDA.toString());
-  console.log('📍 Escrow Wallet PDA:', pdas.escrowWalletPDA.toString());
   
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
       { pubkey: pdas.challengePDA, isSigner: false, isWritable: true }, // challenge
       { pubkey: creator, isSigner: true, isWritable: true }, // creator
-      { pubkey: creatorTokenAccount, isSigner: false, isWritable: true }, // creator_token_account
-      { pubkey: pdas.escrowTokenAccountPDA, isSigner: false, isWritable: true }, // escrow_token_account
-      { pubkey: pdas.escrowWalletPDA, isSigner: false, isWritable: false }, // escrow_wallet
       { pubkey: challengeSeed.publicKey, isSigner: true, isWritable: false }, // challenge_seed
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
-      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }, // rent
-      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // mint
     ],
     data: instructionData,
   });
@@ -239,14 +226,133 @@ export async function createChallenge(
 }
 
 /**
- * Accept a challenge
+ * Express intent to join challenge - NO PAYMENT REQUIRED
+ * Moves challenge to CreatorConfirmationRequired state
  */
-export async function acceptChallenge(
+export async function expressJoinIntent(
   wallet: any,
   connection: Connection,
   challengePDA: string
 ): Promise<string> {
-  console.log('🎯 Accepting challenge...');
+  console.log('✋ Expressing intent to join challenge (NO PAYMENT)...');
+  
+  if (!wallet || !wallet.publicKey) {
+    throw new Error('Wallet not connected');
+  }
+
+  const challenger = new PublicKey(wallet.publicKey.toString());
+  const challengeAddress = new PublicKey(challengePDA);
+  
+  // Create instruction data for express_join_intent
+  const { sha256 } = await import('@noble/hashes/sha2.js');
+  const hash = sha256(new TextEncoder().encode('global:express_join_intent'));
+  const discriminator = Buffer.from(hash.slice(0, 8));
+  
+  const instructionData = Buffer.alloc(8); // discriminator only
+  discriminator.copy(instructionData, 0);
+
+  const instruction = new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      { pubkey: challengeAddress, isSigner: false, isWritable: true }, // challenge
+      { pubkey: challenger, isSigner: true, isWritable: true }, // challenger
+    ],
+    data: instructionData,
+  });
+
+  const transaction = new Transaction().add(instruction);
+  const { blockhash } = await connection.getLatestBlockhash();
+  transaction.recentBlockhash = blockhash;
+  transaction.feePayer = challenger;
+
+  const signedTransaction = await wallet.signTransaction(transaction);
+  const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+  await connection.confirmTransaction(signature);
+  
+  console.log('✅ Join intent expressed successfully!');
+  return signature;
+}
+
+/**
+ * Creator funds escrow after joiner expressed intent
+ * Moves challenge to CreatorFunded state
+ */
+export async function creatorFund(
+  wallet: any,
+  connection: Connection,
+  challengePDA: string,
+  entryFeeUsdfg: number
+): Promise<string> {
+  console.log('💰 Creator funding challenge...');
+  
+  if (!wallet || !wallet.publicKey) {
+    throw new Error('Wallet not connected');
+  }
+
+  const creator = new PublicKey(wallet.publicKey.toString());
+  const challengeAddress = new PublicKey(challengePDA);
+  
+  // Get creator's token account
+  const creatorTokenAccount = await getAssociatedTokenAddress(USDFG_MINT, creator);
+  
+  // Derive escrow PDAs
+  const [escrowTokenAccountPDA] = PublicKey.findProgramAddressSync(
+    [SEEDS.ESCROW_WALLET, challengeAddress.toBuffer(), USDFG_MINT.toBuffer()],
+    PROGRAM_ID
+  );
+  
+  // Convert USDFG to lamports
+  const entryFeeLamports = Math.floor(entryFeeUsdfg * Math.pow(10, 9));
+  
+  // Create instruction data for creator_fund
+  const { sha256 } = await import('@noble/hashes/sha2.js');
+  const hash = sha256(new TextEncoder().encode('global:creator_fund'));
+  const discriminator = Buffer.from(hash.slice(0, 8));
+  
+  const instructionData = Buffer.alloc(8 + 8); // discriminator + entry_fee
+  discriminator.copy(instructionData, 0);
+  const entryFeeBuffer = numberToU64Buffer(entryFeeLamports);
+  entryFeeBuffer.copy(instructionData, 8);
+
+  const instruction = new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      { pubkey: challengeAddress, isSigner: false, isWritable: true }, // challenge
+      { pubkey: creator, isSigner: true, isWritable: true }, // creator
+      { pubkey: creatorTokenAccount, isSigner: false, isWritable: true }, // creator_token_account
+      { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // escrow_token_account
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
+      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }, // rent
+      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // mint
+    ],
+    data: instructionData,
+  });
+
+  const transaction = new Transaction().add(instruction);
+  const { blockhash } = await connection.getLatestBlockhash();
+  transaction.recentBlockhash = blockhash;
+  transaction.feePayer = creator;
+
+  const signedTransaction = await wallet.signTransaction(transaction);
+  const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+  await connection.confirmTransaction(signature);
+  
+  console.log('✅ Creator funded successfully!');
+  return signature;
+}
+
+/**
+ * Joiner funds escrow after creator funded
+ * Moves challenge to Active state
+ */
+export async function joinerFund(
+  wallet: any,
+  connection: Connection,
+  challengePDA: string,
+  entryFeeUsdfg: number
+): Promise<string> {
+  console.log('💰 Joiner funding challenge...');
   
   if (!wallet || !wallet.publicKey) {
     throw new Error('Wallet not connected');
@@ -258,24 +364,24 @@ export async function acceptChallenge(
   // Get challenger's token account
   const challengerTokenAccount = await getAssociatedTokenAddress(USDFG_MINT, challenger);
   
-  // Derive only the PDAs needed for accept using the actual challenge PDA
-  const [escrowWalletPDA] = PublicKey.findProgramAddressSync(
-    [SEEDS.ESCROW_WALLET],
-    PROGRAM_ID
-  );
+  // Derive escrow PDAs
   const [escrowTokenAccountPDA] = PublicKey.findProgramAddressSync(
     [SEEDS.ESCROW_WALLET, challengeAddress.toBuffer(), USDFG_MINT.toBuffer()],
     PROGRAM_ID
   );
   
-  // Create instruction data for accept_challenge
-  // Calculate discriminator using SHA256 of "global:accept_challenge"
+  // Convert USDFG to lamports
+  const entryFeeLamports = Math.floor(entryFeeUsdfg * Math.pow(10, 9));
+  
+  // Create instruction data for joiner_fund
   const { sha256 } = await import('@noble/hashes/sha2.js');
-  const hash = sha256(new TextEncoder().encode('global:accept_challenge'));
+  const hash = sha256(new TextEncoder().encode('global:joiner_fund'));
   const discriminator = Buffer.from(hash.slice(0, 8));
   
-  const instructionData = Buffer.alloc(8); // discriminator only
+  const instructionData = Buffer.alloc(8 + 8); // discriminator + entry_fee
   discriminator.copy(instructionData, 0);
+  const entryFeeBuffer = numberToU64Buffer(entryFeeLamports);
+  entryFeeBuffer.copy(instructionData, 8);
 
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
@@ -285,7 +391,6 @@ export async function acceptChallenge(
       { pubkey: challengerTokenAccount, isSigner: false, isWritable: true }, // challenger_token_account
       { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // escrow_token_account
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
-      { pubkey: escrowWalletPDA, isSigner: false, isWritable: false }, // escrow_wallet
       { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // mint
     ],
     data: instructionData,
@@ -300,8 +405,18 @@ export async function acceptChallenge(
   const signature = await connection.sendRawTransaction(signedTransaction.serialize());
   await connection.confirmTransaction(signature);
   
-  console.log('✅ Challenge accepted successfully!');
+  console.log('✅ Joiner funded successfully! Challenge is now ACTIVE!');
   return signature;
+}
+
+// Legacy function - kept for backwards compatibility but deprecated
+/** @deprecated Use expressJoinIntent() instead */
+export async function acceptChallenge(
+  wallet: any,
+  connection: Connection,
+  challengePDA: string
+): Promise<string> {
+  return expressJoinIntent(wallet, connection, challengePDA);
 }
 
 /**

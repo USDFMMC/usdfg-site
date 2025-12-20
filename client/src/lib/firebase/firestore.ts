@@ -44,9 +44,16 @@ export interface ChallengeData {
   challenger?: string;                // Challenger wallet (if accepted) or team key
   targetPlayer?: string;               // Optional: specific player to challenge (for direct challenges)
   entryFee: number;                   // Entry fee amount
-  status: 'pending' | 'active' | 'completed' | 'cancelled' | 'disputed' | 'in-progress';
+  // NEW STATE MACHINE - No legacy status values
+  status: 'pending_waiting_for_opponent' | 'creator_confirmation_required' | 'creator_funded' | 'active' | 'completed' | 'cancelled' | 'disputed';
+  pendingJoiner?: string;             // Wallet that expressed join intent (in creator_confirmation_required state)
   createdAt: Timestamp;               // Creation time
-  expiresAt: Timestamp;               // Expiration time
+  expiresAt: Timestamp;               // Expiration time (legacy - use expirationTimer)
+  expirationTimer?: Timestamp;        // TTL for pending challenges (24 hours)
+  creatorFundingDeadline?: Timestamp; // Deadline for creator to fund (5 minutes after join intent)
+  joinerFundingDeadline?: Timestamp;  // Deadline for joiner to fund (5 minutes after creator funds)
+  fundedByCreatorAt?: Timestamp;      // When creator funded escrow
+  fundedByJoinerAt?: Timestamp;       // When joiner funded escrow
   winner?: string;                    // Winner wallet (if completed) or team key
   challengeType?: 'solo' | 'team';    // Challenge type - solo or team (defaults to solo for backward compatibility)
   teamOnly?: boolean;                 // For team challenges: true = only teams can accept, false = open to anyone (defaults to false)
@@ -810,7 +817,7 @@ export const updateChallenge = async (challengeId: string, updates: Partial<Chal
   }
 };
 
-export const updateChallengeStatus = async (challengeId: string, status: 'active' | 'pending' | 'completed' | 'cancelled' | 'disputed' | 'expired') => {
+export const updateChallengeStatus = async (challengeId: string, status: 'pending_waiting_for_opponent' | 'creator_confirmation_required' | 'creator_funded' | 'active' | 'completed' | 'cancelled' | 'disputed') => {
   try {
     const challengeRef = doc(db, 'challenges', challengeId);
     
@@ -931,8 +938,9 @@ export const fetchChallengeById = async (challengeId: string): Promise<Challenge
   }
 };
 
-// Join challenge with proper Firestore operations
-export const joinChallenge = async (challengeId: string, wallet: string, isFounderChallenge: boolean = false, isTeam?: boolean) => {
+// Express intent to join challenge - NO PAYMENT REQUIRED
+// Moves challenge to creator_confirmation_required state
+export const expressJoinIntent = async (challengeId: string, wallet: string, isFounderChallenge: boolean = false, isTeam?: boolean) => {
   try {
     const challengeRef = doc(db, "challenges", challengeId);
     const snap = await getDoc(challengeRef);
@@ -942,107 +950,60 @@ export const joinChallenge = async (challengeId: string, wallet: string, isFound
     }
 
     const data = snap.data() as ChallengeData;
-    const format = data.format || (data.tournament ? 'tournament' : 'standard');
-    const maxPlayers =
-      data.maxPlayers ||
-      (format === 'tournament'
-        ? data.tournament?.maxPlayers || 2
-        : 2);
     
-    // Check if this is a team challenge with teamOnly restriction
+    // Validate challenge is in pending state
+    if (data.status !== 'pending_waiting_for_opponent') {
+      throw new Error(`Challenge is not waiting for opponent. Current status: ${data.status}`);
+    }
+    
+    // Check if challenge expired
+    if (data.expirationTimer && data.expirationTimer.toMillis() < Date.now()) {
+      throw new Error("Challenge has expired");
+    }
+    
+    // Check if creator is trying to join their own challenge
+    if (data.creator.toLowerCase() === wallet.toLowerCase()) {
+      throw new Error("Cannot join your own challenge");
+    }
+    
+    // Handle team challenges
     if (data.challengeType === 'team' && data.teamOnly === true) {
-      // Only teams can accept - check if challenger is part of a team
       const challengerTeam = await getTeamByMember(wallet);
       if (!challengerTeam) {
-        throw new Error("This challenge is only open to teams. You must be part of a team to accept.");
+        throw new Error("This challenge is only open to teams. You must be part of a team to join.");
       }
-      // Use team key for team challenges - only team key holder can accept
       const teamKey = challengerTeam.teamKey;
       if (teamKey !== wallet) {
-        throw new Error("Only the team key holder can accept team challenges. You are a team member, not the key holder.");
+        throw new Error("Only the team key holder can join team challenges. You are a team member, not the key holder.");
       }
-      // Use team key as challenger
       wallet = teamKey;
       isTeam = true;
     } else if (data.challengeType === 'team' && data.teamOnly === false) {
-      // Team challenge open to anyone - if challenger is a team, use team key
       const challengerTeam = await getTeamByMember(wallet);
       if (challengerTeam) {
-        // Challenger is part of a team - only team key holder can accept
         if (challengerTeam.teamKey !== wallet) {
-          throw new Error("Only the team key holder can accept challenges. You are a team member, not the key holder.");
+          throw new Error("Only the team key holder can join challenges. You are a team member, not the key holder.");
         }
-        // Use team key as challenger
         wallet = challengerTeam.teamKey;
         isTeam = true;
       }
-      // If challenger is not part of a team, they can accept as solo player (isTeam remains false)
-    } else if (data.challengeType === 'team') {
-      // Team challenge without teamOnly specified (backward compatibility) - treat as open to all
-      const challengerTeam = await getTeamByMember(wallet);
-      if (challengerTeam) {
-        // Challenger is part of a team - only team key holder can accept
-        if (challengerTeam.teamKey !== wallet) {
-          throw new Error("Only the team key holder can accept challenges. You are a team member, not the key holder.");
-        }
-        // Use team key as challenger
-        wallet = challengerTeam.teamKey;
-        isTeam = true;
-      }
-      // If challenger is not part of a team, they can accept as solo player (isTeam remains false)
     }
     
-    if (data.players && data.players.length >= maxPlayers) {
-      throw new Error("Challenge already full");
+    // Check if already expressed intent
+    if (data.pendingJoiner && data.pendingJoiner.toLowerCase() === wallet.toLowerCase()) {
+      throw new Error("You have already expressed intent to join this challenge");
     }
 
-    // Check if player/team is already in the challenge
-    if (data.players && data.players.includes(wallet)) {
-      throw new Error("You are already in this challenge");
-    }
+    // Calculate creator funding deadline (5 minutes from now)
+    const creatorFundingDeadline = Timestamp.fromDate(new Date(Date.now() + (5 * 60 * 1000)));
 
-    const newPlayers = data.players ? [...data.players, wallet] : [wallet];
-    const isFull = newPlayers.length >= maxPlayers;
-
+    // Update challenge to express join intent - NO PAYMENT
     const updates: any = {
-      players: newPlayers,
-      joinedBy: arrayUnion(wallet),
+      status: 'creator_confirmation_required',
+      pendingJoiner: wallet,
+      creatorFundingDeadline,
       updatedAt: serverTimestamp(),
-      maxPlayers,
     };
-
-    if (format === 'tournament') {
-      const tournamentState = ensureTournamentState(
-        data.tournament,
-        maxPlayers
-      );
-      tournamentState.bracket = seedPlayersIntoBracket(
-        tournamentState.bracket,
-        newPlayers
-      );
-      tournamentState.stage = isFull
-        ? 'round_in_progress'
-        : 'waiting_for_players';
-      tournamentState.currentRound = tournamentState.currentRound || 1;
-
-      if (isFull) {
-        tournamentState.bracket = activateRoundMatches(
-          tournamentState.bracket,
-          tournamentState.currentRound
-        );
-      }
-
-      updates.tournament = sanitizeTournamentState(tournamentState);
-      updates.status = 'active';
-    } else {
-      updates.status = isFull ? "in-progress" : "active";
-
-    if (isFull) {
-      // Set deadline to 2 hours from now for result submission
-      updates.resultDeadline = Timestamp.fromDate(new Date(Date.now() + 2 * 60 * 60 * 1000));
-      console.log('⏰ Challenge is full! Result submission phase started (2-hour deadline)');
-      }
-    }
 
     await updateDoc(challengeRef, updates);
 
@@ -1062,45 +1023,274 @@ export const joinChallenge = async (challengeId: string, wallet: string, isFound
       }
     }
 
-    // If this is a Founder Challenge, mark player as having participated
-    if (isFounderChallenge) {
-      const playerRef = doc(db, 'player_stats', wallet);
-      const playerSnap = await getDoc(playerRef);
-      
-      if (playerSnap.exists()) {
-        // Update existing stats to mark Founder Challenge participation
-        await updateDoc(playerRef, {
-          founderChallenge: true,
-          lastActive: serverTimestamp(),
-        });
-      } else {
-        // Create new player stats with Founder Challenge flag
-        await setDoc(playerRef, {
-          wallet,
-          wins: 0,
-          losses: 0,
-          winRate: 0,
-          totalEarned: 0,
-          gamesPlayed: 0,
-          lastActive: serverTimestamp(),
-          trustScore: 0,
-          trustReviews: 0,
-          founderChallenge: true, // Mark Founder Challenge participation
-          gameStats: {},
-          categoryStats: {},
-        });
-      }
-    }
-
-    // Note: For Founder Challenges, USDFG transfer tracking happens separately
-    // when the actual token transfer occurs (via recordFounderChallengeReward)
-    // We don't track calculated amounts here - only actual transfers
-
-    console.log('✅ Player joined challenge:', challengeId, isFounderChallenge ? '(Founder Challenge - USDFG will be tracked when transferred)' : '');
+    console.log('✅ Join intent expressed successfully (NO PAYMENT):', challengeId);
     return true;
   } catch (error) {
-    console.error('❌ Error joining challenge:', error);
+    console.error('❌ Error expressing join intent:', error);
     throw error;
+  }
+};
+
+// Legacy function - kept for backwards compatibility
+/** @deprecated Use expressJoinIntent() instead */
+export const joinChallenge = expressJoinIntent;
+
+/**
+ * Creator funds escrow after joiner expressed intent
+ * Moves challenge to creator_funded state
+ */
+export const creatorFund = async (challengeId: string, wallet: string) => {
+  try {
+    const challengeRef = doc(db, "challenges", challengeId);
+    const snap = await getDoc(challengeRef);
+    
+    if (!snap.exists()) {
+      throw new Error("Challenge not found");
+    }
+
+    const data = snap.data() as ChallengeData;
+    
+    // Validate challenge is in creator_confirmation_required state
+    if (data.status !== 'creator_confirmation_required') {
+      throw new Error(`Challenge is not waiting for creator funding. Current status: ${data.status}`);
+    }
+    
+    // CRITICAL: Validate that someone has expressed join intent
+    if (!data.pendingJoiner) {
+      throw new Error("No one has expressed intent to join this challenge yet. Creator can only fund after someone joins.");
+    }
+    
+    // Validate caller is the creator
+    if (data.creator.toLowerCase() !== wallet.toLowerCase()) {
+      throw new Error("Only the challenge creator can fund the challenge");
+    }
+    
+    // Check if deadline expired
+    if (data.creatorFundingDeadline && data.creatorFundingDeadline.toMillis() < Date.now()) {
+      throw new Error("Creator funding deadline has expired");
+    }
+    
+    // Calculate joiner funding deadline (5 minutes from now)
+    const joinerFundingDeadline = Timestamp.fromDate(new Date(Date.now() + (5 * 60 * 1000)));
+
+    // Update challenge to creator_funded state
+    const updates: any = {
+      status: 'creator_funded',
+      challenger: data.pendingJoiner, // Move pendingJoiner to challenger
+      pendingJoiner: null, // Clear pending joiner
+      fundedByCreatorAt: Timestamp.now(),
+      joinerFundingDeadline,
+      updatedAt: serverTimestamp(),
+    };
+
+    await updateDoc(challengeRef, updates);
+    
+    console.log('✅ Creator funded successfully:', challengeId);
+    return true;
+  } catch (error) {
+    console.error('❌ Error in creator funding:', error);
+    throw error;
+  }
+};
+
+/**
+ * Joiner funds escrow after creator funded
+ * Moves challenge to active state
+ */
+export const joinerFund = async (challengeId: string, wallet: string) => {
+  try {
+    const challengeRef = doc(db, "challenges", challengeId);
+    const snap = await getDoc(challengeRef);
+    
+    if (!snap.exists()) {
+      throw new Error("Challenge not found");
+    }
+
+    const data = snap.data() as ChallengeData;
+    
+    // Validate challenge is in creator_funded state
+    if (data.status !== 'creator_funded') {
+      throw new Error(`Challenge is not waiting for joiner funding. Current status: ${data.status}`);
+    }
+    
+    // Validate caller is the challenger
+    if (!data.challenger || data.challenger.toLowerCase() !== wallet.toLowerCase()) {
+      throw new Error("Only the challenger can fund the challenge");
+    }
+    
+    // Check if deadline expired
+    if (data.joinerFundingDeadline && data.joinerFundingDeadline.toMillis() < Date.now()) {
+      throw new Error("Joiner funding deadline has expired");
+    }
+    
+    const format = data.format || (data.tournament ? 'tournament' : 'standard');
+    const maxPlayers = data.maxPlayers || (format === 'tournament' ? data.tournament?.maxPlayers || 8 : 2);
+    
+    // Now add challenger to players array and activate challenge
+    const newPlayers = data.players ? [...data.players, wallet] : [data.creator, wallet];
+    const isFull = newPlayers.length >= maxPlayers;
+
+    const updates: any = {
+      status: 'active',
+      fundedByJoinerAt: Timestamp.now(),
+      players: newPlayers,
+      updatedAt: serverTimestamp(),
+    };
+
+    if (format === 'tournament') {
+      const tournamentState = ensureTournamentState(data.tournament, maxPlayers);
+      tournamentState.bracket = seedPlayersIntoBracket(tournamentState.bracket, newPlayers);
+      tournamentState.stage = isFull ? 'round_in_progress' : 'waiting_for_players';
+      tournamentState.currentRound = tournamentState.currentRound || 1;
+
+      if (isFull) {
+        tournamentState.bracket = activateRoundMatches(tournamentState.bracket, tournamentState.currentRound);
+      }
+
+      updates.tournament = sanitizeTournamentState(tournamentState);
+    }
+
+    if (isFull) {
+      // Set deadline to 2 hours from now for result submission
+      updates.resultDeadline = Timestamp.fromDate(new Date(Date.now() + 2 * 60 * 60 * 1000));
+      console.log('⏰ Challenge is full! Result submission phase started (2-hour deadline)');
+    }
+
+    await updateDoc(challengeRef, updates);
+    
+    console.log('✅ Joiner funded successfully. Challenge is now ACTIVE:', challengeId);
+    return true;
+  } catch (error) {
+    console.error('❌ Error in joiner funding:', error);
+    throw error;
+  }
+};
+
+/**
+ * Auto-revert challenge if creator funding deadline expired
+ * Reverts to pending_waiting_for_opponent state
+ */
+export const revertCreatorTimeout = async (challengeId: string): Promise<boolean> => {
+  try {
+    const challengeRef = doc(db, "challenges", challengeId);
+    const snap = await getDoc(challengeRef);
+    
+    if (!snap.exists()) {
+      return false;
+    }
+
+    const data = snap.data() as ChallengeData;
+    
+    // Only revert if in creator_confirmation_required state and deadline passed
+    if (data.status !== 'creator_confirmation_required') {
+      return false;
+    }
+    
+    if (!data.creatorFundingDeadline || data.creatorFundingDeadline.toMillis() > Date.now()) {
+      return false; // Deadline not expired yet
+    }
+    
+    // Revert to pending state
+    const updates: any = {
+      status: 'pending_waiting_for_opponent',
+      pendingJoiner: null,
+      creatorFundingDeadline: null,
+      updatedAt: serverTimestamp(),
+    };
+
+    await updateDoc(challengeRef, updates);
+    
+    console.log('✅ Creator timeout - challenge reverted to pending:', challengeId);
+    return true;
+  } catch (error) {
+    console.error('❌ Error reverting creator timeout:', error);
+    return false;
+  }
+};
+
+/**
+ * Auto-refund creator and revert challenge if joiner funding deadline expired
+ * Reverts to pending_waiting_for_opponent state
+ */
+export const revertJoinerTimeout = async (challengeId: string): Promise<boolean> => {
+  try {
+    const challengeRef = doc(db, "challenges", challengeId);
+    const snap = await getDoc(challengeRef);
+    
+    if (!snap.exists()) {
+      return false;
+    }
+
+    const data = snap.data() as ChallengeData;
+    
+    // Only revert if in creator_funded state and deadline passed
+    if (data.status !== 'creator_funded') {
+      return false;
+    }
+    
+    if (!data.joinerFundingDeadline || data.joinerFundingDeadline.toMillis() > Date.now()) {
+      return false; // Deadline not expired yet
+    }
+    
+    // Note: On-chain refund happens via auto_refund_joiner_timeout contract function
+    // This Firestore function just reverts the state
+    
+    // Revert to pending state
+    const updates: any = {
+      status: 'pending_waiting_for_opponent',
+      challenger: null,
+      pendingJoiner: null,
+      joinerFundingDeadline: null,
+      fundedByCreatorAt: null,
+      updatedAt: serverTimestamp(),
+    };
+
+    await updateDoc(challengeRef, updates);
+    
+    console.log('✅ Joiner timeout - challenge reverted to pending (creator refunded on-chain):', challengeId);
+    return true;
+  } catch (error) {
+    console.error('❌ Error reverting joiner timeout:', error);
+    return false;
+  }
+};
+
+/**
+ * Auto-expire pending challenges after 24 hours
+ */
+export const expirePendingChallenge = async (challengeId: string): Promise<boolean> => {
+  try {
+    const challengeRef = doc(db, "challenges", challengeId);
+    const snap = await getDoc(challengeRef);
+    
+    if (!snap.exists()) {
+      return false;
+    }
+
+    const data = snap.data() as ChallengeData;
+    
+    // Only expire if in pending_waiting_for_opponent state
+    if (data.status !== 'pending_waiting_for_opponent') {
+      return false;
+    }
+    
+    if (!data.expirationTimer || data.expirationTimer.toMillis() > Date.now()) {
+      return false; // Not expired yet
+    }
+    
+    // Mark as cancelled
+    const updates: any = {
+      status: 'cancelled',
+      updatedAt: serverTimestamp(),
+    };
+
+    await updateDoc(challengeRef, updates);
+    
+    console.log('✅ Pending challenge expired and cancelled:', challengeId);
+    return true;
+  } catch (error) {
+    console.error('❌ Error expiring pending challenge:', error);
+    return false;
   }
 };
 
@@ -1192,7 +1382,7 @@ export async function recordFounderChallengeReward(
 
 // Real-time active challenge functions
 export function listenActiveForCreator(creator: string, cb: (active: any[]) => void) {
-  const q = query(collection(db, "challenges"), where("creator", "==", creator), where("status", "in", ["active", "pending"]));
+  const q = query(collection(db, "challenges"), where("creator", "==", creator), where("status", "in", ["active", "pending_waiting_for_opponent", "creator_confirmation_required", "creator_funded"]));
   return onSnapshot(q, (snap) => {
     const active = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     console.log('🔒 Active challenges for creator:', active.length);
@@ -1586,19 +1776,25 @@ export const syncChallengeStatus = async (challengeId: string, challengePDA: str
     
     let firestoreStatus: string;
     switch (statusByte) {
-      case 0: // Open
+      case 0: // PendingWaitingForOpponent
+        firestoreStatus = 'pending_waiting_for_opponent';
+        break;
+      case 1: // CreatorConfirmationRequired
+        firestoreStatus = 'creator_confirmation_required';
+        break;
+      case 2: // CreatorFunded
+        firestoreStatus = 'creator_funded';
+        break;
+      case 3: // Active (was InProgress)
         firestoreStatus = 'active';
         break;
-      case 1: // InProgress
-        firestoreStatus = 'in-progress';
-        break;
-      case 2: // Completed
+      case 4: // Completed
         firestoreStatus = 'completed';
         break;
-      case 3: // Cancelled
+      case 5: // Cancelled
         firestoreStatus = 'cancelled';
         break;
-      case 4: // Disputed
+      case 6: // Disputed
         firestoreStatus = 'disputed';
         break;
       default:
@@ -1613,10 +1809,10 @@ export const syncChallengeStatus = async (challengeId: string, challengePDA: str
     if (snap.exists()) {
       const currentData = snap.data();
       
-      // Don't overwrite 'completed' status with 'in-progress' from on-chain
-      // This happens because Firestore marks as completed when both submit, but on-chain is still InProgress
-      if (currentData.status === 'completed' && firestoreStatus === 'in-progress') {
-        console.log(`⏭️  Skipping sync: Firestore is 'completed', on-chain is 'in-progress' (waiting for claim)`);
+      // Don't overwrite 'completed' status with 'active' from on-chain
+      // This happens because Firestore marks as completed when both submit, but on-chain is still Active
+      if (currentData.status === 'completed' && firestoreStatus === 'active') {
+        console.log(`⏭️  Skipping sync: Firestore is 'completed', on-chain is 'active' (waiting for claim)`);
         return;
       }
       
@@ -1646,7 +1842,7 @@ export const startResultSubmissionPhase = async (challengeId: string): Promise<v
     
     await updateDoc(challengeRef, {
       resultDeadline: deadline,
-      status: 'in-progress',
+      status: 'active',
       updatedAt: Timestamp.now(),
     });
     
@@ -1671,7 +1867,7 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
     
     const data = snap.data() as ChallengeData;
     
-    if (!data.resultDeadline || data.status !== 'in-progress') return;
+    if (!data.resultDeadline || data.status !== 'active') return;
     
     const now = Timestamp.now();
     const deadlinePassed = now.toMillis() > data.resultDeadline.toMillis();
@@ -2344,7 +2540,7 @@ export async function upsertLockNotification({
     if (initiator && target) {
       payload.participants = [initiator.toLowerCase(), target.toLowerCase()];
     }
-    if (status === 'pending') {
+    if (status === 'pending_waiting_for_opponent' || status === 'creator_confirmation_required' || status === 'creator_funded') {
       payload.createdAt = serverTimestamp();
     }
 
@@ -2486,7 +2682,7 @@ export function listenToChallengeNotifications(
   const notificationsQuery = query(
     collection(db, 'challenge_notifications'),
     where('targetPlayer', '==', walletLower),
-    where('status', '==', 'pending')
+    where('status', '==', 'pending_waiting_for_opponent')
   );
 
   return onSnapshot(

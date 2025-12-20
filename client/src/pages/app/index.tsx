@@ -5,13 +5,13 @@ import { Link } from "react-router-dom";
 import WalletConnectSimple from "@/components/arena/WalletConnectSimple";
 import { useWallet } from '@solana/wallet-adapter-react';
 // Removed legacy wallet import - using MWA hooks instead
-import { joinChallengeOnChain } from "@/lib/chain/events";
+import { expressJoinIntent as expressJoinIntentOnChain, creatorFund as creatorFundOnChain, joinerFund as joinerFundOnChain } from "@/lib/chain/contract";
 import { handlePhantomReturn, isPhantomReturn, SESSION_STORAGE_NONCE } from '@/lib/wallet/phantom-deeplink';
 import TournamentBracketView from "@/components/arena/TournamentBracketView";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
-import { ChallengeData, joinChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage, uploadTeamImage, updateTeamImage, upsertChallengeNotification, listenToChallengeNotifications, ChallengeNotification, fetchChallengeById, submitTournamentMatchResult } from "@/lib/firebase/firestore";
+import { ChallengeData, expressJoinIntent, creatorFund, joinerFund, revertCreatorTimeout, revertJoinerTimeout, expirePendingChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage, uploadTeamImage, updateTeamImage, upsertChallengeNotification, listenToChallengeNotifications, ChallengeNotification, fetchChallengeById, submitTournamentMatchResult } from "@/lib/firebase/firestore";
 import { Timestamp } from "firebase/firestore";
 import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
@@ -114,6 +114,45 @@ const AdRotationBox: React.FC = () => {
       </div>
     </div>
   );
+};
+
+// Countdown Timer Component for Funding Deadlines
+const CountdownTimer: React.FC<{
+  deadline: Timestamp;
+  expiredMessage?: string;
+  className?: string;
+}> = ({ deadline, expiredMessage = "Expired", className = "" }) => {
+  const [timeLeft, setTimeLeft] = useState<string>("");
+  const [expired, setExpired] = useState(false);
+
+  useEffect(() => {
+    const updateTimer = () => {
+      const now = Date.now();
+      const deadlineMs = deadline.toMillis();
+      const diff = deadlineMs - now;
+
+      if (diff <= 0) {
+        setExpired(true);
+        setTimeLeft(expiredMessage);
+        return;
+      }
+
+      const minutes = Math.floor(diff / 60000);
+      const seconds = Math.floor((diff % 60000) / 1000);
+      setTimeLeft(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+
+    return () => clearInterval(interval);
+  }, [deadline, expiredMessage]);
+
+  if (expired) {
+    return <span className={`text-red-400 ${className}`}>{expiredMessage}</span>;
+  }
+
+  return <span className={`${className}`}>⏰ {timeLeft} left</span>;
 };
 
 const ArenaHome: React.FC = () => {
@@ -1177,10 +1216,60 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   useEffect(() => {
     if (firestoreChallenges) {
       const activeCount = firestoreChallenges.filter((c: any) => 
-        c.status === 'active' || c.status === 'in-progress' || c.status === 'pending'
+        c.status === 'active' || c.status === 'pending_waiting_for_opponent' || c.status === 'creator_confirmation_required' || c.status === 'creator_funded'
       ).length;
       setActiveChallengesCount(activeCount);
     }
+  }, [firestoreChallenges]);
+
+  // Timeout monitoring: Check and revert expired challenges
+  useEffect(() => {
+    if (!firestoreChallenges || firestoreChallenges.length === 0) return;
+
+    const checkTimeouts = async () => {
+      for (const challenge of firestoreChallenges) {
+        const status = challenge.status || challenge.rawData?.status;
+        const challengeId = challenge.id;
+
+        if (!challengeId) continue;
+
+        try {
+          // Check creator timeout (creator_confirmation_required state)
+          if (status === 'creator_confirmation_required') {
+            const deadline = challenge.rawData?.creatorFundingDeadline;
+            if (deadline && deadline.toMillis() < Date.now()) {
+              await revertCreatorTimeout(challengeId);
+            }
+          }
+
+          // Check joiner timeout (creator_funded state)
+          if (status === 'creator_funded') {
+            const deadline = challenge.rawData?.joinerFundingDeadline;
+            if (deadline && deadline.toMillis() < Date.now()) {
+              await revertJoinerTimeout(challengeId);
+            }
+          }
+
+          // Check pending expiration (pending_waiting_for_opponent state)
+          if (status === 'pending_waiting_for_opponent') {
+            const expirationTimer = challenge.rawData?.expirationTimer;
+            if (expirationTimer && expirationTimer.toMillis() < Date.now()) {
+              await expirePendingChallenge(challengeId);
+            }
+          }
+        } catch (error) {
+          console.error(`Error checking timeout for challenge ${challengeId}:`, error);
+        }
+      }
+    };
+
+    // Check immediately
+    checkTimeouts();
+
+    // Then check every 30 seconds
+    const interval = setInterval(checkTimeouts, 30000);
+
+    return () => clearInterval(interval);
   }, [firestoreChallenges]);
   
   // Update current user's lastActive when they connect/view the page
@@ -1555,7 +1644,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const format = challenge.format || (challenge.tournament ? 'tournament' : 'standard');
       if (format === 'tournament') return false;
       
-      if (challenge.status !== 'in-progress') return false;
+      if (challenge.status !== 'active') return false;
       
       const players = challenge.players || [];
       const isParticipant = players.some((player: string) => 
@@ -1691,7 +1780,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     // Check if user has an active challenge they created
     const userActiveChallenge = challenges.find(c => 
       c.creator === currentWallet && 
-      (c.status === 'active' || c.status === 'pending')
+      (c.status === 'active' || c.status === 'pending_waiting_for_opponent' || c.status === 'creator_confirmation_required' || c.status === 'creator_funded')
     );
 
     if (userActiveChallenge) {
@@ -1847,8 +1936,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         // Get status from Firestore data directly (most reliable)
         const status = fc.status || fc.rawData?.status || 'unknown';
         
-        // Only block if status is active, pending, or in-progress (NOT completed, cancelled, disputed, expired)
-        const isActive = status === 'active' || status === 'pending' || status === 'in-progress';
+        // Only block if status is active or in pending/funding states (NOT completed, cancelled, disputed)
+        const isActive = status === 'active' || status === 'pending_waiting_for_opponent' || status === 'creator_confirmation_required' || status === 'creator_funded';
         const isCompleted = status === 'completed' || status === 'cancelled' || status === 'disputed' || status === 'expired';
         
         const shouldBlock = (isCreator || isParticipant) && isActive && !isCompleted;
@@ -1988,13 +2077,23 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const challengeTitle = challengeData.title || 
         `${challengeData.game || 'Game'} - ${challengeData.mode || 'Challenge'}${challengeData.username ? ` by ${challengeData.username}` : ''}`;
       
+      // Calculate timers
+      const now = Date.now();
+      const expirationTimer = Timestamp.fromDate(new Date(now + (24 * 60 * 60 * 1000))); // 24 hours TTL for pending challenges
+      
       const firestoreChallengeData = {
         creator: currentWallet,
-        // challenger: undefined, // Will be set when someone accepts (don't include undefined fields)
+        // challenger: undefined, // Will be set when someone expresses join intent (don't include undefined fields)
         entryFee: challengeData.entryFee,
-        status: 'active' as const,
+        status: 'pending_waiting_for_opponent' as const, // NEW: No payment required, waiting for opponent
         createdAt: Timestamp.now(),
-        expiresAt: Timestamp.fromDate(new Date(Date.now() + (2 * 60 * 60 * 1000))), // 2 hours from now
+        expiresAt: Timestamp.fromDate(new Date(now + (2 * 60 * 60 * 1000))), // 2 hours from now (legacy, kept for compatibility)
+        expirationTimer, // TTL for pending challenges (24 hours)
+        // pendingJoiner: undefined, // Will be set when someone expresses join intent
+        // creatorFundingDeadline: undefined, // Will be set when joiner expresses intent
+        // joinerFundingDeadline: undefined, // Will be set when creator funds
+        // fundedByCreatorAt: undefined, // Will be set when creator funds
+        // fundedByJoinerAt: undefined, // Will be set when joiner funds
         // winner: undefined, // Will be set when match completes (don't include undefined fields)
         // UI fields for display
         players: [currentWallet], // Creator is first player
@@ -3341,6 +3440,83 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                               </span>
                             )}
                           </div>
+                          {/* NEW STATE MACHINE STATUS BADGES */}
+                          {challenge.status === "pending_waiting_for_opponent" && (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="px-2 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-xs">
+                                Waiting for Opponent
+                              </span>
+                              {isOwner && (
+                                <span className="px-2 py-1 bg-blue-500/10 text-blue-300 border border-blue-500/20 rounded text-xs">
+                                  Your Challenge
+                                </span>
+                              )}
+                              {challenge.rawData?.expirationTimer && (
+                                <CountdownTimer
+                                  deadline={challenge.rawData.expirationTimer}
+                                  expiredMessage="Expired"
+                                  className="text-xs text-blue-300"
+                                />
+                              )}
+                              {!isOwner && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleShareChallenge(challenge);
+                                  }}
+                                  className="px-2 py-1 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded text-xs hover:bg-amber-600/30 transition-all flex items-center gap-1"
+                                  title="Share Challenge"
+                                >
+                                  📤 Share
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          {challenge.status === "creator_confirmation_required" && (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="px-2 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded text-xs">
+                                {isOwner ? "Confirm & Fund" : "Opponent Found"}
+                              </span>
+                              {challenge.rawData?.creatorFundingDeadline && (
+                                <CountdownTimer
+                                  deadline={challenge.rawData.creatorFundingDeadline}
+                                  expiredMessage="Creator Timeout"
+                                  className="text-xs text-amber-300"
+                                />
+                              )}
+                              {isOwner && challenge.rawData?.pendingJoiner && (
+                                <span className="px-2 py-1 bg-amber-500/10 text-amber-300 border border-amber-500/20 rounded text-xs">
+                                  Opponent: {challenge.rawData.pendingJoiner.slice(0, 6)}...{challenge.rawData.pendingJoiner.slice(-4)}
+                                </span>
+                              )}
+                              {isOwner && !challenge.rawData?.pendingJoiner && (
+                                <span className="px-2 py-1 bg-red-500/10 text-red-300 border border-red-500/20 rounded text-xs">
+                                  ⚠️ No opponent found
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {challenge.status === "creator_funded" && (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
+                                {(() => {
+                                  const currentWallet = publicKey?.toString()?.toLowerCase();
+                                  const challenger = challenge.rawData?.challenger?.toLowerCase();
+                                  if (currentWallet === challenger) {
+                                    return "Fund to Activate";
+                                  }
+                                  return "Creator Funded";
+                                })()}
+                              </span>
+                              {challenge.rawData?.joinerFundingDeadline && (
+                                <CountdownTimer
+                                  deadline={challenge.rawData.joinerFundingDeadline}
+                                  expiredMessage="Joiner Timeout"
+                                  className="text-xs text-green-300"
+                                />
+                              )}
+                            </div>
+                          )}
                           {challenge.status === "active" && (
                             <div className="flex items-center gap-2">
                               <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
@@ -3357,11 +3533,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                 📤 Share
                               </button>
                             </div>
-                          )}
-                          {challenge.status === "in-progress" && (
-                            <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded text-xs">
-                              In Progress
-                            </span>
                           )}
                           {(challenge.status === "cancelled" || (challenge.expiresAt && challenge.expiresAt < Date.now())) && (
                             <span className="px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs animate-pulse">
@@ -3651,8 +3822,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                             // console.log("🔍 In-Progress Challenge Debug:", { challengeId: challenge.id, status: challenge.status, currentWallet, players: challenge.rawData?.players, isParticipant, hasSubmittedResult, results: challenge.rawData?.results });
                           }
 
-                          // Owner buttons (but only if NOT in-progress)
-                          if (isOwner && challenge.status !== "in-progress") {
+                          // Owner buttons (but only if NOT active)
+                          if (isOwner && challenge.status !== "active") {
                             return (
                               <div className="flex space-x-2">
                                 <button 
@@ -3752,8 +3923,91 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                             );
                           }
 
-                          // Show "Join" button for non-participants
-                          // Only show if Firestore says "active" AND we haven't checked on-chain status yet
+                          // STATE-DRIVEN: Show appropriate buttons based on challenge state and user role
+                          const challengeStatus = challenge.status || challenge.rawData?.status;
+                          const creator = challenge.creator?.toLowerCase();
+                          const challenger = challenge.rawData?.challenger?.toLowerCase();
+                          const pendingJoiner = challenge.rawData?.pendingJoiner?.toLowerCase();
+                          const isCreatorUser = currentWallet === creator;
+                          const isChallengerUser = currentWallet === challenger;
+                          const isPendingJoinerUser = currentWallet === pendingJoiner;
+                          
+                          // Pending: Creator sees nothing actionable, others can express intent
+                          if (challengeStatus === "pending_waiting_for_opponent" && !isOwner) {
+                            return (
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedChallenge(challenge);
+                                  setShowJoinModal(true);
+                                }}
+                                className="relative w-full px-4 py-2 bg-gradient-to-r from-blue-500/20 to-blue-600/20 hover:from-blue-500/30 hover:to-blue-600/30 text-blue-200 border border-blue-400/40 hover:border-blue-400/60 font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm overflow-hidden group"
+                                disabled={!isConnected}
+                              >
+                                Express Join Intent (No Payment)
+                              </button>
+                            );
+                          }
+                          
+                          // Creator Confirmation: Creator sees "Confirm & Fund" ONLY if pendingJoiner exists, others see waiting
+                          if (challengeStatus === "creator_confirmation_required") {
+                            if (isCreatorUser) {
+                              // Only show funding button if someone has expressed intent
+                              if (challenge.rawData?.pendingJoiner) {
+                                return (
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedChallenge(challenge);
+                                      setShowJoinModal(true);
+                                    }}
+                                    className="relative w-full px-4 py-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-200 border border-amber-400/40 hover:border-amber-400/60 font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
+                                    disabled={!isConnected}
+                                  >
+                                    Confirm & Fund ({challenge.entryFee} USDFG)
+                                  </button>
+                                );
+                              } else {
+                                // Safety: Should not happen, but show message if no pendingJoiner
+                                return (
+                                  <div className="w-full px-4 py-2 bg-red-500/10 text-red-300 border border-red-500/20 font-semibold rounded-lg text-center">
+                                    ⚠️ No opponent found. Please wait for someone to join.
+                                  </div>
+                                );
+                              }
+                            }
+                            return (
+                              <div className="w-full px-4 py-2 bg-amber-500/10 text-amber-300 border border-amber-500/20 font-semibold rounded-lg text-center">
+                                Waiting for creator to confirm...
+                              </div>
+                            );
+                          }
+                          
+                          // Creator Funded: Challenger sees "Fund Now", others see waiting
+                          if (challengeStatus === "creator_funded") {
+                            if (isChallengerUser) {
+                              return (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedChallenge(challenge);
+                                    setShowJoinModal(true);
+                                  }}
+                                  className="relative w-full px-4 py-2 bg-gradient-to-r from-green-500/20 to-green-600/20 hover:from-green-500/30 hover:to-green-600/30 text-green-200 border border-green-400/40 hover:border-green-400/60 font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
+                                  disabled={!isConnected}
+                                >
+                                  Fund Now ({challenge.entryFee} USDFG)
+                                </button>
+                              );
+                            }
+                            return (
+                              <div className="w-full px-4 py-2 bg-green-500/10 text-green-300 border border-green-500/20 font-semibold rounded-lg text-center">
+                                Creator funded. Waiting for challenger...
+                              </div>
+                            );
+                          }
+                          
+                          // Active: Show join button if not full (legacy behavior for backwards compatibility)
                           if (challenge.status === "active" && challenge.players < challenge.capacity) {
                             return (
                               <button 
@@ -6008,9 +6262,25 @@ const JoinChallengeModal: React.FC<{
       onClose();
   };
 
-  const handleJoin = async () => {
+  // Get challenge status and determine user role
+  const challengeStatus = challenge.status || challenge.rawData?.status || 'pending_waiting_for_opponent';
+  const walletAddress = publicKey?.toString() || '';
+  const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
+  const isCreator = walletAddress.toLowerCase() === creatorWallet.toLowerCase();
+  const isChallenger = challenge.rawData?.challenger && walletAddress.toLowerCase() === challenge.rawData.challenger.toLowerCase();
+  const pendingJoiner = challenge.rawData?.pendingJoiner;
+  const isPendingJoiner = pendingJoiner && walletAddress.toLowerCase() === pendingJoiner.toLowerCase();
+
+  // Express join intent - NO PAYMENT
+  const handleExpressJoinIntent = async () => {
     if (!isConnected || !publicKey) {
       setError('Please connect your wallet first');
+      setState('error');
+      return;
+    }
+
+    if (challengeStatus !== 'pending_waiting_for_opponent') {
+      setError(`Challenge is not waiting for opponent. Current status: ${challengeStatus}`);
       setState('error');
       return;
     }
@@ -6018,148 +6288,182 @@ const JoinChallengeModal: React.FC<{
     setState('processing');
     
     try {
-      const walletAddress = publicKey.toString();
-      if (!walletAddress) {
-        throw new Error('Wallet not connected');
-      }
-
-      // Check if this is a team challenge with teamOnly restriction
+      const walletAddr = publicKey.toString();
+      
+      // Check team restrictions
       const challengeType = challenge.rawData?.challengeType;
       const teamOnly = challenge.rawData?.teamOnly;
       
       if (challengeType === 'team' && teamOnly === true) {
-        // Team-only challenge - verify user is in a team
-        const userTeam = await getTeamByMember(walletAddress);
+        const userTeam = await getTeamByMember(walletAddr);
         if (!userTeam) {
-          throw new Error('This challenge is only open to teams. You must be part of a team to join. Please create or join a team first.');
+          throw new Error('This challenge is only open to teams. You must be part of a team to join.');
         }
       }
       
-      // Check if this is a Founder Challenge (admin-created with 0 entry fee)
+      // Check if Founder Challenge
       const { ADMIN_WALLET } = await import('@/lib/chain/config');
       const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
       const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
       const isAdmin = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
-      const isFree = entryFee === 0 || entryFee < 0.000000001;
-      const isFounderChallenge = isAdmin && isFree;
+      const isFounderChallenge = isAdmin && (entryFee === 0 || entryFee < 0.000000001);
       
       if (isFounderChallenge) {
-        // Just add player to challenge in Firestore
-        // USDFG transfer tracking happens separately when actual token transfer occurs
-        // (via recordFounderChallengeReward function called after token transfer)
-        await joinChallenge(challenge.id, walletAddress, true);
+        // Founder Challenge - express intent in Firestore only
+        await expressJoinIntent(challenge.id, walletAddr, true);
       } else {
-        // Regular challenge or tournament - require on-chain transaction for entry fee
-        if (!signTransaction) {
-          throw new Error('Wallet does not support transaction signing');
+        // Regular challenge - express intent on-chain and in Firestore
+        const challengePDA = challenge.rawData?.pda || challenge.pda;
+        if (!challengePDA) {
+          throw new Error('Challenge has no on-chain PDA. Cannot join this challenge.');
         }
-      
-        // Step 1: Join on-chain (Solana transaction) - ALL players must pay entry fee
-      // Use the PDA from the challenge data, not the Firestore ID
-      const challengePDA = challenge.rawData?.pda || challenge.pda;
-      if (!challengePDA) {
-        throw new Error('Challenge has no on-chain PDA. Cannot join this challenge.');
-      }
-      
-        const format = ((challenge.rawData as any)?.format) || ((challenge.rawData as any)?.tournament ? 'tournament' : 'standard');
-        const isTournament = format === 'tournament';
         
-        // For tournaments, use direct transfer to escrow (bypasses AcceptChallenge limitation)
-        // For regular challenges, use the standard AcceptChallenge instruction
-        if (isTournament) {
-          // Tournament: Transfer USDFG directly to escrow
-          const { Connection } = await import('@solana/web3.js');
-          const { getRpcEndpoint } = await import('@/lib/chain/rpc');
-          const connection = new Connection(getRpcEndpoint(), 'confirmed');
-          const { transferTournamentEntryFee } = await import('@/lib/chain/contract');
-          
-          await transferTournamentEntryFee(
-            { signTransaction, publicKey },
-            connection,
-            challengePDA,
-            challenge.entryFee
-          );
-        } else {
-          // Regular challenge: Use standard AcceptChallenge instruction
-          try {
-      await joinChallengeOnChain(challengePDA, challenge.entryFee, walletAddress, {
-        signTransaction: signTransaction,
-        publicKey: publicKey
-      });
-          } catch (onChainError: any) {
-            // Re-throw errors for regular challenges
-            throw onChainError;
-          }
-        }
-      
-      // Step 2: Update Firestore
-      await joinChallenge(challenge.id, walletAddress);
+        const { Connection } = await import('@solana/web3.js');
+        const { getRpcEndpoint } = await import('@/lib/chain/rpc');
+        const connection = new Connection(getRpcEndpoint(), 'confirmed');
         
-        // Step 3: For tournaments, open the tournament lobby
-        if (isTournament) {
-          try {
-            const refreshed = await fetchChallengeById(challenge.id);
-            const merged = mergeChallengeDataForModal(challenge, refreshed);
-            setSelectedChallenge(merged);
-            setShowTournamentLobby(true);
-          } catch (mergeError) {
-            console.error('Failed to merge challenge data, but join succeeded:', mergeError);
-            // Join succeeded, so just close the modal and let real-time updates handle the UI
-            setState('success');
-            setTimeout(() => {
-              onClose();
-            }, 1500);
-            return; // Exit early since we've already handled success
-          }
-        }
-      }
-      
-      // Refresh USDFG balance after successful challenge join (entry fee was deducted)
-      if (onBalanceRefresh) {
-        setTimeout(() => {
-          onBalanceRefresh().catch(() => {
-            // Silently handle errors
-          });
-        }, 2000); // Wait 2 seconds for transaction to confirm
+        // Express intent on-chain (NO PAYMENT)
+        await expressJoinIntentOnChain(
+          { signTransaction: signTransaction!, publicKey },
+          connection,
+          challengePDA
+        );
+        
+        // Express intent in Firestore
+        await expressJoinIntent(challenge.id, walletAddr);
       }
       
       setState('success');
-      
       setTimeout(() => {
         onClose();
       }, 1500);
     } catch (err: any) {
-      console.error("❌ Join failed:", err);
+      console.error("❌ Express join intent failed:", err);
+      setError(err.message || 'Failed to express join intent. Please try again.');
+      setState('error');
+    }
+  };
+
+  // Creator funds after joiner expressed intent
+  const handleCreatorFund = async () => {
+    if (!isConnected || !publicKey || !isCreator) {
+      setError('Only the challenge creator can fund the challenge');
+      setState('error');
+      return;
+    }
+
+    if (challengeStatus !== 'creator_confirmation_required') {
+      setError(`Challenge is not waiting for creator funding. Current status: ${challengeStatus}`);
+      setState('error');
+      return;
+    }
+
+    setState('processing');
+    
+    try {
+      const walletAddr = publicKey.toString();
+      const challengePDA = challenge.rawData?.pda || challenge.pda;
+      const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
       
-      // Handle specific error cases
-      let errorMessage = 'Failed to join challenge. Please try again.';
-      
-      if (err.message?.includes('ChallengeExpired')) {
-        errorMessage = 'This challenge has expired and is no longer available to join.';
-      } else if (err.message?.includes('Challenge has expired')) {
-        errorMessage = 'This challenge has expired and is no longer available to join.';
-      } else if (err.message?.includes('InsufficientFunds') || err.message?.includes('Insufficient USDFG balance')) {
-        errorMessage = 'You don\'t have enough USDFG tokens to join this challenge. Please acquire USDFG tokens first.';
-      } else if (err.message?.includes('no record of a prior credit') || err.message?.includes('Attempt to debit an account')) {
-        errorMessage = 'Your USDFG token account needs to be set up and funded. Please ensure you have USDFG tokens in your wallet before joining.';
-      } else if (err.message?.includes('SelfChallenge')) {
-        errorMessage = 'You cannot join your own challenge.';
-      } else if (err.message?.includes('NotOpen')) {
-        errorMessage = 'This challenge is no longer open for joining.';
-      } else if (err.message?.includes('already been processed')) {
-        errorMessage = 'This challenge has already been joined or processed. Please refresh the page to see the latest status.';
-      } else if (err.message?.includes('Transaction simulation failed')) {
-        // Check for specific simulation errors
-        if (err.message?.includes('no record of a prior credit') || err.message?.includes('Attempt to debit')) {
-          errorMessage = 'Your wallet needs USDFG tokens to join. Please acquire USDFG tokens first.';
-        } else {
-        errorMessage = 'Transaction failed. This challenge may have already been joined or is no longer available.';
-        }
-      } else if (err.message) {
-        errorMessage = err.message;
+      if (!challengePDA) {
+        throw new Error('Challenge has no on-chain PDA.');
       }
       
-      setError(errorMessage);
+      if (!signTransaction) {
+        throw new Error('Wallet does not support transaction signing');
+      }
+      
+      const { Connection } = await import('@solana/web3.js');
+      const { getRpcEndpoint } = await import('@/lib/chain/rpc');
+      const connection = new Connection(getRpcEndpoint(), 'confirmed');
+      
+      // Creator funds on-chain
+      await creatorFundOnChain(
+        { signTransaction, publicKey },
+        connection,
+        challengePDA,
+        entryFee
+      );
+      
+      // Update Firestore
+      await creatorFund(challenge.id, walletAddr);
+      
+      // Refresh balance
+      if (onBalanceRefresh) {
+        setTimeout(() => {
+          onBalanceRefresh!().catch(() => {});
+        }, 2000);
+      }
+      
+      setState('success');
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+    } catch (err: any) {
+      console.error("❌ Creator funding failed:", err);
+      setError(err.message || 'Failed to fund challenge. Please try again.');
+      setState('error');
+    }
+  };
+
+  // Joiner funds after creator funded
+  const handleJoinerFund = async () => {
+    if (!isConnected || !publicKey || !isChallenger) {
+      setError('Only the challenger can fund the challenge');
+      setState('error');
+      return;
+    }
+
+    if (challengeStatus !== 'creator_funded') {
+      setError(`Challenge is not waiting for joiner funding. Current status: ${challengeStatus}`);
+      setState('error');
+      return;
+    }
+
+    setState('processing');
+    
+    try {
+      const walletAddr = publicKey.toString();
+      const challengePDA = challenge.rawData?.pda || challenge.pda;
+      const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
+      
+      if (!challengePDA) {
+        throw new Error('Challenge has no on-chain PDA.');
+      }
+      
+      if (!signTransaction) {
+        throw new Error('Wallet does not support transaction signing');
+      }
+      
+      const { Connection } = await import('@solana/web3.js');
+      const { getRpcEndpoint } = await import('@/lib/chain/rpc');
+      const connection = new Connection(getRpcEndpoint(), 'confirmed');
+      
+      // Joiner funds on-chain
+      await joinerFundOnChain(
+        { signTransaction, publicKey },
+        connection,
+        challengePDA,
+        entryFee
+      );
+      
+      // Update Firestore
+      await joinerFund(challenge.id, walletAddr);
+      
+      // Refresh balance
+      if (onBalanceRefresh) {
+        setTimeout(() => {
+          onBalanceRefresh!().catch(() => {});
+        }, 2000);
+      }
+      
+      setState('success');
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+    } catch (err: any) {
+      console.error("❌ Joiner funding failed:", err);
+      setError(err.message || 'Failed to fund challenge. Please try again.');
       setState('error');
     }
   };
@@ -6177,6 +6481,41 @@ const JoinChallengeModal: React.FC<{
 
         {state === 'review' && (
           <div className="space-y-4">
+            {/* State-driven messaging */}
+            {challengeStatus === 'pending_waiting_for_opponent' && !isCreator && (
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 mb-4">
+                <p className="text-sm text-blue-300">
+                  ℹ️ <strong>No funds are committed until you express intent and the creator accepts.</strong>
+                </p>
+              </div>
+            )}
+            
+            {challengeStatus === 'creator_confirmation_required' && isCreator && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 mb-4">
+                <p className="text-sm text-amber-300">
+                  ⚠️ <strong>Opponent found! Confirm and fund to activate match.</strong>
+                </p>
+                {challenge.rawData?.creatorFundingDeadline && (
+                  <p className="text-xs text-amber-200 mt-1">
+                    Deadline: {new Date(challenge.rawData.creatorFundingDeadline.toMillis()).toLocaleTimeString()}
+                  </p>
+                )}
+              </div>
+            )}
+            
+            {challengeStatus === 'creator_funded' && isChallenger && (
+              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 mb-4">
+                <p className="text-sm text-green-300">
+                  ✅ <strong>Creator has funded. Fund now to activate the match.</strong>
+                </p>
+                {challenge.rawData?.joinerFundingDeadline && (
+                  <p className="text-xs text-green-200 mt-1">
+                    Deadline: {new Date(challenge.rawData.joinerFundingDeadline.toMillis()).toLocaleTimeString()}
+                  </p>
+                )}
+              </div>
+            )}
+            
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-400">Challenge:</span>
@@ -6184,23 +6523,7 @@ const JoinChallengeModal: React.FC<{
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-400">Entry Fee:</span>
-                <span className={`font-medium ${
-                  (() => {
-                    const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
-                    const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
-                    const isAdmin = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
-                    const isFree = entryFee === 0 || entryFee < 0.000000001;
-                    return isAdmin && isFree;
-                  })() ? 'text-green-400' : 'text-white'
-                }`}>
-                  {(() => {
-                    const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
-                    const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
-                    const isAdmin = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
-                    const isFree = entryFee === 0 || entryFee < 0.000000001;
-                    return isAdmin && isFree ? 'FREE' : `${challenge.entryFee} USDFG`;
-                  })()}
-                </span>
+                <span className="text-white font-medium">{challenge.entryFee} USDFG</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-400">Prize Pool:</span>
@@ -6256,19 +6579,7 @@ const JoinChallengeModal: React.FC<{
               </div>
             </div>
             
-            <p className="text-xs text-gray-400">
-              {(() => {
-                const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
-                const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
-                const isAdmin = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
-                const isFree = entryFee === 0 || entryFee < 0.000000001;
-                const isFounderChallenge = isAdmin && isFree;
-                return isFounderChallenge 
-                  ? '🏆 Founder Challenge - Free entry! No transaction needed.' 
-                  : 'You will need to approve a transaction in your wallet. Make sure you have enough USDFG and SOL for fees.';
-              })()}
-            </p>
-
+            {/* State-driven action buttons */}
             <div className="flex items-center justify-between pt-4">
               <button
                 onClick={onClose}
@@ -6276,20 +6587,62 @@ const JoinChallengeModal: React.FC<{
               >
                 Cancel
               </button>
-              <button
-                onClick={handleJoin}
-                className="relative bg-gradient-to-r from-amber-400 to-orange-500 text-black px-6 py-2 rounded-lg font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(255,215,130,0.35)] overflow-hidden group animate-pulse-subtle"
-              >
-                {/* Shimmer effect */}
-                <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent transition-transform duration-1000 ease-in-out"></span>
-                {/* Glow pulse */}
-                <span className="absolute inset-0 bg-gradient-to-r from-amber-300/40 via-orange-300/40 to-amber-300/40 opacity-0 group-hover:opacity-100 animate-pulse-blur transition-opacity duration-300"></span>
-                <span className="relative z-10 flex items-center justify-center gap-2">
-                  <span className="animate-bounce-subtle">⚡</span>
-                Join Challenge
-                  <span className="hidden group-hover:inline animate-pulse">→</span>
-                </span>
-              </button>
+              
+              {/* Pending: Show "Express Join Intent" for non-creators */}
+              {challengeStatus === 'pending_waiting_for_opponent' && !isCreator && (
+                <button
+                  onClick={handleExpressJoinIntent}
+                  disabled={state === 'processing'}
+                  className="relative bg-gradient-to-r from-blue-400 to-blue-500 text-white px-6 py-2 rounded-lg font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(59,130,246,0.35)] overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    Express Join Intent (No Payment)
+                  </span>
+                </button>
+              )}
+              
+              {/* Creator Confirmation: Show "Confirm and Fund" for creator */}
+              {challengeStatus === 'creator_confirmation_required' && isCreator && (
+                <button
+                  onClick={handleCreatorFund}
+                  disabled={state === 'processing'}
+                  className="relative bg-gradient-to-r from-amber-400 to-orange-500 text-black px-6 py-2 rounded-lg font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(255,215,130,0.35)] overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    Confirm and Fund ({challenge.entryFee} USDFG)
+                  </span>
+                </button>
+              )}
+              
+              {/* Creator Funded: Show "Fund Now" for challenger */}
+              {challengeStatus === 'creator_funded' && isChallenger && (
+                <button
+                  onClick={handleJoinerFund}
+                  disabled={state === 'processing'}
+                  className="relative bg-gradient-to-r from-green-400 to-green-500 text-white px-6 py-2 rounded-lg font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(34,197,94,0.35)] overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    Fund Now ({challenge.entryFee} USDFG)
+                  </span>
+                </button>
+              )}
+              
+              {/* No action available */}
+              {(challengeStatus === 'pending_waiting_for_opponent' && isCreator) ||
+               (challengeStatus === 'creator_confirmation_required' && !isCreator && !isPendingJoiner) ||
+               (challengeStatus === 'creator_funded' && !isChallenger) ||
+               (challengeStatus === 'active') ||
+               (challengeStatus === 'completed') ||
+               (challengeStatus === 'cancelled') ? (
+                <div className="text-sm text-gray-400">
+                  {challengeStatus === 'pending_waiting_for_opponent' && isCreator && 'Waiting for opponent...'}
+                  {challengeStatus === 'creator_confirmation_required' && !isCreator && !isPendingJoiner && 'Creator must confirm first'}
+                  {challengeStatus === 'creator_funded' && !isChallenger && 'Only the challenger can fund'}
+                  {challengeStatus === 'active' && 'Challenge is active'}
+                  {challengeStatus === 'completed' && 'Challenge completed'}
+                  {challengeStatus === 'cancelled' && 'Challenge cancelled'}
+                </div>
+              ) : null}
             </div>
           </div>
         )}

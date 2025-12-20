@@ -18,6 +18,8 @@ const MAX_ENTRY_FEE_LAMPORTS: u64 = 1_000_000_000_000; // 1000 USDFG
 pub mod usdfg_smart_contract {
     use super::*;
 
+    /// Create challenge metadata only - NO PAYMENT REQUIRED
+    /// Challenge starts in PendingWaitingForOpponent state
     pub fn create_challenge(ctx: Context<CreateChallenge>, usdfg_amount: u64) -> Result<()> {
         // Validate entry fee
         require!(
@@ -31,30 +33,21 @@ pub mod usdfg_smart_contract {
 
         let now = Clock::get()?.unix_timestamp;
         let dispute_timer = now + 7200; // 2 hours (matches UI expiration)
+        let expiration_timer = now + 86400; // 24 hours TTL for pending challenges
 
         let challenge = &mut ctx.accounts.challenge;
 
-        // Transfer tokens to escrow
-        let cpi_accounts = Transfer {
-            from: ctx.accounts.creator_token_account.to_account_info(),
-            to: ctx.accounts.escrow_token_account.to_account_info(),
-            authority: ctx.accounts.creator.to_account_info(),
-        };
-        let cpi_ctx = CpiContext::new(
-            ctx.accounts.token_program.to_account_info(),
-            cpi_accounts,
-        );
-        token::transfer(cpi_ctx, usdfg_amount)?;
-
+        // NO PAYMENT - Just create metadata
         // Initialize challenge
         challenge.creator = ctx.accounts.creator.key();
         challenge.challenger = None;
         challenge.entry_fee = usdfg_amount;
-        challenge.status = ChallengeStatus::Open;
+        challenge.status = ChallengeStatus::PendingWaitingForOpponent;
         challenge.created_at = now;
         challenge.last_updated = now;
         challenge.processing = false;
         challenge.dispute_timer = dispute_timer;
+        challenge.expiration_timer = expiration_timer; // TTL for pending state
         challenge.creator_result = None;
         challenge.challenger_result = None;
 
@@ -67,11 +60,16 @@ pub mod usdfg_smart_contract {
         Ok(())
     }
 
-    pub fn accept_challenge(ctx: Context<AcceptChallenge>) -> Result<()> {
+    /// Express intent to join - NO PAYMENT REQUIRED
+    /// Moves challenge to CreatorConfirmationRequired state
+    pub fn express_join_intent(ctx: Context<ExpressJoinIntent>) -> Result<()> {
         let challenge = &mut ctx.accounts.challenge;
 
-        // Validate challenge is open
-        require!(challenge.status == ChallengeStatus::Open, ChallengeError::NotOpen);
+        // Validate challenge is waiting for opponent
+        require!(
+            challenge.status == ChallengeStatus::PendingWaitingForOpponent,
+            ChallengeError::NotOpen
+        );
         
         // Prevent self-challenge
         require!(
@@ -79,23 +77,98 @@ pub mod usdfg_smart_contract {
             ChallengeError::SelfChallenge
         );
         
-        // Verify challenger has enough tokens
-        require!(
-            ctx.accounts.challenger_token_account.amount >= challenge.entry_fee,
-            ChallengeError::InsufficientFunds
-        );
-        
         // Verify not expired
         require!(
-            Clock::get()?.unix_timestamp < challenge.dispute_timer,
+            Clock::get()?.unix_timestamp < challenge.expiration_timer,
             ChallengeError::ChallengeExpired
         );
 
+        // NO PAYMENT - Just express intent
         challenge.challenger = Some(ctx.accounts.challenger.key());
-        challenge.status = ChallengeStatus::InProgress;
+        challenge.status = ChallengeStatus::CreatorConfirmationRequired;
+        challenge.confirmation_timer = Clock::get()?.unix_timestamp + 300; // 5 minutes for creator to fund
         challenge.last_updated = Clock::get()?.unix_timestamp;
 
-        // Transfer tokens to escrow
+        emit!(JoinIntentExpressed {
+            challenge: challenge.key(),
+            challenger: ctx.accounts.challenger.key(),
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        Ok(())
+    }
+
+    /// Creator funds escrow after joiner expressed intent
+    /// Moves challenge to CreatorFunded state
+    pub fn creator_fund(ctx: Context<CreatorFund>, usdfg_amount: u64) -> Result<()> {
+        let challenge = &mut ctx.accounts.challenge;
+
+        require!(
+            challenge.status == ChallengeStatus::CreatorConfirmationRequired,
+            ChallengeError::NotOpen
+        );
+        require!(
+            ctx.accounts.creator.key() == challenge.creator,
+            ChallengeError::Unauthorized
+        );
+        require!(
+            usdfg_amount == challenge.entry_fee,
+            ChallengeError::EntryFeeMismatch
+        );
+        require!(
+            Clock::get()?.unix_timestamp < challenge.confirmation_timer,
+            ChallengeError::ConfirmationExpired
+        );
+
+        // Transfer creator's tokens to escrow
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.creator_token_account.to_account_info(),
+            to: ctx.accounts.escrow_token_account.to_account_info(),
+            authority: ctx.accounts.creator.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            cpi_accounts,
+        );
+        token::transfer(cpi_ctx, usdfg_amount)?;
+
+        challenge.status = ChallengeStatus::CreatorFunded;
+        challenge.joiner_funding_timer = Clock::get()?.unix_timestamp + 300; // 5 minutes for joiner to fund
+        challenge.last_updated = Clock::get()?.unix_timestamp;
+
+        emit!(CreatorFunded {
+            challenge: challenge.key(),
+            creator: challenge.creator,
+            amount: usdfg_amount,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        Ok(())
+    }
+
+    /// Joiner funds escrow after creator funded
+    /// Moves challenge to Active state
+    pub fn joiner_fund(ctx: Context<JoinerFund>, usdfg_amount: u64) -> Result<()> {
+        let challenge = &mut ctx.accounts.challenge;
+
+        require!(
+            challenge.status == ChallengeStatus::CreatorFunded,
+            ChallengeError::NotInProgress
+        );
+        require!(
+            ctx.accounts.challenger.key() == challenge.challenger.unwrap(),
+            ChallengeError::Unauthorized
+        );
+        require!(
+            usdfg_amount == challenge.entry_fee,
+            ChallengeError::EntryFeeMismatch
+        );
+        require!(
+            Clock::get()?.unix_timestamp < challenge.joiner_funding_timer,
+            ChallengeError::FundingExpired
+        );
+
+        // Transfer joiner's tokens to escrow
         let cpi_accounts = Transfer {
             from: ctx.accounts.challenger_token_account.to_account_info(),
             to: ctx.accounts.escrow_token_account.to_account_info(),
@@ -105,7 +178,10 @@ pub mod usdfg_smart_contract {
             ctx.accounts.token_program.to_account_info(),
             cpi_accounts,
         );
-        token::transfer(cpi_ctx, challenge.entry_fee)?;
+        token::transfer(cpi_ctx, usdfg_amount)?;
+
+        challenge.status = ChallengeStatus::Active;
+        challenge.last_updated = Clock::get()?.unix_timestamp;
 
         emit!(ChallengeAccepted {
             challenge: challenge.key(),
@@ -125,9 +201,9 @@ pub mod usdfg_smart_contract {
         let challenge = &mut ctx.accounts.challenge;
         let submitter = ctx.accounts.submitter.key();
 
-        // Validate challenge is in progress
+        // Validate challenge is active (both players funded)
         require!(
-            challenge.status == ChallengeStatus::InProgress,
+            challenge.status == ChallengeStatus::Active,
             ChallengeError::NotInProgress
         );
 
@@ -167,9 +243,9 @@ pub mod usdfg_smart_contract {
         require!(!challenge.processing, ChallengeError::ReentrancyDetected);
         challenge.processing = true;
 
-        // Validate challenge is in progress
+        // Validate challenge is active
         require!(
-            challenge.status == ChallengeStatus::InProgress,
+            challenge.status == ChallengeStatus::Active,
             ChallengeError::NotInProgress
         );
 
@@ -278,9 +354,9 @@ pub mod usdfg_smart_contract {
         require!(!challenge.processing, ChallengeError::ReentrancyDetected);
         challenge.processing = true;
 
-        // Validate challenge is in progress
+        // Validate challenge is active
         require!(
-            challenge.status == ChallengeStatus::InProgress,
+            challenge.status == ChallengeStatus::Active,
             ChallengeError::NotInProgress
         );
 
@@ -356,14 +432,19 @@ pub mod usdfg_smart_contract {
         Ok(())
     }
 
-    /// Cancel challenge (only if not accepted yet)
+    /// Cancel challenge - only in pending states (no escrow to refund)
     pub fn cancel_challenge(ctx: Context<CancelChallenge>) -> Result<()> {
         let challenge = &mut ctx.accounts.challenge;
 
         require!(!challenge.processing, ChallengeError::ReentrancyDetected);
         challenge.processing = true;
 
-        require!(challenge.status == ChallengeStatus::Open, ChallengeError::NotOpen);
+        // Can cancel if pending or if creator didn't fund in time
+        require!(
+            challenge.status == ChallengeStatus::PendingWaitingForOpponent ||
+            challenge.status == ChallengeStatus::CreatorConfirmationRequired,
+            ChallengeError::NotOpen
+        );
         require!(
             ctx.accounts.creator.key() == challenge.creator,
             ChallengeError::Unauthorized
@@ -372,7 +453,65 @@ pub mod usdfg_smart_contract {
         challenge.status = ChallengeStatus::Cancelled;
         challenge.last_updated = Clock::get()?.unix_timestamp;
 
-        // Refund creator
+        // NO REFUND - no escrow was created in pending states
+
+        emit!(RefundIssued {
+            challenge: challenge.key(),
+            creator: challenge.creator,
+            challenger: Pubkey::default(),
+            amount: challenge.entry_fee,
+            reason: "Challenge cancelled".to_string(),
+            timestamp: challenge.last_updated,
+        });
+
+        challenge.processing = false;
+        Ok(())
+    }
+
+    /// Auto-refund creator if confirmation timer expired (permissionless)
+    pub fn auto_refund_creator_timeout(ctx: Context<AutoRefundCreatorTimeout>) -> Result<()> {
+        let challenge = &mut ctx.accounts.challenge;
+
+        require!(
+            challenge.status == ChallengeStatus::CreatorConfirmationRequired,
+            ChallengeError::NotOpen
+        );
+        require!(
+            Clock::get()?.unix_timestamp >= challenge.confirmation_timer,
+            ChallengeError::ConfirmationExpired
+        );
+
+        // Revert to pending state - no escrow to refund
+        challenge.status = ChallengeStatus::PendingWaitingForOpponent;
+        challenge.challenger = None;
+        challenge.last_updated = Clock::get()?.unix_timestamp;
+
+        emit!(RefundIssued {
+            challenge: challenge.key(),
+            creator: challenge.creator,
+            challenger: Pubkey::default(),
+            amount: 0, // No escrow was created
+            reason: "Creator funding timeout - challenge reverted to pending".to_string(),
+            timestamp: Clock::get()?.unix_timestamp,
+        });
+
+        Ok(())
+    }
+
+    /// Auto-refund creator if joiner funding timer expired (permissionless)
+    pub fn auto_refund_joiner_timeout(ctx: Context<AutoRefundJoinerTimeout>) -> Result<()> {
+        let challenge = &mut ctx.accounts.challenge;
+
+        require!(
+            challenge.status == ChallengeStatus::CreatorFunded,
+            ChallengeError::NotInProgress
+        );
+        require!(
+            Clock::get()?.unix_timestamp >= challenge.joiner_funding_timer,
+            ChallengeError::FundingExpired
+        );
+
+        // Refund creator and revert to pending
         let escrow_seeds = [
             ESCROW_WALLET_SEED,
             challenge.to_account_info().key.as_ref(),
@@ -392,16 +531,19 @@ pub mod usdfg_smart_contract {
         );
         token::transfer(cpi_ctx, challenge.entry_fee)?;
 
+        challenge.status = ChallengeStatus::PendingWaitingForOpponent;
+        challenge.challenger = None;
+        challenge.last_updated = Clock::get()?.unix_timestamp;
+
         emit!(RefundIssued {
             challenge: challenge.key(),
             creator: challenge.creator,
             challenger: Pubkey::default(),
             amount: challenge.entry_fee,
-            reason: "Challenge cancelled".to_string(),
-            timestamp: challenge.last_updated,
+            reason: "Joiner funding timeout - creator refunded".to_string(),
+            timestamp: Clock::get()?.unix_timestamp,
         });
 
-        challenge.processing = false;
         Ok(())
     }
 }
@@ -423,6 +565,24 @@ pub struct CreateChallenge<'info> {
     pub challenge: Account<'info, Challenge>,
     #[account(mut)]
     pub creator: Signer<'info>,
+    pub challenge_seed: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ExpressJoinIntent<'info> {
+    #[account(mut)]
+    pub challenge: Account<'info, Challenge>,
+    #[account(mut)]
+    pub challenger: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct CreatorFund<'info> {
+    #[account(mut)]
+    pub challenge: Account<'info, Challenge>,
+    #[account(mut)]
+    pub creator: Signer<'info>,
     #[account(mut, constraint = creator_token_account.owner == creator.key())]
     pub creator_token_account: Account<'info, TokenAccount>,
     #[account(
@@ -434,17 +594,14 @@ pub struct CreateChallenge<'info> {
         token::authority = escrow_token_account
     )]
     pub escrow_token_account: Account<'info, TokenAccount>,
-    /// CHECK: Escrow wallet PDA
-    pub escrow_wallet: AccountInfo<'info>,
-    pub challenge_seed: Signer<'info>,
-    pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
     pub mint: Account<'info, Mint>,
 }
 
 #[derive(Accounts)]
-pub struct AcceptChallenge<'info> {
+pub struct JoinerFund<'info> {
     #[account(mut)]
     pub challenge: Account<'info, Challenge>,
     #[account(mut)]
@@ -463,12 +620,6 @@ pub struct AcceptChallenge<'info> {
     )]
     pub escrow_token_account: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
-    /// CHECK: Escrow wallet PDA
-    #[account(
-        seeds = [ESCROW_WALLET_SEED],
-        bump
-    )]
-    pub escrow_wallet: AccountInfo<'info>,
     pub mint: Account<'info, Mint>,
 }
 
@@ -543,12 +694,18 @@ pub struct CancelChallenge<'info> {
     pub challenge: Account<'info, Challenge>,
     #[account(mut)]
     pub creator: Signer<'info>,
-    #[account(
-        mut,
-        constraint = creator_token_account.owner == creator.key(),
-        constraint = creator_token_account.mint == mint.key()
-    )]
-    pub creator_token_account: Account<'info, TokenAccount>,
+}
+
+#[derive(Accounts)]
+pub struct AutoRefundCreatorTimeout<'info> {
+    #[account(mut)]
+    pub challenge: Account<'info, Challenge>,
+}
+
+#[derive(Accounts)]
+pub struct AutoRefundJoinerTimeout<'info> {
+    #[account(mut)]
+    pub challenge: Account<'info, Challenge>,
     #[account(
         mut,
         seeds = [ESCROW_WALLET_SEED, challenge.key().as_ref(), mint.key().as_ref()],
@@ -557,6 +714,11 @@ pub struct CancelChallenge<'info> {
         token::authority = escrow_token_account
     )]
     pub escrow_token_account: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        constraint = creator_token_account.owner == challenge.creator
+    )]
+    pub creator_token_account: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
     pub mint: Account<'info, Mint>,
 }
@@ -572,6 +734,9 @@ pub struct Challenge {
     pub entry_fee: u64,
     pub status: ChallengeStatus,
     pub dispute_timer: i64,
+    pub expiration_timer: i64,        // TTL for pending challenges (24 hours)
+    pub confirmation_timer: i64,     // Timer for creator to fund (5 minutes)
+    pub joiner_funding_timer: i64,   // Timer for joiner to fund (5 minutes)
     pub winner: Option<Pubkey>,
     pub created_at: i64,
     pub last_updated: i64,
@@ -587,6 +752,9 @@ impl Challenge {
         8 + // entry_fee
         1 + // status
         8 + // dispute_timer
+        8 + // expiration_timer
+        8 + // confirmation_timer
+        8 + // joiner_funding_timer
         1 + 32 + // winner (Option<Pubkey>)
         8 + // created_at
         8 + // last_updated
@@ -597,8 +765,10 @@ impl Challenge {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
 pub enum ChallengeStatus {
-    Open,
-    InProgress,
+    PendingWaitingForOpponent,  // No escrow, waiting for joiner
+    CreatorConfirmationRequired, // Joiner expressed intent, waiting for creator to fund
+    CreatorFunded,              // Creator funded, waiting for joiner to fund
+    Active,                      // Both funded, match active (was InProgress)
     Completed,
     Cancelled,
     Disputed,
@@ -638,6 +808,12 @@ pub enum ChallengeError {
     NoDispute,
     #[msg("Both players conceded - use refund function")]
     BothConceded,
+    #[msg("Entry fee mismatch")]
+    EntryFeeMismatch,
+    #[msg("Confirmation timer expired")]
+    ConfirmationExpired,
+    #[msg("Funding timer expired")]
+    FundingExpired,
 }
 
 // ============================================
@@ -646,6 +822,21 @@ pub enum ChallengeError {
 
 #[event]
 pub struct ChallengeCreated {
+    pub creator: Pubkey,
+    pub amount: u64,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct JoinIntentExpressed {
+    pub challenge: Pubkey,
+    pub challenger: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct CreatorFunded {
+    pub challenge: Pubkey,
     pub creator: Pubkey,
     pub amount: u64,
     pub timestamp: i64,
