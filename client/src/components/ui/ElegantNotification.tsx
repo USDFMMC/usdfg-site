@@ -89,7 +89,8 @@ const ElegantNotification: React.FC<ElegantNotificationProps> = ({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className={`relative w-[90vw] max-w-md rounded-xl bg-gradient-to-br ${colors.bg} border ${colors.border} shadow-[0_0_30px_${colors.glow}] backdrop-blur-md pointer-events-auto`}
+            className={`relative w-[90vw] max-w-md rounded-xl bg-gradient-to-br ${colors.bg} border ${colors.border} backdrop-blur-md pointer-events-auto`}
+            style={{ boxShadow: `0 0 30px ${colors.glow}` }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Top Border Glow */}
