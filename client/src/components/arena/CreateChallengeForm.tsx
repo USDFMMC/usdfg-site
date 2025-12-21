@@ -111,13 +111,13 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
   // Game categories and options - Simple, clean list for UI
   // Note: Image mapping logic in index.tsx handles all game variations automatically
   const gameCategories = {
-    Sports: ["FC 26", "NBA 2K26", "Custom"],
-    Racing: ["Gran Turismo 7", "Forza Horizon 5", "Mario Kart", "Custom"],
-    Fighting: ["Mortal Kombat 1", "Street Fighter 6", "Tekken 8", "Custom"],
-    Shooting: ["COD MW3", "Fortnite", "Valorant", "Custom"]
+    Sports: ["FC 26", "NBA 2K26"],
+    Racing: ["Gran Turismo 7", "Forza Horizon 5", "Mario Kart"],
+    Fighting: ["Mortal Kombat 1", "Street Fighter 6", "Tekken 8"],
+    Shooting: ["COD MW3", "Fortnite", "Valorant"]
   };
 
-  // Available games for selection (flattened + Custom)
+  // Available games for selection (flattened + single Custom option)
   const availableGames = [...Object.values(gameCategories).flat(), "Custom"];
 
   // Platform options
