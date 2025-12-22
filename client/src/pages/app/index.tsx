@@ -707,7 +707,7 @@ const ArenaHome: React.FC = () => {
       case 'Shooting':
         return '/assets/categories/shooting.png';
       case 'Fighting':
-        return '/assets/categories/boxing.png'; // Use boxing.png as fallback for fighting category
+        return '/assets/categories/tekken.png'; // Fighting games category (Street Fighter, Tekken, Mortal Kombat)
       default:
         return '/assets/categories/sports.png'; // Default to sports category image
     }
