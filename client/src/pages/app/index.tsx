@@ -3981,10 +3981,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                       setSelectedChallenge(challenge);
                                       setShowJoinModal(true);
                                     }}
-                                    className="relative w-full px-4 py-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-200 border border-amber-400/40 hover:border-amber-400/60 font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
+                                    className="relative w-full px-4 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white border-2 border-green-400 hover:border-green-300 font-bold rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_30px_rgba(34,197,94,0.7),0_0_60px_rgba(34,197,94,0.4)] hover:shadow-[0_0_40px_rgba(34,197,94,0.9),0_0_80px_rgba(34,197,94,0.6)] hover:scale-105"
                                     disabled={!isConnected}
                                   >
-                                    Confirm & Fund ({challenge.entryFee} USDFG)
+                                    ✨ Confirm & Fund ({challenge.entryFee} USDFG) ✨
                                   </button>
                                 );
                               } else {
@@ -6626,10 +6626,10 @@ const JoinChallengeModal: React.FC<{
                 <button
                   onClick={handleCreatorFund}
                   disabled={state === 'processing'}
-                  className="relative bg-gradient-to-r from-amber-400 to-orange-500 text-black px-6 py-2 rounded-lg font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(255,215,130,0.35)] overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="relative bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-lg font-bold hover:brightness-110 transition-all duration-300 shadow-[0_0_35px_rgba(34,197,94,0.75),0_0_70px_rgba(34,197,94,0.5)] hover:shadow-[0_0_45px_rgba(34,197,94,0.95),0_0_90px_rgba(34,197,94,0.7)] overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed border-2 border-green-400 hover:scale-105"
                 >
-                  <span className="relative z-10 flex items-center justify-center gap-2">
-                    Confirm and Fund ({challenge.entryFee} USDFG)
+                  <span className="relative z-10 flex items-center justify-center gap-2 text-lg">
+                    ✨ Confirm and Fund ({challenge.entryFee} USDFG) ✨
                   </span>
                 </button>
               )}
