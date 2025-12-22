@@ -623,8 +623,18 @@ const ArenaHome: React.FC = () => {
       return '/assets/categories/soccer.png';
     }
     
+    // Street Fighter games - use tekken.png (Street Fighter 6, Street Fighter V, etc.)
+    if (lowerGame.includes('street fighter')) {
+      return '/assets/categories/tekken.png';
+    }
+    
     // Tekken games - use tekken.png (Tekken 8, Tekken 7, etc.)
     if (lowerGame.includes('tekken')) {
+      return '/assets/categories/tekken.png';
+    }
+    
+    // Mortal Kombat games - use tekken.png (Mortal Kombat 1, Mortal Kombat 11, etc.)
+    if (lowerGame.includes('mortal kombat')) {
       return '/assets/categories/tekken.png';
     }
     
