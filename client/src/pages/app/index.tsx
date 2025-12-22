@@ -2462,8 +2462,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       if (error?.message?.includes('already submitted') || 
           error?.message?.includes('already been processed')) {
         alert("✅ Your result was already submitted. Trust review may not have been recorded.");
+      } else if (error?.message?.includes('permission') || error?.message?.includes('Missing or insufficient permissions')) {
+        // Trust review permission error - result was submitted successfully, just review failed
+        console.warn("⚠️ Trust review failed due to permissions, but result was submitted successfully");
+        alert("✅ Result submitted successfully. Trust review could not be saved (permission issue - this is okay, your result was recorded).");
       } else {
-      alert("Failed to submit result and trust review. Please try again.");
+        alert("Failed to submit result and trust review. Please try again.");
       }
     }
   };
