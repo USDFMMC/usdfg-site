@@ -36,7 +36,7 @@ const generateMockChallenges = (category: string) => {
     '/assets/categories/soccer.png',
     '/assets/categories/basketball.png',
     '/assets/categories/football.png',
-    '/assets/categories/fighting.png',
+    '/assets/categories/boxing.png', // Use boxing.png as fallback for fighting category
     '/assets/categories/ufc.png',
     '/assets/categories/boxing.png',
     '/assets/categories/racing.png',
