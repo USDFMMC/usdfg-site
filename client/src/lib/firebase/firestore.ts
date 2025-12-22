@@ -1112,7 +1112,7 @@ export const joinerFund = async (challengeId: string, wallet: string) => {
     if (data.status !== 'creator_funded') {
       throw new Error(`Challenge is not waiting for joiner funding. Current status: ${data.status}`);
     }
-    
+
     // Validate caller is the challenger
     if (!data.challenger || data.challenger.toLowerCase() !== wallet.toLowerCase()) {
       throw new Error("Only the challenger can fund the challenge");
@@ -1154,7 +1154,7 @@ export const joinerFund = async (challengeId: string, wallet: string) => {
       // Set deadline to 2 hours from now for result submission
       updates.resultDeadline = Timestamp.fromDate(new Date(Date.now() + 2 * 60 * 60 * 1000));
       console.log('⏰ Challenge is full! Result submission phase started (2-hour deadline)');
-    }
+      }
 
     await updateDoc(challengeRef, updates);
     
@@ -1199,7 +1199,7 @@ export const revertCreatorTimeout = async (challengeId: string): Promise<boolean
     };
 
     await updateDoc(challengeRef, updates);
-    
+
     console.log('✅ Creator timeout - challenge reverted to pending:', challengeId);
     return true;
   } catch (error) {
@@ -1249,7 +1249,7 @@ export const revertJoinerTimeout = async (challengeId: string): Promise<boolean>
     
     console.log('✅ Joiner timeout - challenge reverted to pending (creator refunded on-chain):', challengeId);
     return true;
-  } catch (error) {
+      } catch (error) {
     console.error('❌ Error reverting joiner timeout:', error);
     return false;
   }
@@ -1262,7 +1262,7 @@ export const expirePendingChallenge = async (challengeId: string): Promise<boole
   try {
     const challengeRef = doc(db, "challenges", challengeId);
     const snap = await getDoc(challengeRef);
-    
+      
     if (!snap.exists()) {
       return false;
     }

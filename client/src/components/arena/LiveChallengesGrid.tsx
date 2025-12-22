@@ -12,17 +12,14 @@ interface LiveChallengesGridProps {
   challenges?: any[]; // Array of challenge data to count live challenges per category
 }
 
-// Define the 9 categories (constant, outside component)
+// Define the 6 categories (removed CASUAL, OPEN, FEATURED)
 const CATEGORIES: CategoryCard[] = [
   { key: 'FPS', label: 'FPS', icon: '🎯' },
   { key: 'SPORTS', label: 'SPORTS', icon: '⚽' },
   { key: 'FIGHTING', label: 'FIGHTING', icon: '🥊' },
   { key: 'RACING', label: 'RACING', icon: '🏎️' },
   { key: 'STRATEGY', label: 'STRATEGY', icon: '♟️' },
-  { key: 'CASUAL', label: 'CASUAL', icon: '🎮' },
-  { key: 'OPEN', label: 'OPEN', icon: '🌐' },
   { key: 'TOURNAMENTS', label: 'TOURNAMENTS', icon: '🏆' },
-  { key: 'FEATURED', label: 'FEATURED', icon: '⭐' },
 ];
 
 const LiveChallengesGrid: React.FC<LiveChallengesGridProps> = ({ challenges = [] }) => {
@@ -57,22 +54,16 @@ const LiveChallengesGrid: React.FC<LiveChallengesGridProps> = ({ challenges = []
           counts['RACING']++;
         } else if (challengeCategory.includes('STRATEGY') || challengeCategory.includes('BOARDGAMES')) {
           counts['STRATEGY']++;
-        } else {
-          counts['OPEN']++;
         }
       }
     });
 
-    // Featured and Tournaments need special handling
+    // Tournaments need special handling
     challenges.forEach(challenge => {
       const status = challenge.status?.toLowerCase() || '';
       if (status === 'active' || status === 'pending_waiting_for_opponent') {
         if (challenge.format === 'tournament' || challenge.tournament) {
           counts['TOURNAMENTS']++;
-        }
-        // Featured could be based on entry fee or other criteria
-        if (challenge.entryFee >= 100) { // Example: high-value challenges
-          counts['FEATURED']++;
         }
       }
     });
@@ -88,11 +79,11 @@ const LiveChallengesGrid: React.FC<LiveChallengesGridProps> = ({ challenges = []
   // Calculate exact card dimensions for iPhone 13 Pro (390px width)
   // Screen width: 390px
   // Horizontal padding: 14px × 2 = 28px
-  // Grid gap: 10px × 2 = 20px (between 3 columns)
-  // Available width: 390 - 28 - 20 = 342px
-  // Card width: 342 / 3 = 114px
+  // Grid gap: 10px × 1 = 10px (between 2 columns for 6 items)
+  // Available width: 390 - 28 - 10 = 352px
+  // Card width: 352 / 2 = 176px (2 columns × 3 rows = 6 categories)
   // Card height: 122px (slightly taller than wide)
-  const cardWidth = 114;
+  const cardWidth = 176;
   const cardHeight = 122;
 
   return (
@@ -114,9 +105,9 @@ const LiveChallengesGrid: React.FC<LiveChallengesGridProps> = ({ challenges = []
         <p className="text-gray-400 text-xs mt-0.5">Pick a Battle</p>
       </div>
 
-      {/* Grid Container */}
+      {/* Grid Container - 2 columns × 3 rows for 6 categories */}
       <div 
-        className="grid grid-cols-3 gap-[10px] px-[14px] pb-[12px]"
+        className="grid grid-cols-2 gap-[10px] px-[14px] pb-[12px]"
         style={{
           width: '100%',
           maxWidth: '390px',
