@@ -24,6 +24,7 @@ import ElegantButton from "@/components/ui/ElegantButton";
 import ElegantModal from "@/components/ui/ElegantModal";
 import CreateChallengeForm from "@/components/arena/CreateChallengeForm";
 import ElegantNavbar from "@/components/layout/ElegantNavbar";
+import LiveChallengesGrid from "@/components/arena/LiveChallengesGrid";
 // Lazy load heavy modals for better performance on all devices
 const SubmitResultRoom = lazy(() => import("@/components/arena/SubmitResultRoom").then(module => ({ default: module.SubmitResultRoom })));
 const PlayerProfileModal = lazy(() => import("@/components/arena/PlayerProfileModal"));
@@ -3174,6 +3175,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             
             {/* Win Rate Stat Box - Now with rotating ad images */}
             <AdRotationBox />
+          </div>
+
+          {/* Live Challenges Grid - Mobile First (iPhone 13 Pro optimized) */}
+          <div className="mb-6 md:hidden">
+            <LiveChallengesGrid challenges={challenges} />
           </div>
 
           {/* Available Challenges Section */}

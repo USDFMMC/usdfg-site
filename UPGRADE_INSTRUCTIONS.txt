@@ -1,0 +1,9 @@
+The deployed contract at 3UCz8aURYFXUqNWgHDfbiRziVKjPB8G7BYrgj93MyHUp is outdated.
+
+It expects token accounts during challenge creation, but our new code removed that.
+
+You need to either:
+1. Upgrade the existing program (if you have upgrade authority)
+2. Or deploy a new program and update the frontend config
+
+See DEPLOY_NEW_CONTRACT.md for detailed instructions.

@@ -9,6 +9,7 @@ import Home from "@/pages/home";
 import ArenaRoute from "@/pages/ArenaRoute";
 import CreateChallenge from "@/pages/app/challenge/new";
 import PlayerProfile from "@/pages/app/profile/[address]";
+import CategoryDetailPage from "@/pages/app/category/[category]";
 import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
 import Whitepaper from "@/pages/whitepaper";
@@ -38,6 +39,7 @@ function RoutesWithLogging() {
         <Route path="/app/" element={<ArenaRoute />} />
         <Route path="/app/challenge/new" element={<CreateChallenge />} />
         <Route path="/app/profile/:address" element={<PlayerProfile />} />
+        <Route path="/app/category/:category" element={<CategoryDetailPage />} />
         
         {/* Static pages */}
         <Route path="/privacy" element={<Privacy />} />
