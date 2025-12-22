@@ -13,8 +13,8 @@ import { PublicKey } from '@solana/web3.js';
 // Previous: DX4C2FyAKSiycDVSoYgm7WyDgmPNTdBKbvVDyKGGH6wK (had per-challenge authority fix but prize claim expiration)
 // Previous: 3UCz8aURYFXUqNWgHDfbiRziVKjPB8G7BYrgj93MyHUp (old intent-first version)
 // LATEST: New intent-first flow - NO payment during challenge creation
-// Playground uses wallet address as program ID: pZL8bLnnNwLaeG36a2XUAGunbh9sFnMBUY6xEVoNStM
-export const PROGRAM_ID = new PublicKey('pZL8bLnnNwLaeG36a2XUAGunbh9sFnMBUY6xEVoNStM');
+// Deployed via Solana Playground: FXxGzstg3FXqfbX5DRKTabf518SBWRP5d2zumbCim5WP
+export const PROGRAM_ID = new PublicKey('FXxGzstg3FXqfbX5DRKTabf518SBWRP5d2zumbCim5WP');
 
 // Admin wallet address
 export const ADMIN_WALLET = new PublicKey('3SeLoDGsajuQUt2pzSkZV7LmB7gKtckmrD693U69kcUd');

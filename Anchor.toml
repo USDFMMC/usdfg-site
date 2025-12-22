@@ -6,7 +6,7 @@ seeds = false
 skip-lint = false
 
 [programs.devnet]
-usdfg_smart_contract = "pZL8bLnnNwLaeG36a2XUAGunbh9sFnMBUY6xEVoNStM"
+usdfg_smart_contract = "FXxGzstg3FXqfbX5DRKTabf518SBWRP5d2zumbCim5WP"
 
 [registry]
 url = "https://api.apr.dev"
