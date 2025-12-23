@@ -100,9 +100,9 @@ const LiveChallengesGrid: React.FC<LiveChallengesGridProps> = ({ challenges = []
       {/* Header */}
       <div className="px-[14px] pt-[12px] pb-2">
         <h1 className="text-white text-xl font-bold tracking-wide uppercase">
-          LIVE CHALLENGES
+          BROWSE BY CATEGORY
         </h1>
-        <p className="text-gray-400 text-xs mt-0.5">Pick a Battle</p>
+        <p className="text-gray-400 text-xs mt-0.5">Find your battleground</p>
       </div>
 
       {/* Grid Container - 2 columns × 3 rows for 6 categories */}

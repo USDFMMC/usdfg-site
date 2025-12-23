@@ -3191,15 +3191,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             <AdRotationBox />
           </div>
 
-          {/* Live Challenges Grid - Mobile First (iPhone 13 Pro optimized) */}
-          <div className="mb-6 md:hidden">
-            <LiveChallengesGrid challenges={challenges} />
-          </div>
-
-          {/* Available Challenges Section */}
-          <section id="challenges" className="mb-8">
-          </section>
-
           {/* Simple Content */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="relative rounded-[20px] bg-[#07080C]/95 border border-amber-500/30 overflow-hidden shadow-[0_0_40px_rgba(255,215,130,0.08)]">
@@ -3209,7 +3200,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 <div className="flex items-center justify-between mb-4">
                 <h2 className="text-2xl font-bold uppercase tracking-wider text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)] flex items-center">
                   <span className="mr-2">🎯</span>
-                  Available Challenges
+                  LIVE CHALLENGES
                 </h2>
                   <span className="text-sm text-amber-400 font-semibold">
                     {filteredChallenges.length} challenge{filteredChallenges.length !== 1 ? 's' : ''}
@@ -4970,6 +4961,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             </div>
           </div>
         </div>
+
+          {/* Live Challenges Grid - Mobile First (iPhone 13 Pro optimized) */}
+          <div className="mb-6 md:hidden">
+            <LiveChallengesGrid challenges={challenges} />
+          </div>
 
         {/* Create Challenge Modal */}
         <ElegantModal
