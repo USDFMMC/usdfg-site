@@ -3191,9 +3191,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             <AdRotationBox />
           </div>
 
-          {/* Simple Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="relative rounded-[20px] bg-[#07080C]/95 border border-amber-500/30 overflow-hidden shadow-[0_0_40px_rgba(255,215,130,0.08)]">
+          {/* Live Challenges Section */}
+          <div className="relative rounded-[20px] bg-[#07080C]/95 border border-amber-500/30 overflow-hidden shadow-[0_0_40px_rgba(255,215,130,0.08)] mb-6">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
               <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-amber-400/10 via-transparent to-transparent" />
               <div className="relative z-10 p-6">
@@ -3264,9 +3263,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                   )}
                 </div>
                 
-                <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-4">
                   {filteredChallenges.length === 0 ? (
-                    <div className="text-center py-8">
+                    <div className="col-span-full text-center py-8">
                       <p className="text-gray-400 text-sm mb-2">No challenges found matching your filters.</p>
                       <button
                         onClick={() => {
@@ -4269,8 +4268,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="relative rounded-[20px] bg-[#07080C]/95 border border-zinc-800 overflow-hidden shadow-[0_0_40px_rgba(255,215,130,0.08)]">
+          {/* Live Challenges Grid - Mobile First (iPhone 13 Pro optimized) */}
+          <div className="mb-6 md:hidden">
+            <LiveChallengesGrid challenges={challenges} />
+          </div>
+
+          {/* Arena Leaders Section */}
+          <div className="relative rounded-[20px] bg-[#07080C]/95 border border-zinc-800 overflow-hidden shadow-[0_0_40px_rgba(255,215,130,0.08)] mb-6">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
               <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-amber-400/10 via-transparent to-transparent" />
               <div className="relative z-10 text-center py-6">
@@ -4959,13 +4965,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 )}
               </div>
             </div>
-          </div>
-        </div>
-
-          {/* Live Challenges Grid - Mobile First (iPhone 13 Pro optimized) */}
-          <div className="mb-6 md:hidden">
-            <LiveChallengesGrid challenges={challenges} />
-          </div>
 
         {/* Create Challenge Modal */}
         <ElegantModal
