@@ -3263,7 +3263,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                   )}
                 </div>
                 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-3 gap-2 md:gap-4">
                   {filteredChallenges.length === 0 ? (
                     <div className="col-span-full text-center py-8">
                       <p className="text-gray-400 text-sm mb-2">No challenges found matching your filters.</p>
@@ -3283,7 +3283,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     return (
                       <div 
                         key={challenge.id} 
-                        className={`relative bg-[#07080C]/95 border border-amber-500/30 rounded-xl p-4 cursor-pointer hover:border-amber-400/50 shadow-[0_0_20px_rgba(255,215,130,0.05)] hover:shadow-[0_0_30px_rgba(255,215,130,0.08)] transition-all overflow-hidden`}
+                        className={`relative bg-[#07080C]/95 border border-amber-500/30 rounded-xl p-2 md:p-4 cursor-pointer hover:border-amber-400/50 shadow-[0_0_20px_rgba(255,215,130,0.05)] hover:shadow-[0_0_30px_rgba(255,215,130,0.08)] transition-all overflow-hidden`}
                         onClick={async () => {
                           // Don't open join modal for completed challenges
                           if (challenge.status === "completed" || challenge.rawData?.payoutTriggered) {
@@ -3322,6 +3322,73 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           setShowJoinModal(true);
                         }}
                       >
+                        {/* Simplified Mobile View (Amazon-style) */}
+                        <div className="block md:hidden relative w-full flex flex-col">
+                          {/* Large Game Image - Takes most of the card */}
+                          <div className="relative w-full aspect-square rounded-lg overflow-hidden mb-2 bg-[#0A0B0F]/50 flex items-center justify-center">
+                            {(() => {
+                              const gameName = challenge.game || extractGameFromTitle(challenge.title);
+                              const imagePath = getGameImage(gameName);
+                              return (
+                                <img
+                                  src={imagePath}
+                                  alt={gameName}
+                                  className="w-full h-full object-contain p-2"
+                                  loading="lazy"
+                                  decoding="async"
+                                  onError={(e) => {
+                                    const target = e.currentTarget as HTMLImageElement;
+                                    target.src = '/assets/usdfg-logo-transparent.png';
+                                  }}
+                                />
+                              );
+                            })()}
+                          </div>
+                          
+                          {/* Game Name - Bottom */}
+                          <div className="text-center mb-1 min-h-[32px] flex items-center justify-center">
+                            <p className="text-white text-xs font-semibold line-clamp-2 leading-tight">
+                              {challenge.game || extractGameFromTitle(challenge.title) || 'Game'}
+                            </p>
+                          </div>
+                          
+                          {/* Small Status Badge */}
+                          <div className="text-center">
+                            {challenge.status === "pending_waiting_for_opponent" && (
+                              <span className="inline-block px-1.5 py-0.5 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-[10px]">
+                                Open
+                              </span>
+                            )}
+                            {challenge.status === "creator_confirmation_required" && (
+                              <span className="inline-block px-1.5 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded text-[10px]">
+                                {isOwner ? "Confirm" : "Active"}
+                              </span>
+                            )}
+                            {challenge.status === "creator_funded" && (
+                              <span className="inline-block px-1.5 py-0.5 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-[10px]">
+                                Active
+                              </span>
+                            )}
+                            {challenge.status === "active" && (
+                              <span className="inline-block px-1.5 py-0.5 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-[10px]">
+                                Active
+                              </span>
+                            )}
+                            {(challenge.status === "cancelled" || (challenge.expiresAt && challenge.expiresAt < Date.now())) && (
+                              <span className="inline-block px-1.5 py-0.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-[10px]">
+                                Expired
+                              </span>
+                            )}
+                            {challenge.status === "completed" && (
+                              <span className="inline-block px-1.5 py-0.5 bg-gray-500/20 text-gray-400 border border-gray-500/30 rounded text-[10px]">
+                                Done
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Full Detailed View (Desktop/Tablet) */}
+                        <div className="hidden md:block">
                         {/* Full Background Image */}
                         <div className="absolute inset-0 overflow-hidden rounded-2xl z-0">
                           {(() => {
@@ -4261,6 +4328,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                             <span className="text-sm">Join Chat</span>
                           </button>
                         )}
+
+                        </div>
+                        {/* End Full Detailed View (Desktop/Tablet) */}
 
                       </div>
                     );
