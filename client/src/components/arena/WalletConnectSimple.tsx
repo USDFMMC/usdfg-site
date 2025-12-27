@@ -162,9 +162,16 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     if (actuallyConnected && effectivePublicKey) {
       // Clear disconnect flag when user successfully connects
       localStorage.removeItem('wallet_disconnected');
-      onConnect();
       
-      logWalletEvent('connected', { wallet: effectivePublicKey.toString() });
+      // Only log and call onConnect if this is a new connection (check last logged wallet)
+      const lastLoggedWallet = sessionStorage.getItem('last_logged_wallet');
+      const currentWalletString = effectivePublicKey.toString();
+      
+      if (lastLoggedWallet !== currentWalletString) {
+        logWalletEvent('connected', { wallet: currentWalletString });
+        sessionStorage.setItem('last_logged_wallet', currentWalletString);
+        onConnect();
+      }
       
       // Fetch SOL balance (non-blocking, fail gracefully)
       const fetchSOLBalance = async (): Promise<void> => {
@@ -207,15 +214,103 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         setUsdfgBalance(0);
         });
     } else if (!actuallyConnected) {
+      // Only call onDisconnect if we were previously connected
+      const lastLoggedWallet = sessionStorage.getItem('last_logged_wallet');
+      if (lastLoggedWallet) {
+        sessionStorage.removeItem('last_logged_wallet');
+        onDisconnect();
+      }
       setBalance(null);
       setUsdfgBalance(null);
-      onDisconnect();
     }
   }, [connected, publicKey, isConnected, mobile, mobileConnectionState, onConnect, onDisconnect, connection]);
+
+  // Calculate derived values (needed before conditional returns)
+  const effectivePublicKey = publicKey || 
+    (mobile && mobileConnectionState.publicKey ? new PublicKey(mobileConnectionState.publicKey) : null) ||
+    (mobile && typeof window !== 'undefined' && localStorage.getItem('phantom_public_key')
+      ? new PublicKey(localStorage.getItem('phantom_public_key')!)
+      : null);
+  const actuallyConnected = isConnected || (connected && effectivePublicKey) || 
+    (mobile && (mobileConnectionState.connected || (typeof window !== 'undefined' && localStorage.getItem('phantom_connected') === 'true')) && effectivePublicKey);
+
+  // Calculate mobile-specific connection state
+  const isMobile = isMobileSafari();
+  const hasWindowSolana = typeof window !== "undefined" && !!(window as any).solana;
+  
+  // CRITICAL: Check if Phantom connection is in progress, but only if it's recent (not stuck)
+  let isPhantomConnecting = false;
+  if (typeof window !== "undefined") {
+    const connectingFlag = sessionStorage.getItem('phantom_connecting') === 'true';
+    const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
+    
+    if (connectingFlag && connectTimestamp) {
+      const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
+      if (timeSinceConnect > 5000) {
+        console.log("🧹 Clearing stuck connection state (older than 5 seconds)");
+        sessionStorage.removeItem('phantom_connecting');
+        sessionStorage.removeItem('phantom_connect_timestamp');
+        sessionStorage.removeItem('phantom_connect_attempt');
+        isPhantomConnecting = false;
+      } else {
+        isPhantomConnecting = true;
+      }
+    } else if (connectingFlag && !connectTimestamp) {
+      console.log("🧹 Clearing orphaned connection state immediately");
+      sessionStorage.removeItem('phantom_connecting');
+      isPhantomConnecting = false;
+    }
+  }
+  
+  // Calculate button disabled state
+  let isButtonDisabled = false;
+  if (mobile) {
+    const veryRecentConnection = isPhantomConnecting && typeof window !== "undefined";
+    if (veryRecentConnection) {
+      const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
+      if (connectTimestamp) {
+        const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
+        if (timeSinceConnect > 2000) {
+          isButtonDisabled = false;
+        } else {
+          isButtonDisabled = true;
+        }
+      }
+    }
+    if (actuallyConnected) {
+      isButtonDisabled = true;
+    }
+  } else {
+    isButtonDisabled = connecting || actuallyConnected || isPhantomConnecting;
+  }
+
+  // Only log button state changes (not on every render) - reduces console spam
+  // CRITICAL: This hook must be called BEFORE any conditional returns
+  useEffect(() => {
+    if (isMobile && typeof window !== "undefined") {
+      const stateKey = `${actuallyConnected}-${connecting}-${isPhantomConnecting}-${isButtonDisabled}`;
+      const lastState = sessionStorage.getItem('last_button_state');
+      if (lastState !== stateKey) {
+        console.log("🔍 Button state changed:", {
+          actuallyConnected,
+          connecting,
+          isPhantomConnecting,
+          isButtonDisabled
+        });
+        sessionStorage.setItem('last_button_state', stateKey);
+      }
+    }
+  }, [actuallyConnected, connecting, isPhantomConnecting, isButtonDisabled, isMobile]);
 
   // Handle wallet connection
   // CRITICAL: On mobile, be VERY permissive - allow connection attempts
   const handleConnect = () => {
+    // Prevent multiple simultaneous connection attempts
+    if (connecting) {
+      console.warn("⚠️ Connection already in progress - ignoring click");
+      return;
+    }
+    
     console.log("🔘 Connect button clicked", { mobile, actuallyConnected, connecting, isPhantomConnecting });
     
     // On mobile, be very permissive - only block if definitely connected
@@ -296,7 +391,16 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       
       try {
         logWalletEvent('selecting', { adapter: 'Phantom' });
-        await connect();
+        
+        // Wrap in try-catch to prevent React hook order issues
+        try {
+          await connect();
+        } catch (connectError: any) {
+          // Log the error but re-throw it to be handled by outer catch
+          console.error('❌ Connection error in handleConnect:', connectError);
+          throw connectError;
+        }
+        
         logWalletEvent('connect_called', { adapter: 'Phantom' });
         
         // Clear timeout and connecting state on success
@@ -353,16 +457,6 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       localStorage.setItem('wallet_disconnected', 'true');
     }
   };
-
-  // If connected (via prop OR adapter), show connected state
-  // On mobile, also check localStorage for stored connection
-  const effectivePublicKey = publicKey || 
-    (mobile && mobileConnectionState.publicKey ? new PublicKey(mobileConnectionState.publicKey) : null) ||
-    (mobile && typeof window !== 'undefined' && localStorage.getItem('phantom_public_key')
-      ? new PublicKey(localStorage.getItem('phantom_public_key')!)
-      : null);
-  const actuallyConnected = isConnected || (connected && effectivePublicKey) || 
-    (mobile && (mobileConnectionState.connected || (typeof window !== 'undefined' && localStorage.getItem('phantom_connected') === 'true')) && effectivePublicKey);
 
   // Show connected state if connected
   if (actuallyConnected && effectivePublicKey) {
@@ -427,101 +521,10 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         </div>
       </div>
     );
-      }
+  }
   
   // Show connection button
-  // CRITICAL: Always use handleConnect - it calls useUSDFGWallet.connect()
-  // which now handles the logic: checks window.solana on mobile, uses adapter if available, deep link otherwise
-  // This consolidates all connection logic in one place (useUSDFGWallet)
-  const isMobile = isMobileSafari();
-  const hasWindowSolana = typeof window !== "undefined" && !!(window as any).solana;
   
-  // CRITICAL: Check if Phantom connection is in progress, but only if it's recent (not stuck)
-  // Clear stuck states automatically - be aggressive about clearing on Safari
-  let isPhantomConnecting = false;
-  if (typeof window !== "undefined") {
-    const connectingFlag = sessionStorage.getItem('phantom_connecting') === 'true';
-    const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
-    
-    if (connectingFlag && connectTimestamp) {
-      const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
-      // If connection state is older than 5 seconds, consider it stuck and clear it (more aggressive)
-      // This ensures button is clickable quickly on Safari
-      if (timeSinceConnect > 5000) {
-        console.log("🧹 Clearing stuck connection state (older than 5 seconds)");
-        sessionStorage.removeItem('phantom_connecting');
-        sessionStorage.removeItem('phantom_connect_timestamp');
-        sessionStorage.removeItem('phantom_connect_attempt');
-        isPhantomConnecting = false;
-      } else {
-        // Only consider it connecting if it's very recent (within 5 seconds)
-        isPhantomConnecting = true;
-      }
-    } else if (connectingFlag && !connectTimestamp) {
-      // No timestamp but marked as connecting - clear it immediately (orphaned state)
-      console.log("🧹 Clearing orphaned connection state immediately");
-      sessionStorage.removeItem('phantom_connecting');
-      isPhantomConnecting = false;
-    } else {
-      // No connecting flag at all - ensure it's false
-      isPhantomConnecting = false;
-    }
-  }
-  
-  // Removed new tab warning - if Phantom works correctly, it returns to same tab
-  // If it opens a new tab, user can close it themselves (no need for warning)
-  
-  // CRITICAL: On mobile, be VERY lenient with button disabled state
-  // Only disable if we're CERTAIN we're connected or actively connecting (within 2 seconds)
-  // This ensures button is always clickable on mobile Safari
-  let isButtonDisabled = false;
-  if (mobile) {
-    // On mobile: Only disable if actually connected OR very recent connection (within 2 seconds)
-    const veryRecentConnection = isPhantomConnecting && typeof window !== "undefined";
-    if (veryRecentConnection) {
-      const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
-      if (connectTimestamp) {
-        const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
-        // Only disable if connection attempt is within last 2 seconds
-        if (timeSinceConnect > 2000) {
-          // Stale - don't disable
-          isButtonDisabled = false;
-        } else {
-          // Very recent - disable to prevent double-clicks
-          isButtonDisabled = true;
-        }
-      } else {
-        // No timestamp - don't disable
-        isButtonDisabled = false;
-      }
-    }
-    // Also disable if actually connected
-    if (actuallyConnected) {
-      isButtonDisabled = true;
-    }
-  } else {
-    // Desktop: Use normal logic
-    isButtonDisabled = connecting || actuallyConnected || isPhantomConnecting;
-  }
-  
-  // Only log button state changes (not on every render) - reduces console spam
-  useEffect(() => {
-    if (isMobile && typeof window !== "undefined") {
-      const stateKey = `${actuallyConnected}-${connecting}-${isPhantomConnecting}-${isButtonDisabled}`;
-      const lastState = sessionStorage.getItem('last_button_state');
-      if (lastState !== stateKey) {
-        console.log("🔍 Button state changed:", {
-          actuallyConnected,
-          connecting,
-          isPhantomConnecting,
-          isButtonDisabled
-        });
-        sessionStorage.setItem('last_button_state', stateKey);
-      }
-    }
-  }, [actuallyConnected, connecting, isPhantomConnecting, isButtonDisabled, isMobile]);
-  
-  // Show connected state if connected
   if (actuallyConnected && effectivePublicKey) {
     const shortAddress = `${effectivePublicKey.toString().slice(0, 4)}...${effectivePublicKey.toString().slice(-4)}`;
     return (

@@ -112,14 +112,20 @@ export function useUSDFGWallet() {
       }
       
       console.log("🔍 Selecting Phantom wallet...");
-      await wallet.select(phantomWallet.adapter.name);
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      
-      // Verify selection worked
-      if (!wallet.wallet) {
-        const errorMsg = "Failed to select Phantom wallet. Please try again.";
-        console.error("❌", errorMsg);
-        throw new Error(errorMsg);
+      try {
+        await wallet.select(phantomWallet.adapter.name);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        
+        // Verify selection worked
+        if (!wallet.wallet) {
+          const errorMsg = "Failed to select Phantom wallet. Please try again.";
+          console.error("❌", errorMsg);
+          throw new Error(errorMsg);
+        }
+      } catch (selectError: any) {
+        console.error("❌ Error selecting wallet:", selectError);
+        // Re-throw with more context
+        throw new Error(`Failed to select Phantom wallet: ${selectError.message || 'Unknown error'}`);
       }
     }
     

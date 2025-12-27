@@ -11,7 +11,7 @@ import TournamentBracketView from "@/components/arena/TournamentBracketView";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
-import { ChallengeData, expressJoinIntent, creatorFund, joinerFund, revertCreatorTimeout, revertJoinerTimeout, expirePendingChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage, uploadTeamImage, updateTeamImage, upsertChallengeNotification, listenToChallengeNotifications, ChallengeNotification, fetchChallengeById, submitTournamentMatchResult } from "@/lib/firebase/firestore";
+import { ChallengeData, expressJoinIntent, creatorFund, joinerFund, revertCreatorTimeout, revertJoinerTimeout, expirePendingChallenge, cleanupExpiredChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage, uploadTeamImage, updateTeamImage, upsertChallengeNotification, listenToChallengeNotifications, ChallengeNotification, fetchChallengeById, submitTournamentMatchResult } from "@/lib/firebase/firestore";
 import { Timestamp } from "firebase/firestore";
 import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
@@ -2776,13 +2776,61 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
   // Memoize filtered challenges to prevent unnecessary re-renders
   const filteredChallenges = useMemo(() => {
+    const now = Date.now();
+    
     return challenges.filter(challenge => {
-    const categoryMatch = filterCategory === 'All' || challenge.category === filterCategory;
-    const gameMatch = filterGame === 'All' || challenge.game === filterGame;
-    const myChallengesMatch = !showMyChallenges || challenge.creator === (publicKey?.toString() || null);
-    return categoryMatch && gameMatch && myChallengesMatch;
-  });
+      // Filter by category
+      const categoryMatch = filterCategory === 'All' || challenge.category === filterCategory;
+      // Filter by game
+      const gameMatch = filterGame === 'All' || challenge.game === filterGame;
+      // Filter by "My Challenges" toggle
+      const myChallengesMatch = !showMyChallenges || challenge.creator === (publicKey?.toString() || null);
+      
+      // Check if challenge is expired (these will be deleted automatically)
+      const isExpired = challenge.status === 'cancelled' || 
+        (challenge.expiresAt && challenge.expiresAt < now) ||
+        (challenge.rawData?.expirationTimer && challenge.rawData.expirationTimer.toMillis() < now);
+      
+      // Also exclude completed and disputed challenges from joinable list
+      const isCompleted = challenge.status === 'completed' || challenge.status === 'disputed';
+      
+      // Only show joinable challenges (unless user wants to see their own challenges)
+      const isJoinable = !isExpired && !isCompleted;
+      
+      // If showing "My Challenges", show all their challenges regardless of status
+      // Otherwise, only show joinable challenges
+      const shouldShow = showMyChallenges ? (categoryMatch && gameMatch && myChallengesMatch) : (categoryMatch && gameMatch && isJoinable);
+      
+      return shouldShow;
+    });
   }, [challenges, filterCategory, filterGame, showMyChallenges, publicKey]);
+
+  // Auto-delete expired challenges to save Firebase storage
+  useEffect(() => {
+    if (!challenges.length || showMyChallenges) return; // Don't delete user's own challenges
+    
+    const now = Date.now();
+    const expiredIds: string[] = [];
+    
+    challenges.forEach(challenge => {
+      const isExpired = challenge.status === 'cancelled' || 
+        (challenge.expiresAt && challenge.expiresAt < now) ||
+        (challenge.rawData?.expirationTimer && challenge.rawData.expirationTimer.toMillis() < now);
+      
+      if (isExpired) {
+        expiredIds.push(challenge.id);
+      }
+    });
+    
+    // Delete expired challenges asynchronously
+    if (expiredIds.length > 0) {
+      expiredIds.forEach(challengeId => {
+        cleanupExpiredChallenge(challengeId).catch(err => {
+          console.error('Failed to delete expired challenge:', challengeId, err);
+        });
+      });
+    }
+  }, [challenges, showMyChallenges]);
 
   // Memoize unique games and categories
   const uniqueGames = useMemo(() => ['All', ...Array.from(new Set(challenges.map(c => c.game)))], [challenges]);
@@ -3191,904 +3239,231 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             <AdRotationBox />
           </div>
 
-          {/* Live Challenges Section */}
-          <div className="relative rounded-[20px] bg-[#07080C]/95 border border-amber-500/30 overflow-hidden shadow-[0_0_40px_rgba(255,215,130,0.08)] mb-6">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
-              <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-amber-400/10 via-transparent to-transparent" />
-              <div className="relative z-10 p-6">
-                <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold uppercase tracking-wider text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)] flex items-center">
-                  <span className="mr-2">🎯</span>
-                  LIVE CHALLENGES
-                </h2>
-                  <span className="text-sm text-amber-400 font-semibold">
-                    {filteredChallenges.length} challenge{filteredChallenges.length !== 1 ? 's' : ''}
+          {/* Live Challenges Discovery Section - Category-based horizontal scrolling */}
+          <div className="relative mb-6">
+            {/* Header */}
+            <div className="mb-5 px-4 md:px-0">
+              <h1 className="text-lg md:text-2xl font-semibold text-white mb-1">Live Challenges</h1>
+              <p className="text-sm text-white/55">Browse by category. Swipe left or right inside each section.</p>
+            </div>
+
+            {/* Helper function to map challenge categories to discovery categories */}
+            {(() => {
+              // Group challenges by discovery category (Sports, Fighting, FPS, Racing)
+              const categorizeChallenge = (challenge: any): 'Sports' | 'Fighting' | 'FPS' | 'Racing' | null => {
+                const category = challenge.category?.toUpperCase() || '';
+                const game = challenge.game?.toLowerCase() || '';
+                
+                // Map to discovery categories
+                if (category.includes('SPORTS') || category.includes('BASKETBALL') || 
+                    category.includes('SOCCER') || category.includes('FOOTBALL') || 
+                    category.includes('BASEBALL') || category.includes('GOLF')) {
+                  return 'Sports';
+                }
+                if (category.includes('FIGHTING') || category.includes('BOXING')) {
+                  return 'Fighting';
+                }
+                if (category.includes('SHOOTING') || category.includes('FPS') || 
+                    game.includes('cod') || game.includes('call of duty') || 
+                    game.includes('valorant') || game.includes('cs') || 
+                    game.includes('battlefield')) {
+                  return 'FPS';
+                }
+                if (category.includes('RACING')) {
+                  return 'Racing';
+                }
+                return null; // Exclude uncategorized
+              };
+
+              const categoryGroups: Record<string, any[]> = {
+                Sports: [],
+                Fighting: [],
+                FPS: [],
+                Racing: []
+              };
+
+              filteredChallenges.forEach(challenge => {
+                const category = categorizeChallenge(challenge);
+                if (category && categoryGroups[category]) {
+                  categoryGroups[category].push(challenge);
+                }
+              });
+
+              // Category title colors matching prototype
+              const categoryTitleClass = (title: string) => {
+                if (title === 'Sports') return 'text-emerald-400';
+                if (title === 'Fighting') return 'text-rose-400';
+                if (title === 'FPS') return 'text-indigo-400';
+                if (title === 'Racing') return 'text-amber-400';
+                return 'text-white';
+              };
+
+              // Status badge component
+              const StatusPill = ({ status, isOwner, players, capacity }: { status: string; isOwner: boolean; players: number; capacity: number }) => {
+                if (status === "pending_waiting_for_opponent") {
+                  return (
+                    <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-emerald-500/20 text-emerald-200 border-emerald-500/30 ring-1 ring-emerald-400/30 shadow-[0_0_12px_rgba(16,185,129,0.25)]">
+                      OPEN
+                    </span>
+                  );
+                }
+                if (status === "active" || status === "creator_funded") {
+                  return (
+                    <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-rose-500/20 text-rose-200 border-rose-500/30 ring-1 ring-rose-400/40 shadow-[0_0_16px_rgba(244,63,94,0.35)]">
+                      LIVE
+                    </span>
+                  );
+                }
+                if (status === "creator_confirmation_required") {
+                  return (
+                    <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-amber-500/20 text-amber-200 border-amber-500/30 ring-1 ring-amber-400/30 shadow-[0_0_12px_rgba(245,158,11,0.25)]">
+                      {isOwner ? 'CONFIRM' : 'LIVE'}
+                    </span>
+                  );
+                }
+                if (players >= capacity) {
+                  return (
+                    <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-neutral-600/25 text-neutral-200 border-neutral-500/30">
+                      FULL
+                    </span>
+                  );
+                }
+                return (
+                  <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-white/10 text-white border-white/10">
+                    {status.toUpperCase()}
                   </span>
-                </div>
+                );
+              };
+
+              // Platform icon helper
+              const platformIcon = (platform: string) => {
+                const p = String(platform || '').toLowerCase();
+                if (p.includes('ps')) return '🎮';
+                if (p.includes('xbox')) return '🟩';
+                if (p.includes('pc')) return '🖥️';
+                if (p.includes('mobile')) return '📱';
+                return '🎮';
+              };
+
+              // Discovery card component
+              const DiscoveryCard = ({ challenge, onSelect }: { challenge: any; onSelect: () => void }) => {
+                const gameName = challenge.game || extractGameFromTitle(challenge.title);
+                const imagePath = getGameImage(gameName);
+                const isOwner = isChallengeOwner(challenge);
                 
-                {/* Filter Controls */}
-                <div className="flex flex-wrap gap-3 mb-6">
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-amber-300">Category:</label>
-                    <select
-                      value={filterCategory}
-                      onChange={(e) => setFilterCategory(e.target.value)}
-                      className="px-3 py-1.5 bg-zinc-800/50 border border-amber-500/30 rounded-lg text-white text-sm focus:border-amber-400 focus:outline-none hover:border-amber-400/60 transition-all"
-                    >
-                      {categories.map(category => (
-                        <option key={category} value={category}>{category}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-amber-300">Game:</label>
-                    <select
-                      value={filterGame}
-                      onChange={(e) => setFilterGame(e.target.value)}
-                      className="px-3 py-1.5 bg-zinc-800/50 border border-amber-500/30 rounded-lg text-white text-sm focus:border-amber-400 focus:outline-none hover:border-amber-400/60 transition-all"
-                    >
-                      {uniqueGames.map(game => (
-                        <option key={game} value={game}>{game}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  {isConnected && (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setShowMyChallenges(!showMyChallenges)}
-                        className={`px-3 py-1.5 rounded-lg border text-sm transition-all ${
-                          showMyChallenges 
-                            ? 'bg-amber-600/20 border-amber-500/30 text-amber-400' 
-                            : 'bg-zinc-800/50 border-amber-500/30 text-amber-300 hover:bg-amber-600/20 hover:border-amber-400/50'
-                        }`}
-                      >
-                        {showMyChallenges ? '👤 My Challenges' : '🌐 All Challenges'}
-                      </button>
-                    </div>
-                  )}
-                  
-                  {(filterCategory !== 'All' || filterGame !== 'All' || showMyChallenges) && (
-                    <button
-                      onClick={() => {
-                        setFilterCategory('All');
-                        setFilterGame('All');
-                        setShowMyChallenges(false);
+                const status = challenge.status;
+                const isOpen = status === "pending_waiting_for_opponent";
+                const isLive = status === "active" || status === "creator_funded";
+                const isFull = challenge.players >= challenge.capacity;
+
+                const edgeGlow = isOpen
+                  ? 'border-emerald-400/50 shadow-[0_0_18px_rgba(16,185,129,0.40)] ring-1 ring-emerald-400/20'
+                  : isLive
+                    ? 'border-rose-400/55 shadow-[0_0_22px_rgba(244,63,94,0.48)] ring-1 ring-rose-400/20'
+                    : 'border-white/10';
+
+                return (
+                  <button
+                    type="button"
+                    className={`relative w-full text-left rounded-xl border overflow-hidden p-3 transition active:scale-[0.99] h-[192px] sm:h-[200px] ${edgeGlow}`}
+                    onClick={onSelect}
+                    aria-label={`Open ${gameName} challenge`}
+                  >
+                    <img
+                      src={imagePath}
+                      alt=""
+                      aria-hidden="true"
+                      className="absolute inset-0 h-full w-full object-cover scale-110"
+                      loading="lazy"
+                      draggable={false}
+                      onError={(e) => {
+                        const target = e.currentTarget as HTMLImageElement;
+                        target.src = '/assets/usdfg-logo-transparent.png';
                       }}
-                      className="px-3 py-1.5 bg-amber-600/20 text-amber-400 border border-amber-500/30 rounded-lg text-sm hover:bg-amber-600/30 transition-colors"
-                    >
-                      Clear Filters
-                    </button>
-                  )}
-                </div>
-                
-                <div className="grid grid-cols-3 gap-2 md:gap-4">
-                  {filteredChallenges.length === 0 ? (
-                    <div className="col-span-full text-center py-8">
-                      <p className="text-gray-400 text-sm mb-2">No challenges found matching your filters.</p>
-                      <button
-                        onClick={() => {
-                          setFilterCategory('All');
-                          setFilterGame('All');
-                        }}
-                        className="text-amber-400 hover:text-amber-300 text-sm underline"
-                      >
-                        Clear filters to see all challenges
-                      </button>
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/75 to-black/40" />
+                    <div className="absolute inset-0 shadow-[inset_0_0_80px_rgba(0,0,0,0.9)]" />
+                    <div className="absolute inset-0 ring-1 ring-white/5 rounded-xl" />
+
+                    <div className="relative z-10 flex h-full flex-col gap-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[15px] font-semibold truncate">{gameName}</div>
+                          <div className="text-xs text-white/70 truncate">{challenge.mode || 'Head-to-Head'}</div>
+                        </div>
+                        <StatusPill 
+                          status={status} 
+                          isOwner={isOwner} 
+                          players={challenge.players || 0} 
+                          capacity={challenge.capacity || 2} 
+                        />
+                      </div>
+
+                      <div className="mt-auto grid grid-cols-2 gap-2 text-xs">
+                        <div className="rounded-lg bg-black/45 p-2">
+                          <div className="text-white/70">💰 Entry</div>
+                          <div className="font-semibold">{challenge.entryFee} USDFG</div>
+                        </div>
+                        <div className="rounded-lg bg-black/45 p-2">
+                          <div className="text-white/70">🏆 Prize</div>
+                          <div className="font-semibold">{challenge.prizePool} USDFG</div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 text-[12px] text-white/80">
+                        <div className="min-w-0 truncate">
+                          <span className="text-white/60">👤 Creator</span>{' '}
+                          <span className="font-semibold">{challenge.username || challenge.creator?.slice(0, 8) + '...'}</span>
+                        </div>
+                        <div className="shrink-0">
+                          <span className="text-white/60">{platformIcon(challenge.platform)}</span>{' '}
+                          <span className="font-semibold">{challenge.platform || 'All'}</span>
+                        </div>
+                      </div>
                     </div>
-                  ) : (
-                    filteredChallenges.map((challenge) => {
-                    const isOwner = isChallengeOwner(challenge);
+                  </button>
+                );
+              };
+
+              // Render category rows
+              return (
+                <>
+                  {(Object.entries(categoryGroups) as Array<[string, any[]]>).map(([categoryTitle, items]) => {
+                    if (items.length === 0) return null;
+                    
                     return (
-                      <div 
-                        key={challenge.id} 
-                        className={`relative bg-[#07080C]/95 border border-amber-500/30 rounded-xl p-2 md:p-4 cursor-pointer hover:border-amber-400/50 shadow-[0_0_20px_rgba(255,215,130,0.05)] hover:shadow-[0_0_30px_rgba(255,215,130,0.08)] transition-all overflow-hidden`}
-                        onClick={async () => {
-                          // Don't open join modal for completed challenges
-                          if (challenge.status === "completed" || challenge.rawData?.payoutTriggered) {
-                            return;
-                          }
-                          
-                          // Check if this is a team challenge with teamOnly restriction
-                          const challengeType = challenge.rawData?.challengeType;
-                          const teamOnly = challenge.rawData?.teamOnly;
-                          
-                          if (challengeType === 'team' && teamOnly === true) {
-                            // Team-only challenge - verify user is in a team
-                            if (!currentWallet) {
-                              setNotification({
-                                isOpen: true,
-                                message: 'Please connect your wallet to join this team challenge.',
-                                title: 'Wallet Required',
-                                type: 'warning'
-                              });
-                              return;
-                            }
-                            
-                            const userTeam = await getTeamByMember(currentWallet);
-                            if (!userTeam) {
-                              setNotification({
-                                isOpen: true,
-                                message: 'This challenge is only open to teams. You must be part of a team to join. Please create or join a team first.',
-                                title: 'Team Required',
-                                type: 'warning'
-                              });
-                              return;
-                            }
-                          }
-                          
-                          setSelectedChallenge(challenge);
-                          setShowJoinModal(true);
-                        }}
-                      >
-                        {/* Simplified Mobile View (Amazon-style) */}
-                        <div className="block md:hidden relative w-full flex flex-col">
-                          {/* Large Game Image - Takes most of the card */}
-                          <div className="relative w-full aspect-square rounded-lg overflow-hidden mb-2 bg-[#0A0B0F]/50 flex items-center justify-center">
-                            {(() => {
-                              const gameName = challenge.game || extractGameFromTitle(challenge.title);
-                              const imagePath = getGameImage(gameName);
-                              return (
-                                <img
-                                  src={imagePath}
-                                  alt={gameName}
-                                  className="w-full h-full object-contain p-2"
-                                  loading="lazy"
-                                  decoding="async"
-                                  onError={(e) => {
-                                    const target = e.currentTarget as HTMLImageElement;
-                                    target.src = '/assets/usdfg-logo-transparent.png';
-                                  }}
-                                />
-                              );
-                            })()}
-                          </div>
-                          
-                          {/* Game Name - Bottom */}
-                          <div className="text-center mb-1 min-h-[32px] flex items-center justify-center">
-                            <p className="text-white text-xs font-semibold line-clamp-2 leading-tight">
-                              {challenge.game || extractGameFromTitle(challenge.title) || 'Game'}
-                            </p>
-                          </div>
-                          
-                          {/* Small Status Badge */}
-                          <div className="text-center">
-                            {challenge.status === "pending_waiting_for_opponent" && (
-                              <span className="inline-block px-1.5 py-0.5 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-[10px]">
-                                Open
-                              </span>
-                            )}
-                            {challenge.status === "creator_confirmation_required" && (
-                              <span className="inline-block px-1.5 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded text-[10px]">
-                                {isOwner ? "Confirm" : "Active"}
-                              </span>
-                            )}
-                            {challenge.status === "creator_funded" && (
-                              <span className="inline-block px-1.5 py-0.5 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-[10px]">
-                                Active
-                              </span>
-                            )}
-                            {challenge.status === "active" && (
-                              <span className="inline-block px-1.5 py-0.5 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-[10px]">
-                                Active
-                              </span>
-                            )}
-                            {(challenge.status === "cancelled" || (challenge.expiresAt && challenge.expiresAt < Date.now())) && (
-                              <span className="inline-block px-1.5 py-0.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-[10px]">
-                                Expired
-                              </span>
-                            )}
-                            {challenge.status === "completed" && (
-                              <span className="inline-block px-1.5 py-0.5 bg-gray-500/20 text-gray-400 border border-gray-500/30 rounded text-[10px]">
-                                Done
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {/* Full Detailed View (Desktop/Tablet) */}
-                        <div className="hidden md:block">
-                        {/* Full Background Image */}
-                        <div className="absolute inset-0 overflow-hidden rounded-2xl z-0">
-                          {(() => {
-                            const gameName = challenge.game || extractGameFromTitle(challenge.title);
-                            const imagePath = getGameImage(gameName);
-                            return (
-                              <img
-                                src={imagePath}
-                                alt={gameName}
-                                className="absolute inset-0 w-full h-full object-cover"
-                                style={{ objectFit: 'contain', objectPosition: 'center' }}
-                                loading="lazy"
-                                decoding="async"
-                                onError={(e) => {
-                                  const target = e.currentTarget as HTMLImageElement;
-                                  console.error(`❌ Failed to load image: ${imagePath}`);
-                                  target.src = '/assets/usdfg-logo-transparent.png';
-                                }}
-                              />
-                            );
-                          })()}
-                          <div className="absolute inset-0 bg-gradient-to-br from-[#07080C]/70 via-[#07080C]/60 to-[#07080C]/70 rounded-2xl" />
-                        </div>
-                        
-                        {/* Ambient Glow */}
-                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60 rounded-2xl" />
-                        <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite] rounded-t-2xl" />
-                        <div className="relative z-10 mb-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center space-x-3">
-                              <div className="w-10 h-10 rounded-lg overflow-hidden shadow-lg shadow-amber-500/20 border border-amber-400/30 bg-[#07080C]/50 flex items-center justify-center">
-                                <img
-                                  src={getGameImage(challenge.game || extractGameFromTitle(challenge.title))}
-                                  alt={challenge.game || extractGameFromTitle(challenge.title)}
-                                  className="w-full h-full object-contain p-1"
-                                  loading="lazy"
-                                  decoding="async"
-                                  onError={(e) => {
-                                    const target = e.currentTarget as HTMLImageElement;
-                                    target.src = '/assets/usdfg-logo-transparent.png';
-                                  }}
-                                />
-                              </div>
-                              <div>
-                                <h3 className="text-white font-bold text-lg drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">{challenge.title}</h3>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-text-dim text-sm neocore-body">{getGameCategory(challenge.game || extractGameFromTitle(challenge.title))}</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* Game Name - Most Prominent */}
-                          <div className="mb-3">
-                            <div className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-400/40 rounded-lg shadow-[0_0_20px_rgba(255,215,130,0.2)]">
-                              <span className="text-amber-300 mr-2 text-lg">🎮</span>
-                              <span className="text-amber-200 font-bold text-lg drop-shadow-[0_0_8px_rgba(255,215,130,0.4)]">
-                                {challenge.game || extractGameFromTitle(challenge.title) || 'Game'}
-                              </span>
-                            </div>
-                          </div>
-                          
-                          {/* Challenge Details */}
-                          <div className="mb-3">
-                            {challenge.platform && (
-                              <p className="text-text-dim/60 text-xs neocore-body">
-                                🖥️ {challenge.platform}
-                                {challenge.username && challenge.creator && (
-                                  <>
-                                    {' • 👤 '}
-                                    <button
-                                      onClick={async (e) => {
-                                        e.stopPropagation();
-                                        try {
-                                          const creatorStats = await getPlayerStats(challenge.creator);
-                                          if (creatorStats) {
-                                            setSelectedPlayer(creatorStats);
-                                            setShowPlayerProfile(true);
-                                          }
-                                        } catch (error) {
-                                          console.error('Failed to load creator profile:', error);
-                                        }
-                                      }}
-                                      className="text-amber-300 hover:text-amber-200 underline transition-colors"
-                                    >
-                                      {challenge.username}
-                                    </button>
-                                  </>
-                                )}
-                              </p>
-                            )}
-                            {/* Team Challenge Indicator */}
-                            {(() => {
-                              const challengeType = challenge.rawData?.challengeType;
-                              const teamOnly = challenge.rawData?.teamOnly;
-                              if (challengeType === 'team') {
-                                return (
-                                  <div className="mt-2 inline-flex items-center px-2 py-1 bg-zinc-800/50 border border-amber-400/30 rounded text-xs">
-                                    <span className="text-amber-300 mr-1">👥</span>
-                                    <span className="text-amber-200">
-                                      {teamOnly ? 'Teams Only' : 'Open to All'}
-                                    </span>
-                                  </div>
-                                );
-                              }
-                              return null;
-                            })()}
-                            {challenge.createdAt && (
-                              <p className="text-text-dim/60 text-xs neocore-body">
-                                Created {new Date(challenge.createdAt).toLocaleDateString()} at {new Date(challenge.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </p>
-                            )}
-                            {challenge.expiresAt && challenge.expiresAt > Date.now() && (
-                              <p className="text-orange-400/80 text-xs neocore-body">
-                                ⏰ Expires in {Math.max(0, Math.floor((challenge.expiresAt - Date.now()) / (1000 * 60)))} minutes
-                              </p>
-                            )}
-                            {isOwner && (
-                              <span className="inline-block px-2 py-1 bg-glow-electric/20 text-glow-electric border border-glow-electric/30 rounded text-xs mt-1 neocore-body">
-                                Your Challenge
-                              </span>
-                            )}
-                            {isFounderChallenge(challenge) && (
-                              <span className="inline-block px-2 py-1 bg-gradient-to-r from-purple-600/30 to-pink-600/30 text-purple-300 border border-purple-400/50 rounded text-xs mt-1 font-bold neocore-body animate-pulse-subtle">
-                                🏆 Founder Challenge - Free Entry!
-                              </span>
-                            )}
-                          </div>
-                          {/* NEW STATE MACHINE STATUS BADGES */}
-                          {challenge.status === "pending_waiting_for_opponent" && (
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="px-2 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-xs">
-                                Waiting for Opponent
-                              </span>
-                              {isOwner && (
-                                <span className="px-2 py-1 bg-blue-500/10 text-blue-300 border border-blue-500/20 rounded text-xs">
-                                  Your Challenge
-                                </span>
-                              )}
-                              {challenge.rawData?.expirationTimer && (
-                                <CountdownTimer
-                                  deadline={challenge.rawData.expirationTimer}
-                                  expiredMessage="Expired"
-                                  className="text-xs text-blue-300"
-                                />
-                              )}
-                              {!isOwner && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleShareChallenge(challenge);
-                                  }}
-                                  className="px-2 py-1 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded text-xs hover:bg-amber-600/30 transition-all flex items-center gap-1"
-                                  title="Share Challenge"
-                                >
-                                  📤 Share
-                                </button>
-                              )}
-                            </div>
-                          )}
-                          {challenge.status === "creator_confirmation_required" && (
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="px-2 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded text-xs">
-                                {isOwner ? "Confirm & Fund" : "Opponent Found"}
-                              </span>
-                              {challenge.rawData?.creatorFundingDeadline && (
-                                <CountdownTimer
-                                  deadline={challenge.rawData.creatorFundingDeadline}
-                                  expiredMessage="Creator Timeout"
-                                  className="text-xs text-amber-300"
-                                />
-                              )}
-                              {isOwner && challenge.rawData?.pendingJoiner && (
-                                <span className="px-2 py-1 bg-amber-500/10 text-amber-300 border border-amber-500/20 rounded text-xs">
-                                  Opponent: {challenge.rawData.pendingJoiner.slice(0, 6)}...{challenge.rawData.pendingJoiner.slice(-4)}
-                                </span>
-                              )}
-                              {isOwner && !challenge.rawData?.pendingJoiner && (
-                                <span className="px-2 py-1 bg-red-500/10 text-red-300 border border-red-500/20 rounded text-xs">
-                                  ⚠️ No opponent found
-                                </span>
-                              )}
-                            </div>
-                          )}
-                          {challenge.status === "creator_funded" && (
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
-                                {(() => {
-                                  const currentWallet = publicKey?.toString()?.toLowerCase();
-                                  const challenger = challenge.rawData?.challenger?.toLowerCase();
-                                  if (currentWallet === challenger) {
-                                    return "Fund to Activate";
-                                  }
-                                  return "Creator Funded";
-                                })()}
-                              </span>
-                              {challenge.rawData?.joinerFundingDeadline && (
-                                <CountdownTimer
-                                  deadline={challenge.rawData.joinerFundingDeadline}
-                                  expiredMessage="Joiner Timeout"
-                                  className="text-xs text-green-300"
-                                />
-                              )}
-                            </div>
-                          )}
-                          {challenge.status === "active" && (
-                            <div className="flex items-center gap-2">
-                              <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
-                                Active
-                              </span>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleShareChallenge(challenge);
-                                }}
-                                className="px-2 py-1 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded text-xs hover:bg-amber-600/30 transition-all flex items-center gap-1"
-                                title="Share Challenge"
-                              >
-                                📤 Share
-                              </button>
-                            </div>
-                          )}
-                          {(challenge.status === "cancelled" || (challenge.expiresAt && challenge.expiresAt < Date.now())) && (
-                            <span className="px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs animate-pulse">
-                              Expired
-                            </span>
-                          )}
-                          {challenge.status === "completed" && (
-                            <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
-                              ✅ Completed
-                            </span>
-                          )}
-                          {challenge.status === "disputed" && (
-                            <span className="px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs animate-pulse">
-                              🔴 Disputed
-                            </span>
-                          )}
-                        </div>
-                        
-                        {/* Show tournament champion for completed tournaments - placed prominently after status */}
-                        {challenge.status === "completed" && (() => {
-                          const format = challenge.rawData?.format || (challenge.rawData?.tournament ? 'tournament' : 'standard');
-                          const isTournament = format === 'tournament';
-                          const champion = challenge.rawData?.tournament?.champion;
-                          
-                          if (isTournament && champion) {
-                            const isCurrentUser = currentWallet && champion.toLowerCase() === currentWallet.toLowerCase();
-                            return (
-                              <div className="mb-2 px-3 py-2 rounded border border-amber-400/30 bg-amber-500/5 relative z-10">
-                                <div className="flex items-center justify-between gap-2">
-                                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                                    <span className="text-sm">🏆</span>
-                                    <span className="text-xs font-medium text-amber-200/90">Champion:</span>
-                                    <span className="text-xs text-gray-300 truncate">
-                                      {isCurrentUser ? (
-                                        <span className="text-emerald-400 font-semibold">You</span>
-                                      ) : (
-                                        <span>{champion.slice(0, 6)}...{champion.slice(-4)}</span>
-                                      )}
-                                    </span>
-                                  </div>
-                                  {isCurrentUser && challenge.rawData?.canClaim && !challenge.rawData?.payoutTriggered && (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleClaimPrize(challenge);
-                                      }}
-                                      disabled={claimingPrize === challenge.id}
-                                      className={`px-3 py-1 text-xs font-semibold text-white rounded transition-all flex-shrink-0 ${
-                                        claimingPrize === challenge.id
-                                          ? 'bg-gray-500 cursor-not-allowed'
-                                          : 'bg-gradient-to-r from-green-600 to-emerald-500 hover:brightness-110'
-                                      }`}
-                                    >
-                                      {claimingPrize === challenge.id ? '⏳' : `Claim ${challenge.prizePool} USDFG`}
-                                    </button>
-                                  )}
-                                  {isCurrentUser && challenge.rawData?.payoutTriggered && (
-                                    <span className="px-2 py-1 text-xs bg-green-600/20 text-green-400 border border-green-600/30 rounded flex-shrink-0">
-                                      ✅ Claimed
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          }
-                          return null;
-                        })()}
-                        
-                        <div className="relative z-10 grid grid-cols-3 gap-2 mb-2">
-                          <div className="text-center">
-                            <div className={`font-bold text-sm drop-shadow-[0_0_8px_rgba(255,215,130,0.2)] ${
-                              isFounderChallenge(challenge) ? 'text-green-400' : 'text-white'
-                            }`}>
-                              {isFounderChallenge(challenge) ? 'FREE' : `${challenge.entryFee} USDFG`}
-                            </div>
-                            <div className={`text-xs ${isFounderChallenge(challenge) ? 'text-green-300' : 'text-amber-200'}`}>Entry Fee</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-white font-bold text-sm drop-shadow-[0_0_8px_rgba(255,215,130,0.2)]">{challenge.prizePool} USDFG</div>
-                            <div className="text-amber-200 text-xs">Prize Pool</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-white font-bold text-sm drop-shadow-[0_0_8px_rgba(255,215,130,0.2)]">
-                              {challenge.players || 0}/{challenge.capacity || 2}
-                            </div>
-                            <div className="text-amber-200 text-xs">Players</div>
-                          </div>
+                      <section key={categoryTitle} className="mb-6">
+                        <div className="mb-2 flex items-center justify-between px-4 md:px-0">
+                          <h2 className={`text-sm font-semibold tracking-wide ${categoryTitleClass(categoryTitle)}`}>
+                            {categoryTitle}
+                          </h2>
+                          <div className="text-xs text-white/45">Swipe</div>
                         </div>
 
-                        {/* View Escrow Token Account on Solana Explorer */}
-                        {challenge.rawData?.pda && (() => {
-                          try {
-                            const challengePDA = new PublicKey(challenge.rawData.pda);
-                            const [escrowTokenAccountPDA] = PublicKey.findProgramAddressSync(
-                              [SEEDS.ESCROW_WALLET, challengePDA.toBuffer(), USDFG_MINT.toBuffer()],
-                              PROGRAM_ID
-                            );
-                            return (
-                              <div className="mb-2 relative z-20">
-                                <a
-                                  href={`https://explorer.solana.com/address/${escrowTokenAccountPDA.toString()}?cluster=devnet`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                                  className="flex items-center justify-center gap-1.5 px-2 py-1 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-lg hover:bg-amber-600/30 transition-all text-xs cursor-pointer relative z-20"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    e.nativeEvent.stopImmediatePropagation();
-                                    window.open(`https://explorer.solana.com/address/${escrowTokenAccountPDA.toString()}?cluster=devnet`, '_blank', 'noopener,noreferrer');
-                                  }}
-                                  onMouseDown={(e) => {
-                                    e.stopPropagation();
-                                    e.nativeEvent.stopImmediatePropagation();
-                                  }}
+                        <div 
+                          className="flex gap-3 overflow-x-auto pb-2 px-4 md:px-0" 
+                          style={{ WebkitOverflowScrolling: 'touch' }}
+                        >
+                          {items.map((challenge) => (
+                            <div 
+                              key={challenge.id} 
+                              className="flex-none w-[48%] md:w-[calc((100%-32px)/3)]"
                             >
-                              <span>🔗</span>
-                              <span>View Escrow on Solana Explorer</span>
-                              <span className="text-xs">↗</span>
-                            </a>
-                          </div>
-                            );
-                          } catch (error) {
-                            console.error('Error deriving escrow token account:', error);
-                            return null;
-                          }
-                        })()}
-
-                        {/* Challenge Details - Removed (fields not stored to keep data light) */}
-
-                        {/* Winner Display for Completed/Disputed Challenges */}
-                        {(challenge.status === "completed" || challenge.status === "disputed") && challenge.rawData?.winner && (
-                          <div className="mb-2 p-2 rounded-lg border border-amber-400/20 bg-gradient-to-r from-amber-500/5 to-orange-500/5 backdrop-blur-sm">
-                            <div className="text-center">
-                              {challenge.rawData.winner === "tie" ? (
-                                <>
-                                  <div className="text-lg mb-1">🤝</div>
-                                  <div className="text-sm font-semibold text-amber-300">TIE - Entry Fees Returned</div>
-                                  <p className="text-xs text-gray-400 mt-0.5">Entry fees will be returned to both players</p>
-                                </>
-                              ) : (
-                                <>
-                                  <div className="flex items-center justify-center gap-2 mb-2">
-                                    <img 
-                                      src="/assets/usdfg-trophy.png" 
-                                      alt="USDFG Trophy" 
-                                      className="w-8 h-8 object-contain"
-                                      onError={(e) => {
-                                        const target = e.currentTarget as HTMLImageElement;
-                                        target.style.display = 'none';
-                                        target.nextElementSibling?.classList.remove('hidden');
-                                      }}
-                                    />
-                                    <span className="text-lg hidden">🏆</span>
-                                    <div className="text-sm font-semibold text-amber-300">Winner</div>
-                                  </div>
-                                  <div className="bg-black/40 rounded-md px-2 py-1 border border-amber-400/20">
-                                    <p className="text-xs font-medium text-amber-200 font-mono break-all">{challenge.rawData.winner}</p>
-                                  </div>
-                                  {/* Admin button to mark reward as transferred (Founder Challenges only) */}
-                                  {(() => {
-                                    const currentWallet = publicKey?.toString()?.toLowerCase();
-                                    const isAdmin = currentWallet === ADMIN_WALLET.toString().toLowerCase();
-                                    const founderChallenge = isFounderChallenge(challenge);
-                                    const hasWinner = challenge.status === "completed" && challenge.rawData?.winner;
-                                    const notTransferred = !challenge.rawData?.payoutTriggered;
-                                    
-                                    if (isAdmin && founderChallenge && hasWinner && notTransferred) {
-                                      return (
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleMarkPrizeTransferred(challenge);
-                                          }}
-                                          disabled={markingPrizeTransferred === challenge.id}
-                                          className={`mt-2 w-full px-3 py-1.5 text-sm text-white font-semibold rounded-lg transition-all shadow-[0_0_10px_rgba(255,215,130,0.1)] ${
-                                            markingPrizeTransferred === challenge.id
-                                              ? 'bg-gray-500 cursor-not-allowed'
-                                              : 'bg-gradient-to-r from-purple-600 to-indigo-500 hover:brightness-110'
-                                          }`}
-                                        >
-                                          {markingPrizeTransferred === challenge.id ? '⏳ Processing...' : '✅ Mark Prize as Transferred'}
-                                        </button>
-                                      );
-                                    }
-                                    return null;
-                                  })()}
+                              <DiscoveryCard 
+                                challenge={challenge}
+                                onSelect={async () => {
+                                  // Don't open join modal for completed, expired, or disputed challenges
+                                  const isExpired = challenge.status === 'cancelled' || 
+                                    (challenge.expiresAt && challenge.expiresAt < Date.now()) ||
+                                    (challenge.rawData?.expirationTimer && challenge.rawData.expirationTimer.toMillis() < Date.now());
                                   
-                                  {(() => {
-                                    // Check if user is winner (for tournaments, check champion; for regular, check winner)
-                                    const format = challenge.rawData?.format || (challenge.rawData?.tournament ? 'tournament' : 'standard');
-                                    const isTournament = format === 'tournament';
-                                    const tournamentChampion = challenge.rawData?.tournament?.champion;
-                                    const regularWinner = challenge.rawData?.winner;
-                                    const currentWalletLower = publicKey?.toString().toLowerCase();
-                                    
-                                    const isWinner = currentWalletLower && (
-                                      (isTournament && tournamentChampion?.toLowerCase() === currentWalletLower) ||
-                                      (!isTournament && regularWinner?.toLowerCase() === currentWalletLower)
-                                    );
-                                    
-                                    if (!isWinner) return null;
-                                    
-                                    return (
-                                      <>
-                                        <p className="text-green-400 font-semibold mt-1.5 text-sm">
-                                          {isTournament ? '🏆 Tournament Champion!' : '🎉 You Won!'}
-                                        </p>
-                                      {/* Claim Reward Button - Hide for Founder Challenges */}
-                                      {(() => {
-                                        const founderChallenge = isFounderChallenge(challenge);
-                                        
-                                        // Founder Challenge - show manual transfer message
-                                        if (founderChallenge) {
-                                          if (challenge.rawData?.payoutTriggered) {
-                                            return (
-                                              <div className="mt-2 px-3 py-1.5 text-sm bg-green-600/20 text-green-400 border border-green-600/30 font-semibold rounded-lg cursor-default">
-                                                ✅ Reward Received
-                                              </div>
-                                            );
-                                          } else {
-                                            return (
-                                              <div className="mt-2 px-3 py-1.5 text-sm bg-amber-600/20 text-amber-400 border border-amber-600/30 font-semibold rounded-lg text-center">
-                                                🏆 Reward will be transferred manually by the founder
-                                              </div>
-                                            );
-                                          }
-                                        }
-                                        
-                                        // Regular challenge - show claim button
-                                        if (challenge.rawData?.canClaim && !challenge.rawData?.payoutTriggered) {
-                                          return (
-                                        <button 
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleClaimPrize(challenge);
-                                          }}
-                                          disabled={claimingPrize === challenge.id}
-                                              className={`mt-2 w-full px-3 py-1.5 text-sm text-white font-semibold rounded-lg transition-all shadow-[0_0_10px_rgba(255,215,130,0.1)] ${
-                                            claimingPrize === challenge.id 
-                                              ? 'bg-gray-500 cursor-not-allowed' 
-                                              : 'bg-gradient-to-r from-green-600 to-emerald-500 hover:brightness-110 animate-pulse'
-                                          }`}
-                                        >
-                                              {claimingPrize === challenge.id ? '⏳ Processing...' : `🏆 Claim Your Reward (${challenge.prizePool} USDFG)`}
-                                        </button>
-                                          );
-                                        }
-                                        
-                                        if (challenge.rawData?.payoutTriggered) {
-                                          return (
-                                            <div className="mt-2 px-3 py-1.5 text-sm bg-green-600/20 text-green-400 border border-green-600/30 font-semibold rounded-lg cursor-default">
-                                              ✅ Reward Claimed
-                                        </div>
-                                          );
-                                        }
-                                        
-                                        return null;
-                                      })()}
-                                    </>
-                                    );
-                                  })()}
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {challenge.status === "disputed" && (
-                          <div className="mb-3 p-3 rounded-lg border bg-gradient-to-r from-red-500/10 to-pink-500/10 border-red-500/20">
-                            <div className="text-center">
-                              <div className="text-xl mb-1.5">⚠️</div>
-                              <div className="text-xl font-bold text-red-400">Dispute</div>
-                              <p className="text-sm text-gray-400 mt-1">Both players claimed they won. Admin review required.</p>
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Check if user is a participant (creator or joined player) */}
-                        {(() => {
-                          const currentWallet = publicKey?.toString()?.toLowerCase();
-                          const isParticipant = currentWallet && challenge.rawData?.players?.some((p: string) => p.toLowerCase() === currentWallet);
-                          const hasSubmittedResult = currentWallet && challenge.rawData?.results?.[currentWallet];
-
-                          // Debug logging for submit result button
-                          if (challenge.status === "in-progress") {
-                            // Debug: In-Progress Challenge Debug (uncomment for debugging)
-                            // console.log("🔍 In-Progress Challenge Debug:", { challengeId: challenge.id, status: challenge.status, currentWallet, players: challenge.rawData?.players, isParticipant, hasSubmittedResult, results: challenge.rawData?.results });
-                          }
-
-                          // Owner buttons (but only if NOT active)
-                          if (isOwner && challenge.status !== "active") {
-                            return (
-                              <div className="flex space-x-2">
-                                <button 
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    e.nativeEvent.stopImmediatePropagation();
-                                    if (challenge.id) {
-                                    handleDeleteChallenge(challenge.id);
-                                    }
-                                  }}
-                                  onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                  }}
-                                  className="flex-1 px-4 py-2 bg-red-600/20 text-red-400 border border-red-600/30 font-semibold rounded-lg hover:bg-red-600/30 transition-all relative z-20"
-                                >
-                                  🗑️ Delete
-                                </button>
-                                <button 
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    e.nativeEvent.stopImmediatePropagation();
-                                  }}
-                                  onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                  }}
-                                  className="flex-1 px-4 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 font-semibold rounded-lg hover:bg-gray-600/30 transition-all relative z-20"
-                                  disabled
-                                >
-                                  ✏️ Edit (Coming Soon)
-                                </button>
-                              </div>
-                            );
-                          }
-
-                          // Show "Submit Result" button for participants in "in-progress" challenges
-                          // Only the main challengers can submit results:
-                          // - Creator (players[0]) - who created the challenge
-                          // - First challenger who accepted (players[1]) - the other main challenger
-                          // Spectators (players[2+]) cannot submit results
-                          if (challenge.status === "in-progress") {
-                            // If wallet not connected, show connect prompt
-                            if (!currentWallet || !isConnected) {
-                              return (
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    connect();
-                                  }}
-                                  className="w-full px-4 py-2 bg-zinc-800/90 hover:bg-zinc-700/90 text-amber-300 border border-amber-400/30 hover:border-amber-400/50 font-semibold rounded-lg transition-all backdrop-blur-sm"
-                                >
-                                  🔌 Connect to Submit Result
-                                </button>
-                              );
-                            }
-
-                            // Check if user is one of the first 2 challengers (creator or first challenger who accepted)
-                            // players[0] = creator (who created the challenge)
-                            // players[1] = first challenger who accepted/joined the challenge (the other main challenger)
-                            // players[2+] = spectators (not eligible to submit results)
-                            const players = challenge.rawData?.players || [];
-                            const isMainChallenger = players.length >= 2 && 
-                              currentWallet && 
-                              (players[0]?.toLowerCase() === currentWallet || players[1]?.toLowerCase() === currentWallet);
-
-                            // If wallet connected and is a main challenger (creator or first challenger who accepted)
-                            if (isMainChallenger) {
-                              if (hasSubmittedResult) {
-                                return (
-                                  <div className="w-full px-4 py-2 bg-amber-600/20 text-amber-300 border border-amber-500/30 font-semibold rounded-lg text-center">
-                                    ✅ Result Submitted
-                                  </div>
-                                );
-                              }
-                              return (
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedChallenge(challenge);
-                                    setShowSubmitResultModal(true);
-                                  }}
-                                  className="w-full px-4 py-2 bg-gradient-to-r from-yellow-600 to-orange-500 text-white font-semibold rounded-lg hover:brightness-110 transition-all animate-pulse"
-                                >
-                                  🏆 Submit Result
-                                </button>
-                              );
-                            }
-
-                            // If wallet connected but not a participant, just show status
-                            return (
-                              <div className="w-full px-4 py-2 bg-amber-600/20 text-amber-300 border border-amber-500/30 font-semibold rounded-lg text-center">
-                                ⚔️ Match In Progress
-                              </div>
-                            );
-                          }
-
-                          // STATE-DRIVEN: Show appropriate buttons based on challenge state and user role
-                          const challengeStatus = challenge.status || challenge.rawData?.status;
-                          const creator = challenge.creator?.toLowerCase();
-                          const challenger = challenge.rawData?.challenger?.toLowerCase();
-                          const pendingJoiner = challenge.rawData?.pendingJoiner?.toLowerCase();
-                          const isCreatorUser = currentWallet === creator;
-                          const isChallengerUser = currentWallet === challenger;
-                          const isPendingJoinerUser = currentWallet === pendingJoiner;
-                          
-                          // Pending: Creator sees nothing actionable, others can express intent
-                          if (challengeStatus === "pending_waiting_for_opponent" && !isOwner) {
-                            return (
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedChallenge(challenge);
-                                  setShowJoinModal(true);
-                                }}
-                                className="relative w-full px-4 py-2 bg-gradient-to-r from-blue-500/20 to-blue-600/20 hover:from-blue-500/30 hover:to-blue-600/30 text-blue-200 border border-blue-400/40 hover:border-blue-400/60 font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm overflow-hidden group"
-                                disabled={!isConnected}
-                              >
-                                Express Join Intent (No Payment)
-                              </button>
-                            );
-                          }
-                          
-                          // Creator Confirmation: Creator sees "Confirm & Fund" ONLY if pendingJoiner exists, others see waiting
-                          if (challengeStatus === "creator_confirmation_required") {
-                            if (isCreatorUser) {
-                              // Only show funding button if someone has expressed intent
-                              if (challenge.rawData?.pendingJoiner) {
-                                return (
-                                  <button 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedChallenge(challenge);
-                                      setShowJoinModal(true);
-                                    }}
-                                    className="relative w-full px-4 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white border-2 border-green-400 hover:border-green-300 font-bold rounded-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_30px_rgba(34,197,94,0.7),0_0_60px_rgba(34,197,94,0.4)] hover:shadow-[0_0_40px_rgba(34,197,94,0.9),0_0_80px_rgba(34,197,94,0.6)] hover:scale-105"
-                                    disabled={!isConnected}
-                                  >
-                                    ✨ Confirm & Fund ({challenge.entryFee} USDFG) ✨
-                                  </button>
-                                );
-                              } else {
-                                // Safety: Should not happen, but show message if no pendingJoiner
-                                return (
-                                  <div className="w-full px-4 py-2 bg-red-500/10 text-red-300 border border-red-500/20 font-semibold rounded-lg text-center">
-                                    ⚠️ No opponent found. Please wait for someone to join.
-                                  </div>
-                                );
-                              }
-                            }
-                            return (
-                              <div className="w-full px-4 py-2 bg-amber-500/10 text-amber-300 border border-amber-500/20 font-semibold rounded-lg text-center">
-                                Waiting for creator to confirm...
-                              </div>
-                            );
-                          }
-                          
-                          // Creator Funded: Challenger sees "Fund Now", others see waiting
-                          if (challengeStatus === "creator_funded") {
-                            if (isChallengerUser) {
-                              return (
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedChallenge(challenge);
-                                    setShowJoinModal(true);
-                                  }}
-                                  className="relative w-full px-4 py-2 bg-gradient-to-r from-green-500/20 to-green-600/20 hover:from-green-500/30 hover:to-green-600/30 text-green-200 border border-green-400/40 hover:border-green-400/60 font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
-                                  disabled={!isConnected}
-                                >
-                                  Fund Now ({challenge.entryFee} USDFG)
-                                </button>
-                              );
-                            }
-                            return (
-                              <div className="w-full px-4 py-2 bg-green-500/10 text-green-300 border border-green-500/20 font-semibold rounded-lg text-center">
-                                Creator funded. Waiting for challenger...
-                              </div>
-                            );
-                          }
-                          
-                          // Active: Show join button if not full (legacy behavior for backwards compatibility)
-                          if (challenge.status === "active" && challenge.players < challenge.capacity) {
-                            return (
-                              <button 
-                                onClick={async () => {
+                                  if (challenge.status === "completed" || 
+                                      challenge.status === "disputed" || 
+                                      challenge.rawData?.payoutTriggered ||
+                                      isExpired) {
+                                    return;
+                                  }
+                                  
                                   // Check if this is a team challenge with teamOnly restriction
                                   const challengeType = challenge.rawData?.challengeType;
                                   const teamOnly = challenge.rawData?.teamOnly;
@@ -4117,227 +3492,19 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                     }
                                   }
                                   
-                                  // Check if this is a Founder Challenge (no PDA, skip on-chain check)
-                                  const founderChallenge = isFounderChallenge(challenge);
-                                  
-                                  if (founderChallenge) {
-                                    // Founder Challenge - no PDA, no on-chain check needed
-                                    // Just open the join modal directly
-                                    setSelectedChallenge(challenge);
-                                    setShowJoinModal(true);
-                                    return;
-                                  }
-                                  
-                                  // Regular challenge - check on-chain status before allowing join
-                                  try {
-                                    const challengePDA = challenge.rawData?.pda || (challenge as any).pda;
-                                    if (!challengePDA) {
-                                      alert('Challenge has no on-chain PDA. Cannot join this challenge.');
-                                      return;
-                                    }
-                                    
-                                    // Check if challenge is actually open on-chain
-                                    const { Connection, PublicKey } = await import('@solana/web3.js');
-                                    const { PROGRAM_ID } = await import('@/lib/chain/config');
-                                    
-                                    // Use the connection from the hook
-                                    const { getRpcEndpoint } = await import('@/lib/chain/rpc');
-                                    const connection = new Connection(getRpcEndpoint());
-                                    
-                                    const accountInfo = await connection.getAccountInfo(new PublicKey(challengePDA));
-                                    if (!accountInfo || !accountInfo.data) {
-                                      alert('Challenge not found on-chain. It may have been deleted.');
-                                      return;
-                                    }
-                                    
-                                    // Parse the challenge data to check status
-                                    const data = accountInfo.data;
-                                    const statusByte = data[8 + 32 + 33 + 8]; // Skip discriminator (8), creator (32), challenger Option (33), entry_fee (8), then status
-                                    
-                                    // Debug: On-chain challenge status (uncomment for debugging)
-                                    // console.log('🔍 On-chain challenge status:', statusByte);
-                                    // console.log('🔍 Challenge data length:', data.length);
-                                    // console.log('🔍 First 50 bytes:', Array.from(data.slice(0, 50)).map(b => b.toString(16).padStart(2, '0')).join(' '));
-                                    
-                                    if (statusByte > 1) { // Only block if status is > 1 (Completed, Cancelled, Disputed)
-                                      const statusNames = ['Open', 'InProgress', 'Completed', 'Cancelled', 'Disputed'];
-                                      const statusName = statusNames[statusByte] || 'Unknown';
-                                      alert(`This challenge is no longer open. Current status: ${statusName} (${statusByte}). It may have already been completed or cancelled.`);
-                                      return;
-                                    }
-                                    
-                                    // Challenge is actually open, proceed with join
-                                    setSelectedChallenge(challenge);
-                                    setShowJoinModal(true);
-                                  } catch (error) {
-                                    console.error('Error checking on-chain status:', error);
-                                    alert('Failed to verify challenge status. Please try again.');
-                                  }
+                                  setSelectedChallenge(challenge);
+                                  setShowJoinModal(true);
                                 }}
-                                className="relative w-full px-4 py-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-200 border border-amber-400/40 hover:border-amber-400/60 font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm overflow-hidden group animate-pulse-subtle"
-                                disabled={!isConnected}
-                              >
-                                {/* Shimmer effect */}
-                                <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000 ease-in-out"></span>
-                                {/* Glow effect */}
-                                <span className="absolute inset-0 bg-gradient-to-r from-amber-400/20 via-orange-400/20 to-amber-400/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-sm"></span>
-                                <span className="relative z-10 flex items-center justify-center gap-2">
-                                  <span className="animate-bounce-subtle">⚡</span>
-                                {!isConnected ? "Connect to Join" : "Join Challenge"}
-                                  <span className="hidden group-hover:inline animate-pulse">→</span>
-                                </span>
-                              </button>
-                            );
-                          }
-
-                          if (challenge.status === "active" && challenge.players >= challenge.capacity) {
-                            return (
-                              <div className="w-full px-4 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 font-semibold rounded-lg text-center">
-                                🔒 Challenge Full
-                              </div>
-                            );
-                          }
-
-                          if (challenge.status === "cancelled" || (challenge.expiresAt && challenge.expiresAt < Date.now())) {
-                            return (
-                              <div className="w-full px-4 py-2 bg-red-600/20 text-red-400 border border-red-600/30 font-semibold rounded-lg text-center">
-                                ⏰ Expired
-                              </div>
-                            );
-                          }
-
-                          if (challenge.status === "completed") {
-                            // Check if current user is the winner and can claim prize
-                            // For tournaments, check tournament.champion; for regular challenges, check winner
-                            const format = challenge.rawData?.format || (challenge.rawData?.tournament ? 'tournament' : 'standard');
-                            const isTournament = format === 'tournament';
-                            const tournamentChampion = challenge.rawData?.tournament?.champion;
-                            const regularWinner = challenge.rawData?.winner;
-                            
-                            const isWinner = currentWallet && (
-                              (isTournament && tournamentChampion?.toLowerCase() === currentWallet) ||
-                              (!isTournament && regularWinner?.toLowerCase() === currentWallet)
-                            );
-                            const founderChallenge = isFounderChallenge(challenge);
-                            
-                            // For Founder Challenges, prizes are transferred manually - don't show claim button
-                            if (founderChallenge) {
-                              if (isWinner && challenge.rawData?.payoutTriggered) {
-                                return (
-                                  <div className="w-full px-4 py-2 bg-green-600/20 text-green-400 border border-green-600/30 font-semibold rounded-lg text-center cursor-default">
-                                    ✅ Prize Received
-                                  </div>
-                                );
-                              } else if (isWinner) {
-                                return (
-                                  <div className="w-full px-4 py-2 bg-green-600/20 text-green-400 border border-green-600/30 font-semibold rounded-lg text-center">
-                                    🏆 You Won!
-                                  </div>
-                                );
-                              } else {
-                                return (
-                                  <div className="w-full px-4 py-2 bg-green-600/20 text-green-400 border border-green-600/30 font-semibold rounded-lg text-center">
-                                    ✅ Completed
-                                  </div>
-                                );
-                              }
-                            }
-                            
-                            // Regular challenge - show claim button
-                            const canClaim = isWinner && challenge.rawData?.canClaim && !challenge.rawData?.payoutTriggered;
-                            
-                            // Debug logging for claim button
-                            if (isWinner) {
-                              // Debug: Winner detected (uncomment for debugging)
-                              // console.log('🏆 Winner detected for challenge:', challenge.id);
-                              // console.log('   canClaim:', challenge.rawData?.canClaim);
-                              // console.log('   payoutTriggered:', challenge.rawData?.payoutTriggered);
-                              // console.log('   Should show button?:', canClaim);
-                            }
-                            
-                            if (canClaim) {
-                              return (
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleClaimPrize(challenge);
-                                  }}
-                                  disabled={claimingPrize === challenge.id}
-                                  className={`w-full px-4 py-2 text-white font-semibold rounded-lg transition-all ${
-                                    claimingPrize === challenge.id 
-                                      ? 'bg-gray-500 cursor-not-allowed' 
-                                      : 'bg-gradient-to-r from-green-600 to-emerald-500 hover:brightness-110 animate-pulse'
-                                  }`}
-                                >
-                                  {claimingPrize === challenge.id ? '⏳ Processing...' : '🏆 Claim Reward'}
-                                </button>
-                              );
-                            } else if (isWinner && challenge.rawData?.payoutTriggered) {
-                              return (
-                                <div className="w-full px-4 py-2 bg-green-600/20 text-green-400 border border-green-600/30 font-semibold rounded-lg text-center cursor-default">
-                                  ✅ Prize Claimed
-                                </div>
-                              );
-                            } else if (isWinner) {
-                              return (
-                                <div className="w-full px-4 py-2 bg-green-600/20 text-green-400 border border-green-600/30 font-semibold rounded-lg text-center">
-                                  🏆 You Won!
-                                </div>
-                              );
-                            } else {
-                              return (
-                                <div className="w-full px-4 py-2 bg-green-600/20 text-green-400 border border-green-600/30 font-semibold rounded-lg text-center">
-                                  ✅ Completed
-                                </div>
-                              );
-                            }
-                          }
-
-                          if (challenge.status === "disputed") {
-                            return (
-                              <div className="w-full px-4 py-2 bg-red-600/20 text-red-400 border border-red-600/30 font-semibold rounded-lg text-center">
-                                🔴 Disputed
-                              </div>
-                            );
-                          }
-
-                          return (
-                            <div className="w-full px-4 py-2 bg-gray-600/20 text-gray-400 border border-gray-600/30 font-semibold rounded-lg text-center">
-                              📋 View Details
+                              />
                             </div>
-                          );
-                        })()}
-                        
-                        {/* Join Chat Button - Show for all active challenges */}
-                        {(challenge.status === "active" || challenge.status === "in-progress") && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const format = (challenge.rawData as any)?.format || ((challenge.rawData as any)?.tournament ? 'tournament' : 'standard');
-                              if (format === 'tournament') {
-                                setSelectedChallenge(challenge);
-                                setShowTournamentLobby(true);
-                              } else {
-                              setSelectedChatChallenge(challenge);
-                              setShowChatModal(true);
-                              }
-                            }}
-                            className="relative w-full mt-2 px-3 py-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-amber-200 border border-amber-400/40 hover:border-amber-400/60 font-semibold rounded-lg transition-all flex items-center justify-center gap-2 shadow-[0_0_10px_rgba(255,215,130,0.15)] hover:shadow-[0_0_15px_rgba(255,215,130,0.25)] z-20 backdrop-blur-sm"
-                          >
-                            <span className="text-sm">💬</span>
-                            <span className="text-sm">Join Chat</span>
-                          </button>
-                        )}
-
+                          ))}
                         </div>
-                        {/* End Full Detailed View (Desktop/Tablet) */}
-
-                      </div>
+                      </section>
                     );
-                  }))}
-                </div>
-              </div>
-            </div>
+                  })}
+                </>
+              );
+            })()}
           </div>
 
           {/* Live Challenges Grid - Mobile First (iPhone 13 Pro optimized) */}
@@ -5453,6 +4620,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           </div>
         </ElegantModal>
       )}
+      </div>
 
     </>
   );
@@ -6424,7 +5592,38 @@ const JoinChallengeModal: React.FC<{
       }, 1500);
     } catch (err: any) {
       console.error("❌ Express join intent failed:", err);
-      setError(err.message || 'Failed to express join intent. Please try again.');
+      
+      // Extract error message from various possible locations
+      let errorMessage = err.message || err.toString() || 'Failed to express join intent. Please try again.';
+      
+      // Check error logs if available (for Solana transaction errors)
+      if (err.logs && Array.isArray(err.logs)) {
+        const logsString = err.logs.join(' ');
+        if (logsString.includes("ChallengeExpired") || logsString.includes("6005") || logsString.includes("0x1775")) {
+          errorMessage = "⚠️ This challenge has expired. Please refresh the page to see the latest challenges.";
+          setError(errorMessage);
+          setState('error');
+          return;
+        }
+      }
+      
+      // Check error message string
+      const errorString = errorMessage.toLowerCase();
+      if (errorString.includes("challengeexpired") || 
+          errorString.includes("6005") || 
+          errorString.includes("0x1775") ||
+          errorString.includes("challenge has expired") ||
+          errorString.includes("challenge expired")) {
+        errorMessage = "⚠️ This challenge has expired. Please refresh the page to see the latest challenges.";
+      } else if (errorString.includes("challengenotfound") || 
+                 errorString.includes("not found")) {
+        errorMessage = "❌ Challenge not found on-chain. It may have been deleted or cancelled.";
+      } else if (errorString.includes("alreadyjoined") || 
+                 errorString.includes("already joined")) {
+        errorMessage = "✅ You have already expressed intent to join this challenge. Please wait for the creator to fund it.";
+      }
+      
+      setError(errorMessage);
       setState('error');
     }
   };

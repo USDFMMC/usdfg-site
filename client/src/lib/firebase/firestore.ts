@@ -1256,7 +1256,7 @@ export const revertJoinerTimeout = async (challengeId: string): Promise<boolean>
 };
 
 /**
- * Auto-expire pending challenges after 24 hours
+ * Auto-delete expired pending challenges after 24 hours (saves Firebase storage)
  */
 export const expirePendingChallenge = async (challengeId: string): Promise<boolean> => {
   try {
@@ -1269,7 +1269,7 @@ export const expirePendingChallenge = async (challengeId: string): Promise<boole
 
     const data = snap.data() as ChallengeData;
     
-    // Only expire if in pending_waiting_for_opponent state
+    // Only delete if in pending_waiting_for_opponent state
     if (data.status !== 'pending_waiting_for_opponent') {
       return false;
     }
@@ -1278,18 +1278,13 @@ export const expirePendingChallenge = async (challengeId: string): Promise<boole
       return false; // Not expired yet
     }
     
-    // Mark as cancelled
-    const updates: any = {
-      status: 'cancelled',
-      updatedAt: serverTimestamp(),
-    };
-
-    await updateDoc(challengeRef, updates);
+    // Delete expired challenge immediately to save Firebase storage
+    await cleanupExpiredChallenge(challengeId);
     
-    console.log('✅ Pending challenge expired and cancelled:', challengeId);
+    console.log('✅ Pending challenge expired and deleted:', challengeId);
     return true;
   } catch (error) {
-    console.error('❌ Error expiring pending challenge:', error);
+    console.error('❌ Error deleting expired pending challenge:', error);
     return false;
   }
 };
