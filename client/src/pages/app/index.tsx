@@ -744,6 +744,7 @@ const ArenaHome: React.FC = () => {
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showSubmitResultModal, setShowSubmitResultModal] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<any>(null);
+  const [showDetailSheet, setShowDetailSheet] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string>('All');
   const [filterGame, setFilterGame] = useState<string>('All');
   const [showMyChallenges, setShowMyChallenges] = useState<boolean>(false);
@@ -3004,6 +3005,177 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     );
   }, [currentWallet, normalizedCurrentWallet, connect, lockInProgress, userLocks, currentLockTarget, mutualLockOpponentId, handleLockToggle, formatWalletAddress, createFriendlyMatchId, pendingLockInitiators]);
 
+  // Platform icon helper (used in detail sheet)
+  const platformIcon = (platform: string) => {
+    const p = String(platform || '').toLowerCase();
+    if (p.includes('ps')) return '🎮';
+    if (p.includes('xbox')) return '🟩';
+    if (p.includes('pc')) return '🖥️';
+    if (p.includes('mobile')) return '📱';
+    return '🎮';
+  };
+
+  // Detail row component for bottom sheet
+  const DetailRow = ({ label, value, multiline }: { label: string; value: string; multiline?: boolean }) => {
+    return (
+      <div className="rounded-lg bg-black/40 p-3">
+        <div className="text-white/60 text-xs">{label}</div>
+        <div className={`font-semibold text-sm ${multiline ? 'whitespace-normal leading-snug' : 'truncate'}`}>{value}</div>
+      </div>
+    );
+  };
+
+  // Challenge detail sheet component (bottom sheet)
+  const ChallengeDetailSheet = ({ challenge, onClose, onJoin }: { challenge: any; onClose: () => void; onJoin: () => void }) => {
+    const gameName = challenge.game || extractGameFromTitle(challenge.title);
+    const imagePath = getGameImage(gameName);
+    const isOwner = isChallengeOwner(challenge);
+    
+    React.useEffect(() => {
+      const original = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = original;
+      };
+    }, []);
+
+    // Calculate expiration time
+    const getExpiresText = () => {
+      if (challenge.expiresAt && challenge.expiresAt > Date.now()) {
+        const minutes = Math.max(0, Math.floor((challenge.expiresAt - Date.now()) / (1000 * 60)));
+        if (minutes < 60) return `${minutes}m`;
+        const hours = Math.floor(minutes / 60);
+        return `${hours}h`;
+      }
+      if (challenge.rawData?.expirationTimer) {
+        const timer = challenge.rawData.expirationTimer;
+        const now = Date.now();
+        const expires = timer.toMillis();
+        if (expires > now) {
+          const minutes = Math.max(0, Math.floor((expires - now) / (1000 * 60)));
+          if (minutes < 60) return `${minutes}m`;
+          const hours = Math.floor(minutes / 60);
+          return `${hours}h`;
+        }
+      }
+      return 'Expired';
+    };
+
+    const status = challenge.status;
+    
+    // Status pill for detail sheet
+    const StatusPillDetail = ({ status, isOwner, players, capacity }: { status: string; isOwner: boolean; players: number; capacity: number }) => {
+      if (status === "pending_waiting_for_opponent") {
+        return (
+          <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-emerald-500/20 text-emerald-200 border-emerald-500/30 ring-1 ring-emerald-400/30 shadow-[0_0_12px_rgba(16,185,129,0.25)]">
+            OPEN
+          </span>
+        );
+      }
+      if (status === "active" || status === "creator_funded") {
+        return (
+          <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-rose-500/20 text-rose-200 border-rose-500/30 ring-1 ring-rose-400/40 shadow-[0_0_16px_rgba(244,63,94,0.35)]">
+            LIVE
+          </span>
+        );
+      }
+      if (status === "creator_confirmation_required") {
+        return (
+          <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-amber-500/20 text-amber-200 border-amber-500/30 ring-1 ring-amber-400/30 shadow-[0_0_12px_rgba(245,158,11,0.25)]">
+            {isOwner ? 'CONFIRM' : 'LIVE'}
+          </span>
+        );
+      }
+      if (players >= capacity) {
+        return (
+          <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-neutral-600/25 text-neutral-200 border-neutral-500/30">
+            FULL
+          </span>
+        );
+      }
+      return (
+        <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-white/10 text-white border-white/10">
+          {status.toUpperCase()}
+        </span>
+      );
+    };
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-end bg-black/70" onClick={onClose} role="dialog" aria-modal="true">
+        <div
+          className="w-full max-h-[85%] rounded-t-2xl bg-neutral-900 overflow-hidden flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="relative h-[130px] flex-shrink-0">
+            <img 
+              src={imagePath} 
+              alt="" 
+              aria-hidden="true" 
+              className="absolute inset-0 h-full w-full object-cover scale-110" 
+              onError={(e) => {
+                const target = e.currentTarget as HTMLImageElement;
+                target.src = '/assets/usdfg-logo-transparent.png';
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-neutral-900 via-black/60 to-black/20" />
+            <div className="absolute inset-0 shadow-[inset_0_-40px_60px_rgba(0,0,0,0.9)]" />
+
+            <div className="relative z-10 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="text-lg font-semibold truncate">{gameName}</h3>
+                  <p className="text-sm text-white/60 truncate">{challenge.mode || 'Head-to-Head'}</p>
+                </div>
+                <StatusPillDetail 
+                  status={status} 
+                  isOwner={isOwner} 
+                  players={challenge.players || 0} 
+                  capacity={challenge.capacity || 2} 
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="grid grid-cols-2 gap-3">
+              <DetailRow label="Game" value={gameName} />
+              <DetailRow label="Mode" value={challenge.mode || 'Head-to-Head'} />
+              <DetailRow label="💰 Entry Fee" value={`${challenge.entryFee} USDFG`} />
+              <DetailRow label="🏆 Prize Pool" value={`${challenge.prizePool} USDFG`} />
+              <DetailRow label="👥 Players" value={`${challenge.players || 0}/${challenge.capacity || 2}`} />
+              <DetailRow label="🎮 Platform" value={`${platformIcon(challenge.platform)} ${challenge.platform || 'All'}`} />
+              <DetailRow label="👤 Creator" value={challenge.username || challenge.creator?.slice(0, 8) + '...' || 'Unknown'} />
+              <DetailRow label="⏱ Expires" value={getExpiresText()} />
+              <div className="col-span-2">
+                <DetailRow label="📜 Rules" value={challenge.rules || 'Standard USDFG Arena rules apply'} multiline />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="mt-5 w-full rounded-xl bg-white py-3 text-black font-semibold"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+                onJoin();
+              }}
+            >
+              Join Challenge
+            </button>
+
+            <button
+              type="button"
+              className="mt-3 w-full rounded-xl border border-white/10 py-3 text-white/80 font-semibold"
+              onClick={onClose}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       <Helmet>
@@ -3335,8 +3507,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 );
               };
 
-              // Platform icon helper
-              const platformIcon = (platform: string) => {
+              // Platform icon helper (local scope version for cards)
+              const platformIconLocal = (platform: string) => {
                 const p = String(platform || '').toLowerCase();
                 if (p.includes('ps')) return '🎮';
                 if (p.includes('xbox')) return '🟩';
@@ -3416,7 +3588,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           <span className="font-semibold">{challenge.username || challenge.creator?.slice(0, 8) + '...'}</span>
                         </div>
                         <div className="shrink-0">
-                          <span className="text-white/60">{platformIcon(challenge.platform)}</span>{' '}
+                          <span className="text-white/60">{platformIconLocal(challenge.platform)}</span>{' '}
                           <span className="font-semibold">{challenge.platform || 'All'}</span>
                         </div>
                       </div>
@@ -3493,7 +3665,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                   }
                                   
                                   setSelectedChallenge(challenge);
-                                  setShowJoinModal(true);
+                                  setShowDetailSheet(true);
                                 }}
                               />
                             </div>
@@ -4271,6 +4443,18 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               />
             </ElegantModal>
           </Suspense>
+        )}
+
+        {/* Challenge Detail Sheet (Bottom Sheet) */}
+        {showDetailSheet && selectedChallenge && (
+          <ChallengeDetailSheet
+            challenge={selectedChallenge}
+            onClose={() => setShowDetailSheet(false)}
+            onJoin={() => {
+              setShowDetailSheet(false);
+              setShowJoinModal(true);
+            }}
+          />
         )}
 
         {/* Join Challenge Modal */}
