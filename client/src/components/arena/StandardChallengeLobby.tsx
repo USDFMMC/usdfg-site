@@ -197,8 +197,23 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('🏆 Submit Result button clicked');
-            onOpenSubmitResult();
+            console.log('🏆 Submit Result button clicked', {
+              canSubmitResult,
+              onOpenSubmitResult: typeof onOpenSubmitResult === 'function' ? '✅ Function exists' : '❌ Missing',
+              challengeId: challenge.id,
+              status,
+              players
+            });
+            if (typeof onOpenSubmitResult === 'function') {
+              try {
+                onOpenSubmitResult();
+                console.log('✅ onOpenSubmitResult called successfully');
+              } catch (error) {
+                console.error('❌ Error calling onOpenSubmitResult:', error);
+              }
+            } else {
+              console.error('❌ onOpenSubmitResult is not a function!', onOpenSubmitResult);
+            }
           }}
           className="relative w-full rounded-lg bg-amber-400/20 px-4 py-3 text-sm font-semibold text-amber-200 transition-all hover:bg-amber-400/30 hover:shadow-[0_0_12px_rgba(255,215,130,0.3)] border border-amber-400/40 cursor-pointer active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ pointerEvents: 'auto', zIndex: 50 }}

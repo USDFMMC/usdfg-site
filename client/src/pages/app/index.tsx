@@ -4778,57 +4778,57 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           }
 
           // Standard challenge: render persistent lobby
-          if (showStandardLobby) {
-            return (
-              <ElegantModal
-                isOpen={showStandardLobby}
-                onClose={() => {
-                  setShowStandardLobby(false);
-                  setSelectedChallenge(null);
-                }}
-                title={`${selectedChallenge.title || "Challenge"} Lobby`}
-              >
-                <StandardChallengeLobby
-                  challenge={selectedChallenge}
-                  currentWallet={publicKey?.toString() || null}
-                  onOpenSubmitResult={() => {
-                    setShowSubmitResultModal(true);
-                  }}
-                  onClose={() => {
-                    setShowStandardLobby(false);
-                    setSelectedChallenge(null);
-                  }}
-                />
-              </ElegantModal>
-            );
-          }
-          
-          // Standard challenge: render submit result modal as overlay on lobby
           const isMainChallenger =
             players.length >= 2 &&
             currentWallet && 
             (players[0]?.toLowerCase() === currentWallet ||
               players[1]?.toLowerCase() === currentWallet);
           
-          if (showSubmitResultModal && isMainChallenger) {
-            return (
-              <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div></div>}>
-                <SubmitResultRoom
-                  isOpen={showSubmitResultModal}
+          // Render both lobby and submit result modal if needed
+          return (
+            <>
+              {showStandardLobby && (
+                <ElegantModal
+                  isOpen={showStandardLobby}
                   onClose={() => {
-                    setShowSubmitResultModal(false);
-                    // Do NOT clear selectedChallenge - keep lobby mounted
+                    setShowStandardLobby(false);
+                    setSelectedChallenge(null);
                   }}
-                  challengeId={selectedChallenge.id}
-                  challengeTitle={selectedChallenge.title || ""}
-                  currentWallet={publicKey?.toString() || ""}
-                  onSubmit={handleSubmitResult}
-                />
-              </Suspense>
-            );
-          }
-          
-          return null;
+                  title={`${selectedChallenge.title || "Challenge"} Lobby`}
+                >
+                  <StandardChallengeLobby
+                    challenge={selectedChallenge}
+                    currentWallet={publicKey?.toString() || null}
+                    onOpenSubmitResult={() => {
+                      console.log('🎯 onOpenSubmitResult called, setting showSubmitResultModal to true');
+                      setShowSubmitResultModal(true);
+                    }}
+                    onClose={() => {
+                      setShowStandardLobby(false);
+                      setSelectedChallenge(null);
+                    }}
+                  />
+                </ElegantModal>
+              )}
+              
+              {/* Standard challenge: render submit result modal as overlay on lobby */}
+              {showSubmitResultModal && isMainChallenger && (
+                <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div></div>}>
+                  <SubmitResultRoom
+                    isOpen={showSubmitResultModal}
+                    onClose={() => {
+                      setShowSubmitResultModal(false);
+                      // Do NOT clear selectedChallenge - keep lobby mounted
+                    }}
+                    challengeId={selectedChallenge.id}
+                    challengeTitle={selectedChallenge.title || ""}
+                    currentWallet={publicKey?.toString() || ""}
+                    onSubmit={handleSubmitResult}
+                  />
+                </Suspense>
+              )}
+            </>
+          );
         })()}
 
           {friendlyMatch && (
