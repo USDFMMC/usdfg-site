@@ -3344,11 +3344,24 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               </button>
             )}
             
-            {/* Show message if creator tries to cancel after someone expressed intent */}
+            {/* Show funding button for creator when someone expressed intent */}
             {isOwner && status === 'creator_confirmation_required' && (
-              <div className="mt-5 w-full rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 text-amber-200 text-sm">
-                ⚠️ Someone has expressed intent to join. You must fund the challenge or wait for the timeout.
-              </div>
+              <>
+                <div className="mt-5 w-full rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 text-amber-200 text-sm mb-3">
+                  ⚠️ Someone has expressed intent to join. You must fund the challenge or wait for the timeout.
+                </div>
+                <button
+                  type="button"
+                  className="mt-2 w-full rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 py-3 text-white font-bold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(34,197,94,0.35)]"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClose();
+                    onJoin(); // Opens JoinChallengeModal which will show funding button for creator
+                  }}
+                >
+                  ✨ Confirm and Fund Challenge ✨
+                </button>
+              </>
             )}
 
             {/* Show Join button for non-owners or when challenge is joinable */}
