@@ -1610,7 +1610,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     });
     
     // Auto-open tournament lobby if user is in a tournament and modal isn't already open
-    if (myTournamentChallenges.length > 0 && !showTournamentLobby && !showSubmitResultModal && !showTrustReview) {
+    if (myTournamentChallenges.length > 0 && !showTournamentLobby && !showSubmitResultModal && !showTrustReview && !showJoinModal) {
       const challenge = myTournamentChallenges[0];
       const tournament = challenge.tournament;
       const stage = tournament?.stage || 'waiting_for_players';
@@ -1619,6 +1619,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // (Don't auto-open if it's completed or cancelled)
       if (stage === 'waiting_for_players' || stage === 'round_in_progress' || stage === 'awaiting_results') {
         try {
+          // Don't open if lobby is already open for this challenge
+          if (showStandardLobby && selectedChallenge?.id === challenge.id) {
+            return; // Already open (shouldn't happen for tournament, but safety check)
+          }
+          
+          // Close other lobby types
+          if (showStandardLobby) {
+            setShowStandardLobby(false);
+          }
+          
           const merged = mergeChallengeDataForModal(challenge, challenge);
           setSelectedChallenge(merged);
           setShowTournamentLobby(true);
@@ -1628,7 +1638,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         }
       }
     }
-  }, [firestoreChallenges, publicKey, isConnected, showTournamentLobby, showSubmitResultModal, showTrustReview, mergeChallengeDataForModal]);
+  }, [firestoreChallenges, publicKey, isConnected, showTournamentLobby, showSubmitResultModal, showTrustReview, showJoinModal, showStandardLobby, selectedChallenge?.id, mergeChallengeDataForModal]);
 
   // Update selectedChallenge in real-time when tournament data changes
   useEffect(() => {
@@ -1686,7 +1696,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         };
 
         const maxPlayers = updatedChallenge.maxPlayers || getMaxPlayers(mode);
-        const currentPlayers = updatedChallenge.players?.length || (updatedChallenge.challenger ? 2 : 1);
+        const currentPlayersCount = updatedChallenge.players?.length || (updatedChallenge.challenger ? 2 : 1);
+        const playersArray = updatedChallenge.players || []; // Preserve actual players array
 
         const merged = {
           ...selectedChallenge,
@@ -1698,13 +1709,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           username: creatorTag,
           entryFee: updatedChallenge.entryFee,
           prizePool: prizePool,
-          players: currentPlayers,
+          players: currentPlayersCount, // Keep as number for display
           capacity: maxPlayers,
           category: category,
           creator: updatedChallenge.creator,
           rules: rules,
           status: updatedChallenge.status,
-          rawData: updatedChallenge,
+          rawData: {
+            ...updatedChallenge,
+            players: playersArray, // Ensure players array is in rawData
+          },
         };
         
         setSelectedChallenge(merged);
@@ -1821,9 +1835,17 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         return;
       }
       
-      // Close join modal if open
+      // Close any existing modals/lobbies first
       if (showJoinModal) {
         setShowJoinModal(false);
+      }
+      // Don't open if lobby is already open for this challenge
+      if (showStandardLobby && selectedChallenge?.id === challenge.id) {
+        return; // Already open
+      }
+      // Close other lobby types
+      if (showTournamentLobby) {
+        setShowTournamentLobby(false);
       }
       
       // Open standard lobby for active challenge
@@ -1834,7 +1856,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       });
       setShowStandardLobby(true);
     }
-  }, [firestoreChallenges, publicKey, showSubmitResultModal, showTrustReview, showStandardLobby, showJoinModal, isConnected]);
+  }, [firestoreChallenges, publicKey, showSubmitResultModal, showTrustReview, showStandardLobby, showJoinModal, showTournamentLobby, selectedChallenge?.id, isConnected]);
   
   // Convert Firestore challenges to the format expected by the UI
   const challenges = firestoreChallenges.map(challenge => {
@@ -4698,6 +4720,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             }}
             onBalanceRefresh={refreshUSDFGBalance}
             onJoinSuccess={(challenge) => {
+              // Close any existing modals/lobbies first
+              setShowJoinModal(false);
+              setShowTournamentLobby(false);
+              setShowStandardLobby(false);
+              
               // Determine challenge format
               const format = challenge.rawData?.format || (challenge.rawData?.tournament ? 'tournament' : 'standard');
               const isTournament = format === 'tournament';
@@ -4705,7 +4732,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               // Set selected challenge
               setSelectedChallenge(challenge);
               
-              // Open appropriate lobby
+              // Open appropriate lobby (only one)
               if (isTournament) {
                 setShowTournamentLobby(true);
               } else {
