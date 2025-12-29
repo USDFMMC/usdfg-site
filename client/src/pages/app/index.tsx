@@ -1780,7 +1780,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     });
     
     // If there's an in-progress challenge and modal isn't already open
-    if (myInProgressChallenges.length > 0 && !showSubmitResultModal && !showTrustReview && !showStandardLobby) {
+    if (myInProgressChallenges.length > 0 && !showSubmitResultModal && !showTrustReview && !showStandardLobby && !showJoinModal) {
       const challenge = myInProgressChallenges[0];
       
       const results = (challenge as any).results || {};
@@ -1821,6 +1821,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         return;
       }
       
+      // Close join modal if open
+      if (showJoinModal) {
+        setShowJoinModal(false);
+      }
+      
       // Open standard lobby for active challenge
       setSelectedChallenge({
         id: challenge.id,
@@ -1829,7 +1834,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       });
       setShowStandardLobby(true);
     }
-  }, [firestoreChallenges, publicKey, showSubmitResultModal, showTrustReview, showStandardLobby, isConnected]);
+  }, [firestoreChallenges, publicKey, showSubmitResultModal, showTrustReview, showStandardLobby, showJoinModal, isConnected]);
   
   // Convert Firestore challenges to the format expected by the UI
   const challenges = firestoreChallenges.map(challenge => {
@@ -6223,9 +6228,22 @@ const JoinChallengeModal: React.FC<{
         }, 2000);
       }
       
-      // Fetch updated challenge to check if status is active
-      const updatedChallenge = await fetchChallengeById(challenge.id);
-      const finalStatus = updatedChallenge?.status || challenge.status || challenge.rawData?.status;
+      // Wait for Firestore to update, then fetch with retry
+      let updatedChallenge = null;
+      let finalStatus = challenge.status || challenge.rawData?.status;
+      let retries = 0;
+      const maxRetries = 5;
+      
+      while (retries < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms between retries
+        updatedChallenge = await fetchChallengeById(challenge.id);
+        finalStatus = updatedChallenge?.status || challenge.status || challenge.rawData?.status;
+        
+        if (finalStatus === 'active') {
+          break; // Status is active, proceed
+        }
+        retries++;
+      }
       
       setState('success');
       setTimeout(() => {
@@ -6238,6 +6256,10 @@ const JoinChallengeModal: React.FC<{
             rawData: updatedChallenge
           } : challenge;
           onJoinSuccess(challengeToPass);
+        } else {
+          // Status didn't become active yet - close modal anyway
+          // Auto-open logic will handle opening lobby when status becomes active
+          console.log('⚠️ Challenge status not yet active after funding. Status:', finalStatus, '- Modal closed, auto-open will handle lobby');
         }
       }, 1500);
     } catch (err: any) {
