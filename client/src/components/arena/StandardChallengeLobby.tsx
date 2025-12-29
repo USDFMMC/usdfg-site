@@ -1,20 +1,30 @@
-import React from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { ChatBox } from "./ChatBox";
 import { VoiceChat } from "./VoiceChat";
+import { Camera, Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
 
 interface StandardChallengeLobbyProps {
   challenge: any;
   currentWallet?: string | null;
-  onOpenSubmitResult: () => void;
+  onSubmitResult: (didWin: boolean, proofFile?: File | null) => Promise<void>;
   onClose: () => void;
+  isSubmitting?: boolean;
 }
 
 const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   challenge,
   currentWallet,
-  onOpenSubmitResult,
+  onSubmitResult,
   onClose,
+  isSubmitting = false,
 }) => {
+  const [showSubmitForm, setShowSubmitForm] = useState(false);
+  const [selectedResult, setSelectedResult] = useState<boolean | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [proofImage, setProofImage] = useState<string | null>(null);
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const status = challenge.status || challenge.rawData?.status || 'pending_waiting_for_opponent';
   const players = challenge.rawData?.players || challenge.players || [];
   const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
@@ -22,6 +32,45 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const game = challenge.game || challenge.rawData?.game || 'USDFG Arena';
   const mode = challenge.mode || challenge.rawData?.mode || 'Head-to-Head';
   const platform = challenge.platform || challenge.rawData?.platform || 'All Platforms';
+
+  const handleImageCapture = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setProofFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProofImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  }, []);
+
+  const removeImage = useCallback(() => {
+    setProofImage(null);
+    setProofFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, []);
+
+  const handleSubmit = useCallback(async () => {
+    if (selectedResult === null) return;
+    
+    setIsLoading(true);
+    try {
+      await onSubmitResult(selectedResult, proofFile);
+      // Reset form after successful submission
+      setShowSubmitForm(false);
+      setSelectedResult(null);
+      setProofImage(null);
+      setProofFile(null);
+    } catch (error: any) {
+      console.error("❌ Error submitting result:", error);
+      alert(error.message || "Failed to submit result. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedResult, proofFile, onSubmitResult]);
   
   const getStatusDisplay = () => {
     switch (status) {
@@ -100,18 +149,6 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     ? players.find((p: string) => p?.toLowerCase() !== currentWallet?.toLowerCase())
     : null;
 
-  // Debug logging
-  React.useEffect(() => {
-    console.log('🔍 StandardChallengeLobby Submit Button Debug:', {
-      status,
-      playersCount: players.length,
-      players: players,
-      currentWallet,
-      isParticipant,
-      canSubmitResult,
-      onOpenSubmitResult: typeof onOpenSubmitResult === 'function' ? '✅ Function exists' : '❌ Missing'
-    });
-  }, [status, players, currentWallet, isParticipant, canSubmitResult, onOpenSubmitResult]);
 
   return (
     <div className="space-y-4">
@@ -190,38 +227,218 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         </div>
       </div>
 
-      {/* Submit Result Button - Enhanced styling */}
-      {canSubmitResult ? (
+      {/* Submit Result Section */}
+      {canSubmitResult && !showSubmitForm && (
         <button
           type="button"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('🏆 Submit Result button clicked', {
-              canSubmitResult,
-              onOpenSubmitResult: typeof onOpenSubmitResult === 'function' ? '✅ Function exists' : '❌ Missing',
-              challengeId: challenge.id,
-              status,
-              players
-            });
-            if (typeof onOpenSubmitResult === 'function') {
-              try {
-                onOpenSubmitResult();
-                console.log('✅ onOpenSubmitResult called successfully');
-              } catch (error) {
-                console.error('❌ Error calling onOpenSubmitResult:', error);
-              }
-            } else {
-              console.error('❌ onOpenSubmitResult is not a function!', onOpenSubmitResult);
-            }
+            setShowSubmitForm(true);
           }}
-          className="relative w-full rounded-lg bg-amber-400/20 px-4 py-3 text-sm font-semibold text-amber-200 transition-all hover:bg-amber-400/30 hover:shadow-[0_0_12px_rgba(255,215,130,0.3)] border border-amber-400/40 cursor-pointer active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-          style={{ pointerEvents: 'auto', zIndex: 50 }}
-          disabled={!canSubmitResult}
+          className="relative w-full rounded-lg bg-amber-400/20 px-4 py-3 text-sm font-semibold text-amber-200 transition-all hover:bg-amber-400/30 hover:shadow-[0_0_12px_rgba(255,215,130,0.3)] border border-amber-400/40 cursor-pointer active:scale-[0.98]"
         >
           🏆 Submit Result
         </button>
-      ) : (
+      )}
+
+      {/* Submit Result Form - Inline in lobby */}
+      {canSubmitResult && showSubmitForm && (
+        <div className="rounded-xl border border-amber-400/30 bg-gradient-to-br from-gray-900/95 via-amber-900/10 to-gray-900/95 p-4 space-y-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              🏆 Submit Result
+            </h3>
+            <button
+              onClick={() => {
+                setShowSubmitForm(false);
+                setSelectedResult(null);
+                setProofImage(null);
+                setProofFile(null);
+              }}
+              className="text-gray-400 hover:text-white transition-colors p-1"
+              title="Cancel"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Result Selection */}
+          <div>
+            <div className="bg-gradient-to-r from-amber-500/5 to-amber-600/5 border border-amber-500/20 rounded-lg p-2 mb-3">
+              <p className="text-sm font-semibold text-white text-center">
+                Did you win this match?
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setSelectedResult(true)}
+                disabled={isLoading || isSubmitting}
+                className={`
+                  relative overflow-hidden p-3 rounded-lg border transition-all duration-200
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  ${
+                    selectedResult === true
+                      ? "border-green-500/60 bg-gradient-to-br from-green-500/10 to-emerald-500/10 shadow shadow-green-500/10"
+                      : "border-zinc-700/50 bg-zinc-800/60 hover:border-green-500/30 hover:bg-green-500/5"
+                  }
+                `}
+              >
+                <div className="text-center">
+                  <div className="text-2xl mb-1">🏆</div>
+                  <p className="text-sm font-bold text-white">YES</p>
+                  <p className="text-xs text-gray-400 mt-0.5">I won</p>
+                </div>
+                {selectedResult === true && (
+                  <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                    <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                )}
+              </button>
+
+              <button
+                onClick={() => setSelectedResult(false)}
+                disabled={isLoading || isSubmitting}
+                className={`
+                  relative overflow-hidden p-3 rounded-lg border transition-all duration-200
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  ${
+                    selectedResult === false
+                      ? "border-red-500/60 bg-gradient-to-br from-red-500/10 to-rose-500/10 shadow shadow-red-500/10"
+                      : "border-zinc-700/50 bg-zinc-800/60 hover:border-red-500/30 hover:bg-red-500/5"
+                  }
+                `}
+              >
+                <div className="text-center">
+                  <div className="text-2xl mb-1">😔</div>
+                  <p className="text-sm font-bold text-white">NO</p>
+                  <p className="text-xs text-gray-400 mt-0.5">I lost</p>
+                </div>
+                {selectedResult === false && (
+                  <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+                    <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Proof Upload Section */}
+          {selectedResult === true && (
+            <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-2">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-amber-300">
+                  📸 Upload Proof (Optional)
+                </p>
+              </div>
+
+              {!proofImage ? (
+                <div className="space-y-1.5">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleImageCapture}
+                    className="hidden"
+                  />
+                  
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-gradient-to-r from-amber-600/90 to-amber-700/90 hover:from-amber-700 hover:to-amber-800 text-white rounded-lg transition-all text-xs font-medium"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>Take Photo</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (fileInputRef.current) {
+                          fileInputRef.current.removeAttribute('capture');
+                          fileInputRef.current.click();
+                        }
+                      }}
+                      className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-amber-700/90 hover:bg-amber-800 text-white rounded-lg transition-all text-xs font-medium"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload</span>
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-gray-400 text-center mt-1.5">
+                    Screenshot of victory screen or match result
+                  </p>
+                </div>
+              ) : (
+                <div className="relative">
+                  <img
+                    src={proofImage}
+                    alt="Proof"
+                    className="w-full h-32 object-cover rounded-lg"
+                  />
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    className="absolute top-1.5 right-1.5 p-1.5 bg-red-600/90 hover:bg-red-700 rounded-full text-white transition-all"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                  <div className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 bg-green-600/90 rounded text-xs text-white flex items-center gap-1">
+                    <ImageIcon className="w-2.5 h-2.5" />
+                    Proof uploaded
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Info Box */}
+          <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-2">
+            <p className="text-xs text-blue-300 text-center">
+              ⏰ Your opponent has 2 hours to submit their result
+            </p>
+          </div>
+
+          {/* Submit Button */}
+          <button
+            onClick={handleSubmit}
+            disabled={selectedResult === null || isLoading || isSubmitting}
+            className={`
+              w-full py-2 rounded-lg font-semibold text-sm transition-all duration-200 border
+              disabled:opacity-50 disabled:cursor-not-allowed
+              ${
+                selectedResult !== null
+                  ? "bg-gradient-to-r from-amber-600/90 to-amber-700/90 hover:from-amber-700 hover:to-amber-800 text-white shadow shadow-amber-500/10 border-amber-400/30"
+                  : "bg-zinc-700/60 text-gray-400 cursor-not-allowed border-zinc-700/50"
+              }
+            `}
+          >
+            {isLoading || isSubmitting ? (
+              <span className="flex items-center justify-center gap-1.5">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Submitting...
+              </span>
+            ) : (
+              "Submit Result"
+            )}
+          </button>
+
+          {/* Warning */}
+          <p className="text-xs text-gray-500 text-center">
+            ⚠️ Results are final and cannot be changed after submission
+          </p>
+        </div>
+      )}
+
+      {!canSubmitResult && (
         <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-center">
           <div className="text-xs text-gray-400">
             {status !== 'active' && `Status: ${statusDisplay.text}`}
