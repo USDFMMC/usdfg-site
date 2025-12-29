@@ -1220,6 +1220,31 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   // Use Firestore real-time challenges
   const { challenges: firestoreChallenges, loading: challengesLoading, error: challengesError } = useChallenges();
   
+  // Separate state for completed challenges with unclaimed prizes (persists even after refresh)
+  const [unclaimedPrizeChallenges, setUnclaimedPrizeChallenges] = useState<any[]>([]);
+  
+  // Listen for completed challenges where current user won but hasn't claimed prize
+  useEffect(() => {
+    if (!publicKey || !isConnected) {
+      setUnclaimedPrizeChallenges([]);
+      return;
+    }
+    
+    const currentWallet = publicKey.toString().toLowerCase();
+    
+    // Check firestoreChallenges for completed challenges with unclaimed prizes
+    const unclaimed = firestoreChallenges.filter((challenge: any) => {
+      const status = challenge.status || challenge.rawData?.status;
+      const winner = challenge.rawData?.winner || challenge.winner;
+      const prizeClaimedAt = challenge.rawData?.prizeClaimedAt || challenge.prizeClaimedAt;
+      const userWon = winner && winner.toLowerCase() === currentWallet.toLowerCase();
+      
+      return status === 'completed' && userWon && !prizeClaimedAt;
+    });
+    
+    setUnclaimedPrizeChallenges(unclaimed);
+  }, [firestoreChallenges, publicKey, isConnected]);
+  
   // Calculate active challenges count from real-time data
   useEffect(() => {
     if (firestoreChallenges) {
@@ -1821,16 +1846,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         setShowTournamentLobby(false);
       }
       
-      // Open standard lobby for active challenge OR completed challenge where user won (for prize claiming)
+      // Open standard lobby for active challenges only (completed challenges with prizes handled separately)
       const status = challenge.status || challenge.rawData?.status;
-      const isCompleted = status === 'completed';
-      const winner = challenge.rawData?.winner || challenge.winner;
-      const userWon = currentWallet && winner && winner.toLowerCase() === currentWallet.toLowerCase();
-      const prizeClaimed = challenge.rawData?.prizeClaimed || challenge.prizeClaimed;
-      const shouldOpenForPrizeClaim = isCompleted && userWon && !prizeClaimed;
-      
-      // Only auto-open for active challenges OR completed challenges where user can claim prize
-      if (status === 'active' || shouldOpenForPrizeClaim) {
+      if (status === 'active') {
         setSelectedChallenge({
           id: challenge.id,
           title: (challenge as any).title || extractGameFromTitle((challenge as any).title || '') || "Challenge",
@@ -2901,7 +2919,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       // Keep lobby open if needs claim or if challenge is completed (for prize claiming)
       if (!needsClaim && !isCompleted) {
-        setSelectedChallenge(null);
+      setSelectedChallenge(null);
         // Only close lobby if challenge is not completed
         setShowStandardLobby(false);
       } else {
@@ -3535,7 +3553,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       return 'Expired';
     };
 
-    const status = challenge.status;
+    // Use refreshed challenge data if available, otherwise use original
+    const currentChallenge = challengeData || challenge;
+    const status = currentChallenge.status || currentChallenge.rawData?.status || challenge.status;
+    
+    // Check if creator funding deadline has expired
+    const creatorFundingDeadline = currentChallenge.rawData?.creatorFundingDeadline || currentChallenge.creatorFundingDeadline || challenge.rawData?.creatorFundingDeadline || challenge.creatorFundingDeadline;
+    const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
+    const canCreatorFund = status === 'creator_confirmation_required' && !isDeadlineExpired;
     
     // Status pill for detail sheet
     const StatusPillDetail = ({ status, isOwner, players, capacity }: { status: string; isOwner: boolean; players: number; capacity: number }) => {
@@ -3641,18 +3666,42 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               </button>
             )}
             
+            {/* Show deadline expired message for creators */}
+            {isOwner && status === 'creator_confirmation_required' && isDeadlineExpired && (
+              <div className="mt-5 w-full rounded-xl bg-red-500/10 border border-red-500/30 p-4 text-red-200 text-sm">
+                <div className="font-semibold mb-1">⚠️ Confirmation Deadline Expired</div>
+                <p className="text-xs text-red-200/80">
+                  The 5-minute deadline to confirm and fund has passed. The challenge has been reverted to waiting for opponent.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="mt-3 w-full rounded-lg bg-red-600/20 border border-red-500/40 py-2 text-red-200 text-sm font-semibold hover:bg-red-600/30 transition-colors"
+                >
+                  Refresh Page
+                </button>
+              </div>
+            )}
+
             {/* Show button for creators when confirmation required - fund directly without opening modal */}
-            {isOwner && status === 'creator_confirmation_required' && onFund && (
-              <button
-                type="button"
-                className="mt-5 w-full rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 py-3 text-white font-bold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(34,197,94,0.35)]"
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  await onFund(challenge);
-                }}
-              >
-                ✨ Confirm and Fund Challenge ✨
-              </button>
+            {isOwner && canCreatorFund && onFund && (
+              <div className="mt-5 space-y-2">
+                {creatorFundingDeadline && (
+                  <div className="text-xs text-amber-300/80 text-center">
+                    Deadline: {new Date(creatorFundingDeadline.toMillis()).toLocaleTimeString()} ({Math.max(0, Math.floor((creatorFundingDeadline.toMillis() - Date.now()) / 1000 / 60))}m remaining)
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="w-full rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 py-3 text-white font-bold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(34,197,94,0.35)]"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    await onFund(challenge);
+                  }}
+                >
+                  ✨ Confirm and Fund Challenge ✨
+                </button>
+              </div>
             )}
 
             {/* Show Express Join Intent button for non-owners when challenge is waiting */}
@@ -3887,6 +3936,39 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 </p>
               </div>
             )}
+            
+            {/* Unclaimed Prize Notification */}
+            {isConnected && unclaimedPrizeChallenges.length > 0 && (
+              <div className="bg-gradient-to-r from-emerald-500/20 to-green-500/20 border-2 border-emerald-400/50 rounded-xl p-4 max-w-md mx-auto mt-4 shadow-[0_0_30px_rgba(34,197,94,0.4)]">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="text-2xl">💰</div>
+                    <div>
+                      <p className="text-emerald-200 font-bold text-sm">
+                        {unclaimedPrizeChallenges.length} Unclaimed Prize{unclaimedPrizeChallenges.length > 1 ? 's' : ''}!
+                      </p>
+                      <p className="text-emerald-300/80 text-xs mt-1">
+                        Click to claim your winnings
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const challenge = unclaimedPrizeChallenges[0];
+                      setSelectedChallenge({
+                        id: challenge.id,
+                        title: (challenge as any).title || extractGameFromTitle((challenge as any).title || '') || "Challenge",
+                        ...challenge
+                      });
+                      setShowStandardLobby(true);
+                    }}
+                    className="bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-all shadow-[0_0_15px_rgba(34,197,94,0.5)] hover:shadow-[0_0_25px_rgba(34,197,94,0.7)]"
+                  >
+                    Claim Now
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Quick Stats */}
@@ -3937,8 +4019,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             <div className="mb-5 px-4 md:px-0">
               <h1 className="text-lg md:text-2xl font-semibold text-white mb-1">Live Challenges</h1>
               <p className="text-sm text-white/55">Browse by category. Swipe left or right inside each section.</p>
-            </div>
-
+                </div>
+                
             {/* Helper function to map challenge categories to discovery categories */}
             {(() => {
               // Group challenges by discovery category (Sports, Fighting, FPS, Racing)
@@ -3960,7 +4042,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     game.includes('valorant') || game.includes('cs') || 
                     game.includes('battlefield')) {
                   return 'FPS';
-                }
+                          }
                 if (category.includes('RACING')) {
                   return 'Racing';
                 }
@@ -3993,34 +4075,34 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               // Status badge component
               const StatusPill = ({ status, isOwner, players, capacity }: { status: string; isOwner: boolean; players: number; capacity: number }) => {
                 if (status === "pending_waiting_for_opponent") {
-                  return (
+                            return (
                     <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-emerald-500/20 text-emerald-200 border-emerald-500/30 ring-1 ring-emerald-400/30 shadow-[0_0_12px_rgba(16,185,129,0.25)]">
                       OPEN
-                    </span>
+                              </span>
                   );
                 }
                 if (status === "active" || status === "creator_funded") {
-                  return (
+                                return (
                     <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-rose-500/20 text-rose-200 border-rose-500/30 ring-1 ring-rose-400/40 shadow-[0_0_16px_rgba(244,63,94,0.35)]">
                       LIVE
-                    </span>
-                  );
-                }
+                                    </span>
+                                );
+                              }
                 if (status === "creator_confirmation_required") {
                   return (
                     <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-amber-500/20 text-amber-200 border-amber-500/30 ring-1 ring-amber-400/30 shadow-[0_0_12px_rgba(245,158,11,0.25)]">
                       {isOwner ? 'CONFIRM' : 'LIVE'}
-                    </span>
+                              </span>
                   );
                 }
                 if (players >= capacity) {
-                  return (
+                            return (
                     <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-neutral-600/25 text-neutral-200 border-neutral-500/30">
                       FULL
-                    </span>
+                                    </span>
                   );
                 }
-                return (
+                            return (
                   <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-white/10 text-white border-white/10">
                     {status.toUpperCase()}
                   </span>
@@ -4061,15 +4143,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     onClick={onSelect}
                     aria-label={`Open ${gameName} challenge`}
                   >
-                    <img
+                                    <img 
                       src={imagePath}
                       alt=""
                       aria-hidden="true"
                       className="absolute inset-0 h-full w-full object-cover scale-110"
                       loading="lazy"
                       draggable={false}
-                      onError={(e) => {
-                        const target = e.currentTarget as HTMLImageElement;
+                                      onError={(e) => {
+                                        const target = e.currentTarget as HTMLImageElement;
                         target.src = '/assets/usdfg-logo-transparent.png';
                       }}
                     />
@@ -4082,55 +4164,55 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                         <div className="min-w-0 flex-1">
                           <div className="text-[15px] font-semibold truncate">{gameName}</div>
                           <div className="text-xs text-white/70 truncate">{challenge.mode || 'Head-to-Head'}</div>
-                        </div>
+                                  </div>
                         <StatusPill 
                           status={status} 
                           isOwner={isOwner} 
                           players={challenge.players || 0} 
                           capacity={challenge.capacity || 2} 
                         />
-                      </div>
+                                  </div>
 
                       <div className="mt-auto grid grid-cols-2 gap-2 text-xs">
                         <div className="rounded-lg bg-black/45 p-2">
                           <div className="text-white/70">💰 Entry</div>
                           <div className="font-semibold">{challenge.entryFee} USDFG</div>
-                        </div>
+                                              </div>
                         <div className="rounded-lg bg-black/45 p-2">
                           <div className="text-white/70">🏆 Prize</div>
                           <div className="font-semibold">{challenge.prizePool} USDFG</div>
-                        </div>
-                      </div>
+                                              </div>
+                                        </div>
 
                       <div className="flex items-center justify-between gap-2 text-[12px] text-white/80">
                         <div className="min-w-0 truncate">
                           <span className="text-white/60">👤 Creator</span>{' '}
                           <span className="font-semibold">{challenge.username || challenge.creator?.slice(0, 8) + '...'}</span>
-                        </div>
+                            </div>
                         <div className="shrink-0">
                           <span className="text-white/60">{platformIconLocal(challenge.platform)}</span>{' '}
                           <span className="font-semibold">{challenge.platform || 'All'}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </button>
+                          </div>
+                            </div>
+                          </div>
+                                </button>
                 );
               };
 
               // Render category rows
-              return (
+                              return (
                 <>
                   {(Object.entries(categoryGroups) as Array<[string, any[]]>).map(([categoryTitle, items]) => {
                     if (items.length === 0) return null;
                     
-                    return (
+                                return (
                       <section key={categoryTitle} className="mb-6">
                         <div className="mb-2 flex items-center justify-between px-4 md:px-0">
                           <h2 className={`text-sm font-semibold tracking-wide ${categoryTitleClass(categoryTitle)}`}>
                             {categoryTitle}
                           </h2>
                           <div className="text-xs text-white/45">Swipe</div>
-                        </div>
+                                  </div>
 
                         <div 
                           className="flex gap-3 overflow-x-auto pb-2 px-4 md:px-0" 
@@ -4184,19 +4266,19 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                     }
                                   }
                                   
-                                  setSelectedChallenge(challenge);
+                                    setSelectedChallenge(challenge);
                                   setShowDetailSheet(true);
                                 }}
                               />
-                            </div>
+                              </div>
                           ))}
-                        </div>
+                              </div>
                       </section>
-                    );
+                                );
                   })}
                 </>
-              );
-            })()}
+                          );
+                        })()}
           </div>
 
           {/* Live Challenges Grid - Mobile First (iPhone 13 Pro optimized) */}
@@ -5039,10 +5121,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               {showStandardLobby && (
                 <ElegantModal
                   isOpen={showStandardLobby}
-                  onClose={() => {
+          onClose={() => {
                     setShowStandardLobby(false);
                     setSelectedChallenge(null);
-                  }}
+          }}
                   title={`${selectedChallenge.title || "Challenge"} Lobby`}
                 >
                   <StandardChallengeLobby
