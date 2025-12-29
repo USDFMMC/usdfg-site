@@ -13,9 +13,12 @@ interface Message {
 interface ChatBoxProps {
   challengeId: string;
   currentWallet: string;
+  status?: string; // Challenge status (e.g., 'active')
+  platform?: string; // Platform info (e.g., 'PS5')
+  playersCount?: number; // Number of players
 }
 
-export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet }) => {
+export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet, status, platform, playersCount }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -116,6 +119,15 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet }) 
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto space-y-2 mb-2 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
+        {/* Automatic gamer tag exchange message - shown when challenge is active */}
+        {status === 'active' && playersCount && playersCount >= 2 && (
+          <div className="flex justify-center my-2">
+            <div className="max-w-[90%] px-4 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-xs text-yellow-300 text-center">
+              🎮 Please exchange your gamer tag names{platform && platform !== 'All Platforms' ? ` on ${platform}` : ''} so you can find each other and start the match! Share your PSN ID, Xbox Gamertag, Steam username, or other platform identifier.
+            </div>
+          </div>
+        )}
+        
         {messages.length === 0 ? (
           <p className="text-gray-500 text-xs text-center py-4">
             No messages yet. Start the conversation!

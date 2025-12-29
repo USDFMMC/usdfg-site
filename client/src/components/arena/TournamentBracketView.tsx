@@ -19,6 +19,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   challengeId,
   onOpenSubmitResult,
 }) => {
+
   if (!tournament || !tournament.bracket?.length) {
     return (
       <div className="w-full rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-gray-400">
@@ -310,7 +311,12 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-300">
               Match Chat
             </div>
-            <ChatBox challengeId={challengeId} currentWallet={currentWallet || ""} />
+            <ChatBox 
+              challengeId={challengeId} 
+              currentWallet={currentWallet || ""} 
+              status={stage === 'round_in_progress' ? 'active' : undefined}
+              playersCount={players.length}
+            />
           </div>
         </div>
       </div>

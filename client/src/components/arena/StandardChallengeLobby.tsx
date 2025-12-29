@@ -36,6 +36,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const game = challenge.game || challenge.rawData?.game || 'USDFG Arena';
   const mode = challenge.mode || challenge.rawData?.mode || 'Head-to-Head';
   const platform = challenge.platform || challenge.rawData?.platform || 'All Platforms';
+  const challengeId = challenge.id;
 
   const handleImageCapture = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -75,6 +76,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       setIsLoading(false);
     }
   }, [selectedResult, proofFile, onSubmitResult]);
+
   
   const getStatusDisplay = () => {
     switch (status) {
@@ -519,7 +521,13 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-300">
             Match Chat
           </div>
-          <ChatBox challengeId={challenge.id} currentWallet={currentWallet || ""} />
+          <ChatBox 
+            challengeId={challenge.id} 
+            currentWallet={currentWallet || ""} 
+            status={status}
+            platform={platform}
+            playersCount={players.length}
+          />
         </div>
       </div>
     </div>
