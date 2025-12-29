@@ -741,7 +741,6 @@ const ArenaHome: React.FC = () => {
   }, []);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showJoinModal, setShowJoinModal] = useState(false);
   const [showSubmitResultModal, setShowSubmitResultModal] = useState(false);
   const [selectedChallenge, setSelectedChallenge] = useState<any>(null);
   const [showDetailSheet, setShowDetailSheet] = useState(false);
@@ -1072,7 +1071,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       setShowPlayerProfile(false);
       setSelectedPlayer(null);
         setShowCreateModal(false);
-        setShowJoinModal(false);
         setShowSubmitResultModal(false);
         setSelectedChallenge(null);
         setShowTrustReview(false);
@@ -1102,7 +1100,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       if (!isMyChallenge) {
         // Challenge belongs to a different wallet - clear it
         setSelectedChallenge(null);
-        setShowJoinModal(false);
         setShowSubmitResultModal(false);
       }
     }
@@ -1607,7 +1604,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     });
     
     // Auto-open tournament lobby if user is in a tournament and modal isn't already open
-    if (myTournamentChallenges.length > 0 && !showTournamentLobby && !showSubmitResultModal && !showTrustReview && !showJoinModal) {
+    if (myTournamentChallenges.length > 0 && !showTournamentLobby && !showSubmitResultModal && !showTrustReview) {
       const challenge = myTournamentChallenges[0];
       const tournament = challenge.tournament;
       const stage = tournament?.stage || 'waiting_for_players';
@@ -1635,7 +1632,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         }
       }
     }
-  }, [firestoreChallenges, publicKey, isConnected, showTournamentLobby, showSubmitResultModal, showTrustReview, showJoinModal, showStandardLobby, selectedChallenge?.id, mergeChallengeDataForModal]);
+  }, [firestoreChallenges, publicKey, isConnected, showTournamentLobby, showSubmitResultModal, showTrustReview, showStandardLobby, selectedChallenge?.id, mergeChallengeDataForModal]);
 
   // Update selectedChallenge in real-time when tournament data changes
   useEffect(() => {
@@ -1773,7 +1770,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     });
     
     // If there's an in-progress challenge and modal isn't already open
-    if (myInProgressChallenges.length > 0 && !showSubmitResultModal && !showTrustReview && !showStandardLobby && !showJoinModal) {
+    if (myInProgressChallenges.length > 0 && !showSubmitResultModal && !showTrustReview && !showStandardLobby) {
       const challenge = myInProgressChallenges[0];
       
       const results = (challenge as any).results || {};
@@ -1815,9 +1812,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       }
       
       // Close any existing modals/lobbies first
-      if (showJoinModal) {
-        setShowJoinModal(false);
-      }
       // Don't open if lobby is already open for this challenge
       if (showStandardLobby && selectedChallenge?.id === challenge.id) {
         return; // Already open
@@ -1845,7 +1839,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         setShowStandardLobby(true);
       }
     }
-  }, [firestoreChallenges, publicKey, showSubmitResultModal, showTrustReview, showStandardLobby, showJoinModal, showTournamentLobby, selectedChallenge?.id, isConnected]);
+  }, [firestoreChallenges, publicKey, showSubmitResultModal, showTrustReview, showStandardLobby, showTournamentLobby, selectedChallenge?.id, isConnected]);
   
   // Convert Firestore challenges to the format expected by the UI
   const challenges = firestoreChallenges.map(challenge => {
@@ -2453,6 +2447,272 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       setLockInProgress(null);
     }
   }, [normalizedCurrentWallet, currentWallet, currentLockTarget, connect, createFriendlyMatchId, topPlayers, userGamerTag, formatWalletAddress, userLocks]);
+
+  // Handle joiner express intent from ChallengeDetailSheet
+  const handleDirectJoinerExpressIntent = async (challenge: any) => {
+    if (!publicKey || !connection) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    const { signTransaction } = wallet;
+    if (!signTransaction) {
+      alert('Wallet does not support transaction signing');
+      return;
+    }
+
+    const currentWallet = publicKey.toString().toLowerCase();
+    const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
+    const isCreator = currentWallet === creatorWallet.toLowerCase();
+    
+    if (isCreator) {
+      alert('You are the creator. Use the "Confirm and Fund Challenge" button instead.');
+      return;
+    }
+
+    const status = challenge.status || challenge.rawData?.status;
+    if (status !== 'pending_waiting_for_opponent') {
+      alert(`Challenge is not waiting for opponent. Current status: ${status}`);
+      return;
+    }
+
+    try {
+      const walletAddr = publicKey.toString();
+      
+      // Check team restrictions
+      const challengeType = challenge.rawData?.challengeType;
+      const teamOnly = challenge.rawData?.teamOnly;
+      
+      if (challengeType === 'team' && teamOnly === true) {
+        const userTeam = await getTeamByMember(walletAddr);
+        if (!userTeam) {
+          throw new Error('This challenge is only open to teams. You must be part of a team to join.');
+        }
+      }
+      
+      // Check if Founder Challenge
+      const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
+      const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
+      const isAdmin = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+      const isFounderChallenge = isAdmin && (entryFee === 0 || entryFee < 0.000000001);
+      
+      if (isFounderChallenge) {
+        // Founder Challenge - express intent in Firestore only
+        await expressJoinIntent(challenge.id, walletAddr, true);
+        alert('✅ Join intent expressed! Waiting for creator to confirm.');
+        setShowDetailSheet(false);
+        return;
+      }
+      
+      // Regular challenge - express intent on-chain and in Firestore
+      const challengePDA = challenge.rawData?.pda || challenge.pda;
+      if (!challengePDA) {
+        throw new Error('Challenge has no on-chain PDA. Cannot join this challenge.');
+      }
+      
+      // Express intent on-chain (NO PAYMENT)
+      await expressJoinIntentOnChain(
+        { signTransaction, publicKey },
+        connection,
+        challengePDA
+      );
+      
+      // Express intent in Firestore
+      await expressJoinIntent(challenge.id, walletAddr);
+      
+      alert('✅ Join intent expressed! Waiting for creator to fund the challenge.');
+      setShowDetailSheet(false);
+    } catch (err: any) {
+      console.error("❌ Express join intent failed:", err);
+      const errorMessage = err.message || err.toString() || 'Failed to express join intent. Please try again.';
+      alert('Failed to express join intent: ' + errorMessage);
+    }
+  };
+
+  // Handle joiner funding from ChallengeDetailSheet
+  const handleDirectJoinerFund = async (challenge: any) => {
+    if (!publicKey || !connection) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    const { signTransaction } = wallet;
+    if (!signTransaction) {
+      alert('Wallet does not support transaction signing');
+      return;
+    }
+
+    const currentWallet = publicKey.toString().toLowerCase();
+    const challengerWallet = challenge.rawData?.challenger || challenge.challenger;
+    const isChallenger = challengerWallet && challengerWallet.toLowerCase() === currentWallet;
+    
+    if (!isChallenger) {
+      alert('Only the challenger who expressed intent can fund the challenge');
+      return;
+    }
+
+    const status = challenge.status || challenge.rawData?.status;
+    if (status !== 'creator_funded') {
+      alert(`Challenge is not waiting for joiner funding. Current status: ${status}`);
+      return;
+    }
+
+    try {
+      const walletAddr = publicKey.toString();
+      const challengePDA = challenge.rawData?.pda || challenge.pda;
+      const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
+      
+      if (!challengePDA) {
+        throw new Error('Challenge has no on-chain PDA.');
+      }
+
+      // Joiner funds on-chain
+      await joinerFundOnChain(
+        { signTransaction, publicKey },
+        connection,
+        challengePDA,
+        entryFee
+      );
+      
+      // Update Firestore
+      await joinerFund(challenge.id, walletAddr);
+      
+      // Refresh balance
+      setTimeout(() => {
+        refreshUSDFGBalance().catch(() => {});
+      }, 2000);
+
+      // Close detail sheet
+      setShowDetailSheet(false);
+      
+      // Wait for status to become active, then open lobby
+      let updatedChallenge = null;
+      let retries = 0;
+      const maxRetries = 5;
+      
+      while (retries < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        updatedChallenge = await fetchChallengeById(challenge.id);
+        const finalStatus = updatedChallenge?.status || challenge.status || challenge.rawData?.status;
+        
+        if (finalStatus === 'active') {
+          // Open lobby
+          const format = updatedChallenge?.format || (updatedChallenge?.tournament ? 'tournament' : 'standard');
+          const isTournament = format === 'tournament';
+          
+          setSelectedChallenge({
+            id: challenge.id,
+            title: challenge.title || extractGameFromTitle(challenge.title || '') || "Challenge",
+            ...updatedChallenge,
+            rawData: updatedChallenge
+          });
+          
+          if (isTournament) {
+            setShowTournamentLobby(true);
+          } else {
+            setShowStandardLobby(true);
+          }
+          break;
+        }
+        retries++;
+      }
+      
+      alert('✅ Challenge funded successfully! Match is now active.');
+    } catch (err: any) {
+      console.error("❌ Joiner funding failed:", err);
+      alert('Failed to fund challenge: ' + (err.message || 'Unknown error'));
+    }
+  };
+
+  // Handle direct creator funding from ChallengeDetailSheet
+  const handleDirectCreatorFund = async (challenge: any) => {
+    if (!publicKey || !connection) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    const { signTransaction } = wallet;
+    if (!signTransaction) {
+      alert('Wallet does not support transaction signing');
+      return;
+    }
+
+    const currentWallet = publicKey.toString().toLowerCase();
+    const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
+    const isCreator = currentWallet === creatorWallet.toLowerCase();
+    
+    if (!isCreator) {
+      alert('Only the challenge creator can fund the challenge');
+      return;
+    }
+
+    const status = challenge.status || challenge.rawData?.status;
+    if (status !== 'creator_confirmation_required') {
+      alert(`Challenge is not waiting for creator funding. Current status: ${status}`);
+      return;
+    }
+
+    try {
+      // Fetch fresh challenge data to check deadline
+      const freshChallenge = await fetchChallengeById(challenge.id);
+      if (!freshChallenge) {
+        throw new Error('Challenge not found. It may have been cancelled or expired.');
+      }
+
+      const freshStatus = freshChallenge.status;
+      if (freshStatus !== 'creator_confirmation_required') {
+        throw new Error(`Challenge status changed. Current status: ${freshStatus}`);
+      }
+
+      // Check deadline before attempting transaction
+      const deadline = freshChallenge.creatorFundingDeadline;
+      if (deadline && deadline.toMillis() < Date.now()) {
+        throw new Error('⚠️ Confirmation deadline expired. The challenge has been reverted to waiting for opponent.');
+      }
+
+      const challengePDA = freshChallenge.pda || challenge.rawData?.pda || challenge.pda;
+      const entryFee = freshChallenge.entryFee || challenge.entryFee || challenge.rawData?.entryFee || 0;
+      
+      if (!challengePDA) {
+        throw new Error('Challenge has no on-chain PDA.');
+      }
+
+      // Creator funds on-chain
+      await creatorFundOnChain(
+        { signTransaction, publicKey },
+        connection,
+        challengePDA,
+        entryFee
+      );
+      
+      // Update Firestore
+      await creatorFund(challenge.id, currentWallet);
+      
+      // Refresh balance
+      setTimeout(() => {
+        refreshUSDFGBalance().catch(() => {});
+      }, 2000);
+
+      // Close detail sheet
+      setShowDetailSheet(false);
+      
+      alert('✅ Challenge funded successfully! Waiting for opponent to fund.');
+    } catch (err: any) {
+      console.error("❌ Creator funding failed:", err);
+      
+      const errorMessage = err.message || err.toString() || 'Failed to fund challenge. Please try again.';
+      const errorString = errorMessage.toLowerCase();
+      
+      if (errorString.includes("confirmation expired") || 
+          errorString.includes("6015") || 
+          errorString.includes("0x177f") ||
+          errorString.includes("deadline expired")) {
+        alert('⚠️ Confirmation deadline expired. The challenge has been reverted to waiting for opponent. Please refresh the page.');
+      } else {
+        alert('Failed to fund challenge: ' + errorMessage);
+      }
+    }
+  };
 
   // Handle opening submit result modal for tournament matches
   const handleOpenTournamentSubmitResult = (matchId: string, opponentWallet: string) => {
@@ -3234,7 +3494,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   };
 
   // Challenge detail sheet component (bottom sheet)
-  const ChallengeDetailSheet = ({ challenge, onClose, onJoin }: { challenge: any; onClose: () => void; onJoin: () => void }) => {
+  const ChallengeDetailSheet = ({ challenge, onClose, onFund, onExpressIntent, onJoinerFund }: { 
+    challenge: any; 
+    onClose: () => void; 
+    onFund?: (challenge: any) => Promise<void>;
+    onExpressIntent?: (challenge: any) => Promise<void>;
+    onJoinerFund?: (challenge: any) => Promise<void>;
+  }) => {
     const gameName = challenge.game || extractGameFromTitle(challenge.title);
     const imagePath = getGameImage(gameName);
     const isOwner = isChallengeOwner(challenge);
@@ -3375,26 +3641,45 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               </button>
             )}
             
-            {/* Show message for creator when someone expressed intent - funding happens in JoinChallengeModal */}
-            {isOwner && status === 'creator_confirmation_required' && (
-              <div className="mt-5 w-full rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 text-amber-200 text-sm">
-                ⚠️ Someone has expressed intent to join. Click "Join Challenge" below to confirm and fund.
-              </div>
-            )}
-
-            {/* Show button to open JoinChallengeModal - for creators when confirmation required, or for non-owners when joinable */}
-            {((isOwner && status === 'creator_confirmation_required') || 
-              (!isOwner && (status === 'pending_waiting_for_opponent' || status === 'creator_confirmation_required' || status === 'creator_funded'))) && (
+            {/* Show button for creators when confirmation required - fund directly without opening modal */}
+            {isOwner && status === 'creator_confirmation_required' && onFund && (
               <button
                 type="button"
-                className="mt-5 w-full rounded-xl bg-white py-3 text-black font-semibold"
-                onClick={(e) => {
+                className="mt-5 w-full rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 py-3 text-white font-bold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(34,197,94,0.35)]"
+                onClick={async (e) => {
                   e.stopPropagation();
-                  onClose();
-                  onJoin(); // Opens JoinChallengeModal which has the new UI for funding/joining
+                  await onFund(challenge);
                 }}
               >
-                {isOwner && status === 'creator_confirmation_required' ? 'Confirm and Fund Challenge' : 'Join Challenge'}
+                ✨ Confirm and Fund Challenge ✨
+              </button>
+            )}
+
+            {/* Show Express Join Intent button for non-owners when challenge is waiting */}
+            {!isOwner && status === 'pending_waiting_for_opponent' && onExpressIntent && (
+              <button
+                type="button"
+                className="mt-5 w-full rounded-xl bg-gradient-to-r from-blue-400 to-blue-500 py-3 text-white font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(59,130,246,0.35)]"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await onExpressIntent(challenge);
+                }}
+              >
+                Express Join Intent (No Payment)
+              </button>
+            )}
+
+            {/* Show Fund button for joiner when creator has funded */}
+            {!isOwner && status === 'creator_funded' && onJoinerFund && (
+              <button
+                type="button"
+                className="mt-5 w-full rounded-xl bg-gradient-to-r from-green-400 to-green-500 py-3 text-white font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(34,197,94,0.35)]"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await onJoinerFund(challenge);
+                }}
+              >
+                Fund Now ({challenge.entryFee} USDFG)
               </button>
             )}
 
@@ -4685,54 +4970,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           <ChallengeDetailSheet
             challenge={selectedChallenge}
             onClose={() => setShowDetailSheet(false)}
-            onJoin={() => {
-              setShowDetailSheet(false);
-              setShowJoinModal(true);
-            }}
+            onFund={handleDirectCreatorFund}
+            onExpressIntent={handleDirectJoinerExpressIntent}
+            onJoinerFund={handleDirectJoinerFund}
           />
         )}
 
-        {/* Join Challenge Modal */}
-        {showJoinModal && selectedChallenge && (
-          <JoinChallengeModal 
-            challenge={selectedChallenge}
-            onClose={() => setShowJoinModal(false)}
-            isConnected={isConnected}
-            onConnect={async () => {
-              // Select and connect Phantom wallet
-              const phantomWallet = wallet.wallets.find(w => w.adapter.name === 'Phantom');
-              if (phantomWallet) {
-                wallet.select(phantomWallet.adapter.name);
-                try {
-                  await phantomWallet.adapter.connect();
-                } catch (error) {
-                  console.error('Connection error:', error);
-                }
-              }
-            }}
-            onBalanceRefresh={refreshUSDFGBalance}
-            onJoinSuccess={(challenge) => {
-              // Close any existing modals/lobbies first
-              setShowJoinModal(false);
-              setShowTournamentLobby(false);
-              setShowStandardLobby(false);
-              
-              // Determine challenge format
-              const format = challenge.rawData?.format || (challenge.rawData?.tournament ? 'tournament' : 'standard');
-              const isTournament = format === 'tournament';
-              
-              // Set selected challenge
-              setSelectedChallenge(challenge);
-              
-              // Open appropriate lobby (only one)
-              if (isTournament) {
-                setShowTournamentLobby(true);
-              } else {
-                setShowStandardLobby(true);
-              }
-            }}
-          />
-        )}
 
         {/* Submit Result Room - Only render for main challengers (creator and first challenger who accepted) */}
         {selectedChallenge?.id && (() => {
@@ -5916,565 +6159,7 @@ const CreateChallengeModal: React.FC<{
 };
 
 
-// Join Challenge Modal Component
-const JoinChallengeModal: React.FC<{ 
-  challenge: any; 
-  onClose: () => void; 
-  isConnected: boolean;
-  onConnect: () => void;
-  onBalanceRefresh?: () => Promise<void>;
-  onJoinSuccess?: (challenge: any) => void;
-}> = ({ challenge, onClose, isConnected, onConnect, onBalanceRefresh, onJoinSuccess }) => {
-  const { publicKey, signTransaction } = useWallet();
-  const [state, setState] = useState<'review' | 'processing' | 'success' | 'error'>('review');
-  const [error, setError] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState(false);
-
-  const handleConnect = () => {
-    // Close modal and let user connect via main button
-    // Wallet adapter will handle mobile/desktop connection automatically
-      onClose();
-  };
-
-  // Get challenge status and determine user role
-  const challengeStatus = challenge.status || challenge.rawData?.status || 'pending_waiting_for_opponent';
-  const walletAddress = publicKey?.toString() || '';
-  const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
-  const isCreator = walletAddress.toLowerCase() === creatorWallet.toLowerCase();
-  const isChallenger = challenge.rawData?.challenger && walletAddress.toLowerCase() === challenge.rawData.challenger.toLowerCase();
-  const pendingJoiner = challenge.rawData?.pendingJoiner;
-  const isPendingJoiner = pendingJoiner && walletAddress.toLowerCase() === pendingJoiner.toLowerCase();
-
-  // Express join intent - NO PAYMENT
-  const handleExpressJoinIntent = async () => {
-    if (!isConnected || !publicKey) {
-      setError('Please connect your wallet first');
-      setState('error');
-      return;
-    }
-
-    if (challengeStatus !== 'pending_waiting_for_opponent') {
-      setError(`Challenge is not waiting for opponent. Current status: ${challengeStatus}`);
-      setState('error');
-      return;
-    }
-
-    setState('processing');
-    
-    try {
-      const walletAddr = publicKey.toString();
-      
-      // Check team restrictions
-      const challengeType = challenge.rawData?.challengeType;
-      const teamOnly = challenge.rawData?.teamOnly;
-      
-      if (challengeType === 'team' && teamOnly === true) {
-        const userTeam = await getTeamByMember(walletAddr);
-        if (!userTeam) {
-          throw new Error('This challenge is only open to teams. You must be part of a team to join.');
-        }
-      }
-      
-      // Check if Founder Challenge
-      const { ADMIN_WALLET } = await import('@/lib/chain/config');
-      const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
-      const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
-      const isAdmin = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
-      const isFounderChallenge = isAdmin && (entryFee === 0 || entryFee < 0.000000001);
-      
-      if (isFounderChallenge) {
-        // Founder Challenge - express intent in Firestore only
-        await expressJoinIntent(challenge.id, walletAddr, true);
-        // Founder challenge: close modal and open lobby
-        setState('success');
-        setTimeout(() => {
-          onClose();
-          if (onJoinSuccess) {
-            onJoinSuccess(challenge);
-          }
-        }, 1500);
-      } else {
-        // Regular challenge - express intent on-chain and in Firestore
-        const challengePDA = challenge.rawData?.pda || challenge.pda;
-        if (!challengePDA) {
-          throw new Error('Challenge has no on-chain PDA. Cannot join this challenge.');
-        }
-        
-        const { Connection } = await import('@solana/web3.js');
-        const { getRpcEndpoint } = await import('@/lib/chain/rpc');
-        const connection = new Connection(getRpcEndpoint(), 'confirmed');
-        
-        // Express intent on-chain (NO PAYMENT)
-        await expressJoinIntentOnChain(
-          { signTransaction: signTransaction!, publicKey },
-          connection,
-          challengePDA
-        );
-        
-        // Express intent in Firestore
-        await expressJoinIntent(challenge.id, walletAddr);
-        
-        // Modal stays open - status will change to creator_confirmation_required
-        setState('success');
-        setTimeout(() => {
-          setState('review'); // Return to review state to show updated UI
-        }, 1500);
-      }
-    } catch (err: any) {
-      console.error("❌ Express join intent failed:", err);
-      
-      // Extract error message from various possible locations
-      let errorMessage = err.message || err.toString() || 'Failed to express join intent. Please try again.';
-      
-      // Check error logs if available (for Solana transaction errors)
-      if (err.logs && Array.isArray(err.logs)) {
-        const logsString = err.logs.join(' ');
-        if (logsString.includes("ChallengeExpired") || logsString.includes("6005") || logsString.includes("0x1775")) {
-          errorMessage = "⚠️ This challenge has expired. Please refresh the page to see the latest challenges.";
-          setError(errorMessage);
-          setState('error');
-          return;
-        }
-      }
-      
-      // Check error message string
-      const errorString = errorMessage.toLowerCase();
-      if (errorString.includes("challengeexpired") || 
-          errorString.includes("6005") || 
-          errorString.includes("0x1775") ||
-          errorString.includes("challenge has expired") ||
-          errorString.includes("challenge expired")) {
-        errorMessage = "⚠️ This challenge has expired. Please refresh the page to see the latest challenges.";
-      } else if (errorString.includes("challengenotfound") || 
-                 errorString.includes("not found")) {
-        errorMessage = "❌ Challenge not found on-chain. It may have been deleted or cancelled.";
-      } else if (errorString.includes("alreadyjoined") || 
-                 errorString.includes("already joined")) {
-        errorMessage = "✅ You have already expressed intent to join this challenge. Please wait for the creator to fund it.";
-      }
-      
-      setError(errorMessage);
-      setState('error');
-    }
-  };
-
-  // Creator funds after joiner expressed intent
-  const handleCreatorFund = async () => {
-    if (!isConnected || !publicKey || !isCreator) {
-      setError('Only the challenge creator can fund the challenge');
-      setState('error');
-      return;
-    }
-
-    if (challengeStatus !== 'creator_confirmation_required') {
-      setError(`Challenge is not waiting for creator funding. Current status: ${challengeStatus}`);
-      setState('error');
-      return;
-    }
-
-    setState('processing');
-    
-    try {
-      // Fetch fresh challenge data to check deadline
-      const freshChallenge = await fetchChallengeById(challenge.id);
-      if (!freshChallenge) {
-        throw new Error('Challenge not found. It may have been cancelled or expired.');
-      }
-
-      const freshStatus = freshChallenge.status;
-      if (freshStatus !== 'creator_confirmation_required') {
-        throw new Error(`Challenge status changed. Current status: ${freshStatus}`);
-      }
-
-      // Check deadline before attempting transaction
-      const deadline = freshChallenge.creatorFundingDeadline;
-      if (deadline && deadline.toMillis() < Date.now()) {
-        throw new Error('⚠️ Confirmation deadline expired. The challenge has been reverted to waiting for opponent.');
-      }
-
-      const walletAddr = publicKey.toString();
-      const challengePDA = freshChallenge.pda || challenge.rawData?.pda || challenge.pda;
-      const entryFee = freshChallenge.entryFee || challenge.entryFee || challenge.rawData?.entryFee || 0;
-      
-      if (!challengePDA) {
-        throw new Error('Challenge has no on-chain PDA.');
-      }
-      
-      if (!signTransaction) {
-        throw new Error('Wallet does not support transaction signing');
-      }
-      
-      const { Connection } = await import('@solana/web3.js');
-      const { getRpcEndpoint } = await import('@/lib/chain/rpc');
-      const connection = new Connection(getRpcEndpoint(), 'confirmed');
-      
-      // Creator funds on-chain
-      await creatorFundOnChain(
-        { signTransaction, publicKey },
-        connection,
-        challengePDA,
-        entryFee
-      );
-      
-      // Update Firestore
-      await creatorFund(challenge.id, walletAddr);
-      
-      // Refresh balance
-      if (onBalanceRefresh) {
-        setTimeout(() => {
-          onBalanceRefresh!().catch(() => {});
-        }, 2000);
-      }
-      
-      // Modal stays open - status will change to creator_funded
-      setState('success');
-      setTimeout(() => {
-        setState('review'); // Return to review state to show updated UI
-      }, 1500);
-    } catch (err: any) {
-      console.error("❌ Creator funding failed:", err);
-      
-      // Check for expired deadline error
-      const errorMessage = err.message || err.toString() || 'Failed to fund challenge. Please try again.';
-      const errorString = errorMessage.toLowerCase();
-      
-      if (errorString.includes("confirmation expired") || 
-          errorString.includes("6015") || 
-          errorString.includes("0x177f") ||
-          errorString.includes("deadline expired")) {
-        setError('⚠️ Confirmation deadline expired. The challenge has been reverted to waiting for opponent. Please refresh the page.');
-      } else {
-        setError(errorMessage);
-      }
-      
-      setState('error');
-    }
-  };
-
-  // Joiner funds after creator funded
-  const handleJoinerFund = async () => {
-    if (!isConnected || !publicKey || !isChallenger) {
-      setError('Only the challenger can fund the challenge');
-      setState('error');
-      return;
-    }
-
-    if (challengeStatus !== 'creator_funded') {
-      setError(`Challenge is not waiting for joiner funding. Current status: ${challengeStatus}`);
-      setState('error');
-      return;
-    }
-
-    setState('processing');
-    
-    try {
-      const walletAddr = publicKey.toString();
-      const challengePDA = challenge.rawData?.pda || challenge.pda;
-      const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
-      
-      if (!challengePDA) {
-        throw new Error('Challenge has no on-chain PDA.');
-      }
-      
-      if (!signTransaction) {
-        throw new Error('Wallet does not support transaction signing');
-      }
-      
-      const { Connection } = await import('@solana/web3.js');
-      const { getRpcEndpoint } = await import('@/lib/chain/rpc');
-      const connection = new Connection(getRpcEndpoint(), 'confirmed');
-      
-      // Joiner funds on-chain
-      await joinerFundOnChain(
-        { signTransaction, publicKey },
-        connection,
-        challengePDA,
-        entryFee
-      );
-      
-      // Update Firestore
-      await joinerFund(challenge.id, walletAddr);
-      
-      // Refresh balance
-      if (onBalanceRefresh) {
-        setTimeout(() => {
-          onBalanceRefresh!().catch(() => {});
-        }, 2000);
-      }
-      
-      // Wait for Firestore to update, then fetch with retry
-      let updatedChallenge = null;
-      let finalStatus = challenge.status || challenge.rawData?.status;
-      let retries = 0;
-      const maxRetries = 5;
-      
-      while (retries < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms between retries
-        updatedChallenge = await fetchChallengeById(challenge.id);
-        finalStatus = updatedChallenge?.status || challenge.status || challenge.rawData?.status;
-        
-        if (finalStatus === 'active') {
-          break; // Status is active, proceed
-        }
-        retries++;
-      }
-      
-      setState('success');
-      setTimeout(() => {
-        onClose();
-        // Open lobby ONLY if challenge status is active
-        if (finalStatus === 'active' && onJoinSuccess) {
-          const challengeToPass = updatedChallenge ? {
-            ...challenge,
-            ...updatedChallenge,
-            rawData: updatedChallenge
-          } : challenge;
-          onJoinSuccess(challengeToPass);
-        } else {
-          // Status didn't become active yet - close modal anyway
-          // Auto-open logic will handle opening lobby when status becomes active
-          console.log('⚠️ Challenge status not yet active after funding. Status:', finalStatus, '- Modal closed, auto-open will handle lobby');
-        }
-      }, 1500);
-    } catch (err: any) {
-      console.error("❌ Joiner funding failed:", err);
-      setError(err.message || 'Failed to fund challenge. Please try again.');
-      setState('error');
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative w-[90vw] max-w-md rounded-xl border border-amber-400/30 bg-[#07080C]/95 p-4 shadow-[0_0_40px_rgba(255,215,130,0.06)]">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-white">Join Challenge</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
-            ✕
-          </button>
-        </div>
-
-        {state === 'review' && (
-          <div className="space-y-4">
-            {/* State-driven messaging */}
-            {challengeStatus === 'pending_waiting_for_opponent' && !isCreator && (
-              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 mb-4">
-                <p className="text-sm text-blue-300">
-                  ℹ️ <strong>No funds are committed until you express intent and the creator accepts.</strong>
-                </p>
-              </div>
-            )}
-            
-            {challengeStatus === 'creator_confirmation_required' && isCreator && (
-              <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 mb-4">
-                <p className="text-sm text-amber-300">
-                  ⚠️ <strong>Opponent found! Confirm and fund to activate match.</strong>
-                </p>
-                {challenge.rawData?.creatorFundingDeadline && (
-                  <p className="text-xs text-amber-200 mt-1">
-                    Deadline: {new Date(challenge.rawData.creatorFundingDeadline.toMillis()).toLocaleTimeString()}
-                  </p>
-                )}
-              </div>
-            )}
-            
-            {challengeStatus === 'creator_funded' && isChallenger && (
-              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 mb-4">
-                <p className="text-sm text-green-300">
-                  ✅ <strong>Creator has funded. Fund now to activate the match.</strong>
-                </p>
-                {challenge.rawData?.joinerFundingDeadline && (
-                  <p className="text-xs text-green-200 mt-1">
-                    Deadline: {new Date(challenge.rawData.joinerFundingDeadline.toMillis()).toLocaleTimeString()}
-                  </p>
-                )}
-              </div>
-            )}
-            
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Challenge:</span>
-                <span className="text-white font-medium">{challenge.title}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Entry Fee:</span>
-                <span className="text-white font-medium">{challenge.entryFee} USDFG</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Prize Pool:</span>
-                <span className="text-white font-medium">{challenge.prizePool} USDFG</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Players:</span>
-                <span className="text-white font-medium">{challenge.players}/{challenge.capacity}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Platform:</span>
-                <span className="text-white font-medium">{challenge.platform || 'All Platforms'}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Game:</span>
-                <span className="text-white font-medium">{challenge.game || 'USDFG Arena'}</span>
-              </div>
-              {challenge.creator && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Creator:</span>
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      try {
-                        const creatorStats = await getPlayerStats(challenge.creator);
-                        if (creatorStats) {
-                          setSelectedPlayer(creatorStats);
-                          setShowPlayerProfile(true);
-                        }
-                      } catch (error) {
-                        console.error('Failed to load creator profile:', error);
-                      }
-                    }}
-                    className="text-amber-300 hover:text-amber-200 underline transition-colors font-medium"
-                  >
-                    {challenge.username || `${challenge.creator.slice(0, 6)}...${challenge.creator.slice(-4)}`}
-                  </button>
-                </div>
-              )}
-              {challenge.expiresAt && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Expires:</span>
-                  <span className="text-white font-medium">
-                    {new Date(challenge.expiresAt).toLocaleString()}
-                  </span>
-                </div>
-              )}
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Rules:</span>
-                <span className="text-white font-medium text-xs">
-                  {challenge.rules || 'Standard USDFG Arena rules apply'}
-                </span>
-              </div>
-            </div>
-            
-            {/* State-driven action buttons */}
-            <div className="flex items-center justify-between pt-4">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
-              >
-                Cancel
-              </button>
-              
-              {/* Pending: Show "Express Join Intent" for non-creators */}
-              {challengeStatus === 'pending_waiting_for_opponent' && !isCreator && (
-                <button
-                  onClick={handleExpressJoinIntent}
-                  disabled={state === 'processing'}
-                  className="relative bg-gradient-to-r from-blue-400 to-blue-500 text-white px-6 py-2 rounded-lg font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(59,130,246,0.35)] overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="relative z-10 flex items-center justify-center gap-2">
-                    Express Join Intent (No Payment)
-                  </span>
-                </button>
-              )}
-              
-              {/* Creator Confirmation: Show "Confirm and Fund" for creator */}
-              {challengeStatus === 'creator_confirmation_required' && isCreator && (
-                <button
-                  onClick={handleCreatorFund}
-                  disabled={state === 'processing'}
-                  className="relative bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-lg font-bold hover:brightness-110 transition-all duration-300 shadow-[0_0_35px_rgba(34,197,94,0.75),0_0_70px_rgba(34,197,94,0.5)] hover:shadow-[0_0_45px_rgba(34,197,94,0.95),0_0_90px_rgba(34,197,94,0.7)] overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed border-2 border-green-400 hover:scale-105"
-                >
-                  <span className="relative z-10 flex items-center justify-center gap-2 text-lg">
-                    ✨ Confirm and Fund ({challenge.entryFee} USDFG) ✨
-                  </span>
-                </button>
-              )}
-              
-              {/* Creator Funded: Show "Fund Now" for challenger */}
-              {challengeStatus === 'creator_funded' && isChallenger && (
-                <button
-                  onClick={handleJoinerFund}
-                  disabled={state === 'processing'}
-                  className="relative bg-gradient-to-r from-green-400 to-green-500 text-white px-6 py-2 rounded-lg font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(34,197,94,0.35)] overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="relative z-10 flex items-center justify-center gap-2">
-                    Fund Now ({challenge.entryFee} USDFG)
-                  </span>
-                </button>
-              )}
-              
-              {/* No action available */}
-              {(challengeStatus === 'pending_waiting_for_opponent' && isCreator) ||
-               (challengeStatus === 'creator_confirmation_required' && !isCreator && !isPendingJoiner) ||
-               (challengeStatus === 'creator_funded' && !isChallenger) ||
-               (challengeStatus === 'active') ||
-               (challengeStatus === 'completed') ||
-               (challengeStatus === 'cancelled') ? (
-                <div className="text-sm text-gray-400">
-                  {challengeStatus === 'pending_waiting_for_opponent' && isCreator && 'Waiting for opponent...'}
-                  {challengeStatus === 'creator_confirmation_required' && !isCreator && !isPendingJoiner && 'Creator must confirm first'}
-                  {challengeStatus === 'creator_funded' && !isChallenger && 'Only the challenger can fund'}
-                  {challengeStatus === 'active' && 'Challenge is active'}
-                  {challengeStatus === 'completed' && 'Challenge completed'}
-                  {challengeStatus === 'cancelled' && 'Challenge cancelled'}
-                </div>
-              ) : null}
-            </div>
-          </div>
-        )}
-
-        {state === 'processing' && (
-          <div className="text-center py-8">
-            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-gray-600 border-t-amber-400 mb-4" />
-            <p className="text-gray-300">Processing your request...</p>
-          </div>
-        )}
-
-        {state === 'success' && (
-          <div className="text-center py-8">
-            <div className="mx-auto h-12 w-12 rounded-full bg-green-500/20 flex items-center justify-center mb-4">
-              <span className="text-green-400 text-xl">✓</span>
-            </div>
-            <p className="text-green-400 font-medium">Successfully joined the challenge!</p>
-            <p className="text-gray-400 text-sm mt-2">Good luck in the Arena!</p>
-          </div>
-        )}
-
-        {state === 'error' && (
-          <div className="text-center py-8">
-            <div className="mx-auto h-12 w-12 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
-              <span className="text-red-400 text-xl">✕</span>
-            </div>
-            <p className="text-red-400 font-medium">{error}</p>
-            {!isConnected ? (
-              <button
-                onClick={handleConnect}
-                disabled={connecting}
-                className="mt-4 bg-gradient-to-r from-amber-400 to-orange-500 text-black px-4 py-2 rounded-lg font-semibold hover:brightness-110 transition-all disabled:opacity-50"
-              >
-                {connecting ? "Connecting..." : "Connect Wallet First"}
-              </button>
-            ) : (
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => setState('review')}
-                  className="mt-4 bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
-                >
-                  Try Again
-                </button>
-                <button
-                  onClick={() => window.location.reload()}
-                  className="mt-4 bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors"
-                >
-                  Refresh Page
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
+// JoinChallengeModal REMOVED - functionality moved to ChallengeDetailSheet with direct handlers
 
 
 // Profile Settings Modal Component
