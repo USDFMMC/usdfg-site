@@ -8,6 +8,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { expressJoinIntent as expressJoinIntentOnChain, creatorFund as creatorFundOnChain, joinerFund as joinerFundOnChain } from "@/lib/chain/contract";
 import { handlePhantomReturn, isPhantomReturn, SESSION_STORAGE_NONCE } from '@/lib/wallet/phantom-deeplink';
 import TournamentBracketView from "@/components/arena/TournamentBracketView";
+import StandardChallengeLobby from "@/components/arena/StandardChallengeLobby";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
@@ -789,6 +790,7 @@ const ArenaHome: React.FC = () => {
   const [showChatModal, setShowChatModal] = useState<boolean>(false);
   const [selectedChatChallenge, setSelectedChatChallenge] = useState<any>(null);
 const [showTournamentLobby, setShowTournamentLobby] = useState(false);
+const [showStandardLobby, setShowStandardLobby] = useState(false);
 const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string; opponentWallet: string } | null>(null);
   const [showTeamModal, setShowTeamModal] = useState<boolean>(false);
   const [userTeam, setUserTeam] = useState<TeamStats | null>(null);
@@ -1644,6 +1646,117 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       }
     }
   }, [firestoreChallenges, selectedChallenge?.id, showTournamentLobby, mergeChallengeDataForModal]);
+
+  // Update selectedChallenge in real-time when challenge status/data changes (for join modal)
+  useEffect(() => {
+    if (!selectedChallenge || !firestoreChallenges || showTournamentLobby) return;
+    
+    const challengeId = selectedChallenge.id;
+    const updatedChallenge = firestoreChallenges.find((c: any) => c.id === challengeId);
+    
+    if (updatedChallenge) {
+      try {
+        // Convert Firestore challenge to UI format
+        const challengeAny = updatedChallenge as any;
+        const title = challengeAny.title || '';
+        const game = challengeAny.game || extractGameFromTitle(title) || 'USDFG Arena';
+        const category = challengeAny.category || getGameCategory(game) || 'Gaming';
+        const mode = extractModeFromTitle(title) || 'Head-to-Head';
+        const platform = challengeAny.platform || 'All Platforms';
+        const creatorTag = updatedChallenge.creator?.slice(0, 8) + '...' || 'Unknown';
+        const prizePool = updatedChallenge.prizePool || (updatedChallenge.entryFee * 2);
+        const rules = 'Standard USDFG Arena rules apply';
+        
+        const getMaxPlayers = (mode: string) => {
+          if (!mode) return 2;
+          switch (mode.toLowerCase()) {
+            case 'head-to-head':
+            case '1v1':
+              return 2;
+            case 'tournament':
+            case 'bracket':
+              return 8;
+            case 'battle royale':
+              return 16;
+            case 'team vs team':
+              return 4;
+            default:
+              return 2;
+          }
+        };
+
+        const maxPlayers = updatedChallenge.maxPlayers || getMaxPlayers(mode);
+        const currentPlayers = updatedChallenge.players?.length || (updatedChallenge.challenger ? 2 : 1);
+
+        const merged = {
+          ...selectedChallenge,
+          id: updatedChallenge.id,
+          title: `${game} ${mode}`,
+          game: game,
+          mode: mode,
+          platform: platform,
+          username: creatorTag,
+          entryFee: updatedChallenge.entryFee,
+          prizePool: prizePool,
+          players: currentPlayers,
+          capacity: maxPlayers,
+          category: category,
+          creator: updatedChallenge.creator,
+          rules: rules,
+          status: updatedChallenge.status,
+          rawData: updatedChallenge,
+        };
+        
+        setSelectedChallenge(merged);
+      } catch (error) {
+        console.error('Failed to update selected challenge:', error);
+      }
+    }
+  }, [firestoreChallenges, selectedChallenge?.id, showTournamentLobby]);
+
+  // Auto-open chat modal when challenge becomes active and user is a participant
+  useEffect(() => {
+    if (!publicKey || !firestoreChallenges || !isConnected) return;
+    
+    const currentWallet = publicKey.toString().toLowerCase();
+    
+    // Find challenges where user is a participant and status is active/funded
+    const myActiveChallenges = firestoreChallenges.filter((challenge: any) => {
+      // Check players array (actual participant list) or creator
+      const playersArray = challenge.players || [];
+      const isParticipant = playersArray.some((player: string) => 
+        player.toLowerCase() === currentWallet
+      ) || challenge.creator?.toLowerCase() === currentWallet;
+      
+      const status = challenge.status || challenge.rawData?.status;
+      const isActive = status === 'active' || 
+                      status === 'creator_confirmation_required' ||
+                      status === 'creator_funded';
+      
+      return isParticipant && isActive;
+    });
+    
+    // Auto-open chat if user is in an active challenge and chat isn't already open
+    if (myActiveChallenges.length > 0 && !showChatModal && !showTournamentLobby && !showSubmitResultModal) {
+      const challenge = myActiveChallenges[0];
+      
+      try {
+        const game = challenge.game || extractGameFromTitle(challenge.title || '') || 'USDFG Arena';
+        const mode = extractModeFromTitle(challenge.title || '') || 'Head-to-Head';
+        const chatChallenge = {
+          id: challenge.id,
+          title: challenge.title || `${game} ${mode}`,
+          game: game,
+        };
+        
+        setSelectedChatChallenge(chatChallenge);
+        setShowChatModal(true);
+        console.log(`💬 Chat modal auto-opened for challenge: ${challenge.id}`);
+      } catch (error) {
+        console.error('Failed to open chat modal:', error);
+      }
+    }
+  }, [firestoreChallenges, publicKey, isConnected, showChatModal, showTournamentLobby, showSubmitResultModal]);
   
   // Auto-open Submit Result Room when user's challenge becomes "in-progress"
   useEffect(() => {
@@ -1667,7 +1780,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     });
     
     // If there's an in-progress challenge and modal isn't already open
-    if (myInProgressChallenges.length > 0 && !showSubmitResultModal && !showTrustReview) {
+    if (myInProgressChallenges.length > 0 && !showSubmitResultModal && !showTrustReview && !showStandardLobby) {
       const challenge = myInProgressChallenges[0];
       
       const results = (challenge as any).results || {};
@@ -1708,14 +1821,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         return;
       }
       
+      // Open standard lobby for active challenge
       setSelectedChallenge({
         id: challenge.id,
         title: (challenge as any).title || extractGameFromTitle((challenge as any).title || '') || "Challenge",
         ...challenge
       });
-      setShowSubmitResultModal(true);
+      setShowStandardLobby(true);
     }
-  }, [firestoreChallenges, publicKey, showSubmitResultModal, showTrustReview, isConnected]);
+  }, [firestoreChallenges, publicKey, showSubmitResultModal, showTrustReview, showStandardLobby, isConnected]);
   
   // Convert Firestore challenges to the format expected by the UI
   const challenges = firestoreChallenges.map(challenge => {
@@ -2130,9 +2244,21 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         // These are not needed for leaderboards and increase storage costs unnecessarily
       };
       
-      // Debug: Firestore challenge data (uncomment for debugging)
-      // console.log("🔥 Adding challenge to Firestore...");
-      // console.log("🔥 Firestore Challenge Data:", { game: firestoreChallengeData.game, category: firestoreChallengeData.category, title: firestoreChallengeData.title });
+      // Debug: Firestore challenge data
+      console.log("🔥 Adding challenge to Firestore...");
+      console.log("🔥 Firestore Challenge Data:", firestoreChallengeData);
+      
+      // Validate required fields before sending
+      if (!firestoreChallengeData.creator) {
+        throw new Error("Creator wallet is required");
+      }
+      if (firestoreChallengeData.entryFee === undefined || firestoreChallengeData.entryFee === null) {
+        throw new Error("Entry fee is required");
+      }
+      if (!firestoreChallengeData.status) {
+        throw new Error("Status is required");
+      }
+      
       const firestoreId = await addChallenge(firestoreChallengeData);
       // The real-time listener will automatically update the UI
       
@@ -2158,13 +2284,64 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
   };
 
-  const handleDeleteChallenge = async (challengeId: string) => {
-    
-    if (window.confirm("Are you sure you want to delete this challenge? This action cannot be undone.")) {
+  const handleDeleteChallenge = async (challengeId: string, challenge?: any) => {
+    if (window.confirm("Are you sure you want to cancel/delete this challenge? This action cannot be undone.")) {
       try {
+        // Check if challenge has on-chain PDA (not a Founder Challenge)
+        const challengePDA = challenge?.pda || challenge?.rawData?.pda;
+        const challengeStatus = challenge?.status || challenge?.rawData?.status;
+        const isCreator = challenge?.creator === currentWallet || challenge?.rawData?.creator === currentWallet;
+        
+        // Only allow cancellation if:
+        // 1. User is the creator
+        // 2. Challenge is in pending_waiting_for_opponent state ONLY (before anyone expresses intent to join)
+        // IMPORTANT: Cannot cancel after someone has expressed intent (creator_confirmation_required) - that would be cheating!
+        const canCancel = isCreator && challengeStatus === 'pending_waiting_for_opponent';
+        
+        if (!canCancel) {
+          if (!isCreator) {
+            alert("Only the challenge creator can cancel this challenge.");
+          } else if (challengeStatus === 'creator_confirmation_required') {
+            alert("Cannot cancel: Someone has already expressed intent to join. You must either fund the challenge or wait for the timeout.");
+          } else if (challengeStatus === 'creator_funded' || challengeStatus === 'active') {
+            alert("Cannot cancel: Challenge is already active with funds locked.");
+          } else {
+            alert("This challenge cannot be cancelled in its current state.");
+          }
+          return;
+        }
+        
+        // If challenge has on-chain PDA, cancel on-chain first
+        if (challengePDA && challengePDA !== 'founder_' && !challengePDA.startsWith('founder_')) {
+          try {
+            const { cancelChallenge } = await import("@/lib/chain/contract");
+            const { Connection } = await import("@solana/web3.js");
+            const { getRpcEndpoint } = await import("@/lib/chain/rpc");
+            
+            const connection = new Connection(getRpcEndpoint(), 'confirmed');
+            const phantomWallet = wallet.wallets.find(w => w.adapter.name === 'Phantom');
+            const walletToUse = phantomWallet?.adapter || wallet;
+            
+            if (!walletToUse || !walletToUse.publicKey) {
+              throw new Error("Wallet not connected");
+            }
+            
+            await cancelChallenge(walletToUse, connection, challengePDA);
+            console.log("✅ Challenge cancelled on-chain");
+          } catch (onChainError) {
+            console.error("❌ Failed to cancel on-chain:", onChainError);
+            // Continue to delete from Firestore even if on-chain cancel fails
+            // (challenge might already be cancelled or not exist on-chain)
+          }
+        }
+        
+        // Delete from Firestore
         const { deleteChallenge } = await import("@/lib/firebase/firestore");
         await deleteChallenge(challengeId);
-        // Challenge deleted - real-time listener will automatically update the UI
+        console.log("✅ Challenge deleted from Firestore");
+        
+        // Show success message
+        alert("Challenge cancelled and deleted successfully!");
       } catch (error) {
         console.error("❌ Failed to delete challenge:", error);
         alert("Failed to delete challenge: " + (error instanceof Error ? error.message : "Unknown error"));
@@ -3151,17 +3328,43 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               </div>
             </div>
 
-            <button
-              type="button"
-              className="mt-5 w-full rounded-xl bg-white py-3 text-black font-semibold"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-                onJoin();
-              }}
-            >
-              Join Challenge
-            </button>
+            {/* Show Cancel button for creator ONLY in pending_waiting_for_opponent state (before anyone joins) */}
+            {/* IMPORTANT: Cannot cancel after someone expresses intent (creator_confirmation_required) - prevents cheating */}
+            {isOwner && status === 'pending_waiting_for_opponent' && (
+              <button
+                type="button"
+                className="mt-5 w-full rounded-xl bg-red-600/20 border border-red-500/40 py-3 text-red-200 font-semibold hover:bg-red-600/30 transition-colors"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await handleDeleteChallenge(challenge.id, challenge);
+                  onClose();
+                }}
+              >
+                🗑️ Cancel Challenge
+              </button>
+            )}
+            
+            {/* Show message if creator tries to cancel after someone expressed intent */}
+            {isOwner && status === 'creator_confirmation_required' && (
+              <div className="mt-5 w-full rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 text-amber-200 text-sm">
+                ⚠️ Someone has expressed intent to join. You must fund the challenge or wait for the timeout.
+              </div>
+            )}
+
+            {/* Show Join button for non-owners or when challenge is joinable */}
+            {!isOwner && (status === 'pending_waiting_for_opponent' || status === 'creator_confirmation_required' || status === 'creator_funded') && (
+              <button
+                type="button"
+                className="mt-5 w-full rounded-xl bg-white py-3 text-black font-semibold"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                  onJoin();
+                }}
+              >
+                Join Challenge
+              </button>
+            )}
 
             <button
               type="button"
@@ -4476,6 +4679,21 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               }
             }}
             onBalanceRefresh={refreshUSDFGBalance}
+            onJoinSuccess={(challenge) => {
+              // Determine challenge format
+              const format = challenge.rawData?.format || (challenge.rawData?.tournament ? 'tournament' : 'standard');
+              const isTournament = format === 'tournament';
+              
+              // Set selected challenge
+              setSelectedChallenge(challenge);
+              
+              // Open appropriate lobby
+              if (isTournament) {
+                setShowTournamentLobby(true);
+              } else {
+                setShowStandardLobby(true);
+              }
+            }}
           />
         )}
 
@@ -4489,7 +4707,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           const players = selectedChallenge.rawData?.players || [];
 
           if (isTournament) {
-            // Render tournament lobby modal
+            // Render tournament lobby modal - persistent room
             if (showTournamentLobby) {
               return (
                 <ElegantModal
@@ -4511,7 +4729,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               );
             }
             
-            // Render submit result modal for tournament matches
+            // Render submit result modal for tournament matches - overlay on lobby
             if (showSubmitResultModal && tournamentMatchData) {
               return (
                 <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div></div>}>
@@ -4535,32 +4753,58 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             return null;
           }
 
-          // Standard challenge: keep current submit modal behavior
+          // Standard challenge: render persistent lobby
+          if (showStandardLobby) {
+            return (
+              <ElegantModal
+                isOpen={showStandardLobby}
+                onClose={() => {
+                  setShowStandardLobby(false);
+                  setSelectedChallenge(null);
+                }}
+                title={`${selectedChallenge.title || "Challenge"} Lobby`}
+              >
+                <StandardChallengeLobby
+                  challenge={selectedChallenge}
+                  currentWallet={publicKey?.toString() || null}
+                  onOpenSubmitResult={() => {
+                    setShowSubmitResultModal(true);
+                  }}
+                  onClose={() => {
+                    setShowStandardLobby(false);
+                    setSelectedChallenge(null);
+                  }}
+                />
+              </ElegantModal>
+            );
+          }
+          
+          // Standard challenge: render submit result modal as overlay on lobby
           const isMainChallenger =
             players.length >= 2 &&
             currentWallet && 
             (players[0]?.toLowerCase() === currentWallet ||
               players[1]?.toLowerCase() === currentWallet);
           
-          if (!isMainChallenger) {
-            return null;
+          if (showSubmitResultModal && isMainChallenger) {
+            return (
+              <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div></div>}>
+                <SubmitResultRoom
+                  isOpen={showSubmitResultModal}
+                  onClose={() => {
+                    setShowSubmitResultModal(false);
+                    // Do NOT clear selectedChallenge - keep lobby mounted
+                  }}
+                  challengeId={selectedChallenge.id}
+                  challengeTitle={selectedChallenge.title || ""}
+                  currentWallet={publicKey?.toString() || ""}
+                  onSubmit={handleSubmitResult}
+                />
+              </Suspense>
+            );
           }
           
-          return (
-            <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div></div>}>
-        <SubmitResultRoom
-          isOpen={showSubmitResultModal}
-          onClose={() => {
-            setShowSubmitResultModal(false);
-                  setTimeout(() => setSelectedChallenge(null), 100);
-          }}
-                challengeId={selectedChallenge.id}
-                challengeTitle={selectedChallenge.title || ""}
-          currentWallet={publicKey?.toString() || ""}
-          onSubmit={handleSubmitResult}
-        />
-            </Suspense>
-          );
+          return null;
         })()}
 
           {friendlyMatch && (
@@ -5687,7 +5931,8 @@ const JoinChallengeModal: React.FC<{
   isConnected: boolean;
   onConnect: () => void;
   onBalanceRefresh?: () => Promise<void>;
-}> = ({ challenge, onClose, isConnected, onConnect, onBalanceRefresh }) => {
+  onJoinSuccess?: (challenge: any) => void;
+}> = ({ challenge, onClose, isConnected, onConnect, onBalanceRefresh, onJoinSuccess }) => {
   const { publicKey, signTransaction } = useWallet();
   const [state, setState] = useState<'review' | 'processing' | 'success' | 'error'>('review');
   const [error, setError] = useState<string | null>(null);
@@ -5866,6 +6111,10 @@ const JoinChallengeModal: React.FC<{
       setState('success');
       setTimeout(() => {
         onClose();
+        // Open appropriate lobby after successful creator funding
+        if (onJoinSuccess) {
+          onJoinSuccess(challenge);
+        }
       }, 1500);
     } catch (err: any) {
       console.error("❌ Creator funding failed:", err);
@@ -5928,6 +6177,10 @@ const JoinChallengeModal: React.FC<{
       setState('success');
       setTimeout(() => {
         onClose();
+        // Open appropriate lobby after successful joiner funding
+        if (onJoinSuccess) {
+          onJoinSuccess(challenge);
+        }
       }, 1500);
     } catch (err: any) {
       console.error("❌ Joiner funding failed:", err);
