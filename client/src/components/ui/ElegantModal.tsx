@@ -41,6 +41,7 @@ const ElegantModal: React.FC<ElegantModalProps> = ({
       
       {/* Modal */}
       <div
+        onClick={(e) => e.stopPropagation()}
         className={`
           relative w-[90vw] max-w-2xl max-h-[90vh] overflow-hidden rounded-xl border border-amber-400/20
           bg-gradient-to-br from-gray-900/95 via-gray-900/95 to-black/95 backdrop-blur-md

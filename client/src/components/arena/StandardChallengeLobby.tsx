@@ -100,6 +100,19 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     ? players.find((p: string) => p?.toLowerCase() !== currentWallet?.toLowerCase())
     : null;
 
+  // Debug logging
+  React.useEffect(() => {
+    console.log('🔍 StandardChallengeLobby Submit Button Debug:', {
+      status,
+      playersCount: players.length,
+      players: players,
+      currentWallet,
+      isParticipant,
+      canSubmitResult,
+      onOpenSubmitResult: typeof onOpenSubmitResult === 'function' ? '✅ Function exists' : '❌ Missing'
+    });
+  }, [status, players, currentWallet, isParticipant, canSubmitResult, onOpenSubmitResult]);
+
   return (
     <div className="space-y-4">
       {/* Status Banner - Prominent display */}
@@ -187,8 +200,9 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
             console.log('🏆 Submit Result button clicked');
             onOpenSubmitResult();
           }}
-          className="w-full rounded-lg bg-amber-400/20 px-4 py-3 text-sm font-semibold text-amber-200 transition-all hover:bg-amber-400/30 hover:shadow-[0_0_12px_rgba(255,215,130,0.3)] border border-amber-400/40 cursor-pointer"
-          style={{ pointerEvents: 'auto', zIndex: 10 }}
+          className="relative w-full rounded-lg bg-amber-400/20 px-4 py-3 text-sm font-semibold text-amber-200 transition-all hover:bg-amber-400/30 hover:shadow-[0_0_12px_rgba(255,215,130,0.3)] border border-amber-400/40 cursor-pointer active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{ pointerEvents: 'auto', zIndex: 50 }}
+          disabled={!canSubmitResult}
         >
           🏆 Submit Result
         </button>
