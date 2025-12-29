@@ -1827,13 +1827,23 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         setShowTournamentLobby(false);
       }
       
-      // Open standard lobby for active challenge
-      setSelectedChallenge({
-        id: challenge.id,
-        title: (challenge as any).title || extractGameFromTitle((challenge as any).title || '') || "Challenge",
-        ...challenge
-      });
-      setShowStandardLobby(true);
+      // Open standard lobby for active challenge OR completed challenge where user won (for prize claiming)
+      const status = challenge.status || challenge.rawData?.status;
+      const isCompleted = status === 'completed';
+      const winner = challenge.rawData?.winner || challenge.winner;
+      const userWon = currentWallet && winner && winner.toLowerCase() === currentWallet.toLowerCase();
+      const prizeClaimed = challenge.rawData?.prizeClaimed || challenge.prizeClaimed;
+      const shouldOpenForPrizeClaim = isCompleted && userWon && !prizeClaimed;
+      
+      // Only auto-open for active challenges OR completed challenges where user can claim prize
+      if (status === 'active' || shouldOpenForPrizeClaim) {
+        setSelectedChallenge({
+          id: challenge.id,
+          title: (challenge as any).title || extractGameFromTitle((challenge as any).title || '') || "Challenge",
+          ...challenge
+        });
+        setShowStandardLobby(true);
+      }
     }
   }, [firestoreChallenges, publicKey, showSubmitResultModal, showTrustReview, showStandardLobby, showJoinModal, showTournamentLobby, selectedChallenge?.id, isConnected]);
   
@@ -2622,11 +2632,23 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const autoWon = pendingMatchResult.autoWon;
       const challengeForClaim = needsClaim ? selectedChallenge : null;
       
-      // Clear pending match result but keep challenge if needs claim
+      // Clear pending match result but keep challenge if needs claim or completed
       setPendingMatchResult(null);
       
-      if (!needsClaim) {
-      setSelectedChallenge(null);
+      // Get challenge status to check if completed
+      const challengeStatus = selectedChallenge?.status || selectedChallenge?.rawData?.status;
+      const isCompleted = challengeStatus === 'completed';
+      
+      // Keep lobby open if needs claim or if challenge is completed (for prize claiming)
+      if (!needsClaim && !isCompleted) {
+        setSelectedChallenge(null);
+        // Only close lobby if challenge is not completed
+        setShowStandardLobby(false);
+      } else {
+        // Keep lobby open for prize claiming - ensure it's open
+        if (!showStandardLobby) {
+          setShowStandardLobby(true);
+        }
       }
       
       // Show success message
@@ -2642,9 +2664,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       }
       
       if (needsClaim && challengeForClaim) {
-        successMessage += "\n\n💰 You can now claim your reward!";
+        successMessage += "\n\n💰 You can now claim your reward in the lobby!";
         alert(successMessage);
-        // Challenge is still selected, so they can click claim again
+        // Challenge is still selected and lobby is open, so they can claim prize
+      } else if (isCompleted && didWin) {
+        successMessage += "\n\n💰 You can claim your reward in the lobby!";
+        alert(successMessage);
       } else {
         alert(successMessage);
       }
@@ -4793,11 +4818,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     challenge={selectedChallenge}
                     currentWallet={publicKey?.toString() || null}
                     onSubmitResult={handleSubmitResult}
+                    onClaimPrize={handleClaimPrize}
                     onClose={() => {
                       setShowStandardLobby(false);
                       setSelectedChallenge(null);
                     }}
                     isSubmitting={false}
+                    isClaiming={claimingPrize === selectedChallenge.id}
                   />
                 </ElegantModal>
               )}

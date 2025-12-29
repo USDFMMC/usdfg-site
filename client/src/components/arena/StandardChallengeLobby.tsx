@@ -7,16 +7,20 @@ interface StandardChallengeLobbyProps {
   challenge: any;
   currentWallet?: string | null;
   onSubmitResult: (didWin: boolean, proofFile?: File | null) => Promise<void>;
+  onClaimPrize: (challenge: any) => Promise<void>;
   onClose: () => void;
   isSubmitting?: boolean;
+  isClaiming?: boolean;
 }
 
 const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   challenge,
   currentWallet,
   onSubmitResult,
+  onClaimPrize,
   onClose,
   isSubmitting = false,
+  isClaiming = false,
 }) => {
   const [showSubmitForm, setShowSubmitForm] = useState(false);
   const [selectedResult, setSelectedResult] = useState<boolean | null>(null);
@@ -143,6 +147,14 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const statusDisplay = getStatusDisplay();
   const isParticipant = currentWallet && players.some((p: string) => p?.toLowerCase() === currentWallet?.toLowerCase());
   const canSubmitResult = status === 'active' && players.length >= 2 && isParticipant;
+  
+  // Check if user won and can claim prize
+  const results = challenge.rawData?.results || challenge.results || {};
+  const userResult = currentWallet ? results[currentWallet.toLowerCase()] : null;
+  const winner = challenge.rawData?.winner || challenge.winner;
+  const userWon = currentWallet && winner && winner.toLowerCase() === currentWallet.toLowerCase();
+  const canClaimPrize = status === 'completed' && userWon && isParticipant;
+  const prizeClaimed = challenge.rawData?.prizeClaimed || challenge.prizeClaimed;
   
   // Get opponent wallet for display
   const opponentWallet = players.length >= 2 && currentWallet 
@@ -438,13 +450,59 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         </div>
       )}
 
-      {!canSubmitResult && (
+      {/* Prize Claiming Section - Show when challenge is completed and user won */}
+      {canClaimPrize && !prizeClaimed && (
+        <div className="rounded-xl border border-emerald-400/30 bg-gradient-to-br from-emerald-500/10 to-green-500/10 p-4 space-y-3">
+          <div className="text-center">
+            <div className="text-3xl mb-2">🏆</div>
+            <h3 className="text-lg font-bold text-emerald-200 mb-1">You Won!</h3>
+            <p className="text-sm text-emerald-100/80 mb-3">
+              Claim your prize of <span className="font-semibold text-white">{prizePool} USDFG</span>
+            </p>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await onClaimPrize(challenge);
+                } catch (error) {
+                  console.error('Error claiming prize:', error);
+                }
+              }}
+              disabled={isClaiming}
+              className="w-full rounded-lg bg-gradient-to-r from-emerald-500/90 to-green-500/90 hover:from-emerald-600 hover:to-green-600 text-white px-4 py-3 font-semibold transition-all shadow-[0_0_20px_rgba(34,197,94,0.3)] border border-emerald-400/30 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isClaiming ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Claiming Prize...
+                </span>
+              ) : (
+                '💰 Claim Prize'
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Prize Claimed Message */}
+      {canClaimPrize && prizeClaimed && (
+        <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-center">
+          <div className="text-2xl mb-2">✅</div>
+          <p className="text-sm font-semibold text-emerald-200">
+            Prize claimed! Check your wallet for {prizePool} USDFG
+          </p>
+        </div>
+      )}
+
+      {/* Status message when can't submit or claim */}
+      {!canSubmitResult && !canClaimPrize && (
         <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-center">
           <div className="text-xs text-gray-400">
-            {status !== 'active' && `Status: ${statusDisplay.text}`}
+            {status !== 'active' && status !== 'completed' && `Status: ${statusDisplay.text}`}
             {status === 'active' && players.length < 2 && 'Waiting for players to join...'}
             {status === 'active' && players.length >= 2 && !currentWallet && 'Connect wallet to submit results'}
             {status === 'active' && players.length >= 2 && currentWallet && !isParticipant && 'Only participants can submit results'}
+            {status === 'completed' && !userWon && 'Match completed'}
           </div>
         </div>
       )}
