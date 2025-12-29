@@ -3375,38 +3375,26 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               </button>
             )}
             
-            {/* Show funding button for creator when someone expressed intent */}
+            {/* Show message for creator when someone expressed intent - funding happens in JoinChallengeModal */}
             {isOwner && status === 'creator_confirmation_required' && (
-              <>
-                <div className="mt-5 w-full rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 text-amber-200 text-sm mb-3">
-                  ⚠️ Someone has expressed intent to join. You must fund the challenge or wait for the timeout.
-                </div>
-                <button
-                  type="button"
-                  className="mt-2 w-full rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 py-3 text-white font-bold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(34,197,94,0.35)]"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onClose();
-                    onJoin(); // Opens JoinChallengeModal which will show funding button for creator
-                  }}
-                >
-                  ✨ Confirm and Fund Challenge ✨
-                </button>
-              </>
+              <div className="mt-5 w-full rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 text-amber-200 text-sm">
+                ⚠️ Someone has expressed intent to join. Click "Join Challenge" below to confirm and fund.
+              </div>
             )}
 
-            {/* Show Join button for non-owners or when challenge is joinable */}
-            {!isOwner && (status === 'pending_waiting_for_opponent' || status === 'creator_confirmation_required' || status === 'creator_funded') && (
+            {/* Show button to open JoinChallengeModal - for creators when confirmation required, or for non-owners when joinable */}
+            {((isOwner && status === 'creator_confirmation_required') || 
+              (!isOwner && (status === 'pending_waiting_for_opponent' || status === 'creator_confirmation_required' || status === 'creator_funded'))) && (
               <button
                 type="button"
                 className="mt-5 w-full rounded-xl bg-white py-3 text-black font-semibold"
                 onClick={(e) => {
                   e.stopPropagation();
                   onClose();
-                  onJoin();
+                  onJoin(); // Opens JoinChallengeModal which has the new UI for funding/joining
                 }}
               >
-                Join Challenge
+                {isOwner && status === 'creator_confirmation_required' ? 'Confirm and Fund Challenge' : 'Join Challenge'}
               </button>
             )}
 
