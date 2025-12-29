@@ -3553,12 +3553,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       return 'Expired';
     };
 
-    // Use refreshed challenge data if available, otherwise use original
-    const currentChallenge = challengeData || challenge;
-    const status = currentChallenge.status || currentChallenge.rawData?.status || challenge.status;
+    const status = challenge.status || challenge.rawData?.status;
     
     // Check if creator funding deadline has expired
-    const creatorFundingDeadline = currentChallenge.rawData?.creatorFundingDeadline || currentChallenge.creatorFundingDeadline || challenge.rawData?.creatorFundingDeadline || challenge.creatorFundingDeadline;
+    const creatorFundingDeadline = challenge.rawData?.creatorFundingDeadline || challenge.creatorFundingDeadline;
     const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
     const canCreatorFund = status === 'creator_confirmation_required' && !isDeadlineExpired;
     
