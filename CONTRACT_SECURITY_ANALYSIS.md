@@ -180,3 +180,9 @@
 
 The contract balances security and user experience well. The main gaps are spam prevention and the escrow authority configuration.
 
+
+
+
+
+
+

@@ -29,7 +29,6 @@ import LiveChallengesGrid from "@/components/arena/LiveChallengesGrid";
 // Lazy load heavy modals for better performance on all devices
 const SubmitResultRoom = lazy(() => import("@/components/arena/SubmitResultRoom").then(module => ({ default: module.SubmitResultRoom })));
 const PlayerProfileModal = lazy(() => import("@/components/arena/PlayerProfileModal"));
-const ChallengeChatModal = lazy(() => import("@/components/arena/ChallengeChatModal").then(module => ({ default: module.ChallengeChatModal })));
 const TrustReviewModal = lazy(() => import("@/components/arena/TrustReviewModal"));
 const TeamManagementModal = lazy(() => import("@/components/arena/TeamManagementModal"));
 
@@ -787,8 +786,6 @@ const ArenaHome: React.FC = () => {
   const [leaderboardView, setLeaderboardView] = useState<'individual' | 'teams'>('individual'); // Toggle between Individual and Teams
   const [topTeams, setTopTeams] = useState<TeamStats[]>([]);
   const [loadingTopTeams, setLoadingTopTeams] = useState<boolean>(false);
-  const [showChatModal, setShowChatModal] = useState<boolean>(false);
-  const [selectedChatChallenge, setSelectedChatChallenge] = useState<any>(null);
 const [showTournamentLobby, setShowTournamentLobby] = useState(false);
 const [showStandardLobby, setShowStandardLobby] = useState(false);
 const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string; opponentWallet: string } | null>(null);
@@ -1750,27 +1747,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       return isParticipant && isActive;
     });
     
-    // Auto-open chat if user is in an active challenge and chat isn't already open
-    if (myActiveChallenges.length > 0 && !showChatModal && !showTournamentLobby && !showSubmitResultModal) {
-      const challenge = myActiveChallenges[0];
-      
-      try {
-        const game = challenge.game || extractGameFromTitle(challenge.title || '') || 'USDFG Arena';
-        const mode = extractModeFromTitle(challenge.title || '') || 'Head-to-Head';
-        const chatChallenge = {
-          id: challenge.id,
-          title: challenge.title || `${game} ${mode}`,
-          game: game,
-        };
-        
-        setSelectedChatChallenge(chatChallenge);
-        setShowChatModal(true);
-        console.log(`💬 Chat modal auto-opened for challenge: ${challenge.id}`);
-      } catch (error) {
-        console.error('Failed to open chat modal:', error);
-      }
-    }
-  }, [firestoreChallenges, publicKey, isConnected, showChatModal, showTournamentLobby, showSubmitResultModal]);
+    // Note: Chat/voice is now integrated into persistent lobbies (StandardChallengeLobby and TournamentBracketView)
+    // No separate chat modal needed
+  }, [firestoreChallenges, publicKey, isConnected, showTournamentLobby, showSubmitResultModal]);
   
   // Auto-open Submit Result Room when user's challenge becomes "in-progress"
   useEffect(() => {
@@ -5023,27 +5002,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         }}
       />
 
-      {/* Challenge Chat Modal - Only render when we have a valid challenge */}
-      {showChatModal && selectedChatChallenge?.id && (
-        <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div></div>}>
-        <ChallengeChatModal
-          isOpen={showChatModal}
-          onClose={() => {
-            setShowChatModal(false);
-            // Delay clearing selectedChatChallenge to allow components to cleanup
-            setTimeout(() => setSelectedChatChallenge(null), 100);
-          }}
-          challengeId={selectedChatChallenge.id}
-          challengeTitle={selectedChatChallenge.title || ""}
-          currentWallet={publicKey?.toString() || ""}
-          allowSpectators={true}
-          isParticipant={(() => {
-            const currentWallet = publicKey?.toString()?.toLowerCase();
-            return currentWallet && selectedChatChallenge.rawData?.players?.some((p: string) => p.toLowerCase() === currentWallet);
-          })()}
-        />
-        </Suspense>
-      )}
 
       {/* Trust Review Modal */}
       <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div></div>}>

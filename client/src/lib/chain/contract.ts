@@ -474,24 +474,30 @@ export async function cancelChallenge(
   challengePDA: string
 ): Promise<string> {
   console.log('❌ Canceling challenge...');
+  console.log('📍 Challenge PDA:', challengePDA);
   
   if (!wallet || !wallet.publicKey) {
     throw new Error('Wallet not connected');
   }
 
-  const player = new PublicKey(wallet.publicKey.toString());
+  const creator = new PublicKey(wallet.publicKey.toString());
   const challengeAddress = new PublicKey(challengePDA);
   
   // Create instruction data for cancel_challenge
+  // Calculate discriminator using SHA256 of "global:cancel_challenge"
+  const { sha256 } = await import('@noble/hashes/sha2.js');
+  const hash = sha256(new TextEncoder().encode('global:cancel_challenge'));
+  const discriminator = Buffer.from(hash.slice(0, 8));
+  
   const instructionData = Buffer.alloc(8); // discriminator only
-  instructionData.writeUInt32LE(0x33333333, 0); // Placeholder discriminator
-  instructionData.writeUInt32LE(0x44444444, 4); // Placeholder discriminator
+  discriminator.copy(instructionData, 0);
+  console.log('📦 Cancel instruction data created', 'Discriminator:', discriminator.toString('hex'));
 
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
-      { pubkey: challengeAddress, isSigner: false, isWritable: true },
-      { pubkey: player, isSigner: true, isWritable: true },
+      { pubkey: challengeAddress, isSigner: false, isWritable: true }, // challenge
+      { pubkey: creator, isSigner: true, isWritable: true }, // creator
     ],
     data: instructionData,
   });
@@ -499,13 +505,13 @@ export async function cancelChallenge(
   const transaction = new Transaction().add(instruction);
   const { blockhash } = await connection.getLatestBlockhash();
   transaction.recentBlockhash = blockhash;
-  transaction.feePayer = player;
+  transaction.feePayer = creator;
 
   const signedTransaction = await wallet.signTransaction(transaction);
   const signature = await connection.sendRawTransaction(signedTransaction.serialize());
   await connection.confirmTransaction(signature);
   
-  console.log('✅ Challenge canceled successfully!');
+  console.log('✅ Challenge canceled successfully on-chain!');
   return signature;
 }
 

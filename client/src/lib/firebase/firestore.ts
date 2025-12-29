@@ -746,6 +746,29 @@ export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'cr
       delete challengePayload.tournament;
     }
 
+    // Validate required fields before adding
+    if (!challengePayload.creator) {
+      throw new Error("Creator wallet is required");
+    }
+    if (challengePayload.entryFee === undefined || challengePayload.entryFee === null) {
+      throw new Error("Entry fee is required");
+    }
+    if (!challengePayload.status) {
+      throw new Error("Status is required");
+    }
+    if (!challengePayload.createdAt) {
+      throw new Error("CreatedAt timestamp is required");
+    }
+    
+    console.log("🔥 Adding challenge to Firestore with payload:", {
+      creator: challengePayload.creator,
+      entryFee: challengePayload.entryFee,
+      status: challengePayload.status,
+      format: challengePayload.format,
+      maxPlayers: challengePayload.maxPlayers,
+      hasTournament: !!challengePayload.tournament
+    });
+    
     const docRef = await addDoc(collection(db, "challenges"), challengePayload);
     
     // If eligible, create/update player stats with trophy flag
@@ -800,9 +823,30 @@ export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'cr
     
     console.log('✅ Challenge created with ID:', docRef.id);
     return docRef.id;
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error creating challenge:', error);
-    throw error;
+    
+    // Log detailed error information
+    if (error?.code) {
+      console.error('❌ Firebase error code:', error.code);
+    }
+    if (error?.message) {
+      console.error('❌ Error message:', error.message);
+    }
+    if (error?.details) {
+      console.error('❌ Error details:', error.details);
+    }
+    
+    // Provide more helpful error messages
+    if (error?.code === 'permission-denied') {
+      throw new Error('Permission denied. Please check Firestore rules.');
+    } else if (error?.code === 'invalid-argument') {
+      throw new Error('Invalid challenge data. Please check all required fields.');
+    } else if (error?.message) {
+      throw new Error(error.message);
+    } else {
+      throw new Error('Failed to create challenge. Please try again.');
+    }
   }
 };
 

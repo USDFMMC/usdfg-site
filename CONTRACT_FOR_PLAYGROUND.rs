@@ -432,17 +432,19 @@ pub mod usdfg_smart_contract {
         Ok(())
     }
 
-    /// Cancel challenge - only in pending states (no escrow to refund)
+    /// Cancel challenge - ONLY before anyone expresses intent to join (prevents cheating)
+    /// Can only cancel in PendingWaitingForOpponent state
+    /// Once someone expresses intent (CreatorConfirmationRequired), creator must fund or wait for timeout
     pub fn cancel_challenge(ctx: Context<CancelChallenge>) -> Result<()> {
         let challenge = &mut ctx.accounts.challenge;
 
         require!(!challenge.processing, ChallengeError::ReentrancyDetected);
         challenge.processing = true;
 
-        // Can cancel if pending or if creator didn't fund in time
+        // SECURITY: Only allow cancellation BEFORE anyone expresses intent to join
+        // This prevents creators from backing out after someone expressed interest
         require!(
-            challenge.status == ChallengeStatus::PendingWaitingForOpponent ||
-            challenge.status == ChallengeStatus::CreatorConfirmationRequired,
+            challenge.status == ChallengeStatus::PendingWaitingForOpponent,
             ChallengeError::NotOpen
         );
         require!(
