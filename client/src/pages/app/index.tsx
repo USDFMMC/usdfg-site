@@ -6006,6 +6006,14 @@ const JoinChallengeModal: React.FC<{
       if (isFounderChallenge) {
         // Founder Challenge - express intent in Firestore only
         await expressJoinIntent(challenge.id, walletAddr, true);
+        // Founder challenge: close modal and open lobby
+        setState('success');
+        setTimeout(() => {
+          onClose();
+          if (onJoinSuccess) {
+            onJoinSuccess(challenge);
+          }
+        }, 1500);
       } else {
         // Regular challenge - express intent on-chain and in Firestore
         const challengePDA = challenge.rawData?.pda || challenge.pda;
@@ -6026,12 +6034,13 @@ const JoinChallengeModal: React.FC<{
         
         // Express intent in Firestore
         await expressJoinIntent(challenge.id, walletAddr);
+        
+        // Modal stays open - status will change to creator_confirmation_required
+        setState('success');
+        setTimeout(() => {
+          setState('review'); // Return to review state to show updated UI
+        }, 1500);
       }
-      
-      setState('success');
-      setTimeout(() => {
-        onClose();
-      }, 1500);
     } catch (err: any) {
       console.error("❌ Express join intent failed:", err);
       
@@ -6087,9 +6096,26 @@ const JoinChallengeModal: React.FC<{
     setState('processing');
     
     try {
+      // Fetch fresh challenge data to check deadline
+      const freshChallenge = await fetchChallengeById(challenge.id);
+      if (!freshChallenge) {
+        throw new Error('Challenge not found. It may have been cancelled or expired.');
+      }
+
+      const freshStatus = freshChallenge.status;
+      if (freshStatus !== 'creator_confirmation_required') {
+        throw new Error(`Challenge status changed. Current status: ${freshStatus}`);
+      }
+
+      // Check deadline before attempting transaction
+      const deadline = freshChallenge.creatorFundingDeadline;
+      if (deadline && deadline.toMillis() < Date.now()) {
+        throw new Error('⚠️ Confirmation deadline expired. The challenge has been reverted to waiting for opponent.');
+      }
+
       const walletAddr = publicKey.toString();
-      const challengePDA = challenge.rawData?.pda || challenge.pda;
-      const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
+      const challengePDA = freshChallenge.pda || challenge.rawData?.pda || challenge.pda;
+      const entryFee = freshChallenge.entryFee || challenge.entryFee || challenge.rawData?.entryFee || 0;
       
       if (!challengePDA) {
         throw new Error('Challenge has no on-chain PDA.');
@@ -6121,17 +6147,27 @@ const JoinChallengeModal: React.FC<{
         }, 2000);
       }
       
+      // Modal stays open - status will change to creator_funded
       setState('success');
       setTimeout(() => {
-        onClose();
-        // Open appropriate lobby after successful creator funding
-        if (onJoinSuccess) {
-          onJoinSuccess(challenge);
-        }
+        setState('review'); // Return to review state to show updated UI
       }, 1500);
     } catch (err: any) {
       console.error("❌ Creator funding failed:", err);
-      setError(err.message || 'Failed to fund challenge. Please try again.');
+      
+      // Check for expired deadline error
+      const errorMessage = err.message || err.toString() || 'Failed to fund challenge. Please try again.';
+      const errorString = errorMessage.toLowerCase();
+      
+      if (errorString.includes("confirmation expired") || 
+          errorString.includes("6015") || 
+          errorString.includes("0x177f") ||
+          errorString.includes("deadline expired")) {
+        setError('⚠️ Confirmation deadline expired. The challenge has been reverted to waiting for opponent. Please refresh the page.');
+      } else {
+        setError(errorMessage);
+      }
+      
       setState('error');
     }
   };
@@ -6187,12 +6223,21 @@ const JoinChallengeModal: React.FC<{
         }, 2000);
       }
       
+      // Fetch updated challenge to check if status is active
+      const updatedChallenge = await fetchChallengeById(challenge.id);
+      const finalStatus = updatedChallenge?.status || challenge.status || challenge.rawData?.status;
+      
       setState('success');
       setTimeout(() => {
         onClose();
-        // Open appropriate lobby after successful joiner funding
-        if (onJoinSuccess) {
-          onJoinSuccess(challenge);
+        // Open lobby ONLY if challenge status is active
+        if (finalStatus === 'active' && onJoinSuccess) {
+          const challengeToPass = updatedChallenge ? {
+            ...challenge,
+            ...updatedChallenge,
+            rawData: updatedChallenge
+          } : challenge;
+          onJoinSuccess(challengeToPass);
         }
       }, 1500);
     } catch (err: any) {
