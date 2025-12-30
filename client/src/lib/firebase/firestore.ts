@@ -2758,7 +2758,10 @@ export function listenToChallengeNotifications(
   const notificationsQuery = query(
     collection(db, 'challenge_notifications'),
     where('targetPlayer', '==', walletLower),
-    where('status', '==', 'pending_waiting_for_opponent')
+    // Challenge notifications have their own status enum:
+    // 'pending' | 'accepted' | 'declined' | 'expired'
+    // (not the challenge lifecycle statuses like 'pending_waiting_for_opponent').
+    where('status', '==', 'pending')
   );
 
   return onSnapshot(

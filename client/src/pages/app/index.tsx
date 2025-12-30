@@ -3272,7 +3272,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     
     return challenges.filter(challenge => {
       // Filter by category
-      const categoryMatch = filterCategory === 'All' || challenge.category === filterCategory;
+      // Normalize categories so UFC challenges don't get filtered out.
+      // We store UFC as its own category ('UFC') but the UI filter doesn't have a dedicated UFC option.
+      const normalizedCategory =
+        String(challenge.category || '').toLowerCase() === 'ufc' ? 'Fighting' : challenge.category;
+      const categoryMatch = filterCategory === 'All' || normalizedCategory === filterCategory;
       // Filter by game
       const gameMatch = filterGame === 'All' || challenge.game === filterGame;
       // Filter by "My Challenges" toggle
@@ -3344,7 +3348,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     const status = fc.status || fc.rawData?.status || 'unknown';
     
     // EXCLUDE completed, cancelled, disputed, and expired challenges
-    const isActive = status === 'active' || status === 'pending' || status === 'in-progress';
+    // Active/pending lifecycle states (new + legacy)
+    const isActive =
+      status === 'active' ||
+      status === 'pending_waiting_for_opponent' ||
+      status === 'creator_confirmation_required' ||
+      status === 'creator_funded' ||
+      // legacy/backwards-compat
+      status === 'pending' ||
+      status === 'in-progress';
     const isCompleted = status === 'completed' || status === 'cancelled' || status === 'disputed' || status === 'expired';
     
     const shouldBlock = (isCreator || isParticipant) && isActive && !isCompleted;
@@ -4165,7 +4177,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     category.includes('BASEBALL') || category.includes('GOLF')) {
                   return 'Sports';
                 }
-                if (category.includes('FIGHTING') || category.includes('BOXING')) {
+                // UFC is stored as its own category ('UFC') but should appear under Fighting in the UI.
+                if (category.includes('FIGHTING') || category.includes('BOXING') || category.includes('UFC') || game.includes('ufc')) {
                   return 'Fighting';
                 }
                 if (category.includes('SHOOTING') || category.includes('FPS') || 

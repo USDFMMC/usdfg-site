@@ -272,7 +272,8 @@ const CategoryDetailPage: React.FC = () => {
       } else if (categoryUpper === 'SPORTS') {
         return gameCategory === 'Sports' || challengeCategory.includes('SPORTS') || challengeCategory.includes('BASKETBALL') || challengeCategory.includes('SOCCER') || challengeCategory.includes('FOOTBALL');
       } else if (categoryUpper === 'FIGHTING') {
-        return gameCategory === 'Fighting' || challengeCategory.includes('FIGHTING');
+        // Treat UFC as a Fighting category in the UI (grid has no dedicated UFC tile).
+        return gameCategory === 'Fighting' || gameCategory === 'UFC' || challengeCategory.includes('FIGHTING') || challengeCategory.includes('UFC');
       } else if (categoryUpper === 'RACING') {
         return gameCategory === 'Racing' || challengeCategory.includes('RACING');
       } else if (categoryUpper === 'STRATEGY') {
