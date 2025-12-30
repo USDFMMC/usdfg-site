@@ -77,6 +77,10 @@ const getGameImage = (game: string): string => {
   }
   
   // Basketball games - use basketball.png (NBA 2K, basketball, etc.)
+  // Check for NBA 2K26 specifically first (most common)
+  if (lowerGame.includes('nba 2k26') || lowerGame.includes('nba2k26')) {
+    return '/assets/categories/basketball.png';
+  }
   if (lowerGame.includes('nba') || 
       lowerGame.includes('2k') ||
       lowerGame.includes('basketball')) {
@@ -372,9 +376,10 @@ const CategoryDetailPage: React.FC = () => {
                   src={image}
                   alt={game}
                   className="w-full h-full object-cover"
+                  key={`${challengeId}-${image}`}
                   onError={(e) => {
                     // Fallback if image fails to load
-                    (e.target as HTMLImageElement).src = '/assets/categories/sports.png';
+                    (e.target as HTMLImageElement).src = '/assets/categories/basketball.png';
                   }}
                 />
               </div>

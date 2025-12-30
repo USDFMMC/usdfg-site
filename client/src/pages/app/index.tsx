@@ -607,6 +607,10 @@ const ArenaHome: React.FC = () => {
     }
     
     // Basketball games - use basketball.png (NBA 2K, basketball, etc.)
+    // Check for NBA 2K26 specifically first (most common)
+    if (lowerGame.includes('nba 2k26') || lowerGame.includes('nba2k26')) {
+      return '/assets/categories/basketball.png';
+    }
     if (lowerGame.includes('nba') || 
         lowerGame.includes('2k') ||
         lowerGame.includes('basketball')) {
@@ -4199,8 +4203,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                       className="absolute inset-0 h-full w-full object-cover scale-110"
                       loading="lazy"
                       draggable={false}
-                                      onError={(e) => {
-                                        const target = e.currentTarget as HTMLImageElement;
+                      key={`${challenge.id}-${imagePath}`}
+                      onError={(e) => {
+                        const target = e.currentTarget as HTMLImageElement;
                         target.src = '/assets/usdfg-logo-transparent.png';
                       }}
                     />
