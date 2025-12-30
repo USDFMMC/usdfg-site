@@ -2228,7 +2228,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       // Calculate timers
       const now = Date.now();
-      const expirationTimer = Timestamp.fromDate(new Date(now + (24 * 60 * 60 * 1000))); // 24 hours TTL for pending challenges
+      const expirationTimer = Timestamp.fromDate(new Date(now + (60 * 60 * 1000))); // 60 minutes TTL for pending challenges
       
       const firestoreChallengeData = {
         creator: currentWallet,
@@ -2237,7 +2237,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         status: 'pending_waiting_for_opponent' as const, // NEW: No payment required, waiting for opponent
         createdAt: Timestamp.now(),
         expiresAt: Timestamp.fromDate(new Date(now + (2 * 60 * 60 * 1000))), // 2 hours from now (legacy, kept for compatibility)
-        expirationTimer, // TTL for pending challenges (24 hours)
+        expirationTimer, // TTL for pending challenges (60 minutes)
         // pendingJoiner: undefined, // Will be set when someone expresses join intent
         // creatorFundingDeadline: undefined, // Will be set when joiner expresses intent
         // joinerFundingDeadline: undefined, // Will be set when creator funds
@@ -3621,17 +3621,18 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     return (
       <div className="fixed inset-0 z-50 flex items-end bg-black/70" onClick={onClose} role="dialog" aria-modal="true">
         <div
-          className="w-full max-h-[85%] rounded-t-2xl bg-neutral-900 overflow-hidden flex flex-col"
+          className="w-full max-h-[90vh] sm:max-h-[85%] rounded-t-2xl bg-neutral-900 overflow-hidden flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="relative h-[130px] flex-shrink-0">
             <img 
-              src={imagePath} 
+              src={`${imagePath}?v=2&game=${encodeURIComponent(gameName)}`}
               alt="" 
               aria-hidden="true" 
               className="absolute inset-0 h-full w-full object-cover scale-110" 
               onError={(e) => {
                 const target = e.currentTarget as HTMLImageElement;
+                console.error(`❌ Failed to load detail sheet image: ${imagePath} for game: ${gameName}`);
                 target.src = '/assets/usdfg-logo-transparent.png';
               }}
             />
@@ -3671,10 +3672,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
           <div 
             ref={scrollContainerRef}
-            className="flex-1 overflow-y-auto p-4"
+            className="flex-1 overflow-y-auto p-4 pb-24"
             style={{ 
               WebkitOverflowScrolling: 'touch',
-              overscrollBehavior: 'contain'
+              overscrollBehavior: 'contain',
+              paddingBottom: '6rem' // Extra padding to ensure buttons are visible
             }}
           >
             <div className="grid grid-cols-2 gap-3">
@@ -3693,10 +3695,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
             {/* Show Cancel button for creator ONLY in pending_waiting_for_opponent state (before anyone joins) */}
             {/* IMPORTANT: Cannot cancel after someone expresses intent (creator_confirmation_required) - prevents cheating */}
+            {/* Hidden on mobile - shown in sticky container instead */}
             {isOwner && status === 'pending_waiting_for_opponent' && (
               <button
                 type="button"
-                className="mt-5 w-full rounded-xl bg-red-600/20 border border-red-500/40 py-3 text-red-200 font-semibold hover:bg-red-600/30 transition-colors"
+                className="mt-5 w-full rounded-xl bg-red-600/20 border border-red-500/40 py-3 text-red-200 font-semibold hover:bg-red-600/30 transition-colors hidden sm:block"
                 onClick={async (e) => {
                   e.stopPropagation();
                   await handleDeleteChallenge(challenge.id, challenge);
@@ -3725,8 +3728,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             )}
 
             {/* Show button for creators when confirmation required - fund directly without opening modal */}
+            {/* Hidden on mobile - shown in sticky container instead */}
             {isOwner && canCreatorFund && onFund && (
-              <div className="mt-5 space-y-2">
+              <div className="mt-5 space-y-2 hidden sm:block">
                 {creatorFundingDeadline && (
                   <div className="text-xs text-amber-300/80 text-center">
                     Deadline: {new Date(creatorFundingDeadline.toMillis()).toLocaleTimeString()} ({Math.max(0, Math.floor((creatorFundingDeadline.toMillis() - Date.now()) / 1000 / 60))}m remaining)
@@ -3746,10 +3750,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             )}
 
             {/* Show Express Join Intent button for non-owners when challenge is waiting */}
+            {/* Hidden on mobile - shown in sticky container instead */}
             {!isOwner && status === 'pending_waiting_for_opponent' && onExpressIntent && (
               <button
                 type="button"
-                className="mt-5 w-full rounded-xl bg-gradient-to-r from-blue-400 to-blue-500 py-3 text-white font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(59,130,246,0.35)]"
+                className="mt-5 w-full rounded-xl bg-gradient-to-r from-blue-400 to-blue-500 py-3 text-white font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(59,130,246,0.35)] hidden sm:block"
                 onClick={async (e) => {
                   e.stopPropagation();
                   await onExpressIntent(challenge);
@@ -3760,10 +3765,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             )}
 
             {/* Show Fund button for joiner when creator has funded */}
+            {/* Hidden on mobile - shown in sticky container instead */}
             {!isOwner && status === 'creator_funded' && onJoinerFund && (
               <button
                 type="button"
-                className="mt-5 w-full rounded-xl bg-gradient-to-r from-green-400 to-green-500 py-3 text-white font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(34,197,94,0.35)]"
+                className="mt-5 w-full rounded-xl bg-gradient-to-r from-green-400 to-green-500 py-3 text-white font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(34,197,94,0.35)] hidden sm:block"
                 onClick={async (e) => {
                   e.stopPropagation();
                   await onJoinerFund(challenge);
@@ -3787,9 +3793,79 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               </button>
             )}
 
+            {/* Close button - hidden on mobile, shown in sticky container instead */}
             <button
               type="button"
-              className="mt-3 mb-4 w-full rounded-xl border border-white/10 py-3 text-white/80 font-semibold"
+              className="mt-3 mb-4 w-full rounded-xl border border-white/10 py-3 text-white/80 font-semibold hidden sm:block"
+              onClick={onClose}
+            >
+              Close
+            </button>
+          </div>
+          
+          {/* Sticky button container for mobile - ensures buttons are always visible */}
+          <div className="sticky bottom-0 bg-neutral-900 border-t border-white/10 p-4 pb-4 sm:hidden z-10 shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
+            {/* Show Cancel button for creator ONLY in pending_waiting_for_opponent state */}
+            {isOwner && status === 'pending_waiting_for_opponent' && (
+              <button
+                type="button"
+                className="w-full rounded-xl bg-red-600/20 border border-red-500/40 py-3 text-red-200 font-semibold mb-2"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await handleDeleteChallenge(challenge.id, challenge);
+                  onClose();
+                }}
+              >
+                🗑️ Cancel Challenge
+              </button>
+            )}
+            
+            {/* Show button for creators when confirmation required */}
+            {isOwner && canCreatorFund && onFund && (
+              <button
+                type="button"
+                className="w-full rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 py-3 text-white font-bold mb-2"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await onFund(challenge);
+                }}
+              >
+                ✨ Confirm and Fund Challenge ✨
+              </button>
+            )}
+            
+            {/* Show Express Join Intent button for non-owners */}
+            {!isOwner && status === 'pending_waiting_for_opponent' && onExpressIntent && (
+              <button
+                type="button"
+                className="w-full rounded-xl bg-gradient-to-r from-blue-400 to-blue-500 py-3 text-white font-semibold mb-2"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await onExpressIntent(challenge);
+                }}
+              >
+                Express Join Intent (No Payment)
+              </button>
+            )}
+            
+            {/* Show Fund button for joiner */}
+            {!isOwner && status === 'creator_funded' && onJoinerFund && (
+              <button
+                type="button"
+                className="w-full rounded-xl bg-gradient-to-r from-green-400 to-green-500 py-3 text-white font-semibold mb-2"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await onJoinerFund(challenge);
+                }}
+              >
+                Fund Now ({challenge.entryFee} USDFG)
+              </button>
+            )}
+            
+            {/* Close button - always visible on mobile */}
+            <button
+              type="button"
+              className="w-full rounded-xl border border-white/10 py-3 text-white/80 font-semibold"
               onClick={onClose}
             >
               Close
@@ -4193,6 +4269,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                   }
                 }
                 const imagePath = getGameImage(gameName);
+                // Debug logging for mobile issues - helps identify what image is being used
+                if (gameName.toLowerCase().includes('nba') || gameName.toLowerCase().includes('2k')) {
+                  console.log(`🏀 NBA Game Image Debug - Game: "${gameName}", Image: "${imagePath}", Challenge ID: ${challenge.id}, Title: "${challenge.title}"`);
+                }
                 const isOwner = isChallengeOwner(challenge);
                 
                 const status = challenge.status;
@@ -4215,16 +4295,25 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                       aria-label={`Open ${gameName} challenge`}
                     >
                                     <img 
-                      src={imagePath}
+                      src={`${imagePath}?v=2&game=${encodeURIComponent(gameName)}`}
                       alt=""
                       aria-hidden="true"
                       className="absolute inset-0 h-full w-full object-cover scale-110"
                       loading="lazy"
                       draggable={false}
-                      key={`${challenge.id}-${imagePath}`}
+                      key={`${challenge.id}-${gameName}-${imagePath}`}
                       onError={(e) => {
                         const target = e.currentTarget as HTMLImageElement;
+                        console.error(`❌ Failed to load image: ${imagePath} for game: ${gameName}, challenge: ${challenge.id}`);
                         target.src = '/assets/usdfg-logo-transparent.png';
+                      }}
+                      onLoad={() => {
+                        if (gameName.toLowerCase().includes('nba') || gameName.toLowerCase().includes('2k')) {
+                          console.log(`✅ Successfully loaded image: ${imagePath} for game: ${gameName}`);
+                        }
+                      }}
+                      onLoad={() => {
+                        console.log(`✅ Loaded image: ${imagePath} for game: ${gameName}`);
                       }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/75 to-black/40" />

@@ -228,26 +228,10 @@ const generateMockChallenges = (category: string) => {
   const statuses = ['Open', 'Waiting', 'Open', 'Open', 'Waiting', 'Open'];
   const modes = ['Head-to-Head', 'Best of 3', 'Quick Match', 'Full Match', 'Tournament', 'Custom'];
   
-  // Available category images
-  const categoryImages = [
-    '/assets/categories/cod.png',
-    '/assets/categories/valorant.png',
-    '/assets/categories/fortnite.png',
-    '/assets/categories/battlefield.png',
-    '/assets/categories/soccer.png',
-    '/assets/categories/basketball.png',
-    '/assets/categories/football.png',
-    '/assets/categories/boxing.png', // Use boxing.png as fallback for fighting category
-    '/assets/categories/ufc.png',
-    '/assets/categories/boxing.png',
-    '/assets/categories/racing.png',
-    '/assets/categories/boardgames.png',
-    '/assets/categories/sports.png',
-  ];
-  
+  // Generate mock challenges - DO NOT include image field
+  // Images will be determined by getGameImage() function to ensure consistency
   for (let i = 0; i < 18; i++) {
     const gameIndex = i % gameNames.length;
-    const imageIndex = i % categoryImages.length;
     
     mockChallenges.push({
       id: `mock-${category}-${i}`,
@@ -256,7 +240,7 @@ const generateMockChallenges = (category: string) => {
       opponent: usernames[i % usernames.length],
       status: statuses[i % statuses.length],
       mode: modes[i % modes.length],
-      image: categoryImages[imageIndex],
+      // DO NOT include image field - let getGameImage() determine it
       isMock: true, // Clearly marked as mock data
     });
   }

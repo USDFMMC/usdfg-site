@@ -33,7 +33,7 @@ pub mod usdfg_smart_contract {
 
         let now = Clock::get()?.unix_timestamp;
         let dispute_timer = now + 7200; // 2 hours (matches UI expiration)
-        let expiration_timer = now + 86400; // 24 hours TTL for pending challenges
+        let expiration_timer = now + 3600; // 60 minutes TTL for pending challenges
 
         let challenge = &mut ctx.accounts.challenge;
 
@@ -736,7 +736,7 @@ pub struct Challenge {
     pub entry_fee: u64,
     pub status: ChallengeStatus,
     pub dispute_timer: i64,
-    pub expiration_timer: i64,        // TTL for pending challenges (24 hours)
+    pub expiration_timer: i64,        // TTL for pending challenges (60 minutes)
     pub confirmation_timer: i64,     // Timer for creator to fund (5 minutes)
     pub joiner_funding_timer: i64,   // Timer for joiner to fund (5 minutes)
     pub winner: Option<Pubkey>,

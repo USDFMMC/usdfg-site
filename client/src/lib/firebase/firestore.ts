@@ -49,7 +49,7 @@ export interface ChallengeData {
   pendingJoiner?: string;             // Wallet that expressed join intent (in creator_confirmation_required state)
   createdAt: Timestamp;               // Creation time
   expiresAt: Timestamp;               // Expiration time (legacy - use expirationTimer)
-  expirationTimer?: Timestamp;        // TTL for pending challenges (24 hours)
+  expirationTimer?: Timestamp;        // TTL for pending challenges (60 minutes)
   creatorFundingDeadline?: Timestamp; // Deadline for creator to fund (5 minutes after join intent)
   joinerFundingDeadline?: Timestamp;  // Deadline for joiner to fund (5 minutes after creator funds)
   fundedByCreatorAt?: Timestamp;      // When creator funded escrow
@@ -1033,9 +1033,15 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
       }
     }
     
-    // Check if already expressed intent
-    if (data.pendingJoiner && data.pendingJoiner.toLowerCase() === wallet.toLowerCase()) {
+    // Check if already expressed intent (only if challenge is still in creator_confirmation_required state)
+    // If challenge was reverted, pendingJoiner should be null, so this check allows re-joining
+    if (data.status === 'creator_confirmation_required' && data.pendingJoiner && data.pendingJoiner.toLowerCase() === wallet.toLowerCase()) {
       throw new Error("You have already expressed intent to join this challenge");
+    }
+    
+    // Also check if challenger field is set (should be cleared on revert, but double-check)
+    if (data.challenger && data.challenger.toLowerCase() === wallet.toLowerCase() && data.status !== 'pending_waiting_for_opponent') {
+      throw new Error("You are already part of this challenge");
     }
 
     // Calculate creator funding deadline (5 minutes from now)
@@ -1234,10 +1240,11 @@ export const revertCreatorTimeout = async (challengeId: string): Promise<boolean
       return false; // Deadline not expired yet
     }
     
-    // Revert to pending state
+    // Revert to pending state - clear ALL joiner-related fields to allow new users to join
     const updates: any = {
       status: 'pending_waiting_for_opponent',
       pendingJoiner: null,
+      challenger: null, // Clear challenger field to allow new users to join
       creatorFundingDeadline: null,
       updatedAt: serverTimestamp(),
     };
@@ -1300,7 +1307,7 @@ export const revertJoinerTimeout = async (challengeId: string): Promise<boolean>
 };
 
 /**
- * Auto-delete expired pending challenges after 24 hours (saves Firebase storage)
+ * Auto-delete expired pending challenges after 60 minutes (saves Firebase storage)
  */
 export const expirePendingChallenge = async (challengeId: string): Promise<boolean> => {
   try {
@@ -1470,7 +1477,9 @@ export async function cleanupCompletedChallenge(id: string) {
 // Auto-cleanup for expired challenges (delete immediately)
 export async function cleanupExpiredChallenge(id: string) {
   try {
-    // First, clean up all chat messages for this challenge
+    console.log('🗑️ Starting complete cleanup for expired challenge:', id);
+    
+    // 1. Clean up all chat messages for this challenge
     console.log('🗑️ Cleaning up chat messages for expired challenge:', id);
     const chatQuery = query(
       collection(db, 'challenge_chats'),
@@ -1478,19 +1487,47 @@ export async function cleanupExpiredChallenge(id: string) {
     );
     const chatSnapshot = await getDocs(chatQuery);
     
-    // Delete all chat messages
     const chatDeletePromises = chatSnapshot.docs.map(docSnapshot => 
       deleteDoc(doc(db, 'challenge_chats', docSnapshot.id))
     );
     await Promise.all(chatDeletePromises);
     console.log(`🗑️ Deleted ${chatSnapshot.size} chat messages for expired challenge:`, id);
     
-    // Then delete the challenge document
+    // 2. Delete voice signals if any
+    try {
+      const voiceSignalRef = doc(db, 'voice_signals', id);
+      const voiceSignalSnap = await getDoc(voiceSignalRef);
+      if (voiceSignalSnap.exists()) {
+        await deleteDoc(voiceSignalRef);
+        console.log('🗑️ Deleted voice signals for expired challenge:', id);
+      }
+    } catch (voiceError) {
+      console.log('ℹ️ No voice signals to delete for challenge:', id);
+    }
+    
+    // 3. Delete challenge notifications
+    try {
+      const notificationQuery = query(
+        collection(db, 'challenge_notifications'),
+        where('challengeId', '==', id)
+      );
+      const notificationSnapshot = await getDocs(notificationQuery);
+      const notificationDeletePromises = notificationSnapshot.docs.map(docSnapshot =>
+        deleteDoc(doc(db, 'challenge_notifications', docSnapshot.id))
+      );
+      await Promise.all(notificationDeletePromises);
+      console.log(`🗑️ Deleted ${notificationSnapshot.size} challenge notifications for expired challenge:`, id);
+    } catch (notificationError) {
+      console.log('ℹ️ No challenge notifications to delete for challenge:', id);
+    }
+    
+    // 4. Finally, delete the challenge document itself
     const challengeRef = doc(db, "challenges", id);
     await deleteDoc(challengeRef);
-    console.log('🗑️ Expired challenge cleaned up:', id);
+    console.log('✅ Expired challenge and all related data cleaned up:', id);
   } catch (error) {
     console.error('❌ Failed to cleanup expired challenge:', error);
+    throw error;
   }
 }
 
