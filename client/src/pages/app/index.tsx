@@ -4177,7 +4177,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     category.includes('BASEBALL') || category.includes('GOLF')) {
                   return 'Sports';
                 }
-                if (category.includes('FIGHTING') || category.includes('BOXING')) {
+                // UFC is stored as its own category ('UFC') but should appear under Fighting in the UI.
+                if (category.includes('FIGHTING') || category.includes('BOXING') || category.includes('UFC') || game.includes('ufc')) {
                   return 'Fighting';
                 }
                 if (category.includes('SHOOTING') || category.includes('FPS') || 
