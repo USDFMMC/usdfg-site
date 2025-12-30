@@ -1247,9 +1247,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const status = challenge.status || challenge.rawData?.status;
       const winner = challenge.rawData?.winner || challenge.winner;
       const prizeClaimedAt = challenge.rawData?.prizeClaimedAt || challenge.prizeClaimedAt;
+      const payoutTriggered = challenge.rawData?.payoutTriggered || challenge.payoutTriggered;
       const userWon = winner && winner.toLowerCase() === currentWallet.toLowerCase();
       
-      return status === 'completed' && userWon && !prizeClaimedAt;
+      // Prize is claimed if either prizeClaimedAt exists OR payoutTriggered is true
+      const isClaimed = prizeClaimedAt || payoutTriggered;
+      
+      return status === 'completed' && userWon && !isClaimed;
     });
     
     setUnclaimedPrizeChallenges(unclaimed);
@@ -3093,6 +3097,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Call the claim function
       await claimChallengePrize(challenge.id, wallet, connection);
       
+      // Immediately remove this challenge from unclaimed list (optimistic update)
+      setUnclaimedPrizeChallenges(prev => 
+        prev.filter(c => c.id !== challenge.id)
+      );
+      
       alert("🏆 Reward claimed! Check your wallet for the USDFG tokens.");
       
       // Refresh USDFG balance after successful prize claim
@@ -3103,6 +3112,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       }, 2000); // Wait 2 seconds for transaction to confirm
       
       // The real-time listener will update the UI automatically
+      // But we've already optimistically removed it from the list above
     } catch (error) {
       console.error("❌ Failed to claim prize:", error);
       
@@ -3961,7 +3971,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                   </button>
                   <Link 
                     to="#challenges"
-                    className="text-glow-amber underline underline-offset-4 hover:text-glow-amber/80 transition-colors neocore-body text-sm sm:text-base"
+                    className="text-amber-300 underline underline-offset-4 hover:text-amber-200 transition-colors neocore-body text-sm sm:text-base"
                   >
                     Browse Challenges
                   </Link>
@@ -4203,14 +4213,31 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                         <div className="min-w-0 flex-1">
                           <div className="text-[15px] font-semibold truncate">{gameName}</div>
                           <div className="text-xs text-white/70 truncate">{challenge.mode || 'Head-to-Head'}</div>
-                                  </div>
-                        <StatusPill 
-                          status={status} 
-                          isOwner={isOwner} 
-                          players={challenge.players || 0} 
-                          capacity={challenge.capacity || 2} 
-                        />
-                                  </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1.5">
+                          <StatusPill 
+                            status={status} 
+                            isOwner={isOwner} 
+                            players={challenge.players || 0} 
+                            capacity={challenge.capacity || 2} 
+                          />
+                          {/* Share button - positioned below status */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleShareChallenge(challenge);
+                            }}
+                            className="p-1.5 rounded-lg bg-black/60 hover:bg-black/80 backdrop-blur-sm border border-white/20 hover:border-amber-400/40 transition-all"
+                            title="Share challenge"
+                            aria-label="Share challenge"
+                          >
+                            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
 
                       <div className="mt-auto grid grid-cols-2 gap-2 text-xs">
                         <div className="rounded-lg bg-black/45 p-2">
@@ -4234,21 +4261,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           </div>
                             </div>
                           </div>
-                    </button>
-                    {/* Share button - positioned absolutely in top-right corner */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleShareChallenge(challenge);
-                      }}
-                      className="absolute top-2 right-2 z-20 p-1.5 rounded-lg bg-black/60 hover:bg-black/80 backdrop-blur-sm border border-white/20 hover:border-amber-400/40 transition-all"
-                      title="Share challenge"
-                      aria-label="Share challenge"
-                    >
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                      </svg>
                     </button>
                   </div>
                 );

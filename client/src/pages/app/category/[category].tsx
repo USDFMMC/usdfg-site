@@ -45,18 +45,92 @@ const getGameCategory = (game: string): string => {
 
 // Helper function to get game image (matches logic from index.tsx)
 const getGameImage = (game: string): string => {
-  if (!game) return '/assets/categories/sports.png';
+  if (!game || game === 'Gaming') {
+    return '/assets/categories/basketball.png'; // Default fallback
+  }
   
-  const lowerGame = game.toLowerCase();
+  // Check for specific games first (check this FIRST before category check)
+  const lowerGame = game.toLowerCase().trim();
   
-  // UFC games
+  // Valorant - use specific Valorant image
+  if (lowerGame === 'valorant' || lowerGame.includes('valorant')) {
+    return '/assets/categories/valorant.png';
+  }
+  
+  // Fortnite - use specific Fortnite image
+  if (lowerGame.includes('fortnite')) {
+    return '/assets/categories/fortnite.png';
+  }
+  
+  // UFC games - use ufc.png (EA Sports UFC, UFC)
   if (lowerGame.includes('ufc') || lowerGame.includes('ea sports ufc')) {
     return '/assets/categories/ufc.png';
   }
   
-  // Football games (American football)
-  if (lowerGame.includes('madden') || lowerGame.includes('nfl') || lowerGame.includes('retro bowl') || lowerGame.includes('axis football') || lowerGame.includes('mutant football')) {
+  // American Football games - use football.png (Madden, NFL, etc.) - CHECK THIS BEFORE SOCCER
+  if (lowerGame.includes('madden') || 
+      lowerGame.includes('nfl') ||
+      lowerGame.includes('retro bowl') ||
+      lowerGame.includes('axis football') ||
+      lowerGame.includes('mutant football')) {
     return '/assets/categories/football.png';
+  }
+  
+  // Basketball games - use basketball.png (NBA 2K, basketball, etc.)
+  if (lowerGame.includes('nba') || 
+      lowerGame.includes('2k') ||
+      lowerGame.includes('basketball')) {
+    return '/assets/categories/basketball.png';
+  }
+  
+  // Soccer games - use soccer.png (FIFA, FC, EA Sports FC, etc.)
+  if (lowerGame.includes('fifa') || 
+      lowerGame.startsWith('fc') || 
+      lowerGame.includes('fc 26') || 
+      lowerGame.includes('fc26') || 
+      lowerGame.includes('fc ') ||
+      lowerGame.includes('ea sports fc') ||
+      lowerGame.includes('soccer')) {
+    return '/assets/categories/soccer.png';
+  }
+  
+  // Street Fighter games - use tekken.png (Street Fighter 6, Street Fighter V, etc.)
+  if (lowerGame.includes('street fighter')) {
+    return '/assets/categories/tekken.png';
+  }
+  
+  // Tekken games - use tekken.png (Tekken 8, Tekken 7, etc.)
+  if (lowerGame.includes('tekken')) {
+    return '/assets/categories/tekken.png';
+  }
+  
+  // Mortal Kombat games - use tekken.png (Mortal Kombat 1, Mortal Kombat 11, etc.)
+  if (lowerGame.includes('mortal kombat')) {
+    return '/assets/categories/tekken.png';
+  }
+  
+  // Battlefield games - use battlefield.png (Battlefield 2042, V, 1, etc.)
+  if (lowerGame.includes('battlefield')) {
+    return '/assets/categories/battlefield.png';
+  }
+  
+  // GTA games - use gta.png (GTA 6, GTA V, GTA IV, etc.)
+  if (lowerGame.includes('gta')) {
+    return '/assets/categories/gta.png';
+  }
+  
+  // Call of Duty games - use cod.png (COD MW3, Black Ops, Warzone, etc.)
+  if (lowerGame.includes('cod') || lowerGame.includes('call of duty')) {
+    return '/assets/categories/cod.png';
+  }
+  
+  // Boxing games - use boxing.png (Undisputed, Fight Night, Creed, etc.)
+  if (lowerGame.includes('boxing') || 
+      lowerGame.includes('fight night') || 
+      lowerGame.includes('creed') || 
+      lowerGame.includes('undisputed') ||
+      lowerGame.includes('esports boxing')) {
+    return '/assets/categories/boxing.png';
   }
   
   // Board games
@@ -64,49 +138,64 @@ const getGameImage = (game: string): string => {
     return '/assets/categories/boardgames.png';
   }
   
-  // Fighting games
-  if (lowerGame.includes('street fighter')) {
-    return '/assets/categories/tekken.png';
-  }
-  if (lowerGame.includes('tekken')) {
-    return '/assets/categories/tekken.png';
-  }
-  if (lowerGame.includes('mortal kombat')) {
-    return '/assets/categories/tekken.png';
+  // Baseball games - use baseball.png (MLB The Show, RBI Baseball, etc.)
+  if (lowerGame.includes('mlb') || 
+      lowerGame.includes('baseball') ||
+      lowerGame.includes('the show')) {
+    return '/assets/categories/baseball.png';
   }
   
-  // Boxing games
-  if (lowerGame.includes('boxing') || lowerGame.includes('fight night') || lowerGame.includes('creed') || lowerGame.includes('undisputed') || lowerGame.includes('esports boxing')) {
-    return '/assets/categories/boxing.png';
+  // Golf games - use golf.png (PGA Tour, The Golf Club, etc.) - EXCLUDE Mario Golf
+  if ((lowerGame.includes('golf') || lowerGame.includes('pga')) && !lowerGame.includes('mario')) {
+    return '/assets/categories/golf.png';
   }
   
-  // Shooting games
-  if (lowerGame.includes('valorant')) {
-    return '/assets/categories/valorant.png';
-  }
-  if (lowerGame.includes('cod') || lowerGame.includes('call of duty')) {
-    return '/assets/categories/cod.png';
-  }
-  if (lowerGame.includes('battlefield')) {
-    return '/assets/categories/battlefield.png';
+  // Tennis games - use tennis.png (TopSpin, AO Tennis, Tennis World Tour, etc.)
+  if (lowerGame.includes('tennis') || lowerGame.includes('topspin') || lowerGame.includes('matchpoint')) {
+    return '/assets/categories/tennis.png';
   }
   
-  // Racing games
-  if (!lowerGame.includes('mario') && (lowerGame.includes('forza') || lowerGame.includes('gran turismo') || lowerGame.includes('f1') || lowerGame.includes('assetto corsa') || lowerGame.includes('project cars') || lowerGame.includes('iracing') || lowerGame.includes('need for speed') || lowerGame.includes('the crew'))) {
+  // Street Basketball games - use nbastreet.png (NBA Street, Playgrounds, NBA The Run, etc.)
+  if (lowerGame.includes('nba street') || 
+      lowerGame.includes('playgrounds') || 
+      lowerGame.includes('street hoops') ||
+      lowerGame.includes('street basketball') ||
+      lowerGame.includes('nba the run')) {
+    return '/assets/categories/nbastreet.png';
+  }
+  
+  // Racing games - use racing.png (Gran Turismo, Forza, F1, etc.) - EXCLUDE Mario Kart
+  if (!lowerGame.includes('mario') && 
+      (lowerGame.includes('forza') || 
+       lowerGame.includes('gran turismo') || 
+       lowerGame.includes('f1') || 
+       lowerGame.includes('assetto corsa') || 
+       lowerGame.includes('project cars') || 
+       lowerGame.includes('iracing') || 
+       lowerGame.includes('need for speed') || 
+       lowerGame.includes('the crew'))) {
     return '/assets/categories/racing.png';
   }
   
-  // Get category and return appropriate image
+  // Get category and return appropriate image (fallback)
   const category = getGameCategory(game);
   switch (category) {
-    case 'UFC': return '/assets/categories/ufc.png';
-    case 'Football': return '/assets/categories/football.png';
-    case 'BoardGames': return '/assets/categories/boardgames.png';
-    case 'Sports': return '/assets/categories/sports.png';
-    case 'Racing': return '/assets/categories/racing.png';
-    case 'Shooting': return '/assets/categories/shooting.png';
-    case 'Fighting': return '/assets/categories/tekken.png';
-    default: return '/assets/categories/sports.png';
+    case 'UFC':
+      return '/assets/categories/ufc.png';
+    case 'Football':
+      return '/assets/categories/football.png';
+    case 'BoardGames':
+      return '/assets/categories/boardgames.png';
+    case 'Sports':
+      return '/assets/categories/basketball.png'; // Using basketball.png (sports.png doesn't exist)
+    case 'Racing':
+      return '/assets/categories/racing.png';
+    case 'Shooting':
+      return '/assets/categories/cod.png'; // Using cod.png (shooting.png doesn't exist)
+    case 'Fighting':
+      return '/assets/categories/tekken.png'; // Fighting games category
+    default:
+      return '/assets/categories/basketball.png'; // Default to basketball category image
   }
 };
 
@@ -263,7 +352,8 @@ const CategoryDetailPage: React.FC = () => {
             const status = challenge.status || 'Open';
             const mode = challenge.mode || challenge.challengeMode || 'Standard';
             const creator = challenge.creator || challenge.opponent || 'Unknown';
-            const image = challenge.image || getGameImage(game);
+            // Always use getGameImage to ensure consistent images (ignore stored challenge.image which may be old)
+            const image = getGameImage(game);
             
             // Get opponent (for real challenges)
             const players = challenge.players || [];

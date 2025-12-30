@@ -19,7 +19,6 @@
 html {
   height: 100%;
   overflow-x: hidden;
-  /* Safari viewport fix */
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
 }
@@ -28,12 +27,10 @@ body {
   height: 100%;
   overflow-x: hidden;
   position: relative;
-  /* Safari specific fixes */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Ensure proper mobile layout */
 #root {
   min-height: 100vh;
   width: 100%;
@@ -42,7 +39,6 @@ body {
 
 /* Mobile responsive fixes - Only apply to Arena page */
 @media (max-width: 768px) {
-  /* Only apply fixed positioning to Arena page, not the landing page */
   body.arena-page {
     position: fixed;
     width: 100%;
@@ -56,37 +52,9 @@ body {
     overflow-x: hidden;
   }
   
-  /* General mobile fixes for all pages */
   body {
     overflow-x: hidden;
   }
-}
-
-/* Safari-specific fixes */
-@supports (-webkit-appearance: none) {
-  /* Safari-specific styles */
-  .bg-gradient-to-r {
-    background: linear-gradient(to right, var(--tw-gradient-stops));
-  }
-  
-  .bg-clip-text {
-    -webkit-background-clip: text;
-    background-clip: text;
-  }
-}
-
-/* Safari flexbox fixes */
-.flex {
-  display: -webkit-box;
-  display: -webkit-flex;
-  display: -ms-flexbox;
-  display: flex;
-}
-
-/* Safari grid fixes */
-.grid {
-  display: -webkit-grid;
-  display: grid;
 }
 
 /* Challenge expiry animations */
@@ -113,39 +81,26 @@ body {
   animation: bounce-slow 3s ease-in-out infinite;
 }
 
-
-/* Live price indicator animation - lightweight pulsing red/green */
+/* Live price indicator animation */
 @keyframes pulseLive {
   0%, 100% {
-    color: rgb(34, 197, 94); /* green-500 */
+    color: rgb(34, 197, 94);
     opacity: 1;
   }
   50% {
-    color: rgb(239, 68, 68); /* red-500 */
+    color: rgb(239, 68, 68);
     opacity: 0.85;
   }
 }
 
 .animate-pulse-live {
   animation: pulseLive 2.5s ease-in-out infinite;
-  will-change: color, opacity; /* GPU hint for better performance */
+  will-change: color, opacity;
 }
+
 @layer base {
   :root {
-    /* Original Site Colors */
-    --primary-color: #6c11f3; /* Purple */
-    --secondary-color: #ffc107; /* Amber/Gold */
-    --accent-color: #ff0055; /* Red/Pink */
-    --text-light: #f5f5f5;
-    --text-dark: #202020;
-    --background-light: #242742;
-    --background-dark: #121421;
-    --star-color: #ffeb3b;
-    --neon-glow: 0 0 10px rgba(0, 232, 252, 0.7), 0 0 20px rgba(0, 232, 252, 0.5), 0 0 30px rgba(0, 232, 252, 0.3);
-    --accent-glow: 0 0 10px rgba(255, 0, 85, 0.7), 0 0 20px rgba(255, 0, 85, 0.5), 0 0 30px rgba(255, 0, 85, 0.3);
-    --primary-glow: 0 0 10px rgba(108, 17, 243, 0.7), 0 0 20px rgba(108, 17, 243, 0.5), 0 0 30px rgba(108, 17, 243, 0.3);
-    
-    /* Base colors - Mapped to original colors */
+    /* Base colors */
     --background: 240 33% 8%;
     --foreground: 0 0% 100%;
     
@@ -201,15 +156,15 @@ body {
     --ring: 187 100% 50%;
     --radius: 0.5rem;
     
-    /* NeoCore Interface Colors */
+    /* USDFG Theme Colors - Amber/Gold */
     --background-1: #050505;
     --background-2: #0a0f14;
     --background-3: #10151b;
-    --glow-cyan: #ffc107; /* Amber/Gold */
-    --glow-electric: #ffc107; /* Amber/Gold */
+    --glow-cyan: #fbbf24; /* Amber/Gold */
+    --glow-electric: #fbbf24; /* Amber/Gold */
     --glow-pink: #ff006a;
     --border-soft: rgba(255,255,255,0.05);
-    --border-glow: rgba(251, 191, 36, 0.3); /* Amber/Gold */
+    --border-glow: rgba(251, 191, 36, 0.3);
     --text-primary: #e6e6e6;
     --text-dim: #808080;
   }
@@ -223,10 +178,9 @@ body {
   body {
     @apply bg-background text-foreground;
     background-color: #121421 !important;
-    /* cursor: none; */ /* Crosshair effect disabled */
   }
 
-  /* Crosshair styles */
+  /* Crosshair styles - kept for Crosshair component */
   .crosshair-horizontal {
     transition: opacity 0.2s ease-out, top 0.02s linear;
   }
@@ -243,7 +197,7 @@ body {
     font-family: 'Exo 2', 'Arial', sans-serif;
   }
   
-  /* NeoCore Typography - Optimized Hierarchy */
+  /* NeoCore Typography */
   .neocore-h1 {
     font-family: 'Space Grotesk', sans-serif;
     font-size: 3.2rem;
@@ -310,37 +264,15 @@ body {
       font-size: 0.85rem;
     }
     
-    .challenge-card {
-      margin: 0 4px;
-      box-shadow:
-        inset 0 0 8px rgba(255,255,255,0.03),
-        0 0 16px rgba(0,255,255,0.08);
-    }
-    
     .neocore-panel {
       margin: 0 20px;
       backdrop-filter: blur(8px);
     }
-    
-    .parallax-glow {
-      opacity: 0.01;
-    }
-  }
-
-  /* Performance Optimizations */
-  .neocore-optimized {
-    will-change: transform;
-    transform: translateZ(0);
   }
 
   /* Reduced Motion Preferences */
   @media (prefers-reduced-motion: reduce) {
-    .parallax-glow {
-      animation: none;
-    }
-    
-    .elite-btn:hover,
-    .challenge-card:hover {
+    .elite-btn:hover {
       transform: none;
     }
   }
@@ -353,21 +285,16 @@ body {
   
   .btn-animation:hover {
     @apply -translate-y-0.5;
-    box-shadow: var(--neon-glow);
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
   }
   
   .mascot-float {
     @apply animate-float;
   }
   
-  /* Star styles moved to StarBackground component */
-  
-  /* Hero section styles */
   .hero {
     @apply relative min-h-screen flex flex-col justify-center overflow-hidden;
   }
-  
-  /* Removed particles-container and hero-particle - using StarBackground only */
   
   .token-name {
     @apply font-black tracking-wider;
@@ -385,16 +312,11 @@ body {
     @apply font-semibold tracking-wider uppercase bg-transparent;
   }
 
-  /* Legacy styles removed - using optimized NeoCore components */
-
   .fade-in-up {
     @apply animate-fade-in;
   }
 
-  .shadow-glow {
-    box-shadow: 0 0 10px rgba(255, 102, 255, 0.2);
-  }
-
+  /* Social Media Hover Effects */
   .tiktok-hover {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     color: #fff;
@@ -440,21 +362,13 @@ body {
     text-fill-color: transparent;
   }
 
-  /* NeoCore Interface Components - Optimized */
-  .glow-soft {
-    box-shadow: 0 0 20px rgba(0,255,255,0.15);
-  }
-
-  .glow-strong {
-    box-shadow: 0 0 40px rgba(0,255,255,0.25);
-  }
-
+  /* NeoCore Interface Components */
   .elite-btn {
     position: relative;
     padding: 12px 24px;
-    border: 1px solid rgba(0,255,255,0.2);
+    border: 1px solid rgba(251, 191, 36, 0.2);
     border-radius: 12px;
-    background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,30,40,0.9) 100%);
+    background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(30,20,0,0.9) 100%);
     color: var(--text-primary);
     font-weight: 600;
     letter-spacing: 0.5px;
@@ -469,42 +383,14 @@ body {
     left: 0;
     right: 0;
     height: 1px;
-    background: linear-gradient(to right, rgba(0,255,255,0.1), transparent);
+    background: linear-gradient(to right, rgba(251, 191, 36, 0.1), transparent);
     border-radius: 12px 12px 0 0;
   }
 
   .elite-btn:hover {
-    box-shadow: 0 0 30px rgba(0,255,255,0.2);
-    border-color: rgba(0,255,255,0.4);
+    box-shadow: 0 0 30px rgba(251, 191, 36, 0.2);
+    border-color: rgba(251, 191, 36, 0.4);
     transform: translateY(-1px);
-  }
-
-  .challenge-card {
-    position: relative;
-    background: rgba(10,15,20,0.9);
-    border: 1px solid rgba(0,255,255,0.1);
-    backdrop-filter: blur(10px);
-    box-shadow:
-      inset 0 0 10px rgba(255,255,255,0.03),
-      0 0 20px rgba(0,255,255,0.08);
-    border-radius: 16px;
-    transition: all 0.25s ease-out;
-  }
-
-  .challenge-card::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: linear-gradient(to right, rgba(0,255,255,0.1), transparent);
-    border-radius: 16px 16px 0 0;
-  }
-
-  .challenge-card:hover {
-    box-shadow: 0 0 10px rgba(0,255,255,0.1);
-    border-color: rgba(0,255,255,0.2);
   }
 
   .neocore-panel {
@@ -521,15 +407,9 @@ body {
     left: 0;
     right: 0;
     height: 1px;
-    background: linear-gradient(to right, rgba(0,255,255,0.1), transparent);
+    background: linear-gradient(to right, rgba(251, 191, 36, 0.1), transparent);
     border-radius: 16px 16px 0 0;
   }
-
-  .neocore-glass-overlay {
-    background: rgba(0,0,0,0.85);
-  }
-
-  /* Removed heavy parallax glow for performance */
 }
 
 @keyframes float {
@@ -537,91 +417,63 @@ body {
   50% { transform: translateY(-10px); }
 }
 
-/* starPulse keyframes moved to StarBackground component */
-
-/* Removed particleFade - no longer used */
-
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(30px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
 .animate-fade-in {
   animation: fadeIn 0.8s ease-out forwards;
 }
-.shadow-glow {
-  box-shadow: 0 0 30px rgba(255, 102, 255, 0.4), 0 0 80px rgba(102, 204, 255, 0.2);
-}
 
-/* Duplicate styles removed - using optimized NeoCore versions above */
-.fade-in-up {
-  opacity: 0;
-  transform: translateY(32px);
-  transition: opacity 0.8s cubic-bezier(0.4,0,0.2,1), transform 0.8s cubic-bezier(0.4,0,0.2,1);
-}
-.fade-in-up.visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* Removed heavy glow animations for performance */
-
-.fade-in-delayed {
-  opacity: 0;
-  transform: translateY(30px);
-  animation: fadeIn 1.5s ease-out 1.2s forwards;
-}
-
-/* Wallet Adapter Button Customization */
+/* Wallet Adapter Button Customization - Amber/Gold Theme */
 .wallet-adapter-button-trigger {
   font-size: inherit !important;
   line-height: inherit !important;
 }
 
-/* Ensure Connect Wallet text is visible */
 .wallet-adapter-button .wallet-adapter-button-start-icon {
   margin-right: 8px;
 }
 
-/* Override wallet adapter button to match Create Challenge button size and style - gold/amber theme */
 .wallet-adapter-button:not(.wallet-adapter-button-connected),
 button.wallet-adapter-button:not(.wallet-adapter-button-connected) {
   white-space: nowrap;
-  background: rgba(39, 39, 42, 0.5) !important; /* zinc-800/50 - matches Create Challenge */
-  background-image: none !important; /* Remove any gradient backgrounds */
-  border: 1px solid rgba(63, 63, 70, 1) !important; /* border-zinc-700 - matches Create Challenge */
-  color: rgba(251, 191, 36, 1) !important; /* amber-300 text for goldish look */
-  padding: 0.5rem 1rem !important; /* px-4 py-2 - matches Create Challenge */
-  height: 2.5rem !important; /* h-10 - matches Create Challenge */
-  font-size: 0.875rem !important; /* text-sm - matches Create Challenge */
-  font-weight: 600 !important; /* font-semibold - matches Create Challenge */
-  border-radius: 0.75rem !important; /* rounded-xl - matches Create Challenge */
+  background: rgba(39, 39, 42, 0.5) !important;
+  background-image: none !important;
+  border: 1px solid rgba(63, 63, 70, 1) !important;
+  color: rgba(251, 191, 36, 1) !important;
+  padding: 0.5rem 1rem !important;
+  height: 2.5rem !important;
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  border-radius: 0.75rem !important;
   transition: all 0.2s ease !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 0.5rem !important; /* gap-2 - matches Create Challenge */
+  gap: 0.5rem !important;
   min-width: auto !important;
   box-shadow: none !important;
 }
 
 .wallet-adapter-button:not(.wallet-adapter-button-connected):hover,
 button.wallet-adapter-button:not(.wallet-adapter-button-connected):hover {
-  background: rgba(63, 63, 70, 0.5) !important; /* zinc-700/50 - matches Create Challenge hover */
-  background-image: none !important; /* Remove any gradient backgrounds */
-  border-color: rgba(251, 191, 36, 0.5) !important; /* amber-300/50 - matches Create Challenge hover */
+  background: rgba(63, 63, 70, 0.5) !important;
+  background-image: none !important;
+  border-color: rgba(251, 191, 36, 0.5) !important;
 }
 
 .wallet-adapter-button:not(.wallet-adapter-button-connected):active {
   transform: scale(0.98) !important;
 }
 
-/* Override wallet adapter button icon colors to match gold/amber theme */
 .wallet-adapter-button:not(.wallet-adapter-button-connected) .wallet-adapter-button-start-icon,
 .wallet-adapter-button:not(.wallet-adapter-button-connected) .wallet-adapter-button-end-icon {
-  color: rgba(251, 191, 36, 1) !important; /* amber-300 to match text */
+  color: rgba(251, 191, 36, 1) !important;
 }
 
-/* Join Challenge Button Animations - Optimized for performance */
+/* Button Animations */
 @keyframes pulseSubtle {
   0%, 100% {
     opacity: 1;
@@ -632,6 +484,7 @@ button.wallet-adapter-button:not(.wallet-adapter-button-connected):hover {
     transform: scale(1.02);
   }
 }
+
 @keyframes bounceSubtle {
   0%, 100% {
     transform: translateY(0);
@@ -654,7 +507,7 @@ button.wallet-adapter-button:not(.wallet-adapter-button-connected):hover {
 
 .animate-pulse-subtle {
   animation: pulseSubtle 1.5s ease-in-out infinite;
-  will-change: transform, opacity; /* GPU hint - only transform and opacity for best performance */
+  will-change: transform, opacity;
 }
 
 .animate-bounce-subtle {

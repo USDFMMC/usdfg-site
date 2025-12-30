@@ -191,10 +191,10 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    host: '127.0.0.1', // Use localhost IP instead of 'true' to avoid network interface issues
+    host: 'localhost', // Use localhost for consistent HTTP and WebSocket connections
     strictPort: false, // Allow Vite to use a different port if 5173 is busy
     hmr: {
-      host: 'localhost',
+      host: 'localhost', // Match server host for consistent WebSocket connection
       protocol: 'ws',
       // Don't specify port - let Vite use the same port as the dev server
     },

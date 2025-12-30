@@ -30,7 +30,6 @@ const CreateChallenge: React.FC = () => {
       </Helmet>
 
       <div className="min-h-screen bg-background-1 relative">
-        <div className="parallax-glow"></div>
         {/* Header */}
         <header className="border-b border-soft bg-background-2/80 backdrop-blur-sm neocore-panel">
           <div className="container mx-auto px-4 py-4">
@@ -54,7 +53,7 @@ const CreateChallenge: React.FC = () => {
         {/* Main Content */}
         <main className="container mx-auto px-4 py-8 relative z-10">
           <div className="max-w-2xl mx-auto">
-            <Card className="challenge-card">
+            <Card className="rounded-xl border border-zinc-700/50 bg-zinc-900/50">
               <CardHeader>
                 <CardTitle className="neocore-h2 text-text-primary">New Gaming Challenge</CardTitle>
                 <p className="text-text-dim neocore-body">

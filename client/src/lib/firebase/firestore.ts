@@ -3747,6 +3747,7 @@ export async function claimChallengePrize(
       // Update Firestore to mark prize as claimed
       await updateDoc(challengeRef, {
         payoutTriggered: true,
+        prizeClaimedAt: Timestamp.now(), // Mark as claimed for unclaimed prize filter
         payoutSignature: signature,
         payoutTimestamp: Timestamp.now(),
         updatedAt: Timestamp.now(),
