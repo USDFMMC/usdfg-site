@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import WalletConnectSimple from "@/components/arena/WalletConnectSimple";
 import { useWallet } from '@solana/wallet-adapter-react';
 // Removed legacy wallet import - using MWA hooks instead
-import { expressJoinIntent as expressJoinIntentOnChain, creatorFund as creatorFundOnChain, joinerFund as joinerFundOnChain } from "@/lib/chain/contract";
+import { creatorFund as creatorFundOnChain, joinerFund as joinerFundOnChain } from "@/lib/chain/contract";
 import { handlePhantomReturn, isPhantomReturn, SESSION_STORAGE_NONCE } from '@/lib/wallet/phantom-deeplink';
 import TournamentBracketView from "@/components/arena/TournamentBracketView";
 import StandardChallengeLobby from "@/components/arena/StandardChallengeLobby";
@@ -31,6 +31,7 @@ const SubmitResultRoom = lazy(() => import("@/components/arena/SubmitResultRoom"
 const PlayerProfileModal = lazy(() => import("@/components/arena/PlayerProfileModal"));
 const TrustReviewModal = lazy(() => import("@/components/arena/TrustReviewModal"));
 const TeamManagementModal = lazy(() => import("@/components/arena/TeamManagementModal"));
+import VictoryModal from "@/components/arena/VictoryModal";
 
 // Ad Rotation Component for Win Rate Box
 const AdRotationBox: React.FC = () => {
@@ -792,6 +793,13 @@ const ArenaHome: React.FC = () => {
 const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string; opponentWallet: string } | null>(null);
   const [showTeamModal, setShowTeamModal] = useState<boolean>(false);
   const [userTeam, setUserTeam] = useState<TeamStats | null>(null);
+  // Victory Modal state
+  const [showVictoryModal, setShowVictoryModal] = useState(false);
+  const [victoryModalData, setVictoryModalData] = useState<{
+    autoWon?: boolean;
+    opponentName?: string;
+    needsClaim?: boolean;
+  } | null>(null);
   const [notification, setNotification] = useState<{
     isOpen: boolean;
     message: string;
@@ -2169,37 +2177,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         // We'll just use a Firestore-generated ID
         challengeId = 'founder_' + Date.now().toString();
       } else {
-        // Regular challenge - create on-chain
-      // Create connection
-      const connection = new Connection(getRpcEndpoint(), 'confirmed');
-      
-      // Get the most up-to-date wallet state
-      const phantomWallet = wallet.wallets.find(w => w.adapter.name === 'Phantom');
-      const adapterPublicKey = phantomWallet?.adapter?.publicKey;
-      const adapterConnected = phantomWallet?.adapter?.connected || false;
-      
-      // Use adapter's state if hook state isn't ready yet
-      const walletPublicKey = adapterPublicKey || publicKey;
-      const walletConnected = adapterConnected || connected;
-      
-      if (!walletPublicKey || !walletConnected) {
-        throw new Error("Wallet not ready. Please wait a moment and try again.");
-      }
-      
-      // Use the adapter's methods if available, otherwise use the hook's methods
-      const walletToUse = adapterPublicKey ? {
-        ...wallet,
-        publicKey: adapterPublicKey,
-        signTransaction: phantomWallet.adapter.signTransaction.bind(phantomWallet.adapter),
-        signAllTransactions: phantomWallet.adapter.signAllTransactions?.bind(phantomWallet.adapter)
-      } : wallet;
-      
-      challengeId = await createChallenge(
-        walletToUse,
-        connection,
-        challengeData.entryFee // Entry fee in USDFG
-      );
-      
+        // Regular challenge - create in Firestore only (no on-chain transaction)
+        // PDA will be created when creator funds the challenge
+        challengeId = null; // Will be set when creator funds
       }
       
       // Calculate prize pool
@@ -2259,7 +2239,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         format: challengeData.format || (challengeData.tournament ? 'tournament' : 'standard'),
         tournament: challengeData.format === 'tournament' ? challengeData.tournament : undefined,
         // Prize claim fields
-        pda: isFounderChallenge ? null : challengeId, // Store the challenge PDA from smart contract (null for Founder Challenges)
+        pda: isFounderChallenge ? null : undefined, // PDA will be created when creator funds (null for Founder Challenges)
         prizePool: prizePool, // Prize pool (for Founder Challenges, admin sets this)
         // Store only the title which contains game info - saves storage costs
         title: challengeTitle, // Generated title with game info
@@ -2526,20 +2506,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         return;
       }
       
-      // Regular challenge - express intent on-chain and in Firestore
-      const challengePDA = challenge.rawData?.pda || challenge.pda;
-      if (!challengePDA) {
-        throw new Error('Challenge has no on-chain PDA. Cannot join this challenge.');
-      }
-      
-      // Express intent on-chain (NO PAYMENT)
-      await expressJoinIntentOnChain(
-        { signTransaction, publicKey },
-        connection,
-        challengePDA
-      );
-      
-      // Express intent in Firestore
+      // Regular challenge - express intent in Firestore only (no on-chain transaction)
       await expressJoinIntent(challenge.id, walletAddr);
       
       alert('✅ Join intent expressed! Waiting for creator to fund the challenge.');
@@ -2694,20 +2661,36 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         throw new Error('⚠️ Confirmation deadline expired. The challenge has been reverted to waiting for opponent.');
       }
 
-      const challengePDA = freshChallenge.pda || challenge.rawData?.pda || challenge.pda;
       const entryFee = freshChallenge.entryFee || challenge.entryFee || challenge.rawData?.entryFee || 0;
       
+      // Check if PDA exists, if not create it and fund in one transaction
+      let challengePDA = freshChallenge.pda || challenge.rawData?.pda || challenge.pda;
+      
       if (!challengePDA) {
-        throw new Error('Challenge has no on-chain PDA.');
+        // PDA doesn't exist yet - create it and fund in one transaction
+        const { createAndFundChallenge } = await import('@/lib/chain/contract');
+        const result = await createAndFundChallenge(
+          { signTransaction, publicKey },
+          connection,
+          entryFee
+        );
+        challengePDA = result.pda;
+        
+        // Update Firestore with PDA
+        const { updateDoc, doc } = await import('firebase/firestore');
+        const { db } = await import('@/lib/firebase/config');
+        await updateDoc(doc(db, 'challenges', challenge.id), {
+          pda: challengePDA
+        });
+      } else {
+        // PDA exists - just fund
+        await creatorFundOnChain(
+          { signTransaction, publicKey },
+          connection,
+          challengePDA,
+          entryFee
+        );
       }
-
-      // Creator funds on-chain
-      await creatorFundOnChain(
-        { signTransaction, publicKey },
-        connection,
-        challengePDA,
-        entryFee
-      );
       
       // Update Firestore
       await creatorFund(challenge.id, currentWallet);
@@ -2936,26 +2919,24 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         }
       }
       
-      // Show success message
-      let successMessage = '';
-      if (autoWon) {
-        successMessage = opponentWallet 
-          ? "🏆 Your opponent submitted a loss - you won automatically! Trust review recorded."
-          : "🏆 You won automatically! Trust review recorded.";
+      // Show Victory Modal for wins, regular alert for losses
+      if (didWin || autoWon) {
+        // Show Victory Modal for wins
+        const opponentName = opponentWallet 
+          ? `${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}`
+          : undefined;
+        
+        setVictoryModalData({
+          autoWon,
+          opponentName,
+          needsClaim: needsClaim || (isCompleted && didWin)
+        });
+        setShowVictoryModal(true);
       } else {
-        successMessage = opponentWallet 
-          ? (didWin ? "🏆 You submitted that you WON! Trust review recorded." : "😔 You submitted that you LOST. Trust review recorded.")
-          : (didWin ? "🏆 You submitted that you WON!" : "😔 You submitted that you LOST.");
-      }
-      
-      if (needsClaim && challengeForClaim) {
-        successMessage += "\n\n💰 You can now claim your reward in the lobby!";
-        alert(successMessage);
-        // Challenge is still selected and lobby is open, so they can claim prize
-      } else if (isCompleted && didWin) {
-        successMessage += "\n\n💰 You can claim your reward in the lobby!";
-        alert(successMessage);
-      } else {
+        // Show regular alert for losses
+        let successMessage = opponentWallet 
+          ? "😔 You submitted that you LOST. Trust review recorded."
+          : "😔 You submitted that you LOST.";
         alert(successMessage);
       }
       
@@ -4194,12 +4175,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     : 'border-white/10';
 
                 return (
-                  <button
-                    type="button"
-                    className={`relative text-left rounded-xl border overflow-hidden p-3 transition active:scale-[0.99] w-[176px] h-[176px] sm:w-[180px] sm:h-[180px] ${edgeGlow}`}
-                    onClick={onSelect}
-                    aria-label={`Open ${gameName} challenge`}
-                  >
+                  <div className="relative">
+                    <button
+                      type="button"
+                      className={`relative text-left rounded-xl border overflow-hidden p-3 transition active:scale-[0.99] w-[176px] h-[176px] sm:w-[180px] sm:h-[180px] ${edgeGlow}`}
+                      onClick={onSelect}
+                      aria-label={`Open ${gameName} challenge`}
+                    >
                                     <img 
                       src={imagePath}
                       alt=""
@@ -4252,7 +4234,23 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           </div>
                             </div>
                           </div>
-                                </button>
+                    </button>
+                    {/* Share button - positioned absolutely in top-right corner */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleShareChallenge(challenge);
+                      }}
+                      className="absolute top-2 right-2 z-20 p-1.5 rounded-lg bg-black/60 hover:bg-black/80 backdrop-blur-sm border border-white/20 hover:border-amber-400/40 transition-all"
+                      title="Share challenge"
+                      aria-label="Share challenge"
+                    >
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                      </svg>
+                    </button>
+                  </div>
                 );
               };
 
@@ -5488,6 +5486,23 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           </div>
         </ElegantModal>
       )}
+
+      {/* Victory Modal */}
+      <VictoryModal
+        isOpen={showVictoryModal}
+        onClose={() => {
+          setShowVictoryModal(false);
+          setVictoryModalData(null);
+        }}
+        onClaimReward={() => {
+          // Ensure lobby is open for claiming reward
+          if (selectedChallenge && !showStandardLobby) {
+            setShowStandardLobby(true);
+          }
+        }}
+        autoWon={victoryModalData?.autoWon}
+        opponentName={victoryModalData?.opponentName}
+      />
       </div>
 
     </>

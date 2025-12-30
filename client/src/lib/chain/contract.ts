@@ -88,7 +88,8 @@ export async function derivePDAs(creator: PublicKey, challengeSeed: PublicKey) {
 export async function createChallenge(
   wallet: any,
   connection: Connection,
-  entryFeeUsdfg: number
+  entryFeeUsdfg: number,
+  challengeSeed?: Keypair
 ): Promise<string> {
   console.log('🚀 Creating challenge on smart contract...');
   console.log(`Entry fee: ${entryFeeUsdfg} USDFG`);
@@ -125,14 +126,14 @@ export async function createChallenge(
   const creator = new PublicKey(wallet.publicKey.toString());
   console.log(`👤 Creator: ${creator.toString()}`);
 
-  // Step 2: Generate challenge seed
+  // Step 2: Generate challenge seed (or use provided one)
   console.log('🔧 Step 2: Generating challenge seed...');
-  const challengeSeed = Keypair.generate();
-  console.log(`🔑 Challenge seed: ${challengeSeed.publicKey.toString()}`);
+  const seed = challengeSeed || Keypair.generate();
+  console.log(`🔑 Challenge seed: ${seed.publicKey.toString()}`);
 
   // Step 3: Derive PDAs
   console.log('🔧 Step 3: Deriving PDAs...');
-  const pdas = await derivePDAs(creator, challengeSeed.publicKey);
+  const pdas = await derivePDAs(creator, seed.publicKey);
   console.log(`📍 Challenge PDA: ${pdas.challengePDA.toString()}`);
 
   // Step 4: Create instruction data (NO PAYMENT - metadata only)
@@ -162,7 +163,7 @@ export async function createChallenge(
     keys: [
       { pubkey: pdas.challengePDA, isSigner: false, isWritable: true }, // challenge
       { pubkey: creator, isSigner: true, isWritable: true }, // creator
-      { pubkey: challengeSeed.publicKey, isSigner: true, isWritable: false }, // challenge_seed
+      { pubkey: seed.publicKey, isSigner: true, isWritable: false }, // challenge_seed
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
     ],
     data: instructionData,
@@ -181,7 +182,7 @@ export async function createChallenge(
 
   console.log('🚀 Sending transaction...');
   // Add challenge seed as a signer
-  transaction.partialSign(challengeSeed);
+  transaction.partialSign(seed);
   const signedTransaction = await wallet.signTransaction(transaction);
   
   let signature: string;
@@ -271,6 +272,94 @@ export async function expressJoinIntent(
   
   console.log('✅ Join intent expressed successfully!');
   return signature;
+}
+
+/**
+ * Create challenge PDA and fund in one transaction (for when challenge was created in Firestore only)
+ * This combines create_challenge + creator_fund into a single transaction to save network fees
+ */
+export async function createAndFundChallenge(
+  wallet: any,
+  connection: Connection,
+  entryFeeUsdfg: number
+): Promise<{ pda: string; signature: string }> {
+  console.log('🚀 Creating challenge PDA and funding in one transaction...');
+  
+  if (!wallet || !wallet.publicKey) {
+    throw new Error('Wallet not connected');
+  }
+
+  const creator = new PublicKey(wallet.publicKey.toString());
+  const challengeSeed = Keypair.generate();
+  const pdas = await derivePDAs(creator, challengeSeed.publicKey);
+  
+  // Convert USDFG to lamports
+  const entryFeeLamports = Math.floor(entryFeeUsdfg * Math.pow(10, 9));
+  
+  // Create instruction for create_challenge
+  const { sha256 } = await import('@noble/hashes/sha2.js');
+  const createHash = sha256(new TextEncoder().encode('global:create_challenge'));
+  const createDiscriminator = Buffer.from(createHash.slice(0, 8));
+  const createInstructionData = Buffer.alloc(8 + 8);
+  createDiscriminator.copy(createInstructionData, 0);
+  const entryFeeBuffer = numberToU64Buffer(entryFeeLamports);
+  entryFeeBuffer.copy(createInstructionData, 8);
+  
+  const createInstruction = new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      { pubkey: pdas.challengePDA, isSigner: false, isWritable: true },
+      { pubkey: creator, isSigner: true, isWritable: true },
+      { pubkey: challengeSeed.publicKey, isSigner: true, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: createInstructionData,
+  });
+  
+  // Create instruction for creator_fund
+  const fundHash = sha256(new TextEncoder().encode('global:creator_fund'));
+  const fundDiscriminator = Buffer.from(fundHash.slice(0, 8));
+  const fundInstructionData = Buffer.alloc(8 + 8);
+  fundDiscriminator.copy(fundInstructionData, 0);
+  entryFeeBuffer.copy(fundInstructionData, 8);
+  
+  const creatorTokenAccount = await getAssociatedTokenAddress(USDFG_MINT, creator);
+  const [escrowTokenAccountPDA] = PublicKey.findProgramAddressSync(
+    [SEEDS.ESCROW_WALLET, pdas.challengePDA.toBuffer(), USDFG_MINT.toBuffer()],
+    PROGRAM_ID
+  );
+  
+  const fundInstruction = new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      { pubkey: pdas.challengePDA, isSigner: false, isWritable: true },
+      { pubkey: creator, isSigner: true, isWritable: true },
+      { pubkey: creatorTokenAccount, isSigner: false, isWritable: true },
+      { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+      { pubkey: USDFG_MINT, isSigner: false, isWritable: false },
+    ],
+    data: fundInstructionData,
+  });
+  
+  // Combine both instructions in one transaction
+  const transaction = new Transaction().add(createInstruction, fundInstruction);
+  const { blockhash } = await connection.getLatestBlockhash();
+  transaction.recentBlockhash = blockhash;
+  transaction.feePayer = creator;
+  
+  // Sign with challenge seed
+  transaction.partialSign(challengeSeed);
+  
+  // Sign with wallet
+  const signedTransaction = await wallet.signTransaction(transaction);
+  const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+  await connection.confirmTransaction(signature);
+  
+  console.log('✅ Challenge PDA created and funded in one transaction!');
+  return { pda: pdas.challengePDA.toString(), signature };
 }
 
 /**
