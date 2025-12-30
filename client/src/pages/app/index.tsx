@@ -575,7 +575,7 @@ const ArenaHome: React.FC = () => {
   // Get game/category image based on game name - using category images from /assets/categories/
   const getGameImage = (game: string) => {
     if (!game || game === 'Gaming') {
-      return '/assets/categories/sports.png'; // Default fallback
+      return '/assets/categories/basketball.png'; // Default fallback (sports.png doesn't exist)
     }
     
     // Check for specific games first (check this FIRST before category check)
@@ -679,13 +679,13 @@ const ArenaHome: React.FC = () => {
       return '/assets/categories/tennis.png';
     }
     
-    // Street Basketball games - use nbaStreet.Png (NBA Street, Playgrounds, NBA The Run, etc.)
+    // Street Basketball games - use nbastreet.png (NBA Street, Playgrounds, NBA The Run, etc.)
     if (lowerGame.includes('nba street') || 
         lowerGame.includes('playgrounds') || 
         lowerGame.includes('street hoops') ||
         lowerGame.includes('street basketball') ||
         lowerGame.includes('nba the run')) {
-      return '/assets/categories/nbaStreet.Png';
+      return '/assets/categories/nbastreet.png';
     }
     
     // Racing games - use racing.png (Gran Turismo, Forza, F1, etc.) - EXCLUDE Mario Kart
@@ -711,15 +711,15 @@ const ArenaHome: React.FC = () => {
       case 'BoardGames':
         return '/assets/categories/boardgames.png';
       case 'Sports':
-        return '/assets/categories/sports.png';
+        return '/assets/categories/basketball.png'; // Using basketball.png (sports.png doesn't exist)
       case 'Racing':
         return '/assets/categories/racing.png';
       case 'Shooting':
-        return '/assets/categories/shooting.png';
+        return '/assets/categories/cod.png'; // Using cod.png (shooting.png doesn't exist)
       case 'Fighting':
         return '/assets/categories/tekken.png'; // Fighting games category (Street Fighter, Tekken, Mortal Kombat)
       default:
-        return '/assets/categories/sports.png'; // Default to sports category image
+        return '/assets/categories/basketball.png'; // Default to basketball category image (sports.png doesn't exist)
     }
   };
 
@@ -3512,16 +3512,18 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   };
 
   // Challenge detail sheet component (bottom sheet)
-  const ChallengeDetailSheet = ({ challenge, onClose, onFund, onExpressIntent, onJoinerFund }: { 
+  const ChallengeDetailSheet = ({ challenge, onClose, onFund, onExpressIntent, onJoinerFund, onViewChallenge }: { 
     challenge: any; 
     onClose: () => void; 
     onFund?: (challenge: any) => Promise<void>;
     onExpressIntent?: (challenge: any) => Promise<void>;
     onJoinerFund?: (challenge: any) => Promise<void>;
+    onViewChallenge?: (challenge: any) => void;
   }) => {
     const gameName = challenge.game || extractGameFromTitle(challenge.title);
     const imagePath = getGameImage(gameName);
     const isOwner = isChallengeOwner(challenge);
+    const scrollContainerRef = React.useRef<HTMLDivElement>(null);
     
     React.useEffect(() => {
       const original = document.body.style.overflow;
@@ -3529,6 +3531,20 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       return () => {
         document.body.style.overflow = original;
       };
+    }, []);
+
+    // Prevent auto-scroll on mobile - ensure scroll position is maintained
+    React.useEffect(() => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+
+      // Disable any auto-scroll behavior
+      container.scrollTop = 0; // Start at top when opened
+      
+      // Prevent scroll restoration
+      if ('scrollRestoration' in window.history) {
+        window.history.scrollRestoration = 'manual';
+      }
     }, []);
 
     // Calculate expiration time
@@ -3623,17 +3639,39 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                   <h3 className="text-lg font-semibold truncate">{gameName}</h3>
                   <p className="text-sm text-white/60 truncate">{challenge.mode || 'Head-to-Head'}</p>
                 </div>
-                <StatusPillDetail 
-                  status={status} 
-                  isOwner={isOwner} 
-                  players={challenge.players || 0} 
-                  capacity={challenge.capacity || 2} 
-                />
+                <div className="flex items-center gap-2">
+                  <StatusPillDetail 
+                    status={status} 
+                    isOwner={isOwner} 
+                    players={challenge.players || 0} 
+                    capacity={challenge.capacity || 2} 
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onClose();
+                    }}
+                    className="ml-2 p-1.5 rounded-lg bg-black/40 hover:bg-black/60 text-white/80 hover:text-white transition-colors"
+                    aria-label="Close"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4">
+          <div 
+            ref={scrollContainerRef}
+            className="flex-1 overflow-y-auto p-4"
+            style={{ 
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehavior: 'contain'
+            }}
+          >
             <div className="grid grid-cols-2 gap-3">
               <DetailRow label="Game" value={gameName} />
               <DetailRow label="Mode" value={challenge.mode || 'Head-to-Head'} />
@@ -3730,9 +3768,23 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               </button>
             )}
 
+            {/* View Challenge button - allows anyone to watch/view the challenge as a spectator */}
+            {onViewChallenge && (status === 'active' || status === 'creator_funded' || status === 'completed') && (
+              <button
+                type="button"
+                className="mt-5 w-full rounded-xl bg-gradient-to-r from-purple-500/80 to-indigo-500/80 py-3 text-white font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(139,92,246,0.35)]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewChallenge(challenge);
+                }}
+              >
+                👁️ View Challenge (Watch as Spectator)
+              </button>
+            )}
+
             <button
               type="button"
-              className="mt-3 w-full rounded-xl border border-white/10 py-3 text-white/80 font-semibold"
+              className="mt-3 mb-4 w-full rounded-xl border border-white/10 py-3 text-white/80 font-semibold"
               onClick={onClose}
             >
               Close
@@ -4137,7 +4189,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 return (
                   <button
                     type="button"
-                    className={`relative w-full text-left rounded-xl border overflow-hidden p-3 transition active:scale-[0.99] h-[192px] sm:h-[200px] ${edgeGlow}`}
+                    className={`relative text-left rounded-xl border overflow-hidden p-3 transition active:scale-[0.99] w-[176px] h-[176px] sm:w-[180px] sm:h-[180px] ${edgeGlow}`}
                     onClick={onSelect}
                     aria-label={`Open ${gameName} challenge`}
                   >
@@ -4219,7 +4271,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           {items.map((challenge) => (
                             <div 
                               key={challenge.id} 
-                              className="flex-none w-[48%] md:w-[calc((100%-32px)/3)]"
+                              className="flex-none"
                             >
                               <DiscoveryCard 
                                 challenge={challenge}
@@ -5053,6 +5105,19 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             onFund={handleDirectCreatorFund}
             onExpressIntent={handleDirectJoinerExpressIntent}
             onJoinerFund={handleDirectJoinerFund}
+            onViewChallenge={(challenge) => {
+              // Close detail sheet and open the appropriate lobby as a viewer
+              setShowDetailSheet(false);
+              setSelectedChallenge(challenge);
+              
+              // Determine if it's a tournament or standard challenge
+              const format = challenge.rawData?.format || (challenge.rawData?.tournament ? "tournament" : "standard");
+              if (format === "tournament") {
+                setShowTournamentLobby(true);
+              } else {
+                setShowStandardLobby(true);
+              }
+            }}
           />
         )}
 

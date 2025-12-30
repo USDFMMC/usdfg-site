@@ -38,6 +38,11 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const platform = challenge.platform || challenge.rawData?.platform || 'All Platforms';
   const challengeId = challenge.id;
 
+  // Check if user already submitted result (moved up for use in handleSubmit)
+  const results = challenge.rawData?.results || challenge.results || {};
+  const userResult = currentWallet ? results[currentWallet.toLowerCase()] : null;
+  const hasAlreadySubmitted = !!userResult;
+
   const handleImageCapture = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -61,6 +66,12 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const handleSubmit = useCallback(async () => {
     if (selectedResult === null) return;
     
+    // Prevent double submission - check if already submitted or currently loading
+    if (isLoading || hasAlreadySubmitted) {
+      console.log("⚠️ Submission prevented - already submitted or in progress");
+      return;
+    }
+    
     setIsLoading(true);
     try {
       await onSubmitResult(selectedResult, proofFile);
@@ -75,7 +86,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [selectedResult, proofFile, onSubmitResult]);
+  }, [selectedResult, proofFile, onSubmitResult, isLoading, hasAlreadySubmitted]);
 
   
   const getStatusDisplay = () => {
@@ -148,11 +159,10 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
   const statusDisplay = getStatusDisplay();
   const isParticipant = currentWallet && players.some((p: string) => p?.toLowerCase() === currentWallet?.toLowerCase());
-  const canSubmitResult = status === 'active' && players.length >= 2 && isParticipant;
+  
+  const canSubmitResult = status === 'active' && players.length >= 2 && isParticipant && !hasAlreadySubmitted;
   
   // Check if user won and can claim prize
-  const results = challenge.rawData?.results || challenge.results || {};
-  const userResult = currentWallet ? results[currentWallet.toLowerCase()] : null;
   const winner = challenge.rawData?.winner || challenge.winner;
   const userWon = currentWallet && winner && winner.toLowerCase() === currentWallet.toLowerCase();
   const canClaimPrize = status === 'completed' && userWon && isParticipant;
@@ -242,7 +252,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       </div>
 
       {/* Submit Result Section */}
-      {canSubmitResult && !showSubmitForm && (
+      {canSubmitResult && !showSubmitForm && !hasAlreadySubmitted && (
         <button
           type="button"
           onClick={(e) => {
@@ -256,8 +266,20 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         </button>
       )}
 
+      {/* Show message if already submitted */}
+      {hasAlreadySubmitted && status === 'active' && isParticipant && (
+        <div className="rounded-xl border border-green-400/30 bg-green-500/10 p-4 text-center text-sm text-green-100">
+          <div className="text-base font-semibold text-white mb-1">
+            ✅ Result Submitted
+          </div>
+          <p className="text-xs text-green-100/80 mt-1">
+            You have already submitted your result. Waiting for opponent...
+          </p>
+        </div>
+      )}
+
       {/* Submit Result Form - Inline in lobby */}
-      {canSubmitResult && showSubmitForm && (
+      {canSubmitResult && showSubmitForm && !hasAlreadySubmitted && (
         <div className="rounded-xl border border-amber-400/30 bg-gradient-to-br from-gray-900/95 via-amber-900/10 to-gray-900/95 p-4 space-y-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -424,7 +446,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           {/* Submit Button */}
           <button
             onClick={handleSubmit}
-            disabled={selectedResult === null || isLoading || isSubmitting}
+            disabled={selectedResult === null || isLoading || isSubmitting || hasAlreadySubmitted}
             className={`
               w-full py-2 rounded-lg font-semibold text-sm transition-all duration-200 border
               disabled:opacity-50 disabled:cursor-not-allowed
@@ -503,7 +525,16 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
             {status !== 'active' && status !== 'completed' && `Status: ${statusDisplay.text}`}
             {status === 'active' && players.length < 2 && 'Waiting for players to join...'}
             {status === 'active' && players.length >= 2 && !currentWallet && 'Connect wallet to submit results'}
-            {status === 'active' && players.length >= 2 && currentWallet && !isParticipant && 'Only participants can submit results'}
+            {status === 'active' && players.length >= 2 && currentWallet && !isParticipant && (
+              <span>
+                👁️ <span className="text-purple-300">Viewing as Spectator</span> - You can watch and chat, but only participants can submit results
+              </span>
+            )}
+            {status === 'active' && players.length >= 2 && !currentWallet && (
+              <span>
+                👁️ <span className="text-purple-300">Viewing as Spectator</span> - Connect wallet to participate
+              </span>
+            )}
             {status === 'completed' && !userWon && 'Match completed'}
           </div>
         </div>

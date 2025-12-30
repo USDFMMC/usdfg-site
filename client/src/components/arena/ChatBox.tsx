@@ -123,7 +123,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet, st
         {status === 'active' && playersCount && playersCount >= 2 && (
           <div className="flex justify-center my-2">
             <div className="max-w-[90%] px-4 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-xs text-yellow-300 text-center">
-              🎮 Please exchange your gamer tag names{platform && platform !== 'All Platforms' ? ` on ${platform}` : ''} so you can find each other and start the match! Share your PSN ID, Xbox Gamertag, Steam username, or other platform identifier.
+              Share your PSN ID, Xbox Gamertag, Steam username, or other platform identifier.
             </div>
           </div>
         )}

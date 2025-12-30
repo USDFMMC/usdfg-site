@@ -376,7 +376,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
         await new Promise(resolve => setTimeout(resolve, 100));
         const phantomWallet = wallets.find(w => w.adapter.name === 'Phantom');
         const isActuallyConnected = phantomWallet?.adapter?.connected || phantomWallet?.adapter?.publicKey !== null;
-        if (isActuallyConnected) {
+        if (isActuallyConnected && phantomWallet) {
           // Once connected, immediately check localStorage for username
             const walletKey = phantomWallet.adapter.publicKey?.toString();
             if (walletKey) {
@@ -679,10 +679,10 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                     // Always store as string to preserve decimal input
                     handleInputChange('entryFee', value);
                   }}
-                  placeholder={currentWallet && (() => {
+                  placeholder={currentWallet ? (() => {
                     const isAdmin = currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
                     return isAdmin ? '0 for Founder Challenge' : '';
-                  })()}
+                  })() : undefined}
                   className="flex-1 px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white placeholder-zinc-500 focus:border-amber-400/50 focus:outline-none transition-all"
                 />
                 <div className="flex items-center gap-1.5 text-xs text-gray-400">

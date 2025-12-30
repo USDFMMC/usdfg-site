@@ -231,8 +231,8 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     (mobile && typeof window !== 'undefined' && localStorage.getItem('phantom_public_key')
       ? new PublicKey(localStorage.getItem('phantom_public_key')!)
       : null);
-  const actuallyConnected = isConnected || (connected && effectivePublicKey) || 
-    (mobile && (mobileConnectionState.connected || (typeof window !== 'undefined' && localStorage.getItem('phantom_connected') === 'true')) && effectivePublicKey);
+  const actuallyConnected = Boolean(isConnected || (connected && effectivePublicKey) || 
+    (mobile && (mobileConnectionState.connected || (typeof window !== 'undefined' && localStorage.getItem('phantom_connected') === 'true')) && effectivePublicKey));
 
   // Calculate mobile-specific connection state
   const isMobile = isMobileSafari();
