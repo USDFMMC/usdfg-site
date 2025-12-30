@@ -518,9 +518,12 @@ const ArenaHome: React.FC = () => {
     }
     
     // If no specific game found, return a generic but more descriptive name
+    // Check for specific versions first (most specific to least specific)
+    if (title.toLowerCase().includes('nba 2k26') || title.toLowerCase().includes('nba2k26')) return 'NBA 2K26';
+    if (title.toLowerCase().includes('nba 2k25') || title.toLowerCase().includes('nba2k25')) return 'NBA 2K25';
     if (title.toLowerCase().includes('fifa')) return 'FIFA 24';
     if (title.toLowerCase().includes('madden')) return 'Madden NFL 24';
-    if (title.toLowerCase().includes('nba') || title.toLowerCase().includes('2k')) return 'NBA 2K25';
+    if (title.toLowerCase().includes('nba') || title.toLowerCase().includes('2k')) return 'NBA 2K26'; // Default to 2K26 for NBA games
     if (title.toLowerCase().includes('street fighter')) return 'Street Fighter 6';
     if (title.toLowerCase().includes('tekken')) return 'Tekken 8';
     if (title.toLowerCase().includes('mortal kombat')) return 'Mortal Kombat';
@@ -4173,7 +4176,22 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
               // Discovery card component
               const DiscoveryCard = ({ challenge, onSelect }: { challenge: any; onSelect: () => void }) => {
-                const gameName = challenge.game || extractGameFromTitle(challenge.title);
+                // Always use challenge.game if available, otherwise extract from title
+                // Normalize game name to ensure consistency, especially for NBA 2K26
+                let gameName = challenge.game || extractGameFromTitle(challenge.title) || 'Gaming';
+                // Ensure NBA 2K26 is recognized (handle variations like "NBA 2K26", "NBA2K26", "NBA 2K 26")
+                const lowerGame = gameName.toLowerCase();
+                if (lowerGame.includes('nba') && (lowerGame.includes('2k') || lowerGame.includes('2 k'))) {
+                  // Check if it's specifically 2K26
+                  if (lowerGame.includes('2k26') || lowerGame.includes('2k 26') || lowerGame.includes('2 k 26')) {
+                    gameName = 'NBA 2K26';
+                  } else if (lowerGame.includes('2k25') || lowerGame.includes('2k 25') || lowerGame.includes('2 k 25')) {
+                    gameName = 'NBA 2K25';
+                  } else {
+                    // Default to 2K26 for any NBA 2K game without specific version
+                    gameName = 'NBA 2K26';
+                  }
+                }
                 const imagePath = getGameImage(gameName);
                 const isOwner = isChallengeOwner(challenge);
                 
