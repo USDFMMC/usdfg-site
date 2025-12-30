@@ -785,8 +785,10 @@ const ArenaHome: React.FC = () => {
   const [leaderboardView, setLeaderboardView] = useState<'individual' | 'teams'>('individual'); // Toggle between Individual and Teams
   const [topTeams, setTopTeams] = useState<TeamStats[]>([]);
   const [loadingTopTeams, setLoadingTopTeams] = useState<boolean>(false);
-const [showTournamentLobby, setShowTournamentLobby] = useState(false);
-const [showStandardLobby, setShowStandardLobby] = useState(false);
+  const [showTournamentLobby, setShowTournamentLobby] = useState(false);
+  const [showStandardLobby, setShowStandardLobby] = useState(false);
+  const [isStandardLobbyMinimized, setIsStandardLobbyMinimized] = useState(false);
+  const [isTournamentLobbyMinimized, setIsTournamentLobbyMinimized] = useState(false);
 const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string; opponentWallet: string } | null>(null);
   const [showTeamModal, setShowTeamModal] = useState<boolean>(false);
   const [userTeam, setUserTeam] = useState<TeamStats | null>(null);
@@ -1650,6 +1652,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           
           const merged = mergeChallengeDataForModal(challenge, challenge);
           setSelectedChallenge(merged);
+          setIsTournamentLobbyMinimized(false);
           setShowTournamentLobby(true);
           console.log(`🏆 Tournament lobby opened (stage: ${stage})`);
         } catch (error) {
@@ -1854,6 +1857,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           title: (challenge as any).title || extractGameFromTitle((challenge as any).title || '') || "Challenge",
           ...challenge
         });
+        setIsStandardLobbyMinimized(false);
         setShowStandardLobby(true);
       }
     }
@@ -2626,8 +2630,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           });
           
           if (isTournament) {
+            setIsTournamentLobbyMinimized(false);
             setShowTournamentLobby(true);
           } else {
+            setIsStandardLobbyMinimized(false);
             setShowStandardLobby(true);
           }
           break;
@@ -2766,6 +2772,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         // Close submit result modal and reopen tournament lobby
         setShowSubmitResultModal(false);
         setTournamentMatchData(null);
+        setIsTournamentLobbyMinimized(false);
         setShowTournamentLobby(true);
         
         // Show success message
@@ -5113,8 +5120,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               // Determine if it's a tournament or standard challenge
               const format = challenge.rawData?.format || (challenge.rawData?.tournament ? "tournament" : "standard");
               if (format === "tournament") {
+                setIsTournamentLobbyMinimized(false);
                 setShowTournamentLobby(true);
               } else {
+                setIsStandardLobbyMinimized(false);
                 setShowStandardLobby(true);
               }
             }}
@@ -5133,15 +5142,20 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
           if (isTournament) {
             // Render tournament lobby modal - persistent room
-            if (showTournamentLobby) {
+            if (showTournamentLobby && !isTournamentLobbyMinimized) {
               return (
                 <ElegantModal
                   isOpen={showTournamentLobby}
                   onClose={() => {
                     setShowTournamentLobby(false);
+                    setIsTournamentLobbyMinimized(false);
                     setSelectedChallenge(null);
                   }}
                   title={`${selectedChallenge.title || "Tournament"} Bracket`}
+                  canMinimize={true}
+                  onMinimize={() => {
+                    setIsTournamentLobbyMinimized(true);
+                  }}
                 >
                   <TournamentBracketView
                     tournament={selectedChallenge.rawData?.tournament}
@@ -5164,6 +5178,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                       setShowSubmitResultModal(false);
                       setTournamentMatchData(null);
                       // Reopen tournament lobby after closing submit result modal
+                      setIsTournamentLobbyMinimized(false);
                       setShowTournamentLobby(true);
                     }}
                     challengeId={selectedChallenge.id}
@@ -5181,14 +5196,19 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           // Standard challenge: render persistent lobby with inline submit form
           return (
             <>
-              {showStandardLobby && (
+              {showStandardLobby && !isStandardLobbyMinimized && (
                 <ElegantModal
                   isOpen={showStandardLobby}
-          onClose={() => {
+                  onClose={() => {
                     setShowStandardLobby(false);
+                    setIsStandardLobbyMinimized(false);
                     setSelectedChallenge(null);
-          }}
+                  }}
                   title={`${selectedChallenge.title || "Challenge"} Lobby`}
+                  canMinimize={true}
+                  onMinimize={() => {
+                    setIsStandardLobbyMinimized(true);
+                  }}
                 >
                   <StandardChallengeLobby
                     challenge={selectedChallenge}
@@ -5197,6 +5217,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     onClaimPrize={handleClaimPrize}
                     onClose={() => {
                       setShowStandardLobby(false);
+                      setIsStandardLobbyMinimized(false);
                       setSelectedChallenge(null);
                     }}
                     isSubmitting={false}
@@ -5207,6 +5228,45 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             </>
           );
         })()}
+
+        {/* Minimized Lobby Indicators */}
+        <div className="fixed bottom-4 right-4 z-40 flex flex-col gap-2">
+          {isStandardLobbyMinimized && selectedChallenge && (
+            <button
+              onClick={() => {
+                setIsStandardLobbyMinimized(false);
+                setShowStandardLobby(true);
+              }}
+              className="flex items-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500/90 to-amber-600/90 hover:from-amber-600 hover:to-amber-700 text-white font-semibold shadow-[0_0_20px_rgba(245,158,11,0.4)] border border-amber-400/30 transition-all hover:scale-105"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+              </svg>
+              <span className="text-sm">{selectedChallenge.title || "Challenge"} Lobby</span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+              </svg>
+            </button>
+          )}
+
+          {isTournamentLobbyMinimized && selectedChallenge && (
+            <button
+              onClick={() => {
+                setIsTournamentLobbyMinimized(false);
+                setShowTournamentLobby(true);
+              }}
+              className="flex items-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500/90 to-amber-600/90 hover:from-amber-600 hover:to-amber-700 text-white font-semibold shadow-[0_0_20px_rgba(245,158,11,0.4)] border border-amber-400/30 transition-all hover:scale-105"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+              </svg>
+              <span className="text-sm">{selectedChallenge.title || "Tournament"} Bracket</span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+              </svg>
+            </button>
+          )}
+        </div>
 
           {friendlyMatch && (
             <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div></div>}>

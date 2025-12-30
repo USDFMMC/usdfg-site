@@ -8,6 +8,8 @@ interface ElegantModalProps {
   title?: string;
   children: React.ReactNode;
   className?: string;
+  onMinimize?: () => void;
+  canMinimize?: boolean;
 }
 
 const ElegantModal: React.FC<ElegantModalProps> = ({
@@ -15,7 +17,9 @@ const ElegantModal: React.FC<ElegantModalProps> = ({
   onClose,
   title,
   children,
-  className = ''
+  className = '',
+  onMinimize,
+  canMinimize = false
 }) => {
   useEffect(() => {
     if (isOpen) {
@@ -56,12 +60,28 @@ const ElegantModal: React.FC<ElegantModalProps> = ({
               <h2 className="text-lg font-bold bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">
                 {title}
               </h2>
-              <button
-                onClick={onClose}
-                className="p-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors duration-300"
-              >
-                <X className="w-4 h-4 text-gray-400" />
-              </button>
+              <div className="flex items-center gap-2">
+                {canMinimize && onMinimize && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMinimize();
+                    }}
+                    className="p-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors duration-300"
+                    title="Minimize"
+                  >
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                    </svg>
+                  </button>
+                )}
+                <button
+                  onClick={onClose}
+                  className="p-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors duration-300"
+                >
+                  <X className="w-4 h-4 text-gray-400" />
+                </button>
+              </div>
             </div>
           </div>
         )}
