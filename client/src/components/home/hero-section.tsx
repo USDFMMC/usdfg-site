@@ -1,6 +1,5 @@
 import React, { useRef } from "react";
 import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 import { useScrollFadeIn } from "@/hooks/useScrollFadeIn";
 
 const MASCOT_WEBP = "/assets/usdfg-mascot-trophy-illustration.webp";
@@ -54,25 +53,19 @@ USDFG
             </p>
 
             <div className="flex flex-col sm:flex-row justify-center lg:justify-start gap-2">
-              <Button
+              <button
                 onClick={onExploreClick}
-                className="w-full sm:w-auto px-4 py-2 text-sm md:text-base transition-all btn-animation hover:scale-105"
-                style={{
-                  background: "var(--primary-color)",
-                  color: "var(--text-light)",
-                  boxShadow: "var(--primary-glow)",
-                }}
+                className="elite-btn neocore-button w-full sm:w-auto px-4 py-2 text-sm md:text-base text-amber-300 hover:text-amber-200"
               >
                 EXPLORE PLATFORM
-              </Button>
+              </button>
 
               <Link to="/whitepaper">
-                <Button
-                  className="w-full sm:w-auto px-4 py-2 text-sm md:text-base transition-all btn-animation border border-amber-400/50 text-white font-bold bg-gradient-to-r from-amber-400/90 via-amber-500/90 to-orange-500/90 hover:brightness-125 hover:scale-105"
-                  style={{ boxShadow: "0 0 12px #00e8fc99, 0 0 3px #fff1", fontWeight: 700 }}
+                <button
+                  className="elite-btn neocore-button w-full sm:w-auto px-4 py-2 text-sm md:text-base text-amber-300 hover:text-amber-200"
                 >
                   WHITEPAPER
-                </Button>
+                </button>
               </Link>
             </div>
           </div>
