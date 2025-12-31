@@ -2700,25 +2700,56 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
       const entryFee = freshChallenge.entryFee || challenge.entryFee || challenge.rawData?.entryFee || 0;
       
-      // Check if PDA exists, if not create it and fund in one transaction
+      // Check if PDA exists
       let challengePDA = freshChallenge.pda || challenge.rawData?.pda || challenge.pda;
       
       if (!challengePDA) {
-        // PDA doesn't exist yet - create it and fund in one transaction
-        const { createAndFundChallenge } = await import('@/lib/chain/contract');
-        const result = await createAndFundChallenge(
-          { signTransaction, publicKey },
-          connection,
-          entryFee
-        );
-        challengePDA = result.pda;
+        // PDA doesn't exist yet - check if there's a pending joiner
+        const pendingJoiner = freshChallenge.pendingJoiner || challenge.rawData?.pendingJoiner;
         
-        // Update Firestore with PDA
-        const { updateDoc, doc } = await import('firebase/firestore');
-        const { db } = await import('@/lib/firebase/config');
-        await updateDoc(doc(db, 'challenges', challenge.id), {
-          pda: challengePDA
-        });
+        if (pendingJoiner) {
+          // There's a joiner waiting - we need to:
+          // 1. Create the PDA
+          // 2. Have the joiner express intent on-chain
+          // 3. Then creator can fund
+          // For now, create the PDA and tell the joiner to try joining again
+          const { createChallenge } = await import('@/lib/chain/contract');
+          challengePDA = await createChallenge(
+            { signTransaction, publicKey },
+            connection,
+            entryFee
+          );
+          
+          // Update Firestore with PDA
+          const { updateDoc, doc } = await import('firebase/firestore');
+          const { db } = await import('@/lib/firebase/config');
+          await updateDoc(doc(db, 'challenges', challenge.id), {
+            pda: challengePDA
+          });
+          
+          // Tell creator that joiner needs to express intent on-chain
+          throw new Error(`⚠️ Challenge PDA created. The challenger (${pendingJoiner.slice(0, 8)}...) needs to express their join intent on-chain. Please ask them to try joining again, then you can fund.`);
+        } else {
+          // No joiner yet - just create the PDA (can't fund without a joiner)
+          const { createChallenge } = await import('@/lib/chain/contract');
+          challengePDA = await createChallenge(
+            { signTransaction, publicKey },
+            connection,
+            entryFee
+          );
+          
+          // Update Firestore with PDA
+          const { updateDoc, doc } = await import('firebase/firestore');
+          const { db } = await import('@/lib/firebase/config');
+          await updateDoc(doc(db, 'challenges', challenge.id), {
+            pda: challengePDA
+          });
+          
+          // Can't fund yet - need to wait for a joiner
+          alert('✅ Challenge PDA created on-chain. Waiting for an opponent to join before you can fund.');
+          setShowDetailSheet(false);
+          return;
+        }
       } else {
         // PDA exists - check if on-chain state needs to be synced
         // If Firestore says creator_confirmation_required but on-chain is still PendingWaitingForOpponent,
