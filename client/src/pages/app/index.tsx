@@ -3953,7 +3953,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             )}
             
             {/* Show button for challenger who already joined in Firestore but needs to express on-chain intent */}
-            {!isOwner && status === 'creator_confirmation_required' && onExpressIntent && (() => {
+            {(() => {
+              if (isOwner || status !== 'creator_confirmation_required' || !onExpressIntent) return false;
+              
               const pendingJoiner = challenge.rawData?.pendingJoiner || challenge.pendingJoiner;
               const challengePDA = challenge.rawData?.pda || challenge.pda;
               const currentWallet = publicKey?.toString()?.toLowerCase() || '';
