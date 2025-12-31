@@ -121,10 +121,10 @@ const ChallengeSystem: React.FC = () => {
               fontWeight: 800,
               fontSize: "2rem",
               letterSpacing: "0.04em",
-              background: "linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%)",
+              background: "linear-gradient(90deg, #22d3ee 0%, #06b6d4 100%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
-              textShadow: "0 0 24px rgba(251, 191, 36, 0.4), 0 2px 6px #000",
+              textShadow: "0 0 24px rgba(34, 211, 238, 0.4), 0 2px 6px #000",
             }}
           >
             Create a Challenge. Prove it.
@@ -154,7 +154,7 @@ const ChallengeSystem: React.FC = () => {
         </section>
 
         {/* Rules / Explainer */}
-        <Card className="relative bg-[#07080C]/98 border border-amber-400/20 max-w-4xl mx-auto shadow-[0_0_20px_rgba(0,0,0,0.3)] backdrop-blur-md transition-all duration-300 hover:scale-[1.01] hover:shadow-[0_0_30px_rgba(255,215,130,0.12)]">
+        <Card className="relative bg-[#07080C]/98 border border-cyan-400/20 max-w-4xl mx-auto shadow-[0_0_20px_rgba(0,0,0,0.3)] backdrop-blur-md transition-all duration-300 hover:scale-[1.01] hover:shadow-[0_0_30px_rgba(34,211,238,0.12)]">
           <CardContent className="relative z-10 p-3 md:p-4">
             <div className="mb-6">
               <motion.h3
@@ -164,7 +164,7 @@ const ChallengeSystem: React.FC = () => {
                 transition={{ duration: 0.6 }}
                 className="text-xl md:text-2xl font-extrabold mb-3 flex items-center justify-center text-white drop-shadow-glow tracking-wide"
               >
-                <span className="mr-3 text-amber-300"><FaBalanceScale className="inline-block w-5 h-5 md:w-6 md:h-6" /></span>
+                <span className="mr-3 text-cyan-300"><FaBalanceScale className="inline-block w-5 h-5 md:w-6 md:h-6" /></span>
                 Challenge Rules & Result Verification
               </motion.h3>
 
@@ -173,7 +173,7 @@ const ChallengeSystem: React.FC = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: 0.1 }}
-                className="text-sm md:text-base text-amber-300 mb-4 text-center font-medium"
+                className="text-sm md:text-base text-cyan-300 mb-4 text-center font-medium"
               >
                 This system protects fairness by locking funds and verifying outcomes through player consensus.
               </motion.p>
@@ -189,37 +189,37 @@ const ChallengeSystem: React.FC = () => {
                   <FaCheckCircle className="text-green-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
                   <span>
                     <span className="font-bold text-white">If both players confirm the result</span>, rewards are released automatically —{" "}
-                    <span className="text-amber-300 font-semibold">no uploads needed</span>.
+                    <span className="text-cyan-300 font-semibold">no uploads needed</span>.
                   </span>
                 </motion.li>
 
                 <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
-                  <FaLock className="text-amber-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
+                  <FaLock className="text-cyan-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
                   <span>
                     <span className="font-bold text-white">Funds stay locked</span> until both players confirm or a dispute is reviewed.
                   </span>
                 </motion.li>
 
                 <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
-                  <FaExclamationTriangle className="text-amber-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
+                  <FaExclamationTriangle className="text-cyan-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
                   <span>
                     <span className="font-bold text-white">If there's a dispute</span>, players must provide{" "}
-                    <span className="text-amber-300 font-semibold">video or screenshot proof</span> for review.
+                    <span className="text-cyan-300 font-semibold">video or screenshot proof</span> for review.
                   </span>
                 </motion.li>
 
                 <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
-                  <FaGavel className="text-amber-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
+                  <FaGavel className="text-cyan-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
                   <span>
                     <span className="font-bold text-white">The founder reviews disputes and makes the final call.</span> Verified winners receive the reward.
                   </span>
                 </motion.li>
 
                 <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
-                  <FaUserShield className="text-amber-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
+                  <FaUserShield className="text-cyan-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
                   <span>
                     <span className="font-bold text-white">Attempts to falsify results</span> may lead to{" "}
-                    <span className="text-amber-300 font-bold">deactivation</span>.
+                    <span className="text-cyan-300 font-bold">deactivation</span>.
                     <br />
                     <span className="text-xs text-neutral-500">USDFG does not disclose penalty thresholds.</span>
                   </span>
@@ -235,9 +235,9 @@ const ChallengeSystem: React.FC = () => {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="mb-4"
             >
-              <div className="bg-gradient-to-br from-amber-900/20 to-orange-900/10 border border-amber-400/20 rounded-lg p-3 text-sm text-center shadow-[0_0_10px_rgba(255,215,130,0.08)] backdrop-blur-md flex items-center justify-center gap-2">
-                <FaExclamationTriangle className="text-yellow-300 w-4 h-4" />
-                <span className="font-semibold text-amber-100">
+              <div className="bg-gradient-to-br from-cyan-900/20 to-blue-900/10 border border-cyan-400/20 rounded-lg p-3 text-sm text-center shadow-[0_0_10px_rgba(34,211,238,0.08)] backdrop-blur-md flex items-center justify-center gap-2">
+                <FaExclamationTriangle className="text-cyan-300 w-4 h-4" />
+                <span className="font-semibold text-cyan-100">
                   Make sure your challenge description clearly defines all win conditions and game settings.
                 </span>
               </div>
@@ -251,8 +251,8 @@ const ChallengeSystem: React.FC = () => {
               transition={{ duration: 0.5, delay: 0.3 }}
               className="flex justify-center mt-4"
             >
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-700/60 to-orange-700/60 border border-amber-400/20 shadow-[0_0_8px_rgba(255,215,130,0.08)] text-amber-100 text-sm font-semibold">
-                <FaUserShield className="text-amber-300 w-4 h-4 mr-1" />
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-cyan-700/60 to-blue-700/60 border border-cyan-400/20 shadow-[0_0_8px_rgba(34,211,238,0.08)] text-cyan-100 text-sm font-semibold">
+                <FaUserShield className="text-cyan-300 w-4 h-4 mr-1" />
                 Fair Play Guaranteed
               </div>
             </motion.div>
@@ -260,7 +260,7 @@ const ChallengeSystem: React.FC = () => {
             {/* --- Challenge creator (mock) --- */}
             <div className="space-y-3 mt-6">
               <div className="text-center mb-6">
-                <h3 className="text-lg md:text-xl font-bold text-white tracking-wide underline decoration-amber-400 underline-offset-2">
+                <h3 className="text-lg md:text-xl font-bold text-white tracking-wide underline decoration-cyan-400 underline-offset-2">
                   Ready to walk away with the token?
                 </h3>
               </div>
@@ -273,7 +273,7 @@ const ChallengeSystem: React.FC = () => {
                   </Label>
                   <select
                     id="category"
-                    className="w-full px-3 py-2 bg-zinc-800/60 text-white border border-zinc-700/50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-amber-400/50 focus:border-amber-400/50"
+                    className="w-full px-3 py-2 bg-zinc-800/60 text-white border border-zinc-700/50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-cyan-400/50 focus:border-cyan-400/50"
                     value={selectedCategory}
                     onChange={(e) => {
                       const val = e.target.value as "Sports" | "Racing" | "Fighting" | "Shooting" | "";
@@ -304,7 +304,7 @@ const ChallengeSystem: React.FC = () => {
                   >
                     <select
                       id="game"
-                      className="w-full px-3 py-2 bg-zinc-800/60 text-white border border-zinc-700/50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-amber-400/50 focus:border-amber-400/50"
+                      className="w-full px-3 py-2 bg-zinc-800/60 text-white border border-zinc-700/50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-cyan-400/50 focus:border-cyan-400/50"
                       value={selectedGame}
                       onChange={(e) => {
                         setSelectedGame(e.target.value);
@@ -346,7 +346,7 @@ const ChallengeSystem: React.FC = () => {
                   >
                     <select
                       id="challenge-mode"
-                      className="w-full px-3 py-2 bg-zinc-800/60 text-white border border-zinc-700/50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-amber-400/50 focus:border-amber-400/50"
+                      className="w-full px-3 py-2 bg-zinc-800/60 text-white border border-zinc-700/50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-cyan-400/50 focus:border-cyan-400/50"
                       value={selectedChallengeMode}
                       onChange={(e) => setSelectedChallengeMode(e.target.value)}
                       disabled={!selectedGame}
@@ -363,7 +363,7 @@ const ChallengeSystem: React.FC = () => {
                     {/* Tooltip for Custom Challenge */}
                     {selectedCategory &&
                       challengeModes[selectedCategory]?.find((m) => m.label === selectedChallengeMode && m.tooltip) && (
-                        <div className="absolute left-0 mt-2 w-full bg-gray-900/95 text-sm text-yellow-300 rounded shadow-lg p-2 z-10 border border-yellow-500/50">
+                        <div className="absolute left-0 mt-2 w-full bg-gray-900/95 text-sm text-cyan-300 rounded shadow-lg p-2 z-10 border border-cyan-500/50">
                           {challengeModes[selectedCategory].find((m) => m.label === selectedChallengeMode)?.tooltip}
                         </div>
                       )}
@@ -377,7 +377,7 @@ const ChallengeSystem: React.FC = () => {
                   </Label>
                   <select
                     id="system"
-                    className="w-full px-3 py-2 bg-zinc-800/60 text-white border border-zinc-700/50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-amber-400/50 focus:border-amber-400/50"
+                    className="w-full px-3 py-2 bg-zinc-800/60 text-white border border-zinc-700/50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-cyan-400/50 focus:border-cyan-400/50"
                     value={selectedSystem}
                     onChange={(e) => setSelectedSystem(e.target.value)}
                     disabled={!selectedGame}
@@ -411,7 +411,7 @@ const ChallengeSystem: React.FC = () => {
                     id="entry-amount"
                     type="number"
                     placeholder="Enter amount (e.g., 10.00)"
-                    className="w-full px-3 py-2 bg-zinc-800/60 text-white border border-zinc-700/50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-amber-400/50 focus:border-amber-400/50"
+                    className="w-full px-3 py-2 bg-zinc-800/60 text-white border border-zinc-700/50 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-cyan-400/50 focus:border-cyan-400/50"
                     min="0.01"
                     step="0.01"
                   />
@@ -437,7 +437,7 @@ Unclear or unfair custom rules may be rejected.`}
               {/* CTA (disabled placeholder) */}
               <div className="text-center">
                 <a
-                  className="inline-block px-5 py-2 bg-gradient-to-r from-amber-600/90 to-orange-500/90 text-white rounded-full font-semibold shadow-[0_0_4px_rgba(251,191,36,0.2)] flex items-center gap-2 transition-all duration-200 text-sm border border-amber-400/30"
+                  className="inline-block px-5 py-2 bg-gradient-to-r from-cyan-600/90 to-blue-500/90 text-white rounded-full font-semibold shadow-[0_0_4px_rgba(34,211,238,0.2)] flex items-center gap-2 transition-all duration-200 text-sm border border-cyan-400/30"
                   title="Launch real challenges from the full platform"
                   style={{ pointerEvents: "none", opacity: 0.6, cursor: "not-allowed" }}
                 >
@@ -454,10 +454,10 @@ Unclear or unfair custom rules may be rejected.`}
         .shimmer {
           position: relative;
           display: inline-block;
-          background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%);
+          background: linear-gradient(90deg, #22d3ee 0%, #06b6d4 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
-          text-shadow: 0 0 32px rgba(251, 191, 36, 0.5), 0 2px 8px #000;
+          text-shadow: 0 0 32px rgba(34, 211, 238, 0.4), 0 2px 8px #000;
           letter-spacing: 0.04em;
           font-weight: 800;
           font-size: 2.25rem;
@@ -466,7 +466,7 @@ Unclear or unfair custom rules may be rejected.`}
         .shimmer::after {
           content: '';
           position: absolute; inset: 0;
-          background: linear-gradient(120deg, transparent 40%, #fef3c7 50%, transparent 60%);
+          background: linear-gradient(120deg, transparent 40%, #a5f3fc 50%, transparent 60%);
           opacity: 0.25; mix-blend-mode: lighten;
           animation: shimmer 4s linear infinite;
           pointer-events: none;
@@ -477,7 +477,7 @@ Unclear or unfair custom rules may be rejected.`}
           position: absolute;
           inset: -20px;
           border-radius: 24px;
-          background: radial-gradient(60% 60% at 50% 50%, rgba(251, 191, 36, 0.2), transparent 70%);
+          background: radial-gradient(60% 60% at 50% 50%, rgba(34, 211, 238, 0.2), transparent 70%);
           filter: blur(24px);
           z-index: 0;
         }
@@ -487,7 +487,7 @@ Unclear or unfair custom rules may be rejected.`}
           100% { opacity: 0.75; filter: blur(28px); }
         }
 
-        .shadow-glow { box-shadow: 0 0 24px rgba(251, 191, 36, 0.3), 0 0 4px rgba(255, 255, 255, 0.1); }
+        .shadow-glow { box-shadow: 0 0 24px rgba(34, 211, 238, 0.3), 0 0 4px rgba(255, 255, 255, 0.1); }
 
         .fade-in-up { opacity: 1 !important; transform: translateY(0) !important; }
 

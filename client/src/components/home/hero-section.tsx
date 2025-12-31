@@ -34,15 +34,15 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
           {/* Left copy */}
           <div className="lg:w-1/2 mb-4 lg:mb-0 text-center lg:text-left">
             <div
-              className="text-2xl md:text-3xl lg:text-4xl font-bold mb-2 text-amber-300"
-              style={{ textShadow: "0 0 20px rgba(251, 191, 36, 0.5)" }}
+              className="text-2xl md:text-3xl lg:text-4xl font-bold mb-2 text-white"
+              style={{ textShadow: "0 0 20px rgba(255, 255, 255, 0.3)" }}
             >
 USDFG
             </div>
 
             <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-4">
               <span className="text-white">GAME. EARN. </span>
-              <span className="text-amber-300" style={{ textShadow: "0 0 20px rgba(251, 191, 36, 0.5)" }}>
+              <span className="text-cyan-400" style={{ textShadow: "0 0 20px rgba(34, 211, 238, 0.4)" }}>
                 CONQUER.
               </span>
             </h1>
@@ -55,14 +55,14 @@ USDFG
             <div className="flex flex-col sm:flex-row justify-center lg:justify-start gap-2">
               <button
                 onClick={onExploreClick}
-                className="elite-btn neocore-button w-full sm:w-auto px-4 py-2 text-sm md:text-base text-amber-300 hover:text-amber-200"
+                className="elite-btn neocore-button w-full sm:w-auto px-4 py-2 text-sm md:text-base text-white hover:text-cyan-300"
               >
                 EXPLORE PLATFORM
               </button>
 
               <Link to="/whitepaper">
                 <button
-                  className="elite-btn neocore-button w-full sm:w-auto px-4 py-2 text-sm md:text-base text-amber-300 hover:text-amber-200"
+                  className="elite-btn neocore-button w-full sm:w-auto px-4 py-2 text-sm md:text-base text-white hover:text-cyan-300"
                 >
                   WHITEPAPER
                 </button>

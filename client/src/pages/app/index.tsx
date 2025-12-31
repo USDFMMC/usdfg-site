@@ -2335,11 +2335,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         // Allow cancellation if:
         // 1. User is the creator
         // 2. Challenge is in pending_waiting_for_opponent state (before anyone expresses intent)
-        // OR: Confirmation deadline expired (challenge reverted, no pending joiner)
+        // OR: Confirmation deadline expired (regardless of pendingJoiner - challenge will revert)
         // OR: Challenge expired (60 minutes) and no one joined
         const canCancel = isCreator && (
           challengeStatus === 'pending_waiting_for_opponent' ||
-          (challengeStatus === 'creator_confirmation_required' && isDeadlineExpired && !pendingJoiner) ||
+          (challengeStatus === 'creator_confirmation_required' && isDeadlineExpired) ||
           (challengeStatus === 'pending_waiting_for_opponent' && isChallengeExpired && !pendingJoiner)
         );
         
@@ -2543,11 +2543,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const challengePDA = challenge.rawData?.pda || challenge.pda;
       const currentStatus = challenge.status || challenge.rawData?.status;
       const pendingJoiner = challenge.rawData?.pendingJoiner || challenge.pendingJoiner;
+      const creatorFundingDeadline = challenge.rawData?.creatorFundingDeadline || challenge.creatorFundingDeadline;
+      const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
       const isAlreadyPendingJoiner = pendingJoiner && pendingJoiner.toLowerCase() === walletAddr.toLowerCase();
       
+      // If user already joined in Firestore and PDA exists, just express on-chain intent
+      // Also handle case where deadline expired but challenge hasn't reverted yet
       if (currentStatus === 'creator_confirmation_required' && isAlreadyPendingJoiner && challengePDA) {
         // Challenger already expressed intent in Firestore, but PDA didn't exist then
         // Now PDA exists, so just express intent on-chain
+        // OR: Deadline expired but challenge hasn't reverted yet - still try on-chain
         try {
           const { expressJoinIntent: expressJoinIntentOnChain } = await import('@/lib/chain/contract');
           await expressJoinIntentOnChain(
@@ -2562,11 +2567,21 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         } catch (onChainError: any) {
           console.error('⚠️ Failed to express intent on-chain:', onChainError);
           const errorMsg = onChainError.message || onChainError.toString() || '';
+          // If deadline expired, the challenge should revert - tell user to wait
+          if (isDeadlineExpired) {
+            throw new Error('⚠️ Confirmation deadline expired. The challenge will automatically revert to open status soon. Please wait a moment and try again.');
+          }
           if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770')) {
-            throw new Error('Challenge state mismatch. Please refresh and try again.');
+            throw new Error('Challenge state mismatch. The challenge may have been reverted. Please refresh and try again.');
           }
           throw onChainError;
         }
+      }
+      
+      // If deadline expired and challenge hasn't reverted yet, don't try to join in Firestore
+      // Just tell user to wait for revert
+      if (currentStatus === 'creator_confirmation_required' && isDeadlineExpired) {
+        throw new Error('⚠️ Confirmation deadline expired. The challenge will automatically revert to open status soon. Please wait a moment and try again.');
       }
       
       // Regular flow - express intent in Firestore first
