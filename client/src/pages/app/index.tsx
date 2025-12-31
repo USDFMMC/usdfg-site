@@ -508,7 +508,8 @@ const ArenaHome: React.FC = () => {
       'FIFA 24', 'Madden NFL 24', 'NBA 2K25',
       'Street Fighter 6', 'Tekken 8', 'Mortal Kombat',
       'Call of Duty', 'Valorant',
-      'Forza Horizon'
+      'Forza Horizon', 'UFC 25', 'EA Sports UFC 5', 'EA Sports UFC 4', 'EA Sports UFC 3',
+      'EA UFC 5', 'EA UFC 4', 'EA UFC 3'
     ];
     
     for (const game of gameKeywords) {
@@ -521,6 +522,13 @@ const ArenaHome: React.FC = () => {
     // Check for specific versions first (most specific to least specific)
     if (title.toLowerCase().includes('nba 2k26') || title.toLowerCase().includes('nba2k26')) return 'NBA 2K26';
     if (title.toLowerCase().includes('nba 2k25') || title.toLowerCase().includes('nba2k25')) return 'NBA 2K25';
+    if (title.toLowerCase().includes('ufc 25') || title.toLowerCase().includes('ufc25')) return 'UFC 25';
+    if (title.toLowerCase().includes('ea sports ufc 5') || title.toLowerCase().includes('ea sports ufc5')) return 'EA Sports UFC 5';
+    if (title.toLowerCase().includes('ea sports ufc 4') || title.toLowerCase().includes('ea sports ufc4')) return 'EA Sports UFC 4';
+    if (title.toLowerCase().includes('ea sports ufc 3') || title.toLowerCase().includes('ea sports ufc3')) return 'EA Sports UFC 3';
+    if (title.toLowerCase().includes('ea ufc 5') || title.toLowerCase().includes('eaufc5')) return 'EA UFC 5';
+    if (title.toLowerCase().includes('ea ufc 4') || title.toLowerCase().includes('eaufc4')) return 'EA UFC 4';
+    if (title.toLowerCase().includes('ea ufc 3') || title.toLowerCase().includes('eaufc3')) return 'EA UFC 3';
     if (title.toLowerCase().includes('fifa')) return 'FIFA 24';
     if (title.toLowerCase().includes('madden')) return 'Madden NFL 24';
     if (title.toLowerCase().includes('nba') || title.toLowerCase().includes('2k')) return 'NBA 2K26'; // Default to 2K26 for NBA games
@@ -530,6 +538,7 @@ const ArenaHome: React.FC = () => {
     if (title.toLowerCase().includes('call of duty') || title.toLowerCase().includes('cod')) return 'Call of Duty';
     if (title.toLowerCase().includes('valorant')) return 'Valorant';
     if (title.toLowerCase().includes('forza')) return 'Forza Horizon';
+    if (title.toLowerCase().includes('ufc') || title.toLowerCase().includes('ea sports ufc')) return 'UFC 25'; // Default to UFC 25 for UFC games
     
     return 'Gaming'; // Fallback
   };
@@ -4198,7 +4207,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     category.includes('BASEBALL') || category.includes('GOLF')) {
                   return 'Sports';
                 }
-                if (category.includes('FIGHTING') || category.includes('BOXING')) {
+                // UFC should map to Fighting category for discovery
+                if (category.includes('UFC') || category.includes('FIGHTING') || category.includes('BOXING') ||
+                    game.includes('ufc') || game.includes('ea sports ufc')) {
                   return 'Fighting';
                 }
                 if (category.includes('SHOOTING') || category.includes('FPS') || 
