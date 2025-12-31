@@ -2712,7 +2712,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           // 1. Create the PDA
           // 2. Have the joiner express intent on-chain
           // 3. Then creator can fund
-          // For now, create the PDA and tell the joiner to try joining again
           const { createChallenge } = await import('@/lib/chain/contract');
           challengePDA = await createChallenge(
             { signTransaction, publicKey },
@@ -2727,8 +2726,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             pda: challengePDA
           });
           
-          // Tell creator that joiner needs to express intent on-chain
-          throw new Error(`⚠️ Challenge PDA created. The challenger (${pendingJoiner.slice(0, 8)}...) needs to express their join intent on-chain. Please ask them to try joining again, then you can fund.`);
+          // Successfully created PDA - now challenger needs to express intent on-chain
+          // They can do this by refreshing and trying to join again (which will now call on-chain express intent)
+          alert(`✅ Challenge PDA created on-chain!\n\nThe challenger (${pendingJoiner.slice(0, 8)}...) needs to refresh and try joining again to express their intent on-chain. Once they do that, you'll be able to fund the challenge.`);
+          setShowDetailSheet(false);
+          return;
         } else {
           // No joiner yet - just create the PDA (can't fund without a joiner)
           const { createChallenge } = await import('@/lib/chain/contract');
