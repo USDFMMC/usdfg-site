@@ -34,20 +34,20 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
           {/* Left copy */}
           <div className="lg:w-1/2 mb-4 lg:mb-0 text-center lg:text-left">
             <div
-              className="text-2xl md:text-3xl lg:text-4xl font-bold mb-2"
-              style={{ color: "var(--secondary-color)", textShadow: "var(--neon-glow)" }}
+              className="text-2xl md:text-3xl lg:text-4xl font-bold mb-2 text-amber-300"
+              style={{ textShadow: "0 0 20px rgba(251, 191, 36, 0.5)" }}
             >
 USDFG
             </div>
 
             <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-4">
               <span className="text-white">GAME. EARN. </span>
-              <span className="conquer-glow" style={{ color: "var(--accent-color)" }}>
+              <span className="text-amber-300" style={{ textShadow: "0 0 20px rgba(251, 191, 36, 0.5)" }}>
                 CONQUER.
               </span>
             </h1>
 
-            <p className="text-sm md:text-base mb-4 max-w-xl" style={{ color: "var(--text-light)" }}>
+            <p className="text-sm md:text-base mb-4 max-w-xl text-neutral-300">
               USDFG wasn't built for everyone.<br />
               It was built for the ones who don't blink.
             </p>
@@ -90,9 +90,6 @@ USDFG
         </div>
       </div>
 
-      <style>{`
-        .conquer-glow { text-shadow: 0 0 8px #ff005c; }
-      `}</style>
     </section>
   );
 };

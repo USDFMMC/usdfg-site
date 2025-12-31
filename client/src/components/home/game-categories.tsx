@@ -75,7 +75,7 @@ const GameCategories: React.FC = () => {
           initial={{ width: 0 }}
           animate={{ width: "180px" }}
           transition={{ duration: 0.8, delay: 0.3 }}
-          className="mx-auto mb-6 h-0.5 rounded-full bg-gradient-to-r from-cyan-400/80 via-purple-500/80 to-cyan-400/80 animate-pulse shadow-[0_0_20px_#22d3ee66]"
+          className="mx-auto mb-6 h-0.5 rounded-full bg-gradient-to-r from-amber-400/80 via-orange-500/80 to-amber-400/80 animate-pulse shadow-[0_0_20px_rgba(251,191,36,0.4)]"
         />
 
         {/* Elite/Premium Intro Paragraph */}

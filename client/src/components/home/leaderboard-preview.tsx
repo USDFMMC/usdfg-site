@@ -153,24 +153,24 @@ const LeaderboardPreview: React.FC = () => {
       <div className="container mx-auto px-3">
         <div className="text-center mb-6">
           <h2 className="text-2xl md:text-3xl font-extrabold mb-3 drop-shadow-glow">
-            USDFG <span className="text-primary">LEADERBOARD</span>
+            USDFG <span className="text-amber-300">LEADERBOARD</span>
           </h2>
           {/* Neon-glow underline/divider */}
-          <div className="mx-auto mb-4 h-0.5 w-40 rounded-full bg-gradient-to-r from-cyan-400/80 via-purple-500/80 to-cyan-400/80 animate-pulse shadow-[0_0_20px_#22d3ee66] shimmer-underline" />
-          <p className="text-cyan-200 max-w-2xl mx-auto text-base md:text-lg font-semibold mb-2">
+          <div className="mx-auto mb-4 h-0.5 w-40 rounded-full bg-gradient-to-r from-amber-400/80 via-orange-500/80 to-amber-400/80 animate-pulse shadow-[0_0_20px_rgba(251,191,36,0.4)] shimmer-underline" />
+          <p className="text-amber-200 max-w-2xl mx-auto text-base md:text-lg font-semibold mb-2">
             No usernames. No profiles. Just your wallet, your skill, your record.
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="ml-1.5 cursor-pointer text-cyan-400">ⓘ</span>
+                  <span className="ml-1.5 cursor-pointer text-amber-400">ⓘ</span>
                 </TooltipTrigger>
-                <TooltipContent className="bg-black/80 text-cyan-100 border-cyan-400/40">
+                <TooltipContent className="bg-black/80 text-amber-100 border-amber-400/40">
                   Your wallet is your identity. No personal data, no registration, no tracking.
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </p>
-          <p className="text-cyan-400 max-w-2xl mx-auto text-sm md:text-base font-medium">
+          <p className="text-amber-300 max-w-2xl mx-auto text-sm md:text-base font-medium">
             Only skill matters. No bots. No aliases. Every win is on-chain.
           </p>
         </div>
@@ -262,8 +262,8 @@ const LeaderboardPreview: React.FC = () => {
                   <TableRow>
                     <TableCell colSpan={tableColumnCount} className="text-center py-8">
                       <div className="flex flex-col items-center gap-2">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
-                        <p className="text-cyan-300 text-sm">Loading leaderboard...</p>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div>
+                        <p className="text-amber-300 text-sm">Loading leaderboard...</p>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -272,8 +272,8 @@ const LeaderboardPreview: React.FC = () => {
                     <TableRow>
                       <TableCell colSpan={tableColumnCount} className="text-center py-8">
                         <div className="flex flex-col items-center gap-2">
-                          <Trophy className="w-12 h-12 text-cyan-400/50" />
-                          <p className="text-cyan-300 text-sm font-semibold">No players yet!</p>
+                          <Trophy className="w-12 h-12 text-amber-400/50" />
+                          <p className="text-amber-300 text-sm font-semibold">No players yet!</p>
                           <p className="text-gray-400 text-xs">Be the first to complete a challenge and claim the top spot.</p>
                         </div>
                       </TableCell>
@@ -294,9 +294,9 @@ const LeaderboardPreview: React.FC = () => {
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Copy className="w-4 h-4 cursor-pointer hover:text-cyan-400" onClick={() => {navigator.clipboard.writeText(player.wallet); setCopiedIdx(i); setTimeout(() => setCopiedIdx(null), 1200);}} />
+                                  <Copy className="w-4 h-4 cursor-pointer hover:text-amber-400" onClick={() => {navigator.clipboard.writeText(player.wallet); setCopiedIdx(i); setTimeout(() => setCopiedIdx(null), 1200);}} />
                                 </TooltipTrigger>
-                                <TooltipContent className="bg-black/80 text-cyan-100 border-cyan-400/40">
+                                <TooltipContent className="bg-black/80 text-amber-100 border-amber-400/40">
                                   {copiedIdx === i ? "Copied!" : "Copy wallet address"}
                                 </TooltipContent>
                               </Tooltip>
@@ -361,14 +361,14 @@ const LeaderboardPreview: React.FC = () => {
                         <TableCell className="text-sm">
                           <div className="flex flex-col">
                             <span className="font-semibold text-white text-sm md:text-base">{team.teamName}</span>
-                            <div className="flex items-center gap-2 text-xs text-cyan-200 mt-1">
+                            <div className="flex items-center gap-2 text-xs text-amber-200 mt-1">
                               <span className="font-mono text-amber-300">{masked}</span>
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <Copy className="w-4 h-4 cursor-pointer hover:text-cyan-400" onClick={() => {navigator.clipboard.writeText(team.teamKey); setCopiedIdx(i); setTimeout(() => setCopiedIdx(null), 1200);}} />
+                                    <Copy className="w-4 h-4 cursor-pointer hover:text-amber-400" onClick={() => {navigator.clipboard.writeText(team.teamKey); setCopiedIdx(i); setTimeout(() => setCopiedIdx(null), 1200);}} />
                                   </TooltipTrigger>
-                                  <TooltipContent className="bg-black/80 text-cyan-100 border-cyan-400/40">
+                                  <TooltipContent className="bg-black/80 text-amber-100 border-amber-400/40">
                                     {copiedIdx === i ? "Copied!" : "Copy team key"}
                                   </TooltipContent>
                                 </Tooltip>

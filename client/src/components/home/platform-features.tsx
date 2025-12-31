@@ -32,10 +32,10 @@ const PlatformFeatures: React.FC = () => {
 
   return (
     <section id="platform" className="py-8 px-3 text-white text-center relative overflow-hidden bg-[#07080C]">
-      <h2 className="text-2xl md:text-3xl font-bold text-center mb-3 text-white animate-fade-in" style={{ textShadow: 'var(--primary-glow)' }}>
+      <h2 className="text-2xl md:text-3xl font-bold text-center mb-3 text-white animate-fade-in" style={{ textShadow: '0 0 20px rgba(251, 191, 36, 0.5)' }}>
         USDFG – The Bitcoin of Gaming
       </h2>
-      <p className="text-center text-sm md:text-base text-muted-foreground mb-6 animate-fade-in" style={{ textShadow: 'var(--neon-glow)' }}>
+      <p className="text-center text-sm md:text-base text-neutral-400 mb-6 animate-fade-in">
         A decentralized arena for competitive gaming.
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 max-w-7xl mx-auto">

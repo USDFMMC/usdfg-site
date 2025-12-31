@@ -63,40 +63,40 @@ const Tokenomics: React.FC = () => {
   return (
     <section id="tokenomics" className="py-12 text-center bg-[#07080C]" ref={sectionRef}>
       {/* Why Tokenomics Matters Intro */}
-      <div className="max-w-2xl mx-auto mb-6 px-4 py-3 rounded-xl bg-[#07080C]/98 border border-purple-700/30 shadow-lg backdrop-blur-md animate-fade-in" style={{ textAlign: 'center' }}>
-          <p className="text-base md:text-lg font-bold text-purple-300 mb-2 drop-shadow-glow">Why Tokenomics Matters</p>
+      <div className="max-w-2xl mx-auto mb-6 px-4 py-3 rounded-xl bg-[#07080C]/98 border border-amber-400/20 shadow-lg backdrop-blur-md animate-fade-in" style={{ textAlign: 'center' }}>
+          <p className="text-base md:text-lg font-bold text-amber-300 mb-2 drop-shadow-glow">Why Tokenomics Matters</p>
         <p className="text-sm md:text-base text-white/90 font-medium">Transparent tokenomics ensures every USDFG token is allocated for platform access and utility, with no hidden distributions. Our structure is designed for platform integrity and fair access—so you always know exactly how tokens are used within the ecosystem.</p>
       </div>
-      <h2 className="text-2xl md:text-3xl font-bold mb-4 text-white" style={{ textShadow: 'var(--primary-glow)' }}>
+      <h2 className="text-2xl md:text-3xl font-bold mb-4 text-white" style={{ textShadow: '0 0 20px rgba(251, 191, 36, 0.5)' }}>
         TOKENOMICS
       </h2>
-      <p className="text-sm md:text-base text-muted-foreground mb-8 max-w-xl mx-auto">
+      <p className="text-sm md:text-base text-neutral-400 mb-8 max-w-xl mx-auto">
         USDFG Token allocation structure for platform access and utility.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 max-w-5xl mx-auto mb-6">
-        <div className="rounded-lg border border-purple-500/30 bg-[#07080C]/98 p-3 text-center shadow-lg animate-float-soft"
+        <div className="rounded-lg border border-amber-400/20 bg-[#07080C]/98 p-3 text-center shadow-lg animate-float-soft"
           onMouseEnter={handleHover(65, setVal1, 0)}
           onMouseLeave={handleMouseLeave}>
-          <p className="text-3xl md:text-4xl font-extrabold text-purple-300 mb-2 animate-pulse-soft">{val1}%</p>
+          <p className="text-3xl md:text-4xl font-extrabold text-amber-300 mb-2 animate-pulse-soft">{val1}%</p>
           <p className="text-base font-bold text-white/90">Public Trading</p>
         </div>
-        <div className="rounded-lg border border-purple-500/30 bg-[#07080C]/98 p-4 text-center shadow-lg animate-float-soft"
+        <div className="rounded-lg border border-amber-400/20 bg-[#07080C]/98 p-4 text-center shadow-lg animate-float-soft"
           onMouseEnter={handleHover(15, setVal2, 1)}
           onMouseLeave={handleMouseLeave}>
-          <p className="text-3xl md:text-4xl font-extrabold text-purple-300 mb-2 animate-pulse-soft">{val2}%</p>
+          <p className="text-3xl md:text-4xl font-extrabold text-amber-300 mb-2 animate-pulse-soft">{val2}%</p>
           <p className="text-base font-bold text-white/90">Core Reserve</p>
         </div>
-        <div className="rounded-lg border border-purple-500/30 bg-[#07080C]/98 p-4 text-center shadow-lg animate-float-soft"
+        <div className="rounded-lg border border-amber-400/20 bg-[#07080C]/98 p-4 text-center shadow-lg animate-float-soft"
           onMouseEnter={handleHover(10, setVal3, 2)}
           onMouseLeave={handleMouseLeave}>
-          <p className="text-3xl md:text-4xl font-extrabold text-purple-300 mb-2 animate-pulse-soft">{val3}%</p>
+          <p className="text-3xl md:text-4xl font-extrabold text-amber-300 mb-2 animate-pulse-soft">{val3}%</p>
           <p className="text-base font-bold text-white/90">Development & Operations</p>
         </div>
-        <div className="rounded-lg border border-purple-500/30 bg-[#07080C]/98 p-4 text-center shadow-lg animate-float-soft"
+        <div className="rounded-lg border border-amber-400/20 bg-[#07080C]/98 p-4 text-center shadow-lg animate-float-soft"
           onMouseEnter={handleHover(10, setVal4, 3)}
           onMouseLeave={handleMouseLeave}>
-          <p className="text-3xl md:text-4xl font-extrabold text-purple-300 mb-2 animate-pulse-soft">{val4}%</p>
+          <p className="text-3xl md:text-4xl font-extrabold text-amber-300 mb-2 animate-pulse-soft">{val4}%</p>
           <p className="text-base font-bold text-white/90">Player Rewards & Challenges</p>
         </div>
       </div>
@@ -116,9 +116,9 @@ const Tokenomics: React.FC = () => {
           animation: floatSoft 3.2s ease-in-out infinite;
         }
         @keyframes pulseSoft {
-          0% { text-shadow: 0 0 8px #a78bfa44; }
-          50% { text-shadow: 0 0 16px #a78bfa99; }
-          100% { text-shadow: 0 0 8px #a78bfa44; }
+          0% { text-shadow: 0 0 8px rgba(251, 191, 36, 0.3); }
+          50% { text-shadow: 0 0 16px rgba(251, 191, 36, 0.6); }
+          100% { text-shadow: 0 0 8px rgba(251, 191, 36, 0.3); }
         }
         .animate-pulse-soft {
           animation: pulseSoft 2.2s ease-in-out infinite;
