@@ -2585,7 +2585,31 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       }
       
       // Regular flow - express intent in Firestore first
-      await expressJoinIntent(challenge.id, walletAddr);
+      // But skip if deadline expired (challenge will revert, don't update Firestore)
+      if (!isDeadlineExpired) {
+        await expressJoinIntent(challenge.id, walletAddr);
+      } else {
+        // Deadline expired - challenge will revert, just try on-chain if PDA exists
+        if (challengePDA) {
+          try {
+            const { expressJoinIntent: expressJoinIntentOnChain } = await import('@/lib/chain/contract');
+            await expressJoinIntentOnChain(
+              { signTransaction, publicKey },
+              connection,
+              challengePDA
+            );
+            console.log('✅ Join intent expressed on-chain (deadline expired, challenge reverting)');
+            alert('✅ Join intent expressed on-chain! The challenge is reverting to open status. Please wait a moment and try joining again.');
+            setShowDetailSheet(false);
+            return;
+          } catch (onChainError: any) {
+            console.error('⚠️ Failed to express intent on-chain:', onChainError);
+            throw new Error('⚠️ Confirmation deadline expired. The challenge will automatically revert to open status soon. Please wait a moment and try again.');
+          }
+        } else {
+          throw new Error('⚠️ Confirmation deadline expired. The challenge will automatically revert to open status soon. Please wait a moment and try again.');
+        }
+      }
       
       // If challenge has a PDA, also express intent on-chain
       if (challengePDA) {
