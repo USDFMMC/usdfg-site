@@ -3832,33 +3832,24 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               <div className="mt-5 w-full rounded-xl bg-red-500/10 border border-red-500/30 p-4 text-red-200 text-sm">
                 <div className="font-semibold mb-1">⚠️ Confirmation Deadline Expired</div>
                 <p className="text-xs text-red-200/80 mb-3">
-                  The 5-minute deadline to confirm and fund has passed. The challenge has been reverted to waiting for opponent.
+                  The 5-minute deadline to confirm and fund has passed. The challenge will automatically revert to waiting for opponent (the same user can rejoin).
                 </p>
-                <div className="flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => window.location.reload()}
-                    className="w-full rounded-lg bg-red-600/20 border border-red-500/40 py-2 text-red-200 text-sm font-semibold hover:bg-red-600/30 transition-colors"
-                  >
-                    🔄 Refresh Page
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (window.confirm("Are you sure you want to delete this challenge? This action cannot be undone.")) {
-                        try {
-                          await handleDeleteChallenge(challenge.id, challenge);
-                          setShowDetailSheet(false);
-                        } catch (error: any) {
-                          alert('Failed to delete challenge: ' + (error.message || 'Unknown error'));
-                        }
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (window.confirm("Are you sure you want to delete this challenge? This action cannot be undone.")) {
+                      try {
+                        await handleDeleteChallenge(challenge.id, challenge);
+                        setShowDetailSheet(false);
+                      } catch (error: any) {
+                        alert('Failed to delete challenge: ' + (error.message || 'Unknown error'));
                       }
-                    }}
-                    className="w-full rounded-lg bg-red-700/30 border border-red-600/50 py-2 text-red-200 text-sm font-semibold hover:bg-red-700/40 transition-colors"
-                  >
-                    🗑️ Delete Challenge
-                  </button>
-                </div>
+                    }
+                  }}
+                  className="w-full rounded-lg bg-red-700/30 border border-red-600/50 py-2 text-red-200 text-sm font-semibold hover:bg-red-700/40 transition-colors"
+                >
+                  🗑️ Delete Challenge
+                </button>
               </div>
             )}
             
@@ -3872,33 +3863,24 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               <div className="mt-5 w-full rounded-xl bg-amber-500/10 border border-amber-500/30 p-4 text-amber-200 text-sm">
                 <div className="font-semibold mb-1">⏰ Challenge Expired</div>
                 <p className="text-xs text-amber-200/80 mb-3">
-                  This challenge has expired (60 minutes) and no one has joined. You can delete it or refresh to see the updated status.
+                  This challenge has expired (60 minutes) and no one has joined. It will be automatically deleted soon.
                 </p>
-                <div className="flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={() => window.location.reload()}
-                    className="w-full rounded-lg bg-amber-600/20 border border-amber-500/40 py-2 text-amber-200 text-sm font-semibold hover:bg-amber-600/30 transition-colors"
-                  >
-                    🔄 Refresh Page
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (window.confirm("Are you sure you want to delete this expired challenge? This action cannot be undone.")) {
-                        try {
-                          await handleDeleteChallenge(challenge.id, challenge);
-                          setShowDetailSheet(false);
-                        } catch (error: any) {
-                          alert('Failed to delete challenge: ' + (error.message || 'Unknown error'));
-                        }
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (window.confirm("Are you sure you want to delete this expired challenge? This action cannot be undone.")) {
+                      try {
+                        await handleDeleteChallenge(challenge.id, challenge);
+                        setShowDetailSheet(false);
+                      } catch (error: any) {
+                        alert('Failed to delete challenge: ' + (error.message || 'Unknown error'));
                       }
-                    }}
-                    className="w-full rounded-lg bg-amber-700/30 border border-amber-600/50 py-2 text-amber-200 text-sm font-semibold hover:bg-amber-700/40 transition-colors"
-                  >
-                    🗑️ Delete Challenge
-                  </button>
-                </div>
+                    }
+                  }}
+                  className="w-full rounded-lg bg-amber-700/30 border border-amber-600/50 py-2 text-amber-200 text-sm font-semibold hover:bg-amber-700/40 transition-colors"
+                >
+                  🗑️ Delete Challenge
+                </button>
               </div>
             )}
 
