@@ -2526,11 +2526,40 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         return;
       }
       
-      // Regular challenge - express intent in Firestore first
+      // Check if challenger already expressed intent in Firestore but PDA didn't exist yet
+      const challengePDA = challenge.rawData?.pda || challenge.pda;
+      const currentStatus = challenge.status || challenge.rawData?.status;
+      const pendingJoiner = challenge.rawData?.pendingJoiner || challenge.pendingJoiner;
+      const isAlreadyPendingJoiner = pendingJoiner && pendingJoiner.toLowerCase() === walletAddr.toLowerCase();
+      
+      if (currentStatus === 'creator_confirmation_required' && isAlreadyPendingJoiner && challengePDA) {
+        // Challenger already expressed intent in Firestore, but PDA didn't exist then
+        // Now PDA exists, so just express intent on-chain
+        try {
+          const { expressJoinIntent: expressJoinIntentOnChain } = await import('@/lib/chain/contract');
+          await expressJoinIntentOnChain(
+            { signTransaction, publicKey },
+            connection,
+            challengePDA
+          );
+          console.log('✅ Join intent expressed on-chain (PDA was created after initial join)');
+          alert('✅ Join intent expressed on-chain! Creator can now fund the challenge.');
+          setShowDetailSheet(false);
+          return;
+        } catch (onChainError: any) {
+          console.error('⚠️ Failed to express intent on-chain:', onChainError);
+          const errorMsg = onChainError.message || onChainError.toString() || '';
+          if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770')) {
+            throw new Error('Challenge state mismatch. Please refresh and try again.');
+          }
+          throw onChainError;
+        }
+      }
+      
+      // Regular flow - express intent in Firestore first
       await expressJoinIntent(challenge.id, walletAddr);
       
       // If challenge has a PDA, also express intent on-chain
-      const challengePDA = challenge.rawData?.pda || challenge.pda;
       if (challengePDA) {
         try {
           const { expressJoinIntent: expressJoinIntentOnChain } = await import('@/lib/chain/contract');
