@@ -2324,16 +2324,29 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         const challengeStatus = challenge?.status || challenge?.rawData?.status;
         const isCreator = challenge?.creator === currentWallet || challenge?.rawData?.creator === currentWallet;
         
-        // Only allow cancellation if:
+        // Check for expired states
+        const creatorFundingDeadline = challenge?.rawData?.creatorFundingDeadline || challenge?.creatorFundingDeadline;
+        const expirationTimer = challenge?.rawData?.expirationTimer || challenge?.expirationTimer;
+        const pendingJoiner = challenge?.rawData?.pendingJoiner || challenge?.pendingJoiner;
+        
+        const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
+        const isChallengeExpired = expirationTimer && expirationTimer.toMillis() < Date.now();
+        
+        // Allow cancellation if:
         // 1. User is the creator
-        // 2. Challenge is in pending_waiting_for_opponent state ONLY (before anyone expresses intent to join)
-        // IMPORTANT: Cannot cancel after someone has expressed intent (creator_confirmation_required) - that would be cheating!
-        const canCancel = isCreator && challengeStatus === 'pending_waiting_for_opponent';
+        // 2. Challenge is in pending_waiting_for_opponent state (before anyone expresses intent)
+        // OR: Confirmation deadline expired (challenge reverted, no pending joiner)
+        // OR: Challenge expired (60 minutes) and no one joined
+        const canCancel = isCreator && (
+          challengeStatus === 'pending_waiting_for_opponent' ||
+          (challengeStatus === 'creator_confirmation_required' && isDeadlineExpired && !pendingJoiner) ||
+          (challengeStatus === 'pending_waiting_for_opponent' && isChallengeExpired && !pendingJoiner)
+        );
         
         if (!canCancel) {
           if (!isCreator) {
             alert("Only the challenge creator can cancel this challenge.");
-          } else if (challengeStatus === 'creator_confirmation_required') {
+          } else if (challengeStatus === 'creator_confirmation_required' && !isDeadlineExpired) {
             alert("Cannot cancel: Someone has already expressed intent to join. You must either fund the challenge or wait for the timeout.");
           } else if (challengeStatus === 'creator_funded' || challengeStatus === 'active') {
             alert("Cannot cancel: Challenge is already active with funds locked.");
