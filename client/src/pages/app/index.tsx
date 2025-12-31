@@ -2517,8 +2517,25 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         return;
       }
       
-      // Regular challenge - express intent in Firestore only (no on-chain transaction)
+      // Regular challenge - express intent in Firestore first
       await expressJoinIntent(challenge.id, walletAddr);
+      
+      // If challenge has a PDA, also express intent on-chain
+      const challengePDA = challenge.rawData?.pda || challenge.pda;
+      if (challengePDA) {
+        try {
+          const { expressJoinIntent: expressJoinIntentOnChain } = await import('@/lib/chain/contract');
+          await expressJoinIntentOnChain(
+            { signTransaction, publicKey },
+            connection,
+            challengePDA
+          );
+          console.log('✅ Join intent expressed on-chain');
+        } catch (onChainError: any) {
+          console.error('⚠️ Failed to express intent on-chain (will retry when creator funds):', onChainError);
+          // Don't fail - Firestore was updated, creator can handle on-chain sync when funding
+        }
+      }
       
       alert('✅ Join intent expressed! Waiting for creator to fund the challenge.');
       setShowDetailSheet(false);
@@ -2694,13 +2711,29 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           pda: challengePDA
         });
       } else {
-        // PDA exists - just fund
-        await creatorFundOnChain(
-          { signTransaction, publicKey },
-          connection,
-          challengePDA,
-          entryFee
-        );
+        // PDA exists - check if on-chain state needs to be synced
+        // If Firestore says creator_confirmation_required but on-chain is still PendingWaitingForOpponent,
+        // the joiner needs to express intent on-chain first
+        try {
+          await creatorFundOnChain(
+            { signTransaction, publicKey },
+            connection,
+            challengePDA,
+            entryFee
+          );
+        } catch (fundError: any) {
+          const errorMsg = fundError.message || fundError.toString() || '';
+          // Check if error is because challenge is not in CreatorConfirmationRequired state
+          if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770') || errorMsg.includes('6000')) {
+            const pendingJoiner = freshChallenge.pendingJoiner || challenge.rawData?.pendingJoiner;
+            if (pendingJoiner) {
+              throw new Error(`⚠️ The challenger (${pendingJoiner.slice(0, 8)}...) needs to express their join intent on-chain first. Please ask them to try joining again, or wait for the challenge to revert to open status.`);
+            } else {
+              throw new Error('⚠️ Challenge state mismatch. The challenger needs to express join intent on-chain. Please refresh and try again.');
+            }
+          }
+          throw fundError; // Re-throw if it's a different error
+        }
       }
       
       // Update Firestore
