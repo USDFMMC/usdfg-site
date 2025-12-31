@@ -3952,6 +3952,28 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               </button>
             )}
             
+            {/* Show button for challenger who already joined in Firestore but needs to express on-chain intent */}
+            {!isOwner && status === 'creator_confirmation_required' && onExpressIntent && (() => {
+              const pendingJoiner = challenge.rawData?.pendingJoiner || challenge.pendingJoiner;
+              const challengePDA = challenge.rawData?.pda || challenge.pda;
+              const currentWallet = publicKey?.toString()?.toLowerCase() || '';
+              const isPendingJoiner = pendingJoiner && pendingJoiner.toLowerCase() === currentWallet;
+              
+              // Show button if user is the pending joiner and PDA exists (meaning they need to express on-chain)
+              return isPendingJoiner && challengePDA;
+            })() && (
+              <button
+                type="button"
+                className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-white font-semibold mb-2"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await onExpressIntent(challenge);
+                }}
+              >
+                ⚡ Express Intent On-Chain (PDA Created)
+              </button>
+            )}
+            
             {/* Show Fund button for joiner */}
             {!isOwner && status === 'creator_funded' && onJoinerFund && (
               <button
