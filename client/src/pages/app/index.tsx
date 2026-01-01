@@ -2589,11 +2589,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       }
       
       // Regular flow - express intent in Firestore first
-      // But skip if deadline expired (challenge will revert, don't update Firestore)
-      if (!isDeadlineExpired) {
-        await expressJoinIntent(challenge.id, walletAddr);
-      } else {
-        // Deadline expired - challenge will revert, just try on-chain if PDA exists
+      // But skip if user is already pending joiner (should have been handled above)
+      // Or if deadline expired (challenge will revert, don't update Firestore)
+      if (isAlreadyPendingJoiner) {
+        // User is already pending joiner - this shouldn't happen if button logic is correct
+        // But handle it gracefully - try on-chain if PDA exists
         if (challengePDA) {
           try {
             const { expressJoinIntent: expressJoinIntentOnChain } = await import('@/lib/chain/contract');
@@ -2602,18 +2602,25 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               connection,
               challengePDA
             );
-            console.log('✅ Join intent expressed on-chain (deadline expired, challenge reverting)');
-            alert('✅ Join intent expressed on-chain! The challenge is reverting to open status. Please wait a moment and try joining again.');
+            console.log('✅ Join intent expressed on-chain (user already pending joiner)');
+            alert('✅ Join intent expressed on-chain! Creator can now fund the challenge.');
             setShowDetailSheet(false);
             return;
           } catch (onChainError: any) {
             console.error('⚠️ Failed to express intent on-chain:', onChainError);
-            throw new Error('⚠️ Confirmation deadline expired. The challenge will automatically revert to open status soon. Please wait a moment and try again.');
+            const errorMsg = onChainError.message || onChainError.toString() || '';
+            if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770')) {
+              throw new Error('Challenge state mismatch. The challenge may have been reverted. Please refresh and try again.');
+            }
+            throw onChainError;
           }
         } else {
-          throw new Error('⚠️ Confirmation deadline expired. The challenge will automatically revert to open status soon. Please wait a moment and try again.');
+          throw new Error('You have already expressed intent to join this challenge. Waiting for creator to fund.');
         }
       }
+      
+      // Normal flow - user hasn't joined yet, express intent in Firestore
+      await expressJoinIntent(challenge.id, walletAddr);
       
       // If challenge has a PDA, also express intent on-chain
       if (challengePDA) {
