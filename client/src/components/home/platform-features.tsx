@@ -32,29 +32,29 @@ const PlatformFeatures: React.FC = () => {
 
   return (
     <section id="platform" className="py-8 px-3 text-white text-center relative overflow-hidden bg-[#07080C]">
-      <h2 className="text-2xl md:text-3xl font-bold text-center mb-3 text-white animate-fade-in" style={{ textShadow: '0 0 20px rgba(34, 211, 238, 0.4)' }}>
+      <h2 className="neocore-h2 text-center mb-3 text-white animate-fade-in" style={{ textShadow: '0 0 20px rgba(251, 191, 36, 0.3)' }}>
         USDFG – The Bitcoin of Gaming
       </h2>
-      <p className="text-center text-sm md:text-base text-neutral-400 mb-6 animate-fade-in">
+      <p className="neocore-body text-center mb-6 animate-fade-in">
         A decentralized arena for competitive gaming.
       </p>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 max-w-7xl mx-auto">
         {features.map((feature, idx) => (
           <div
             key={feature.title}
-            className="feature-card group bg-[#07080C]/98 border border-cyan-400/20 rounded-lg shadow-[0_0_10px_rgba(34,211,238,0.08)] backdrop-blur-md p-3 transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_15px_rgba(34,211,238,0.15)] hover:border-cyan-400/30 relative overflow-hidden animate-fade-in-up"
+            className="neocore-panel group p-3 transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_15px_rgba(255,215,130,0.15)] hover:border-amber-400/30 relative overflow-hidden animate-fade-in-up"
             tabIndex={0}
           >
             <span className="block text-2xl mb-2 drop-shadow-glow animate-bounce-slow">{feature.icon}</span>
-            <h3 className="text-base font-semibold tracking-wide text-cyan-300 mb-2 drop-shadow-glow">{feature.title}</h3>
-            <p className="text-neutral-200 text-sm leading-relaxed font-medium">{feature.description}</p>
+            <h3 className="text-base font-semibold tracking-wide text-amber-300 mb-2 drop-shadow-glow">{feature.title}</h3>
+            <p className="neocore-body text-sm leading-relaxed">{feature.description}</p>
           </div>
         ))}
       </div>
       {/* Custom Animations */}
       <style>{`
         .drop-shadow-glow {
-          filter: drop-shadow(0 0 3px rgba(34,211,238,0.4));
+          filter: drop-shadow(0 0 3px rgba(251, 191, 36, 0.4));
         }
         .animate-bounce-slow {
           animation: bounceSlow 4s ease-in-out infinite;

@@ -93,9 +93,38 @@ body {
   }
 }
 
-.animate-pulse-live {
-  animation: pulseLive 2.5s ease-in-out infinite;
-  will-change: color, opacity;
+  .animate-pulse-live {
+    animation: pulseLive 2.5s ease-in-out infinite;
+    will-change: color, opacity;
+  }
+
+/* Elite Esports Background Animations */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.05);
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 8s ease-in-out infinite;
+}
+
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+.animate-scan {
+  animation: scan 20s linear infinite;
 }
 
 @layer base {

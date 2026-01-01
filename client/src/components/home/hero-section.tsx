@@ -28,8 +28,13 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
   };
 
   return (
-    <section className="hero relative py-8 lg:py-12 overflow-hidden bg-[#07080C]">
-      <div className="container mx-auto px-3">
+    <section className="hero relative py-8 lg:py-12 overflow-hidden">
+      {/* Hero section specific enhancements */}
+      <div className="absolute inset-0 -z-10">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-amber-400/5 rounded-full blur-3xl animate-pulse-slow" />
+      </div>
+      
+      <div className="container mx-auto px-3 relative z-10">
         <div className="flex flex-col lg:flex-row items-center">
           {/* Left copy */}
           <div className="lg:w-1/2 mb-4 lg:mb-0 text-center lg:text-left">
@@ -40,14 +45,14 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
 USDFG
             </div>
 
-            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold mb-4">
+            <h1 className="neocore-h1 mb-4">
               <span className="text-white">GAME. EARN. </span>
-              <span className="text-cyan-400" style={{ textShadow: "0 0 20px rgba(34, 211, 238, 0.4)" }}>
+              <span className="text-amber-300" style={{ textShadow: "0 0 20px rgba(251, 191, 36, 0.4)" }}>
                 CONQUER.
               </span>
             </h1>
 
-            <p className="text-sm md:text-base mb-4 max-w-xl text-neutral-300">
+            <p className="neocore-body mb-4 max-w-xl">
               USDFG wasn't built for everyone.<br />
               It was built for the ones who don't blink.
             </p>
@@ -55,14 +60,14 @@ USDFG
             <div className="flex flex-col sm:flex-row justify-center lg:justify-start gap-2">
               <button
                 onClick={onExploreClick}
-                className="elite-btn neocore-button w-full sm:w-auto px-4 py-2 text-sm md:text-base text-white hover:text-cyan-300"
+                className="elite-btn neocore-button w-full sm:w-auto px-4 py-2 text-sm md:text-base text-amber-300 hover:text-amber-200"
               >
                 EXPLORE PLATFORM
               </button>
 
               <Link to="/whitepaper">
                 <button
-                  className="elite-btn neocore-button w-full sm:w-auto px-4 py-2 text-sm md:text-base text-white hover:text-cyan-300"
+                  className="elite-btn neocore-button w-full sm:w-auto px-4 py-2 text-sm md:text-base text-amber-300 hover:text-amber-200"
                 >
                   WHITEPAPER
                 </button>
