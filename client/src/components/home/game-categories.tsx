@@ -83,7 +83,7 @@ const GameCategories: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.5 }}
-          className="relative max-w-2xl mx-auto mb-6 px-4 py-3 rounded-lg bg-[#07080C]/98 border border-amber-400/20 shadow-[0_0_15px_rgba(255,215,130,0.08)] backdrop-blur-md text-center"
+          className="neocore-panel relative max-w-2xl mx-auto mb-6 px-4 py-3 rounded-lg text-center"
         >
           <p className="text-base md:text-lg font-extrabold text-white mb-2 drop-shadow-glow">
             The Arena Is Open. Any Game. No Excuses.
@@ -109,7 +109,7 @@ const GameCategories: React.FC = () => {
               variants={cardVariants}
               className="group relative h-full flex flex-col"
             >
-              <div className="relative bg-[#07080C]/98 backdrop-blur-sm border border-amber-400/20 rounded-lg p-2 shadow-[0_0_10px_rgba(255,215,130,0.08)] hover:shadow-[0_0_15px_rgba(255,215,130,0.15)] transition-all duration-500 hover:scale-[1.02] hover:border-amber-400/30 h-full flex flex-col">
+              <div className="neocore-panel relative rounded-lg p-2 hover:shadow-[0_0_15px_rgba(255,215,130,0.15)] transition-all duration-500 hover:scale-[1.02] h-full flex flex-col">
                 <div className="relative">
                   <img
                     src={game.image.replace('.png', '.webp')}

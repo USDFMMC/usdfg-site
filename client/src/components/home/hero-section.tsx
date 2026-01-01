@@ -1,6 +1,7 @@
 import React, { useRef } from "react";
 import { Link } from "react-router-dom";
 import { useScrollFadeIn } from "@/hooks/useScrollFadeIn";
+import { GridScan } from "./GridScan";
 
 const MASCOT_WEBP = "/assets/usdfg-mascot-trophy-illustration.webp";
 const MASCOT_PNG  = "/assets/usdfg-mascot-trophy-illustration.png";
@@ -28,8 +29,26 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
   };
 
   return (
-    <section className="hero relative py-8 lg:py-12 overflow-hidden">
-      <div className="container mx-auto px-3 relative z-10">
+    <section className="hero relative py-8 lg:py-12 overflow-hidden min-h-[70vh] flex items-center">
+      {/* GridScan Background */}
+      <div className="absolute inset-0 w-full h-full -z-10">
+        <GridScan
+          sensitivity={0.55}
+          lineThickness={1}
+          linesColor="#FBBF24"
+          gridScale={0.1}
+          scanColor="#FCD34D"
+          scanOpacity={0.4}
+          enablePost
+          bloomIntensity={0.6}
+          chromaticAberration={0.002}
+          noiseIntensity={0.01}
+          enableWebcam={false}
+        />
+      </div>
+      
+      {/* Content */}
+      <div className="container mx-auto px-3 relative z-10 w-full">
         <div className="flex flex-col lg:flex-row items-center">
           {/* Left copy */}
           <div className="lg:w-1/2 mb-4 lg:mb-0 text-center lg:text-left">
@@ -55,14 +74,14 @@ USDFG
             <div className="flex flex-col sm:flex-row justify-center lg:justify-start gap-2">
               <button
                 onClick={onExploreClick}
-                className="elite-btn neocore-button w-full sm:w-auto px-4 py-2 text-sm md:text-base text-amber-300 hover:text-amber-200"
+                className="elite-btn neocore-button w-full sm:w-auto px-4 py-2 text-sm md:text-base text-cyan-300 hover:text-cyan-200"
               >
                 EXPLORE PLATFORM
               </button>
 
               <Link to="/whitepaper">
                 <button
-                  className="elite-btn neocore-button w-full sm:w-auto px-4 py-2 text-sm md:text-base text-amber-300 hover:text-amber-200"
+                  className="elite-btn neocore-button w-full sm:w-auto px-4 py-2 text-sm md:text-base text-purple-300 hover:text-purple-200"
                 >
                   WHITEPAPER
                 </button>

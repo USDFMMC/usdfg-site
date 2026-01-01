@@ -14,7 +14,7 @@ const footerLinks = [
 const Footer: React.FC<FooterProps> = ({ isRevealed }) => {
   return (
     <>
-    <footer className="bg-gradient-to-r from-[#181c2f] via-[#1a142e] to-[#181c2f] border-t border-cyan-400/30 pt-6 pb-10 animate-fade-in text-cyan-100 shadow-[0_-2px_24px_#00e8fc22]" role="contentinfo" aria-label="Site Footer">
+    <footer className="border-t border-amber-400/20 pt-6 pb-10 animate-fade-in text-amber-100 shadow-[0_-2px_24px_rgba(251,191,36,0.1)]" role="contentinfo" aria-label="Site Footer">
       <div className="container mx-auto px-4 sm:px-6">
         <div className="grid grid-cols-1 md:grid-cols-3 items-center gap-6 md:gap-0 w-full">
           {/* Left: Mascot + Tagline */}
@@ -25,17 +25,17 @@ const Footer: React.FC<FooterProps> = ({ isRevealed }) => {
                 src="/assets/usdfg-logo-transparent.png" 
                 alt="USDFG Logo" 
                 className="w-10 h-10 sm:w-12 sm:h-12 object-contain mr-3 mascot-glow"
-                style={{filter: 'drop-shadow(0 0 10px rgba(0, 232, 252, 0.5))'}} 
+                style={{filter: 'drop-shadow(0 0 10px rgba(251, 191, 36, 0.4))'}} 
                 loading="lazy" decoding="async"
               />
             </picture>
-            <span className="text-sm text-cyan-400 font-medium whitespace-nowrap">
+            <span className="text-sm text-amber-300 font-medium whitespace-nowrap">
                 USDFGaming — The Last Great Token for Gamers.
               </span>
           </div>
 
             {/* Center: Social Icons */}
-            <div className="flex items-center justify-center gap-6 mt-4 text-cyan-300">
+            <div className="flex items-center justify-center gap-6 mt-4 text-amber-300">
               <a href="https://twitter.com/USDFGAMING" target="_blank" rel="noopener noreferrer" className="twitter-hover flex items-center gap-2 cursor-pointer" aria-label="Follow us on Twitter">
                 <Twitter size={18} />
                 <span>Twitter</span>
@@ -68,7 +68,7 @@ const Footer: React.FC<FooterProps> = ({ isRevealed }) => {
               ))}
               <button
                 onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                className="text-cyan-400 hover:text-cyan-300 text-sm transition duration-200 underline whitespace-nowrap"
+                className="text-amber-300 hover:text-amber-200 text-sm transition duration-200 underline whitespace-nowrap"
                 type="button"
                 aria-label="Back to Top"
               >

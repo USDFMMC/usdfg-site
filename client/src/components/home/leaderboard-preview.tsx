@@ -39,7 +39,7 @@ const tierColors: Record<string, string> = {
   Bronze: "bg-gradient-to-r from-yellow-700 to-yellow-400 text-yellow-100 border-yellow-400",
   Silver: "bg-gradient-to-r from-gray-400 to-white text-gray-900 border-gray-300",
   Gold: "bg-gradient-to-r from-yellow-300 to-yellow-500 text-yellow-900 border-yellow-400",
-  Platinum: "bg-gradient-to-r from-cyan-300 to-blue-500 text-blue-900 border-cyan-400",
+  Platinum: "bg-gradient-to-r from-amber-300 to-yellow-500 text-yellow-900 border-amber-400",
   Ghostly: "bg-gradient-to-r from-purple-400 to-indigo-900 text-white border-purple-400",
 };
 const tierTooltips: Record<string, string> = {
@@ -221,7 +221,7 @@ const LeaderboardPreview: React.FC = () => {
           </div>
 
           {/* Leaderboard Table */}
-          <div className="overflow-x-auto rounded-lg bg-[#07080C]/98 border border-amber-400/20 shadow-[0_0_20px_rgba(0,0,0,0.3)] backdrop-blur-md p-2 relative neon-outline">
+          <div className="neocore-panel overflow-x-auto rounded-lg p-2 relative neon-outline">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -318,13 +318,13 @@ const LeaderboardPreview: React.FC = () => {
                                       ? "bg-gradient-to-r from-gray-300/90 to-gray-500/90 border-gray-300/50"
                                       : player.rankTitle === "Bronze"
                                       ? "bg-gradient-to-r from-amber-700/90 to-yellow-500/90 border-amber-700/50"
-                                      : "bg-gradient-to-r from-cyan-400/90 to-blue-600/90 border-cyan-400/50"
+                                      : "bg-gradient-to-r from-amber-400/90 to-yellow-600/90 border-amber-400/50"
                                   } animate-fade-in-up`}
                                   >
                                     {player.rankTitle === "Gold" && <Crown className="w-4 h-4 text-yellow-300 drop-shadow-glow animate-bounce" />}
                                     {player.rankTitle === "Silver" && <Crown className="w-4 h-4 text-gray-200 drop-shadow-glow animate-bounce" />}
                                     {player.rankTitle === "Bronze" && <Crown className="w-4 h-4 text-amber-400 drop-shadow-glow animate-bounce" />}
-                                    {player.rankTitle === "Platinum" && <Crown className="w-4 h-4 text-cyan-200 drop-shadow-glow animate-bounce" />}
+                                    {player.rankTitle === "Platinum" && <Crown className="w-4 h-4 text-amber-200 drop-shadow-glow animate-bounce" />}
                                     {player.rankTitle === "Ghostly" && <Crown className="w-4 h-4 text-purple-400 drop-shadow-glow animate-bounce" style={{ filter: 'drop-shadow(0 0 6px #a78bfa) drop-shadow(0 0 12px #fff)' }} />}
                                     <span className="ml-1">{player.rankTitle}</span>
                                   </span>
@@ -343,8 +343,8 @@ const LeaderboardPreview: React.FC = () => {
                   <TableRow>
                     <TableCell colSpan={tableColumnCount} className="text-center py-8">
                       <div className="flex flex-col items-center gap-2">
-                        <Trophy className="w-12 h-12 text-cyan-400/50" />
-                        <p className="text-cyan-300 text-sm font-semibold">No teams yet!</p>
+                        <Trophy className="w-12 h-12 text-amber-400/50" />
+                        <p className="text-amber-300 text-sm font-semibold">No teams yet!</p>
                         <p className="text-gray-400 text-xs">Create a team to climb the leaderboard.</p>
                       </div>
                     </TableCell>
