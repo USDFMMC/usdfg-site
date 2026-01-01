@@ -61,7 +61,7 @@ const Tokenomics: React.FC = () => {
   };
 
   return (
-    <section id="tokenomics" className="py-12 text-center bg-[#07080C]" ref={sectionRef}>
+    <section id="tokenomics" className="py-12 text-center relative" ref={sectionRef}>
       {/* Why Tokenomics Matters Intro */}
       <div className="max-w-2xl mx-auto mb-6 px-4 py-3 rounded-xl bg-[#07080C]/98 border border-amber-400/20 shadow-lg backdrop-blur-md animate-fade-in" style={{ textAlign: 'center' }}>
           <p className="text-base md:text-lg font-bold text-amber-300 mb-2 drop-shadow-glow">Why Tokenomics Matters</p>

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 const CTASection: React.FC = () => {
   return (
-    <section className="py-12 bg-[#07080C]">
+    <section className="py-12 relative">
       <div className="container mx-auto px-3">
         <div className="max-w-4xl mx-auto text-center">
           {/* Enter the Challenge Image - Pro-level polish */}

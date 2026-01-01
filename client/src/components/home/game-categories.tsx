@@ -59,7 +59,7 @@ const GameCategories: React.FC = () => {
   };
 
   return (
-    <section className="py-8 px-3 text-white relative overflow-hidden bg-[#07080C]">
+    <section className="py-8 px-3 text-white relative overflow-hidden">
       <div className="max-w-7xl mx-auto">
         <motion.h2 
           initial={{ opacity: 0, y: -20 }}

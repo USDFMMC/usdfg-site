@@ -149,7 +149,7 @@ const LeaderboardPreview: React.FC = () => {
   }, [activeTab, leaderboardType, isExpanded]);
   
   return (
-    <section className="py-12 bg-[#07080C]">
+    <section className="py-12">
       <div className="container mx-auto px-3">
         <div className="text-center mb-6">
           <h2 className="text-2xl md:text-3xl font-extrabold mb-3 drop-shadow-glow">

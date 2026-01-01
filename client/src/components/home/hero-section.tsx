@@ -29,11 +29,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
 
   return (
     <section className="hero relative py-8 lg:py-12 overflow-hidden">
-      {/* Hero section specific enhancements */}
-      <div className="absolute inset-0 -z-10">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-amber-400/5 rounded-full blur-3xl animate-pulse-slow" />
-      </div>
-      
       <div className="container mx-auto px-3 relative z-10">
         <div className="flex flex-col lg:flex-row items-center">
           {/* Left copy */}

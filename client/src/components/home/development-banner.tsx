@@ -2,7 +2,7 @@ import React from "react";
 
 const AboutSection: React.FC = () => {
   return (
-    <section id="about-usdfg" className="relative flex justify-center items-center min-h-[60vh] px-3 py-8 overflow-hidden bg-[#07080C]">
+    <section id="about-usdfg" className="relative flex justify-center items-center min-h-[60vh] px-3 py-8 overflow-hidden">
       <div className="relative w-full max-w-4xl mx-auto px-3">
         <div className="relative w-full max-w-4xl mx-auto px-4 py-4 rounded-lg bg-[#07080C]/98 border border-amber-400/20 shadow-[0_0_20px_rgba(255,215,130,0.08)] backdrop-blur-md flex flex-col items-center transition-all duration-500 hover:shadow-[0_0_30px_rgba(255,215,130,0.12)]">
           <div className="w-full flex flex-col items-center text-center space-y-4">

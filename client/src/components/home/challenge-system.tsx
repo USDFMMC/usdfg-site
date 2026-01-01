@@ -111,7 +111,7 @@ const ChallengeSystem: React.FC = () => {
   // Render
   // -----------------------------
   return (
-    <section className="py-12 bg-[#07080C]">
+    <section className="py-12 relative">
       <div className="container mx-auto px-3">
         {/* Heading */}
         <div className="text-center mb-8">

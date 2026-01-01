@@ -31,7 +31,7 @@ const PlatformFeatures: React.FC = () => {
   ];
 
   return (
-    <section id="platform" className="py-8 px-3 text-white text-center relative overflow-hidden bg-[#07080C]">
+    <section id="platform" className="py-8 px-3 text-white text-center relative overflow-hidden">
       <h2 className="neocore-h2 text-center mb-3 text-white animate-fade-in" style={{ textShadow: '0 0 20px rgba(251, 191, 36, 0.3)' }}>
         USDFG – The Bitcoin of Gaming
       </h2>
