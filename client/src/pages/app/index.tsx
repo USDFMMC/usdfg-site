@@ -2801,15 +2801,24 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         
         if (pendingJoiner) {
           // There's a joiner waiting - we need to:
-          // 1. Create the PDA
+          // 1. Create the PDA first (can't fund until joiner expresses intent on-chain)
           // 2. Have the joiner express intent on-chain
           // 3. Then creator can fund
           const { createChallenge } = await import('@/lib/chain/contract');
-          challengePDA = await createChallenge(
-            { signTransaction, publicKey },
-            connection,
-            entryFee
-          );
+          try {
+            challengePDA = await createChallenge(
+              { signTransaction, publicKey },
+              connection,
+              entryFee
+            );
+          } catch (createError: any) {
+            console.error('❌ Error creating challenge PDA:', createError);
+            const errorMsg = createError.message || createError.toString() || '';
+            if (errorMsg.includes('InvalidProgramId') || errorMsg.includes('3008')) {
+              throw new Error('⚠️ Program ID mismatch. Please refresh the page and try again. If the issue persists, the contract may need to be redeployed.');
+            }
+            throw createError;
+          }
           
           // Update Firestore with PDA
           const { updateDoc, doc } = await import('firebase/firestore');
@@ -2826,11 +2835,20 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         } else {
           // No joiner yet - just create the PDA (can't fund without a joiner)
           const { createChallenge } = await import('@/lib/chain/contract');
-          challengePDA = await createChallenge(
-            { signTransaction, publicKey },
-            connection,
-            entryFee
-          );
+          try {
+            challengePDA = await createChallenge(
+              { signTransaction, publicKey },
+              connection,
+              entryFee
+            );
+          } catch (createError: any) {
+            console.error('❌ Error creating challenge PDA:', createError);
+            const errorMsg = createError.message || createError.toString() || '';
+            if (errorMsg.includes('InvalidProgramId') || errorMsg.includes('3008')) {
+              throw new Error('⚠️ Program ID mismatch. Please refresh the page and try again. If the issue persists, the contract may need to be redeployed.');
+            }
+            throw createError;
+          }
           
           // Update Firestore with PDA
           const { updateDoc, doc } = await import('firebase/firestore');

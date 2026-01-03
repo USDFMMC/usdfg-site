@@ -51,11 +51,13 @@ export async function derivePDAs(creator: PublicKey, challengeSeed: PublicKey) {
     PROGRAM_ID
   );
 
-  // Challenge PDA
-  const [challengePDA] = PublicKey.findProgramAddressSync(
+  // Challenge PDA - must match contract seeds exactly: [b"challenge", creator.key().as_ref(), challenge_seed.key().as_ref()]
+  // Contract uses: seeds = [b"challenge", creator.key().as_ref(), challenge_seed.key().as_ref()]
+  const [challengePDA, bump] = PublicKey.findProgramAddressSync(
     [SEEDS.CHALLENGE, creator.toBuffer(), challengeSeed.toBuffer()],
     PROGRAM_ID
   );
+  console.log('📍 Challenge PDA derived:', challengePDA.toString(), 'bump:', bump);
 
   // Escrow Wallet PDA
   const [escrowWalletPDA] = PublicKey.findProgramAddressSync(
@@ -133,8 +135,27 @@ export async function createChallenge(
 
   // Step 3: Derive PDAs
   console.log('🔧 Step 3: Deriving PDAs...');
+  console.log('🔍 Creator:', creator.toString());
+  console.log('🔍 Challenge Seed:', seed.publicKey.toString());
+  console.log('🔍 Program ID:', PROGRAM_ID.toString());
+  
   const pdas = await derivePDAs(creator, seed.publicKey);
   console.log(`📍 Challenge PDA: ${pdas.challengePDA.toString()}`);
+  
+  // Check if PDA already exists and has a different owner
+  try {
+    const accountInfo = await connection.getAccountInfo(pdas.challengePDA);
+    if (accountInfo) {
+      const owner = accountInfo.owner.toString();
+      console.log(`⚠️ PDA already exists! Owner: ${owner}`);
+      if (owner !== PROGRAM_ID.toString()) {
+        throw new Error(`Challenge PDA already exists but is owned by a different program (${owner}). This may indicate a previous deployment or incorrect PDA derivation.`);
+      }
+      console.log('✅ PDA exists and is owned by our program - this is okay for init_if_needed');
+    }
+  } catch (checkError) {
+    console.log('ℹ️ Could not check PDA existence:', checkError);
+  }
 
   // Step 4: Create instruction data (NO PAYMENT - metadata only)
   console.log('💰 Entry fee (raw USDFG):', entryFeeUsdfg);
@@ -158,16 +179,32 @@ export async function createChallenge(
   console.log('✅ Creating instruction - NO PAYMENT REQUIRED (metadata only)...');
   console.log('📍 Challenge PDA:', pdas.challengePDA.toString());
   
+  // Verify program ID matches
+  const systemProgramId = SystemProgram.programId;
+  console.log('🔍 Program ID:', PROGRAM_ID.toString());
+  console.log('🔍 System Program ID:', systemProgramId.toString());
+  console.log('🔍 System Program ID (expected):', '11111111111111111111111111111111');
+  
+  // Verify SystemProgram is correct
+  if (systemProgramId.toString() !== '11111111111111111111111111111111') {
+    throw new Error(`System Program ID mismatch! Expected 11111111111111111111111111111111, got ${systemProgramId.toString()}`);
+  }
+  
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
       { pubkey: pdas.challengePDA, isSigner: false, isWritable: true }, // challenge
-      { pubkey: creator, isSigner: true, isWritable: true }, // creator
+      { pubkey: creator, isSigner: true, isWritable: true }, // creator (mut)
       { pubkey: seed.publicKey, isSigner: true, isWritable: false }, // challenge_seed
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
+      { pubkey: systemProgramId, isSigner: false, isWritable: false }, // system_program
     ],
     data: instructionData,
   });
+  
+  console.log('🔍 Instruction accounts:', instruction.keys.map((k, i) => {
+    const accountType = i === 0 ? 'challenge (PDA)' : i === 1 ? 'creator' : i === 2 ? 'challenge_seed' : 'system_program';
+    return `${i}: ${k.pubkey.toString()} (${accountType}, signer: ${k.isSigner}, writable: ${k.isWritable})`;
+  }).join('\n'));
 
   console.log('✅ Instruction created');
 
@@ -305,16 +342,27 @@ export async function createAndFundChallenge(
   const entryFeeBuffer = numberToU64Buffer(entryFeeLamports);
   entryFeeBuffer.copy(createInstructionData, 8);
   
+  // Verify System Program ID
+  const systemProgramId = SystemProgram.programId;
+  if (systemProgramId.toString() !== '11111111111111111111111111111111') {
+    throw new Error(`System Program ID mismatch! Expected 11111111111111111111111111111111, got ${systemProgramId.toString()}`);
+  }
+  
   const createInstruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
-      { pubkey: pdas.challengePDA, isSigner: false, isWritable: true },
-      { pubkey: creator, isSigner: true, isWritable: true },
-      { pubkey: challengeSeed.publicKey, isSigner: true, isWritable: false },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: pdas.challengePDA, isSigner: false, isWritable: true }, // challenge
+      { pubkey: creator, isSigner: true, isWritable: true }, // creator (mut)
+      { pubkey: challengeSeed.publicKey, isSigner: true, isWritable: false }, // challenge_seed
+      { pubkey: systemProgramId, isSigner: false, isWritable: false }, // system_program
     ],
     data: createInstructionData,
   });
+  
+  console.log('🔍 Create instruction accounts:', createInstruction.keys.map((k, i) => {
+    const accountType = i === 0 ? 'challenge (PDA)' : i === 1 ? 'creator' : i === 2 ? 'challenge_seed' : 'system_program';
+    return `${i}: ${k.pubkey.toString()} (${accountType})`;
+  }).join('\n'));
   
   // Create instruction for creator_fund
   const fundHash = sha256(new TextEncoder().encode('global:creator_fund'));
