@@ -3,7 +3,6 @@
   "symbol": "USDFG",
   "description": "USDFG - Skill-based gaming token",
   "image": "https://usdfg.pro/assets/usdfg-token.png",
-  "website": "https://usdfg.pro",
-  "decimals": 9
+  "external_url": "https://usdfg.pro"
 }
 
