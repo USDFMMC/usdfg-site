@@ -89,6 +89,9 @@ async function main() {
       symbol: TOKEN_SYMBOL,
       uri: METADATA_URI,
       sellerFeeBasisPoints: 0,
+      creators: null,
+      collection: null,
+      uses: null,
     });
     
     const builder = updateV1(umi, {
