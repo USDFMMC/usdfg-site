@@ -111,21 +111,51 @@ export function useUSDFGWallet() {
         throw new Error(errorMsg);
       }
       
-      console.log("🔍 Selecting Phantom wallet...");
-      try {
-        await wallet.select(phantomWallet.adapter.name);
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        
-        // Verify selection worked
-        if (!wallet.wallet) {
-          const errorMsg = "Failed to select Phantom wallet. Please try again.";
-          console.error("❌", errorMsg);
+      // Check adapter ready state before attempting selection
+      console.log("🔍 Phantom adapter readyState:", phantomWallet.adapter.readyState);
+      
+      if (phantomWallet.adapter.readyState === "NotFound") {
+        const errorMsg = "Phantom wallet extension not found. Please install Phantom from https://phantom.app and refresh the page.";
+        console.error("❌", errorMsg);
+        throw new Error(errorMsg);
+      }
+      
+      if (phantomWallet.adapter.readyState === "Installed" || phantomWallet.adapter.readyState === "Loadable") {
+        console.log("🔍 Selecting Phantom wallet...");
+        try {
+          await wallet.select(phantomWallet.adapter.name);
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          
+          // Verify selection worked
+          if (!wallet.wallet) {
+            const errorMsg = "Failed to select Phantom wallet. Please refresh the page and try again.";
+            console.error("❌", errorMsg);
+            throw new Error(errorMsg);
+          }
+          console.log("✅ Phantom wallet selected successfully");
+        } catch (selectError: any) {
+          console.error("❌ Error selecting wallet:", selectError);
+          
+          // Provide specific error messages based on error type
+          let errorMsg = "Failed to select Phantom wallet.";
+          
+          if (selectError.message?.includes("not found") || selectError.message?.includes("NotFound")) {
+            errorMsg = "Phantom wallet extension not found. Please install Phantom from https://phantom.app and refresh the page.";
+          } else if (selectError.message?.includes("User rejected") || selectError.message?.includes("User cancelled")) {
+            errorMsg = "Wallet connection was cancelled. Please try again.";
+          } else if (selectError.message) {
+            errorMsg = `Failed to select Phantom wallet: ${selectError.message}`;
+          } else {
+            errorMsg = "Failed to select Phantom wallet. Please refresh the page and try again.";
+          }
+          
           throw new Error(errorMsg);
         }
-      } catch (selectError: any) {
-        console.error("❌ Error selecting wallet:", selectError);
-        // Re-throw with more context
-        throw new Error(`Failed to select Phantom wallet: ${selectError.message || 'Unknown error'}`);
+      } else {
+        // Adapter is not ready yet
+        const errorMsg = "Phantom wallet is not ready yet. Please wait a moment and try again.";
+        console.error("❌", errorMsg, "ReadyState:", phantomWallet.adapter.readyState);
+        throw new Error(errorMsg);
       }
     }
     
