@@ -126,22 +126,27 @@ export async function createChallenge(
   const creator = new PublicKey(wallet.publicKey.toString());
   console.log(`👤 Creator: ${creator.toString()}`);
 
-  // Derive challenge PDA - deployed contract uses init without seeds
-  // We'll use creator as seed to ensure uniqueness and determinism
-  const [challengePDA, bump] = PublicKey.findProgramAddressSync(
-    [SEEDS.CHALLENGE, creator.toBuffer()],
-    PROGRAM_ID
-  );
-  console.log(`📍 Challenge PDA: ${challengePDA.toString()} (bump: ${bump})`);
+  // CRITICAL: Deployed contract uses `init` without seeds
+  // When Anchor uses `init` without seeds, it creates a NEW account (not a PDA)
+  // The account address must be provided by the caller and will be owned by the program
+  // We need to generate a new keypair for the challenge account
+  // Anchor will initialize this account and transfer ownership to the program
+  const challengeKeypair = Keypair.generate();
+  const challengeAddress = challengeKeypair.publicKey;
+  console.log(`📍 Challenge account address: ${challengeAddress.toString()}`);
+  console.log(`📍 This will be a new account owned by the program after init`);
 
-  // Check if challenge already exists
+  // Check if challenge account already exists (shouldn't, but check anyway)
   try {
-    const accountInfo = await connection.getAccountInfo(challengePDA);
-    if (accountInfo && accountInfo.owner.equals(PROGRAM_ID)) {
-      console.log('⚠️ Challenge PDA already exists - this may cause an error');
+    const accountInfo = await connection.getAccountInfo(challengeAddress);
+    if (accountInfo) {
+      throw new Error(`Challenge account ${challengeAddress.toString()} already exists. Please use a different address.`);
     }
-  } catch (checkError) {
-    console.log('ℹ️ Could not check PDA existence:', checkError);
+  } catch (checkError: any) {
+    if (checkError.message?.includes('already exists')) {
+      throw checkError;
+    }
+    console.log('ℹ️ Account does not exist yet (expected for new challenge)');
   }
 
   // Convert USDFG to lamports
@@ -166,10 +171,13 @@ export async function createChallenge(
   // 3. system_program (Program<System>, not writable)
   const systemProgramId = SystemProgram.programId;
   
+  // CRITICAL: When using init without seeds, the account must be a signer
+  // because Anchor needs to sign the account creation instruction to System Program
+  // The account keypair will sign the transaction, then Anchor transfers ownership
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
-      { pubkey: challengePDA, isSigner: false, isWritable: true }, // 0: challenge (Account<'info, Challenge>, init)
+      { pubkey: challengeAddress, isSigner: true, isWritable: true }, // 0: challenge (Account<'info, Challenge>, init) - MUST be signer for init
       { pubkey: creator, isSigner: true, isWritable: true }, // 1: creator (Signer<'info>, mut)
       { pubkey: systemProgramId, isSigner: false, isWritable: false }, // 2: system_program (Program<'info, System>)
     ],
@@ -189,6 +197,9 @@ export async function createChallenge(
   transaction.feePayer = creator;
 
   console.log('🚀 Sending transaction...');
+  // CRITICAL: The challenge account keypair must sign because it's marked as isSigner: true
+  // This allows Anchor to create the account via System Program
+  transaction.partialSign(challengeKeypair);
   const signedTransaction = await wallet.signTransaction(transaction);
   
   let signature: string;
@@ -204,7 +215,7 @@ export async function createChallenge(
     if (sendError.message?.includes('This transaction has already been processed') ||
         sendError.message?.includes('already been processed')) {
       console.log('✅ Transaction already processed - challenge likely created successfully');
-      return challengePDA.toString();
+      return challengeAddress.toString();
     }
     throw sendError;
   }
@@ -223,10 +234,10 @@ export async function createChallenge(
   }
   
   console.log('✅ Challenge created successfully!');
-  console.log(`📍 Challenge PDA: ${challengePDA.toString()}`);
+  console.log(`📍 Challenge account: ${challengeAddress.toString()}`);
   console.log(`🔗 Transaction: https://explorer.solana.com/tx/${signature}?cluster=devnet`);
   
-  return challengePDA.toString();
+  return challengeAddress.toString();
 }
 
 /**
