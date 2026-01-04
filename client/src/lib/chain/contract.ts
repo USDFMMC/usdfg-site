@@ -233,6 +233,10 @@ export async function createChallenge(
 /**
  * Express intent to join challenge - NO PAYMENT REQUIRED
  * Moves challenge to CreatorConfirmationRequired state
+ * 
+ * Deployed contract ExpressJoinIntent struct:
+ * 1. challenge (Account, mut)
+ * 2. challenger (Signer, mut)
  */
 export async function expressJoinIntent(
   wallet: any,
@@ -248,7 +252,7 @@ export async function expressJoinIntent(
   const challenger = new PublicKey(wallet.publicKey.toString());
   const challengeAddress = new PublicKey(challengePDA);
   
-  // Create instruction data for express_join_intent
+  // Create instruction data for express_join_intent (no args in deployed contract)
   const { sha256 } = await import('@noble/hashes/sha2.js');
   const hash = sha256(new TextEncoder().encode('global:express_join_intent'));
   const discriminator = Buffer.from(hash.slice(0, 8));
@@ -256,11 +260,12 @@ export async function expressJoinIntent(
   const instructionData = Buffer.alloc(8); // discriminator only
   discriminator.copy(instructionData, 0);
 
+  // Account order matches deployed contract ExpressJoinIntent struct
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
-      { pubkey: challengeAddress, isSigner: false, isWritable: true }, // challenge
-      { pubkey: challenger, isSigner: true, isWritable: true }, // challenger
+      { pubkey: challengeAddress, isSigner: false, isWritable: true }, // 0: challenge
+      { pubkey: challenger, isSigner: true, isWritable: true }, // 1: challenger
     ],
     data: instructionData,
   });
@@ -436,6 +441,15 @@ export async function creatorFund(
 /**
  * Joiner funds escrow after creator funded
  * Moves challenge to Active state
+ * 
+ * Deployed contract JoinerFund struct:
+ * 1. challenge (Account, mut)
+ * 2. challenger (Signer, mut)
+ * 3. challenger_token_account (Account<TokenAccount>, mut)
+ * 4. escrow_token_account (Account<TokenAccount>, mut)
+ * 5. escrow_authority (AccountInfo, seeds = [ESCROW_AUTHORITY_SEED, challenge.key()])
+ * 6. token_program (Program<Token>)
+ * 7. mint (Account<Mint>)
  */
 export async function joinerFund(
   wallet: any,
@@ -455,34 +469,41 @@ export async function joinerFund(
   // Get challenger's token account
   const challengerTokenAccount = await getAssociatedTokenAddress(USDFG_MINT, challenger);
   
-  // Derive escrow PDAs
-  const [escrowTokenAccountPDA] = PublicKey.findProgramAddressSync(
-    [SEEDS.ESCROW_WALLET, challengeAddress.toBuffer(), USDFG_MINT.toBuffer()],
+  // Derive escrow authority PDA (matches deployed contract)
+  const [escrowAuthorityPDA] = PublicKey.findProgramAddressSync(
+    [SEEDS.ESCROW_AUTHORITY, challengeAddress.toBuffer()],
     PROGRAM_ID
+  );
+  
+  // Escrow token account is an ATA of the escrow authority
+  const escrowTokenAccountPDA = await getAssociatedTokenAddress(
+    USDFG_MINT,
+    escrowAuthorityPDA,
+    true // allowOwnerOffCurve for PDA
   );
   
   // Convert USDFG to lamports
   const entryFeeLamports = Math.floor(entryFeeUsdfg * Math.pow(10, 9));
   
-  // Create instruction data for joiner_fund
+  // Create instruction data for joiner_fund (no args in deployed contract)
   const { sha256 } = await import('@noble/hashes/sha2.js');
   const hash = sha256(new TextEncoder().encode('global:joiner_fund'));
   const discriminator = Buffer.from(hash.slice(0, 8));
   
-  const instructionData = Buffer.alloc(8 + 8); // discriminator + entry_fee
+  const instructionData = Buffer.alloc(8); // discriminator only (no args)
   discriminator.copy(instructionData, 0);
-  const entryFeeBuffer = numberToU64Buffer(entryFeeLamports);
-  entryFeeBuffer.copy(instructionData, 8);
 
+  // Account order matches deployed contract JoinerFund struct
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
-      { pubkey: challengeAddress, isSigner: false, isWritable: true }, // challenge
-      { pubkey: challenger, isSigner: true, isWritable: true }, // challenger
-      { pubkey: challengerTokenAccount, isSigner: false, isWritable: true }, // challenger_token_account
-      { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // escrow_token_account
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
-      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // mint
+      { pubkey: challengeAddress, isSigner: false, isWritable: true }, // 0: challenge
+      { pubkey: challenger, isSigner: true, isWritable: true }, // 1: challenger
+      { pubkey: challengerTokenAccount, isSigner: false, isWritable: true }, // 2: challenger_token_account
+      { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // 3: escrow_token_account
+      { pubkey: escrowAuthorityPDA, isSigner: false, isWritable: false }, // 4: escrow_authority
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // 5: token_program
+      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // 6: mint
     ],
     data: instructionData,
   });
