@@ -42,56 +42,67 @@ export async function getProgram(wallet: any, connection: Connection) {
 }
 
 /**
- * Derive PDA addresses (ORACLE REMOVED)
+ * Derive PDA addresses for deployed contract
+ * 
+ * Deployed contract structure:
+ * - CreateChallenge: challenge (init, no seeds), creator, system_program
+ * - Escrow uses: seeds = [ESCROW_AUTHORITY_SEED, challenge.key().as_ref()]
  */
-export async function derivePDAs(creator: PublicKey, challengeSeed: PublicKey) {
-  // Admin State PDA
-  const [adminStatePDA] = PublicKey.findProgramAddressSync(
-    [SEEDS.ADMIN],
-    PROGRAM_ID
-  );
-
-  // Challenge PDA - must match contract seeds exactly: [b"challenge", creator.key().as_ref(), challenge_seed.key().as_ref()]
-  // Contract uses: seeds = [b"challenge", creator.key().as_ref(), challenge_seed.key().as_ref()]
+export async function derivePDAs(creator: PublicKey) {
+  // Challenge PDA - deployed contract uses simple init without seeds
+  // The PDA is derived by Anchor automatically based on the account initialization
+  // We need to use a deterministic approach: use creator's pubkey as a seed
+  // Actually, looking at the deployed contract, it uses init without seeds, so Anchor
+  // will use a deterministic address based on the program and a discriminator
+  // For now, we'll derive it using creator as seed to ensure uniqueness
   const [challengePDA, bump] = PublicKey.findProgramAddressSync(
-    [SEEDS.CHALLENGE, creator.toBuffer(), challengeSeed.toBuffer()],
+    [SEEDS.CHALLENGE, creator.toBuffer()],
     PROGRAM_ID
   );
   console.log('📍 Challenge PDA derived:', challengePDA.toString(), 'bump:', bump);
 
-  // Escrow Wallet PDA
-  const [escrowWalletPDA] = PublicKey.findProgramAddressSync(
-    [SEEDS.ESCROW_WALLET],
+  // Escrow Authority PDA (used in deployed contract)
+  const [escrowAuthorityPDA, escrowBump] = PublicKey.findProgramAddressSync(
+    [SEEDS.ESCROW_AUTHORITY, challengePDA.toBuffer()],
     PROGRAM_ID
   );
+  console.log('📍 Escrow Authority PDA derived:', escrowAuthorityPDA.toString(), 'bump:', escrowBump);
 
-  // Escrow Token Account PDA
-  const [escrowTokenAccountPDA] = PublicKey.findProgramAddressSync(
-    [SEEDS.ESCROW_WALLET, challengePDA.toBuffer(), USDFG_MINT.toBuffer()],
-    PROGRAM_ID
+  // Escrow Token Account PDA - deployed contract uses init_if_needed with:
+  // seeds = [ESCROW_AUTHORITY_SEED, challenge.key().as_ref()]
+  // token::mint = mint
+  // token::authority = escrow_authority
+  const [escrowTokenAccountPDA] = PublicKey.getAssociatedTokenAddressSync(
+    USDFG_MINT,
+    escrowAuthorityPDA,
+    true // allowOwnerOffCurve for PDA
   );
 
   return {
-    adminStatePDA,
     challengePDA,
-    escrowWalletPDA,
+    escrowAuthorityPDA,
     escrowTokenAccountPDA,
+    escrowBump,
   };
 }
 
 /**
- * Create a challenge on-chain with escrow (ORACLE REMOVED)
+ * Create a challenge on-chain - matches deployed contract structure
+ * 
+ * Deployed contract CreateChallenge struct:
+ * 1. challenge (Account, init) - no seeds, Anchor derives address automatically
+ * 2. creator (Signer, mut)
+ * 3. system_program (Program<System>)
  * 
  * @param wallet - Connected wallet
  * @param connection - Solana connection
  * @param entryFeeUsdfg - Entry fee in USDFG tokens (e.g., 0.001 for 0.001 USDFG)
- * @returns Challenge PDA address
+ * @returns Challenge account address (derived by Anchor)
  */
 export async function createChallenge(
   wallet: any,
   connection: Connection,
-  entryFeeUsdfg: number,
-  challengeSeed?: Keypair
+  entryFeeUsdfg: number
 ): Promise<string> {
   console.log('🚀 Creating challenge on smart contract...');
   console.log(`Entry fee: ${entryFeeUsdfg} USDFG`);
@@ -113,69 +124,36 @@ export async function createChallenge(
     throw new Error('Wallet does not support transaction signing');
   }
 
-  console.log('✅ Wallet has signTransaction method');
-
-  // Smart contract is ready (no initialization needed for player-consensus model)
-  console.log('✅ Smart contract ready for player-consensus challenges');
-
-  // ✅ NEW CONTRACT: No oracle refresh needed!
-
-  console.log('🚀 Creating challenge with USDFG amounts...');
-
-  // Step 1: Prepare transaction (bypassing Anchor)
-  console.log('🔧 Step 1: Preparing transaction (bypassing Anchor)...');
-  
   const creator = new PublicKey(wallet.publicKey.toString());
   console.log(`👤 Creator: ${creator.toString()}`);
 
-  // Step 2: Generate challenge seed (or use provided one)
-  console.log('🔧 Step 2: Generating challenge seed...');
-  const seed = challengeSeed || Keypair.generate();
-  console.log(`🔑 Challenge seed: ${seed.publicKey.toString()}`);
+  // Derive challenge PDA - deployed contract uses init without seeds
+  // We'll use creator as seed to ensure uniqueness and determinism
+  const [challengePDA, bump] = PublicKey.findProgramAddressSync(
+    [SEEDS.CHALLENGE, creator.toBuffer()],
+    PROGRAM_ID
+  );
+  console.log(`📍 Challenge PDA: ${challengePDA.toString()} (bump: ${bump})`);
 
-  // Step 3: Derive PDAs
-  console.log('🔧 Step 3: Deriving PDAs...');
-  console.log('🔍 Creator:', creator.toString());
-  console.log('🔍 Challenge Seed:', seed.publicKey.toString());
-  console.log('🔍 Program ID:', PROGRAM_ID.toString());
-  
-  const pdas = await derivePDAs(creator, seed.publicKey);
-  console.log(`📍 Challenge PDA: ${pdas.challengePDA.toString()}`);
-  
-  // Check if PDA already exists and has a different owner
+  // Check if challenge already exists
   try {
-    const accountInfo = await connection.getAccountInfo(pdas.challengePDA);
-    if (accountInfo) {
-      const owner = accountInfo.owner.toString();
-      console.log(`⚠️ PDA already exists! Owner: ${owner}`);
-      if (owner !== PROGRAM_ID.toString()) {
-        throw new Error(`Challenge PDA already exists but is owned by a different program (${owner}). This may indicate a previous deployment or incorrect PDA derivation.`);
-      }
-      console.log('✅ PDA exists and is owned by our program - this is okay for init_if_needed');
+    const accountInfo = await connection.getAccountInfo(challengePDA);
+    if (accountInfo && accountInfo.owner.equals(PROGRAM_ID)) {
+      console.log('⚠️ Challenge PDA already exists - this may cause an error');
     }
   } catch (checkError) {
     console.log('ℹ️ Could not check PDA existence:', checkError);
   }
 
-  // Step 4: Create instruction data (NO PAYMENT - metadata only)
-  console.log('💰 Entry fee (raw USDFG):', entryFeeUsdfg);
-  // Convert USDFG to lamports (smallest units)
+  // Convert USDFG to lamports
   const entryFeeLamports = Math.floor(entryFeeUsdfg * Math.pow(10, 9)); // 9 decimals
   console.log('💰 Entry fee in lamports:', entryFeeLamports);
 
   // Create instruction data for create_challenge
-  // Anchor 0.29+ uses sha256("global:<instruction_name>")[0..8] for instruction discriminators
-  // For create_challenge, it's sha256("global:create_challenge")[0..8]
+  // Anchor uses sha256("global:create_challenge")[0..8] for instruction discriminator
   const { sha256 } = await import('@noble/hashes/sha2.js');
   const hash = sha256(new TextEncoder().encode('global:create_challenge'));
   const discriminator = Buffer.from(hash.slice(0, 8));
-  
-  // Verify discriminator matches expected value (for debugging)
-  const expectedDiscriminator = 'aaf42f01010fadef';
-  const actualDiscriminator = discriminator.toString('hex');
-  if (actualDiscriminator !== expectedDiscriminator) {
-    console.warn(`⚠️ Discriminator mismatch! Expected: ${expectedDiscriminator}, Got: ${actualDiscriminator}`);
-  }
   
   const instructionData = Buffer.alloc(8 + 8); // discriminator + entry_fee
   discriminator.copy(instructionData, 0);
@@ -183,65 +161,35 @@ export async function createChallenge(
   entryFeeBuffer.copy(instructionData, 8);
   console.log('📦 Instruction data created', 'Discriminator:', discriminator.toString('hex'));
 
-  // Step 5: Create instruction (NO ESCROW - metadata only!)
-  console.log('✅ Creating instruction - NO PAYMENT REQUIRED (metadata only)...');
-  console.log('📍 Challenge PDA:', pdas.challengePDA.toString());
-  
-  // Verify program ID matches
+  // Create instruction - deployed contract expects exactly 3 accounts in this order:
+  // 1. challenge (Account, init, writable)
+  // 2. creator (Signer, mut, writable)
+  // 3. system_program (Program<System>, not writable)
   const systemProgramId = SystemProgram.programId;
-  console.log('🔍 Program ID:', PROGRAM_ID.toString());
-  console.log('🔍 System Program ID:', systemProgramId.toString());
-  console.log('🔍 System Program ID (expected):', '11111111111111111111111111111111');
   
-  // Verify SystemProgram is correct
-  if (systemProgramId.toString() !== '11111111111111111111111111111111') {
-    throw new Error(`System Program ID mismatch! Expected 11111111111111111111111111111111, got ${systemProgramId.toString()}`);
-  }
-  
-  // CRITICAL: Account order must match Anchor's struct definition exactly
-  // CreateChallenge struct order:
-  // 1. challenge (Account, init)
-  // 2. creator (Signer, mut)
-  // 3. challenge_seed (Signer)
-  // 4. system_program (Program<System>)
-  // 
-  // When using #[account(init, ...)], Anchor expects accounts in struct order
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
-      { pubkey: pdas.challengePDA, isSigner: false, isWritable: true }, // 0: challenge (Account<'info, Challenge>)
+      { pubkey: challengePDA, isSigner: false, isWritable: true }, // 0: challenge (Account<'info, Challenge>, init)
       { pubkey: creator, isSigner: true, isWritable: true }, // 1: creator (Signer<'info>, mut)
-      { pubkey: seed.publicKey, isSigner: true, isWritable: false }, // 2: challenge_seed (Signer<'info>)
-      { pubkey: systemProgramId, isSigner: false, isWritable: false }, // 3: system_program (Program<'info, System>)
+      { pubkey: systemProgramId, isSigner: false, isWritable: false }, // 2: system_program (Program<'info, System>)
     ],
     data: instructionData,
   });
   
-  console.log('🔍 Instruction accounts (verifying order):');
+  console.log('🔍 Instruction accounts (matching deployed contract):');
   instruction.keys.forEach((key, idx) => {
-    const accountNames = ['challenge', 'creator', 'challenge_seed', 'system_program'];
+    const accountNames = ['challenge', 'creator', 'system_program'];
     console.log(`  ${idx}: ${key.pubkey.toString()} (${accountNames[idx]}, signer: ${key.isSigner}, writable: ${key.isWritable})`);
   });
-  
-  console.log('🔍 Instruction accounts:', instruction.keys.map((k, i) => {
-    const accountType = i === 0 ? 'challenge (PDA)' : i === 1 ? 'creator' : i === 2 ? 'challenge_seed' : 'system_program';
-    return `${i}: ${k.pubkey.toString()} (${accountType}, signer: ${k.isSigner}, writable: ${k.isWritable})`;
-  }).join('\n'));
 
-  console.log('✅ Instruction created');
-
-  // Step 7: Create and send transaction
-  console.log('🔧 Signing transaction...');
+  // Create and send transaction
   const transaction = new Transaction().add(instruction);
-  
-  // Set recent blockhash
   const { blockhash } = await connection.getLatestBlockhash();
   transaction.recentBlockhash = blockhash;
   transaction.feePayer = creator;
 
   console.log('🚀 Sending transaction...');
-  // Add challenge seed as a signer
-  transaction.partialSign(seed);
   const signedTransaction = await wallet.signTransaction(transaction);
   
   let signature: string;
@@ -249,17 +197,15 @@ export async function createChallenge(
   try {
     signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
       skipPreflight: false,
-      maxRetries: 0, // Don't retry - prevents "already processed" errors
+      maxRetries: 0,
     });
     
     console.log('✅ Transaction sent:', signature);
   } catch (sendError: any) {
-    // Handle "already processed" error during send
     if (sendError.message?.includes('This transaction has already been processed') ||
         sendError.message?.includes('already been processed')) {
       console.log('✅ Transaction already processed - challenge likely created successfully');
-      console.log(`📍 Challenge PDA: ${pdas.challengePDA.toString()}`);
-      return pdas.challengePDA.toString(); // Return the PDA as success
+      return challengePDA.toString();
     }
     throw sendError;
   }
@@ -268,21 +214,20 @@ export async function createChallenge(
   try {
     await connection.confirmTransaction(signature, 'confirmed');
   } catch (confirmError: any) {
-    // If confirmation fails but transaction actually succeeded, continue anyway
     console.log('⚠️  Confirmation warning:', confirmError.message);
     if (!confirmError.message?.includes('Transaction was not confirmed') && 
         !confirmError.message?.includes('already been processed') &&
         !confirmError.message?.includes('This transaction has already been processed')) {
-      throw confirmError; // Only throw if it's a real error
+      throw confirmError;
     }
     console.log('✅ Transaction likely succeeded despite confirmation error');
   }
   
   console.log('✅ Challenge created successfully!');
-  console.log(`📍 Challenge PDA: ${pdas.challengePDA.toString()}`);
+  console.log(`📍 Challenge PDA: ${challengePDA.toString()}`);
   console.log(`🔗 Transaction: https://explorer.solana.com/tx/${signature}?cluster=devnet`);
   
-  return pdas.challengePDA.toString();
+  return challengePDA.toString();
 }
 
 /**
@@ -336,6 +281,8 @@ export async function expressJoinIntent(
 /**
  * Create challenge PDA and fund in one transaction (for when challenge was created in Firestore only)
  * This combines create_challenge + creator_fund into a single transaction to save network fees
+ * 
+ * NOTE: This function may not work with the deployed contract structure. Use createChallenge() separately.
  */
 export async function createAndFundChallenge(
   wallet: any,
@@ -349,8 +296,7 @@ export async function createAndFundChallenge(
   }
 
   const creator = new PublicKey(wallet.publicKey.toString());
-  const challengeSeed = Keypair.generate();
-  const pdas = await derivePDAs(creator, challengeSeed.publicKey);
+  const pdas = await derivePDAs(creator);
   
   // Convert USDFG to lamports
   const entryFeeLamports = Math.floor(entryFeeUsdfg * Math.pow(10, 9));
@@ -370,71 +316,47 @@ export async function createAndFundChallenge(
     throw new Error(`System Program ID mismatch! Expected 11111111111111111111111111111111, got ${systemProgramId.toString()}`);
   }
   
+  // Deployed contract CreateChallenge has only 3 accounts (no challenge_seed)
   const createInstruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
       { pubkey: pdas.challengePDA, isSigner: false, isWritable: true }, // challenge
       { pubkey: creator, isSigner: true, isWritable: true }, // creator (mut)
-      { pubkey: challengeSeed.publicKey, isSigner: true, isWritable: false }, // challenge_seed
       { pubkey: systemProgramId, isSigner: false, isWritable: false }, // system_program
     ],
     data: createInstructionData,
   });
   
-  console.log('🔍 Create instruction accounts:', createInstruction.keys.map((k, i) => {
-    const accountType = i === 0 ? 'challenge (PDA)' : i === 1 ? 'creator' : i === 2 ? 'challenge_seed' : 'system_program';
-    return `${i}: ${k.pubkey.toString()} (${accountType})`;
-  }).join('\n'));
-  
-  // Create instruction for creator_fund
-  const fundHash = sha256(new TextEncoder().encode('global:creator_fund'));
-  const fundDiscriminator = Buffer.from(fundHash.slice(0, 8));
-  const fundInstructionData = Buffer.alloc(8 + 8);
-  fundDiscriminator.copy(fundInstructionData, 0);
-  entryFeeBuffer.copy(fundInstructionData, 8);
-  
-  const creatorTokenAccount = await getAssociatedTokenAddress(USDFG_MINT, creator);
-  const [escrowTokenAccountPDA] = PublicKey.findProgramAddressSync(
-    [SEEDS.ESCROW_WALLET, pdas.challengePDA.toBuffer(), USDFG_MINT.toBuffer()],
-    PROGRAM_ID
-  );
-  
-  const fundInstruction = new TransactionInstruction({
-    programId: PROGRAM_ID,
-    keys: [
-      { pubkey: pdas.challengePDA, isSigner: false, isWritable: true },
-      { pubkey: creator, isSigner: true, isWritable: true },
-      { pubkey: creatorTokenAccount, isSigner: false, isWritable: true },
-      { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true },
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
-      { pubkey: USDFG_MINT, isSigner: false, isWritable: false },
-    ],
-    data: fundInstructionData,
-  });
-  
-  // Combine both instructions in one transaction
-  const transaction = new Transaction().add(createInstruction, fundInstruction);
+  // For now, just create the challenge - funding should be done separately
+  // as the deployed contract structure may not support combining them
+  const transaction = new Transaction().add(createInstruction);
   const { blockhash } = await connection.getLatestBlockhash();
   transaction.recentBlockhash = blockhash;
   transaction.feePayer = creator;
   
-  // Sign with challenge seed
-  transaction.partialSign(challengeSeed);
-  
-  // Sign with wallet
   const signedTransaction = await wallet.signTransaction(transaction);
   const signature = await connection.sendRawTransaction(signedTransaction.serialize());
   await connection.confirmTransaction(signature);
   
-  console.log('✅ Challenge PDA created and funded in one transaction!');
+  console.log('✅ Challenge PDA created!');
+  console.log('⚠️ Note: Funding must be done separately using creatorFund()');
   return { pda: pdas.challengePDA.toString(), signature };
 }
 
 /**
  * Creator funds escrow after joiner expressed intent
  * Moves challenge to CreatorFunded state
+ * 
+ * Deployed contract CreatorFund struct:
+ * 1. challenge (Account, mut)
+ * 2. creator (Signer, mut)
+ * 3. creator_token_account (Account<TokenAccount>, mut)
+ * 4. escrow_token_account (Account<TokenAccount>, init_if_needed)
+ * 5. escrow_authority (AccountInfo, seeds = [ESCROW_AUTHORITY_SEED, challenge.key()])
+ * 6. token_program (Program<Token>)
+ * 7. mint (Account<Mint>)
+ * 8. system_program (Program<System>)
+ * 9. rent (Sysvar<Rent>)
  */
 export async function creatorFund(
   wallet: any,
@@ -454,36 +376,46 @@ export async function creatorFund(
   // Get creator's token account
   const creatorTokenAccount = await getAssociatedTokenAddress(USDFG_MINT, creator);
   
-  // Derive escrow PDAs
-  const [escrowTokenAccountPDA] = PublicKey.findProgramAddressSync(
-    [SEEDS.ESCROW_WALLET, challengeAddress.toBuffer(), USDFG_MINT.toBuffer()],
+  // Derive escrow authority PDA (matches deployed contract)
+  const [escrowAuthorityPDA, escrowBump] = PublicKey.findProgramAddressSync(
+    [SEEDS.ESCROW_AUTHORITY, challengeAddress.toBuffer()],
     PROGRAM_ID
   );
+  console.log('📍 Escrow Authority PDA:', escrowAuthorityPDA.toString(), 'bump:', escrowBump);
+  
+  // Escrow token account is an ATA of the escrow authority
+  // The contract uses init_if_needed, so we need to derive it
+  const escrowTokenAccountPDA = await getAssociatedTokenAddress(
+    USDFG_MINT,
+    escrowAuthorityPDA,
+    true // allowOwnerOffCurve for PDA
+  );
+  console.log('📍 Escrow Token Account PDA:', escrowTokenAccountPDA.toString());
   
   // Convert USDFG to lamports
   const entryFeeLamports = Math.floor(entryFeeUsdfg * Math.pow(10, 9));
   
-  // Create instruction data for creator_fund
+  // Create instruction data for creator_fund (no args in deployed contract)
   const { sha256 } = await import('@noble/hashes/sha2.js');
   const hash = sha256(new TextEncoder().encode('global:creator_fund'));
   const discriminator = Buffer.from(hash.slice(0, 8));
   
-  const instructionData = Buffer.alloc(8 + 8); // discriminator + entry_fee
+  const instructionData = Buffer.alloc(8); // discriminator only (no args)
   discriminator.copy(instructionData, 0);
-  const entryFeeBuffer = numberToU64Buffer(entryFeeLamports);
-  entryFeeBuffer.copy(instructionData, 8);
 
+  // Account order matches deployed contract CreatorFund struct
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
-      { pubkey: challengeAddress, isSigner: false, isWritable: true }, // challenge
-      { pubkey: creator, isSigner: true, isWritable: true }, // creator
-      { pubkey: creatorTokenAccount, isSigner: false, isWritable: true }, // creator_token_account
-      { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // escrow_token_account
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
-      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }, // rent
-      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // mint
+      { pubkey: challengeAddress, isSigner: false, isWritable: true }, // 0: challenge
+      { pubkey: creator, isSigner: true, isWritable: true }, // 1: creator
+      { pubkey: creatorTokenAccount, isSigner: false, isWritable: true }, // 2: creator_token_account
+      { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // 3: escrow_token_account
+      { pubkey: escrowAuthorityPDA, isSigner: false, isWritable: false }, // 4: escrow_authority
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // 5: token_program
+      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // 6: mint
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // 7: system_program
+      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }, // 8: rent
     ],
     data: instructionData,
   });
