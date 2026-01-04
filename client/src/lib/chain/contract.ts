@@ -164,10 +164,18 @@ export async function createChallenge(
   console.log('💰 Entry fee in lamports:', entryFeeLamports);
 
   // Create instruction data for create_challenge
-  // Calculate discriminator using SHA256 of "global:create_challenge"
+  // Anchor 0.29+ uses sha256("global:<instruction_name>")[0..8] for instruction discriminators
+  // For create_challenge, it's sha256("global:create_challenge")[0..8]
   const { sha256 } = await import('@noble/hashes/sha2.js');
   const hash = sha256(new TextEncoder().encode('global:create_challenge'));
   const discriminator = Buffer.from(hash.slice(0, 8));
+  
+  // Verify discriminator matches expected value (for debugging)
+  const expectedDiscriminator = 'aaf42f01010fadef';
+  const actualDiscriminator = discriminator.toString('hex');
+  if (actualDiscriminator !== expectedDiscriminator) {
+    console.warn(`⚠️ Discriminator mismatch! Expected: ${expectedDiscriminator}, Got: ${actualDiscriminator}`);
+  }
   
   const instructionData = Buffer.alloc(8 + 8); // discriminator + entry_fee
   discriminator.copy(instructionData, 0);
@@ -190,15 +198,29 @@ export async function createChallenge(
     throw new Error(`System Program ID mismatch! Expected 11111111111111111111111111111111, got ${systemProgramId.toString()}`);
   }
   
+  // CRITICAL: Account order must match Anchor's struct definition exactly
+  // CreateChallenge struct order:
+  // 1. challenge (Account, init)
+  // 2. creator (Signer, mut)
+  // 3. challenge_seed (Signer)
+  // 4. system_program (Program<System>)
+  // 
+  // When using #[account(init, ...)], Anchor expects accounts in struct order
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
-      { pubkey: pdas.challengePDA, isSigner: false, isWritable: true }, // challenge
-      { pubkey: creator, isSigner: true, isWritable: true }, // creator (mut)
-      { pubkey: seed.publicKey, isSigner: true, isWritable: false }, // challenge_seed
-      { pubkey: systemProgramId, isSigner: false, isWritable: false }, // system_program
+      { pubkey: pdas.challengePDA, isSigner: false, isWritable: true }, // 0: challenge (Account<'info, Challenge>)
+      { pubkey: creator, isSigner: true, isWritable: true }, // 1: creator (Signer<'info>, mut)
+      { pubkey: seed.publicKey, isSigner: true, isWritable: false }, // 2: challenge_seed (Signer<'info>)
+      { pubkey: systemProgramId, isSigner: false, isWritable: false }, // 3: system_program (Program<'info, System>)
     ],
     data: instructionData,
+  });
+  
+  console.log('🔍 Instruction accounts (verifying order):');
+  instruction.keys.forEach((key, idx) => {
+    const accountNames = ['challenge', 'creator', 'challenge_seed', 'system_program'];
+    console.log(`  ${idx}: ${key.pubkey.toString()} (${accountNames[idx]}, signer: ${key.isSigner}, writable: ${key.isWritable})`);
   });
   
   console.log('🔍 Instruction accounts:', instruction.keys.map((k, i) => {
