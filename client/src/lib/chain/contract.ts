@@ -68,11 +68,10 @@ export async function derivePDAs(creator: PublicKey) {
   );
   console.log('📍 Escrow Authority PDA derived:', escrowAuthorityPDA.toString(), 'bump:', escrowBump);
 
-  // Escrow Token Account PDA - deployed contract uses init_if_needed with:
-  // seeds = [ESCROW_AUTHORITY_SEED, challenge.key().as_ref()]
-  // token::mint = mint
-  // token::authority = escrow_authority
-  const [escrowTokenAccountPDA] = PublicKey.getAssociatedTokenAddressSync(
+  // Escrow Token Account PDA - deployed contract uses init_if_needed
+  // It's an Associated Token Account (ATA) of the escrow_authority PDA
+  // We need to derive it using the ATA derivation
+  const escrowTokenAccountPDA = await getAssociatedTokenAddress(
     USDFG_MINT,
     escrowAuthorityPDA,
     true // allowOwnerOffCurve for PDA
