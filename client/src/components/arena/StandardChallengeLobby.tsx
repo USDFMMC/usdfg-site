@@ -1,7 +1,8 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { ChatBox } from "./ChatBox";
 import { VoiceChat } from "./VoiceChat";
 import { Camera, Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
+import { getPlayerStats } from "@/lib/firebase/firestore";
 
 interface StandardChallengeLobbyProps {
   challenge: any;
@@ -28,6 +29,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const [proofImage, setProofImage] = useState<string | null>(null);
   const [proofFile, setProofFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [playerData, setPlayerData] = useState<Record<string, { displayName?: string; profileImage?: string }>>({});
 
   const status = challenge.status || challenge.rawData?.status || 'pending_waiting_for_opponent';
   const players = challenge.rawData?.players || challenge.players || [];
@@ -173,9 +175,117 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     ? players.find((p: string) => p?.toLowerCase() !== currentWallet?.toLowerCase())
     : null;
 
+  // Fetch player display names and profile images
+  useEffect(() => {
+    const fetchPlayerData = async () => {
+      const data: Record<string, { displayName?: string; profileImage?: string }> = {};
+      for (const wallet of players) {
+        if (wallet) {
+          try {
+            const stats = await getPlayerStats(wallet);
+            if (stats) {
+              data[wallet.toLowerCase()] = {
+                displayName: stats.displayName,
+                profileImage: stats.profileImage,
+              };
+            }
+          } catch (error) {
+            console.error(`Failed to fetch stats for ${wallet}:`, error);
+          }
+        }
+      }
+      setPlayerData(data);
+    };
+    
+    if (players.length > 0) {
+      fetchPlayerData();
+    }
+  }, [players]);
+
+  // Separate players and spectators
+  const participants = players.filter((p: string) => p);
+  const spectators: string[] = []; // For now, spectators are non-participants viewing the lobby
 
   return (
     <div className="space-y-4">
+      {/* Players & Spectators List - X Spaces style */}
+      <div className="rounded-xl border border-white/10 bg-black/40 p-4 backdrop-blur-sm">
+        <div className="mb-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-300 mb-2">
+            Participants ({participants.length})
+          </h3>
+          <div className="space-y-2">
+            {participants.map((wallet: string) => {
+              const data = playerData[wallet.toLowerCase()] || {};
+              const displayName = data.displayName || `${wallet.slice(0, 4)}...${wallet.slice(-4)}`;
+              const isCurrentUser = currentWallet && wallet.toLowerCase() === currentWallet.toLowerCase();
+              
+              return (
+                <div
+                  key={wallet}
+                  className={`flex items-center gap-3 p-2 rounded-lg ${
+                    isCurrentUser ? 'bg-amber-500/10 border border-amber-400/30' : 'bg-white/5'
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400/20 to-amber-600/20 border border-amber-400/30 flex items-center justify-center overflow-hidden">
+                    {data.profileImage ? (
+                      <img src={data.profileImage} alt={displayName} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-amber-300 font-semibold text-sm">
+                        {displayName.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-white truncate">
+                      {displayName}
+                      {isCurrentUser && <span className="ml-2 text-xs text-amber-300">(You)</span>}
+                    </div>
+                    <div className="text-xs text-gray-400 truncate">
+                      {wallet.slice(0, 6)}...{wallet.slice(-4)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        
+        {spectators.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-white/5">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-2">
+              Spectators ({spectators.length})
+            </h3>
+            <div className="space-y-2">
+              {spectators.map((wallet: string) => {
+                const data = playerData[wallet.toLowerCase()] || {};
+                const displayName = data.displayName || `${wallet.slice(0, 4)}...${wallet.slice(-4)}`;
+                
+                return (
+                  <div
+                    key={wallet}
+                    className="flex items-center gap-3 p-2 rounded-lg bg-white/5"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-400/20 to-gray-600/20 border border-gray-400/30 flex items-center justify-center overflow-hidden">
+                      {data.profileImage ? (
+                        <img src={data.profileImage} alt={displayName} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-gray-300 font-semibold text-xs">
+                          {displayName.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium text-gray-300 truncate">{displayName}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Status Banner - Prominent display */}
       {status === 'active' && isParticipant && opponentWallet && (
         <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">

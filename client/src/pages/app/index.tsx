@@ -9,6 +9,7 @@ import { creatorFund as creatorFundOnChain, joinerFund as joinerFundOnChain } fr
 import { handlePhantomReturn, isPhantomReturn, SESSION_STORAGE_NONCE } from '@/lib/wallet/phantom-deeplink';
 import TournamentBracketView from "@/components/arena/TournamentBracketView";
 import StandardChallengeLobby from "@/components/arena/StandardChallengeLobby";
+import RightSidePanel from "@/components/ui/RightSidePanel";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
@@ -804,8 +805,6 @@ const ArenaHome: React.FC = () => {
   const [loadingTopTeams, setLoadingTopTeams] = useState<boolean>(false);
   const [showTournamentLobby, setShowTournamentLobby] = useState(false);
   const [showStandardLobby, setShowStandardLobby] = useState(false);
-  const [isStandardLobbyMinimized, setIsStandardLobbyMinimized] = useState(false);
-  const [isTournamentLobbyMinimized, setIsTournamentLobbyMinimized] = useState(false);
 const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string; opponentWallet: string } | null>(null);
   const [showTeamModal, setShowTeamModal] = useState<boolean>(false);
   const [userTeam, setUserTeam] = useState<TeamStats | null>(null);
@@ -1680,7 +1679,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           
           const merged = mergeChallengeDataForModal(challenge, challenge);
           setSelectedChallenge(merged);
-          setIsTournamentLobbyMinimized(false);
           setShowTournamentLobby(true);
           console.log(`🏆 Tournament lobby opened (stage: ${stage})`);
         } catch (error) {
@@ -1885,7 +1883,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           title: (challenge as any).title || extractGameFromTitle((challenge as any).title || '') || "Challenge",
           ...challenge
         });
-        setIsStandardLobbyMinimized(false);
         setShowStandardLobby(true);
       }
     }
@@ -2764,10 +2761,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           });
           
           if (isTournament) {
-            setIsTournamentLobbyMinimized(false);
             setShowTournamentLobby(true);
           } else {
-            setIsStandardLobbyMinimized(false);
             setShowStandardLobby(true);
           }
           break;
@@ -2991,7 +2986,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         // Close submit result modal and reopen tournament lobby
         setShowSubmitResultModal(false);
         setTournamentMatchData(null);
-        setIsTournamentLobbyMinimized(false);
         setShowTournamentLobby(true);
         
         // Show success message
@@ -3756,10 +3750,29 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
     
     React.useEffect(() => {
-      const original = document.body.style.overflow;
+      // Lock body scroll when modal is open - prevent background scroll
+      const originalOverflow = document.body.style.overflow;
+      const originalPosition = document.body.style.position;
+      const originalTop = document.body.style.top;
+      const originalWidth = document.body.style.width;
+      
+      // Get current scroll position
+      const scrollY = window.scrollY;
+      
       document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      
       return () => {
-        document.body.style.overflow = original;
+        // Restore body scroll
+        document.body.style.overflow = originalOverflow;
+        document.body.style.position = originalPosition;
+        document.body.style.top = originalTop;
+        document.body.style.width = originalWidth;
+        
+        // Restore scroll position
+        window.scrollTo(0, scrollY);
       };
     }, []);
 
@@ -3768,13 +3781,43 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const container = scrollContainerRef.current;
       if (!container) return;
 
-      // Disable any auto-scroll behavior
-      container.scrollTop = 0; // Start at top when opened
-      
       // Prevent scroll restoration
       if ('scrollRestoration' in window.history) {
         window.history.scrollRestoration = 'manual';
       }
+      
+      // Start at top when opened, but don't force it repeatedly
+      let scrollPosition = 0;
+      let isUserScrolling = false;
+      
+      const handleScroll = () => {
+        isUserScrolling = true;
+        scrollPosition = container.scrollTop;
+      };
+      
+      const handleTouchStart = () => {
+        isUserScrolling = true;
+      };
+      
+      const handleTouchEnd = () => {
+        // Small delay to allow scroll to settle
+        setTimeout(() => {
+          isUserScrolling = false;
+        }, 100);
+      };
+      
+      container.addEventListener('scroll', handleScroll, { passive: true });
+      container.addEventListener('touchstart', handleTouchStart, { passive: true });
+      container.addEventListener('touchend', handleTouchEnd, { passive: true });
+      
+      // Only set scrollTop initially, not on every render
+      container.scrollTop = 0;
+      
+      return () => {
+        container.removeEventListener('scroll', handleScroll);
+        container.removeEventListener('touchstart', handleTouchStart);
+        container.removeEventListener('touchend', handleTouchEnd);
+      };
     }, []);
 
     // Calculate expiration time
@@ -3844,10 +3887,28 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     };
 
     return (
-      <div className="fixed inset-0 z-50 flex items-end bg-black/70" onClick={onClose} role="dialog" aria-modal="true">
+      <div 
+        className="fixed inset-0 z-50 flex items-end bg-black/70" 
+        onClick={onClose} 
+        role="dialog" 
+        aria-modal="true"
+        style={{
+          // Prevent body scroll when modal is open
+          touchAction: 'none',
+          // Ensure modal is above everything
+          zIndex: 50
+        }}
+      >
         <div
           className="w-full max-h-[90vh] sm:max-h-[85%] rounded-t-2xl bg-neutral-900 overflow-hidden flex flex-col"
           onClick={(e) => e.stopPropagation()}
+          style={{
+            // Prevent scroll interference
+            touchAction: 'pan-y',
+            // Ensure proper stacking
+            position: 'relative',
+            zIndex: 1
+          }}
         >
           <div className="relative h-[130px] flex-shrink-0">
             <img 
@@ -3900,8 +3961,18 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             className="flex-1 overflow-y-auto p-4 pb-24"
             style={{ 
               WebkitOverflowScrolling: 'touch',
-              overscrollBehavior: 'contain',
-              paddingBottom: '6rem' // Extra padding to ensure buttons are visible
+              overscrollBehavior: 'none', // Prevent bounce-back scroll on mobile
+              paddingBottom: '6rem', // Extra padding to ensure buttons are visible
+              touchAction: 'pan-y', // Allow vertical scrolling only
+              willChange: 'scroll-position' // Optimize scroll performance
+            }}
+            onTouchStart={(e) => {
+              // Prevent scroll jumps on touch
+              e.stopPropagation();
+            }}
+            onTouchMove={(e) => {
+              // Allow natural scrolling
+              e.stopPropagation();
             }}
           >
             <div className="grid grid-cols-2 gap-3">
@@ -4068,8 +4139,22 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             </button>
           </div>
           
-          {/* Sticky button container for mobile - ensures buttons are always visible */}
-          <div className="sticky bottom-0 bg-neutral-900 border-t border-white/10 p-4 pb-4 sm:hidden z-10 shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
+          {/* Fixed button container for mobile - ensures buttons are always visible without scroll interference */}
+          <div 
+            className="fixed bottom-0 left-0 right-0 bg-neutral-900 border-t border-white/10 p-4 pb-4 sm:hidden z-10 shadow-[0_-4px_20px_rgba(0,0,0,0.5)]"
+            style={{
+              // Ensure it's above the scroll container
+              position: 'fixed',
+              // Prevent touch events from interfering with scroll
+              touchAction: 'none',
+              // Add safe area padding for iOS
+              paddingBottom: 'max(1rem, env(safe-area-inset-bottom))'
+            }}
+            onTouchStart={(e) => {
+              // Prevent touch events from bubbling to scroll container
+              e.stopPropagation();
+            }}
+          >
             {/* Show Cancel button for creator ONLY in pending_waiting_for_opponent state */}
             {isOwner && status === 'pending_waiting_for_opponent' && (
               <button
@@ -4736,8 +4821,27 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                     }
                                   }
                                   
-                                    setSelectedChallenge(challenge);
-                                  setShowDetailSheet(true);
+                                  // For live challenges (active or creator_funded), open lobby directly
+                                  const isLive = challenge.status === "active" || challenge.status === "creator_funded";
+                                  
+                                  setSelectedChallenge({
+                                    id: challenge.id,
+                                    title: (challenge as any).title || extractGameFromTitle((challenge as any).title || '') || "Challenge",
+                                    ...challenge
+                                  });
+                                  
+                                  if (isLive) {
+                                    // Open lobby directly for live challenges
+                                    const format = challenge.rawData?.format || (challenge.rawData?.tournament ? "tournament" : "standard");
+                                    if (format === "tournament") {
+                                      setShowTournamentLobby(true);
+                                    } else {
+                                      setShowStandardLobby(true);
+                                    }
+                                  } else {
+                                    // Open detail sheet for non-live challenges
+                                    setShowDetailSheet(true);
+                                  }
                                 }}
                               />
                               </div>
@@ -5533,10 +5637,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               // Determine if it's a tournament or standard challenge
               const format = challenge.rawData?.format || (challenge.rawData?.tournament ? "tournament" : "standard");
               if (format === "tournament") {
-                setIsTournamentLobbyMinimized(false);
                 setShowTournamentLobby(true);
               } else {
-                setIsStandardLobbyMinimized(false);
                 setShowStandardLobby(true);
               }
             }}
@@ -5555,20 +5657,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
           if (isTournament) {
             // Render tournament lobby modal - persistent room
-            if (showTournamentLobby && !isTournamentLobbyMinimized) {
+            if (showTournamentLobby) {
               return (
                 <ElegantModal
                   isOpen={showTournamentLobby}
                   onClose={() => {
                     setShowTournamentLobby(false);
-                    setIsTournamentLobbyMinimized(false);
                     setSelectedChallenge(null);
                   }}
                   title={`${selectedChallenge.title || "Tournament"} Bracket`}
-                  canMinimize={true}
-                  onMinimize={() => {
-                    setIsTournamentLobbyMinimized(true);
-                  }}
                 >
                   <TournamentBracketView
                     tournament={selectedChallenge.rawData?.tournament}
@@ -5591,7 +5688,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                       setShowSubmitResultModal(false);
                       setTournamentMatchData(null);
                       // Reopen tournament lobby after closing submit result modal
-                      setIsTournamentLobbyMinimized(false);
                       setShowTournamentLobby(true);
                     }}
                     challengeId={selectedChallenge.id}
@@ -5609,19 +5705,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           // Standard challenge: render persistent lobby with inline submit form
           return (
             <>
-              {showStandardLobby && !isStandardLobbyMinimized && (
-                <ElegantModal
+              {showStandardLobby && (
+                <RightSidePanel
                   isOpen={showStandardLobby}
                   onClose={() => {
                     setShowStandardLobby(false);
-                    setIsStandardLobbyMinimized(false);
                     setSelectedChallenge(null);
                   }}
                   title={`${selectedChallenge.title || "Challenge"} Lobby`}
-                  canMinimize={true}
-                  onMinimize={() => {
-                    setIsStandardLobbyMinimized(true);
-                  }}
                 >
                   <StandardChallengeLobby
                     challenge={selectedChallenge}
@@ -5630,56 +5721,17 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     onClaimPrize={handleClaimPrize}
                     onClose={() => {
                       setShowStandardLobby(false);
-                      setIsStandardLobbyMinimized(false);
                       setSelectedChallenge(null);
                     }}
                     isSubmitting={false}
                     isClaiming={claimingPrize === selectedChallenge.id}
                   />
-                </ElegantModal>
+                </RightSidePanel>
               )}
             </>
           );
         })()}
 
-        {/* Minimized Lobby Indicators */}
-        <div className="fixed bottom-4 right-4 z-40 flex flex-col gap-2">
-          {isStandardLobbyMinimized && selectedChallenge && (
-            <button
-              onClick={() => {
-                setIsStandardLobbyMinimized(false);
-                setShowStandardLobby(true);
-              }}
-              className="flex items-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500/90 to-amber-600/90 hover:from-amber-600 hover:to-amber-700 text-white font-semibold shadow-[0_0_20px_rgba(245,158,11,0.4)] border border-amber-400/30 transition-all hover:scale-105"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-              </svg>
-              <span className="text-sm">{selectedChallenge.title || "Challenge"} Lobby</span>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-              </svg>
-            </button>
-          )}
-
-          {isTournamentLobbyMinimized && selectedChallenge && (
-            <button
-              onClick={() => {
-                setIsTournamentLobbyMinimized(false);
-                setShowTournamentLobby(true);
-              }}
-              className="flex items-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500/90 to-amber-600/90 hover:from-amber-600 hover:to-amber-700 text-white font-semibold shadow-[0_0_20px_rgba(245,158,11,0.4)] border border-amber-400/30 transition-all hover:scale-105"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-              </svg>
-              <span className="text-sm">{selectedChallenge.title || "Tournament"} Bracket</span>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-              </svg>
-            </button>
-          )}
-        </div>
 
           {friendlyMatch && (
             <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div></div>}>
