@@ -2502,6 +2502,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       return;
     }
 
+    const walletAddr = publicKey.toString();
     const status = challenge.status || challenge.rawData?.status;
     const challengePDA = challenge.rawData?.pda || challenge.pda;
     const pendingJoiner = challenge.rawData?.pendingJoiner || challenge.pendingJoiner;
@@ -5716,7 +5717,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     currentWallet={publicKey?.toString() || null}
                     onSubmitResult={handleSubmitResult}
                     onClaimPrize={handleClaimPrize}
-                    onJoinChallenge={handleExpressJoinIntent}
+                    onJoinChallenge={handleDirectJoinerExpressIntent}
                     onClose={() => {
                       setShowStandardLobby(false);
                       setSelectedChallenge(null);
