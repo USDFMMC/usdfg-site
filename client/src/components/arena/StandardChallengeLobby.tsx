@@ -9,6 +9,7 @@ interface StandardChallengeLobbyProps {
   currentWallet?: string | null;
   onSubmitResult: (didWin: boolean, proofFile?: File | null) => Promise<void>;
   onClaimPrize: (challenge: any) => Promise<void>;
+  onJoinChallenge?: (challenge: any) => Promise<void>;
   onClose: () => void;
   isSubmitting?: boolean;
   isClaiming?: boolean;
@@ -19,6 +20,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   currentWallet,
   onSubmitResult,
   onClaimPrize,
+  onJoinChallenge,
   onClose,
   isSubmitting = false,
   isClaiming = false,
@@ -161,6 +163,9 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
   const statusDisplay = getStatusDisplay();
   const isParticipant = currentWallet && players.some((p: string) => p?.toLowerCase() === currentWallet?.toLowerCase());
+  const maxPlayers = challenge.maxPlayers || challenge.rawData?.maxPlayers || 2;
+  const isFull = players.length >= maxPlayers;
+  const canJoin = !isParticipant && !isFull && (status === 'pending_waiting_for_opponent' || status === 'creator_confirmation_required' || status === 'creator_funded') && currentWallet && onJoinChallenge;
   
   const canSubmitResult = status === 'active' && players.length >= 2 && isParticipant && !hasAlreadySubmitted;
   
@@ -285,6 +290,35 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           </div>
         )}
       </div>
+
+      {/* Join Challenge Button - Show if user can join */}
+      {canJoin && (
+        <div className="rounded-xl border border-blue-400/30 bg-blue-500/10 p-4">
+          <div className="text-center">
+            <div className="text-sm font-semibold text-blue-200 mb-2">
+              Join this challenge to compete for {prizePool} USDFG
+            </div>
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (onJoinChallenge) {
+                  try {
+                    await onJoinChallenge(challenge);
+                  } catch (error: any) {
+                    console.error('Failed to join challenge:', error);
+                    alert(error.message || 'Failed to join challenge. Please try again.');
+                  }
+                }
+              }}
+              className="w-full rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-3 font-semibold transition-all shadow-[0_0_15px_rgba(59,130,246,0.5)] hover:shadow-[0_0_25px_rgba(59,130,246,0.7)] border border-blue-400/30"
+            >
+              Join Challenge ({entryFee} USDFG + Network Fee)
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Status Banner - Prominent display */}
       {status === 'active' && isParticipant && opponentWallet && (

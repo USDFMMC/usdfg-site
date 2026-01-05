@@ -803,7 +803,7 @@ const ArenaHome: React.FC = () => {
   const [leaderboardView, setLeaderboardView] = useState<'individual' | 'teams'>('individual'); // Toggle between Individual and Teams
   const [topTeams, setTopTeams] = useState<TeamStats[]>([]);
   const [loadingTopTeams, setLoadingTopTeams] = useState<boolean>(false);
-  const [showTournamentLobby, setShowTournamentLobby] = useState(false);
+const [showTournamentLobby, setShowTournamentLobby] = useState(false);
   const [showStandardLobby, setShowStandardLobby] = useState(false);
 const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string; opponentWallet: string } | null>(null);
   const [showTeamModal, setShowTeamModal] = useState<boolean>(false);
@@ -1878,13 +1878,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Open standard lobby for active challenges only (completed challenges with prizes handled separately)
       const status = challenge.status || challenge.rawData?.status;
       if (status === 'active') {
-        setSelectedChallenge({
-          id: challenge.id,
-          title: (challenge as any).title || extractGameFromTitle((challenge as any).title || '') || "Challenge",
-          ...challenge
-        });
+      setSelectedChallenge({
+        id: challenge.id,
+        title: (challenge as any).title || extractGameFromTitle((challenge as any).title || '') || "Challenge",
+        ...challenge
+      });
         setShowStandardLobby(true);
-      }
+    }
     }
   }, [firestoreChallenges, publicKey, showSubmitResultModal, showTrustReview, showStandardLobby, showTournamentLobby, selectedChallenge?.id, isConnected]);
   
@@ -4678,8 +4678,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                       loading="lazy"
                       draggable={false}
                       key={`${challenge.id}-${gameName}-${imagePath}`}
-                      onError={(e) => {
-                        const target = e.currentTarget as HTMLImageElement;
+                                      onError={(e) => {
+                                        const target = e.currentTarget as HTMLImageElement;
                         console.error(`❌ Failed to load image: ${imagePath} for game: ${gameName}, challenge: ${challenge.id}`);
                         target.src = '/assets/usdfg-logo-transparent.png';
                       }}
@@ -4710,10 +4710,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                             capacity={challenge.capacity || 2} 
                           />
                           {/* Share button - positioned below status */}
-                          <button
+                                        <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
+                                          onClick={(e) => {
+                                            e.stopPropagation();
                               handleShareChallenge(challenge);
                             }}
                             className="p-1.5 rounded-lg bg-black/60 hover:bg-black/80 backdrop-blur-sm border border-white/20 hover:border-amber-400/40 transition-all"
@@ -4723,20 +4723,20 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                             <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                             </svg>
-                          </button>
-                        </div>
-                      </div>
+                                        </button>
+                                              </div>
+                                              </div>
 
                       <div className="mt-auto grid grid-cols-2 gap-2 text-xs">
                         <div className="rounded-lg bg-black/45 p-2">
                           <div className="text-white/70">💰 Entry</div>
                           <div className="font-semibold">{challenge.entryFee} USDFG</div>
-                                              </div>
+                                        </div>
                         <div className="rounded-lg bg-black/45 p-2">
                           <div className="text-white/70">🏆 Prize</div>
                           <div className="font-semibold">{challenge.prizePool} USDFG</div>
-                                              </div>
-                                        </div>
+                            </div>
+                          </div>
 
                       <div className="flex items-center justify-between gap-2 text-[12px] text-white/80">
                         <div className="min-w-0 truncate">
@@ -4747,15 +4747,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           <span className="text-white/60">{platformIconLocal(challenge.platform)}</span>{' '}
                           <span className="font-semibold">{challenge.platform || 'All'}</span>
                           </div>
-                            </div>
-                          </div>
-                    </button>
-                  </div>
-                );
+                              </div>
+                                  </div>
+                                </button>
+                              </div>
+                            );
               };
 
               // Render category rows
-                              return (
+                            return (
                 <>
                   {(Object.entries(categoryGroups) as Array<[string, any[]]>).map(([categoryTitle, items]) => {
                     if (items.length === 0) return null;
@@ -4838,15 +4838,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                     } else {
                                       setShowStandardLobby(true);
                                     }
-                                  } else {
+                              } else {
                                     // Open detail sheet for non-live challenges
                                     setShowDetailSheet(true);
                                   }
                                 }}
                               />
-                              </div>
+                                </div>
                           ))}
-                              </div>
+                                </div>
                       </section>
                                 );
                   })}
@@ -5708,7 +5708,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               {showStandardLobby && (
                 <RightSidePanel
                   isOpen={showStandardLobby}
-                  onClose={() => {
+          onClose={() => {
                     setShowStandardLobby(false);
                     setSelectedChallenge(null);
                   }}
@@ -5719,6 +5719,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     currentWallet={publicKey?.toString() || null}
                     onSubmitResult={handleSubmitResult}
                     onClaimPrize={handleClaimPrize}
+                    onJoinChallenge={handleExpressJoinIntent}
                     onClose={() => {
                       setShowStandardLobby(false);
                       setSelectedChallenge(null);
