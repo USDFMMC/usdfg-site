@@ -4821,26 +4821,23 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                     }
                                   }
                                   
-                                  // For live challenges (active or creator_funded), open lobby directly
-                                  const isLive = challenge.status === "active" || challenge.status === "creator_funded";
-                                  
+                                  // Always open lobby directly (X Spaces style) instead of detail sheet
                                   setSelectedChallenge({
                                     id: challenge.id,
                                     title: (challenge as any).title || extractGameFromTitle((challenge as any).title || '') || "Challenge",
                                     ...challenge
                                   });
                                   
-                                  if (isLive) {
-                                    // Open lobby directly for live challenges
-                                    const format = challenge.rawData?.format || (challenge.rawData?.tournament ? "tournament" : "standard");
-                                    if (format === "tournament") {
-                                      setShowTournamentLobby(true);
-                                    } else {
-                                      setShowStandardLobby(true);
-                                    }
-                              } else {
-                                    // Open detail sheet for non-live challenges
-                                    setShowDetailSheet(true);
+                                  // Determine format and open appropriate lobby
+                                  const format = challenge.rawData?.format || (challenge.rawData?.tournament ? "tournament" : "standard");
+                                  const status = challenge.status || challenge.rawData?.status;
+                                  
+                                  // For tournament challenges, open tournament lobby
+                                  if (format === "tournament") {
+                                    setShowTournamentLobby(true);
+                                  } else {
+                                    // For standard challenges, always open standard lobby
+                                    setShowStandardLobby(true);
                                   }
                                 }}
                               />
