@@ -1035,8 +1035,17 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
     
     // Check if already expressed intent (only if challenge is still in creator_confirmation_required state)
     // If challenge was reverted, pendingJoiner should be null, so this check allows re-joining
+    // BUT: Allow retry if PDA exists (means user needs to express on-chain intent)
+    const challengePDA = data.pda;
     if (data.status === 'creator_confirmation_required' && data.pendingJoiner && data.pendingJoiner.toLowerCase() === wallet.toLowerCase()) {
-      throw new Error("You have already expressed intent to join this challenge");
+      // If PDA exists, user can retry to express on-chain intent
+      if (challengePDA) {
+        // Don't throw error - allow retry for on-chain express intent
+        // The frontend will handle calling on-chain express intent
+        console.log('⚠️ User already expressed intent in Firestore, but PDA exists - allowing retry for on-chain express intent');
+      } else {
+        throw new Error("You have already expressed intent to join this challenge. Waiting for creator to create challenge on-chain.");
+      }
     }
     
     // Also check if challenger field is set (should be cleared on revert, but double-check)
