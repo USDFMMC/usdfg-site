@@ -2506,7 +2506,17 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
 
     const status = challenge.status || challenge.rawData?.status;
-    if (status !== 'pending_waiting_for_opponent') {
+    const challengePDA = challenge.rawData?.pda || challenge.pda;
+    const pendingJoiner = challenge.rawData?.pendingJoiner || challenge.pendingJoiner;
+    const isAlreadyPendingJoiner = pendingJoiner && pendingJoiner.toLowerCase() === walletAddr.toLowerCase();
+    
+    // Allow retry if: status is creator_confirmation_required, user is pendingJoiner, and PDA exists
+    // This handles the case where Firestore was updated but on-chain express intent failed or wasn't called
+    if (status === 'creator_confirmation_required' && isAlreadyPendingJoiner && challengePDA) {
+      // User already expressed intent in Firestore, but needs to express on-chain
+      // This is handled below in the flow, so continue
+      console.log('🔄 User is already pending joiner, will express intent on-chain');
+    } else if (status !== 'pending_waiting_for_opponent') {
       alert(`Challenge is not waiting for opponent. Current status: ${status}`);
       return;
     }
@@ -2619,10 +2629,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         }
       }
       
-      // Normal flow - user hasn't joined yet, express intent in Firestore
-      await expressJoinIntent(challenge.id, walletAddr);
+      // Check if we need to express intent in Firestore or just on-chain
+      const needsFirestoreUpdate = status === 'pending_waiting_for_opponent' && !isAlreadyPendingJoiner;
       
-      // If challenge has a PDA, also express intent on-chain
+      if (needsFirestoreUpdate) {
+        // Normal flow - user hasn't joined yet, express intent in Firestore first
+        await expressJoinIntent(challenge.id, walletAddr);
+      }
+      
+      // If challenge has a PDA, also express intent on-chain (or retry if already pending joiner)
       if (challengePDA) {
         try {
           const { expressJoinIntent: expressJoinIntentOnChain } = await import('@/lib/chain/contract');
@@ -2632,13 +2647,36 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             challengePDA
           );
           console.log('✅ Join intent expressed on-chain');
+          if (needsFirestoreUpdate) {
+            alert('✅ Join intent expressed! Creator can now fund the challenge.');
+          } else {
+            alert('✅ Join intent expressed on-chain! Creator can now fund the challenge.');
+          }
+          setShowDetailSheet(false);
+          return;
         } catch (onChainError: any) {
-          console.error('⚠️ Failed to express intent on-chain (will retry when creator funds):', onChainError);
-          // Don't fail - Firestore was updated, creator can handle on-chain sync when funding
+          console.error('⚠️ Failed to express intent on-chain:', onChainError);
+          const errorMsg = onChainError.message || onChainError.toString() || '';
+          if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770')) {
+            if (isAlreadyPendingJoiner) {
+              // User already expressed intent in Firestore, but on-chain state doesn't match
+              // This can happen if challenge was reverted or state is out of sync
+              throw new Error('Challenge state mismatch. The challenge may have been reverted. Please refresh and try again.');
+            } else {
+              throw new Error('Failed to express intent on-chain. Please try again.');
+            }
+          }
+          throw onChainError;
+        }
+      } else {
+        // No PDA yet - Firestore update was successful, creator will create PDA
+        if (needsFirestoreUpdate) {
+          alert('✅ Join intent expressed! Waiting for creator to create challenge on-chain, then you can retry to express intent on-chain.');
+        } else {
+          alert('✅ Join intent expressed in Firestore. Waiting for creator to create challenge on-chain.');
         }
       }
       
-      alert('✅ Join intent expressed! Waiting for creator to fund the challenge.');
       setShowDetailSheet(false);
     } catch (err: any) {
       console.error("❌ Express join intent failed:", err);
@@ -2876,12 +2914,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         } catch (fundError: any) {
           const errorMsg = fundError.message || fundError.toString() || '';
           // Check if error is because challenge is not in CreatorConfirmationRequired state
-          if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770') || errorMsg.includes('6000')) {
+          if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770') || errorMsg.includes('6000') || errorMsg.includes('Challenge is not open')) {
             const pendingJoiner = freshChallenge.pendingJoiner || challenge.rawData?.pendingJoiner;
             if (pendingJoiner) {
-              throw new Error(`⚠️ The challenger (${pendingJoiner.slice(0, 8)}...) needs to express their join intent on-chain first. Please ask them to try joining again, or wait for the challenge to revert to open status.`);
+              // Challenger expressed intent in Firestore but not on-chain
+              // Tell creator to ask challenger to retry joining (which will express on-chain intent)
+              throw new Error(`⚠️ The challenger (${pendingJoiner.slice(0, 8)}...) needs to express their join intent on-chain first.\n\nThey should click "Express Join Intent" again - it will now call the on-chain function since the PDA exists.`);
             } else {
-              throw new Error('⚠️ Challenge state mismatch. The challenger needs to express join intent on-chain. Please refresh and try again.');
+              throw new Error('⚠️ Challenge state mismatch. No challenger has expressed intent. Please wait for an opponent to join.');
             }
           }
           throw fundError; // Re-throw if it's a different error
