@@ -687,14 +687,17 @@ export async function resolveChallenge(
   
   console.log('📍 Platform wallet:', platformWallet.toString());
   
-  const [escrowWalletPDA] = PublicKey.findProgramAddressSync(
-    [SEEDS.ESCROW_WALLET],
+  // Deployed contract uses ESCROW_AUTHORITY, not ESCROW_WALLET
+  const [escrowAuthorityPDA] = PublicKey.findProgramAddressSync(
+    [SEEDS.ESCROW_AUTHORITY, challengeAddress.toBuffer()],
     PROGRAM_ID
   );
   
-  const [escrowTokenAccountPDA] = PublicKey.findProgramAddressSync(
-    [SEEDS.ESCROW_WALLET, challengeAddress.toBuffer(), USDFG_MINT.toBuffer()],
-    PROGRAM_ID
+  // Escrow token account is an ATA of the escrow authority
+  const escrowTokenAccountPDA = await getAssociatedTokenAddress(
+    USDFG_MINT,
+    escrowAuthorityPDA,
+    true // allowOwnerOffCurve for PDA
   );
   
   // Get winner's token account
@@ -711,7 +714,7 @@ export async function resolveChallenge(
   
   console.log('📍 Derived accounts:');
   console.log('   Platform Wallet:', platformWallet.toString());
-  console.log('   Escrow Wallet PDA:', escrowWalletPDA.toString());
+  console.log('   Escrow Authority PDA:', escrowAuthorityPDA.toString());
   console.log('   Escrow Token Account:', escrowTokenAccountPDA.toString());
   console.log('   Winner Token Account:', winnerTokenAccount.toString());
   console.log('   Platform Token Account:', platformTokenAccount.toString());
@@ -730,17 +733,24 @@ export async function resolveChallenge(
   console.log('📦 Instruction data created');
   console.log('   Discriminator:', discriminator.toString('hex'));
   
-  // Create instruction with all required accounts
+  // Create instruction - deployed contract ResolveChallenge struct:
+  // 1. challenge (Account, mut)
+  // 2. escrow_token_account (Account<TokenAccount>, mut)
+  // 3. winner_token_account (Account<TokenAccount>, mut)
+  // 4. platform_token_account (Account<TokenAccount>, mut)
+  // 5. escrow_authority (AccountInfo, seeds = [ESCROW_AUTHORITY_SEED, challenge.key()])
+  // 6. token_program (Program<Token>)
+  // 7. mint (Account<Mint>)
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
-      { pubkey: challengeAddress, isSigner: false, isWritable: true }, // challenge
-      { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // escrow_token_account
-      { pubkey: winnerTokenAccount, isSigner: false, isWritable: true }, // winner_token_account
-      { pubkey: platformTokenAccount, isSigner: false, isWritable: true }, // platform_token_account (for fees)
-      { pubkey: escrowWalletPDA, isSigner: false, isWritable: false }, // escrow_wallet
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
-      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // mint
+      { pubkey: challengeAddress, isSigner: false, isWritable: true }, // 0: challenge
+      { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // 1: escrow_token_account
+      { pubkey: winnerTokenAccount, isSigner: false, isWritable: true }, // 2: winner_token_account
+      { pubkey: platformTokenAccount, isSigner: false, isWritable: true }, // 3: platform_token_account
+      { pubkey: escrowAuthorityPDA, isSigner: false, isWritable: false }, // 4: escrow_authority
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // 5: token_program
+      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // 6: mint
     ],
     data: instructionData,
   });
