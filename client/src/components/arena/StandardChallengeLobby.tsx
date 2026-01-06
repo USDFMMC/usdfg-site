@@ -355,16 +355,22 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         </div>
       )}
       
-      {/* Show join button for others after expiry (challenge reverted to pending) */}
-      {canJoinAfterExpiry && status === 'pending_waiting_for_opponent' && (
+      {/* Show join button for others after expiry (challenge reverted to pending OR deadline expired but status not updated yet) */}
+      {(canJoinAfterExpiry || (!isCreator && !isParticipant && !isFull && status === 'creator_confirmation_required' && isDeadlineExpired && currentWallet && onJoinChallenge)) && (
         <div className="rounded-xl border border-blue-400/30 bg-blue-500/10 p-4">
           <div className="text-center">
             <div className="text-sm font-semibold text-blue-200 mb-2">
               Join this challenge to compete for {prizePool} USDFG
             </div>
-            <div className="text-xs text-blue-100/70 mb-3">
-              The previous challenger's deadline expired. You can join now!
-            </div>
+            {status === 'creator_confirmation_required' && isDeadlineExpired ? (
+              <div className="text-xs text-blue-100/70 mb-3">
+                ⚡ The previous challenger's deadline expired. You can join now!
+              </div>
+            ) : (
+              <div className="text-xs text-blue-100/70 mb-3">
+                This challenge is open and waiting for an opponent.
+              </div>
+            )}
             <button
               type="button"
               onClick={async (e) => {
