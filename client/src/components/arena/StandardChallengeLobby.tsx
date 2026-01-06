@@ -10,6 +10,7 @@ interface StandardChallengeLobbyProps {
   onSubmitResult: (didWin: boolean, proofFile?: File | null) => Promise<void>;
   onClaimPrize: (challenge: any) => Promise<void>;
   onJoinChallenge?: (challenge: any) => Promise<void>;
+  onCreatorFund?: (challenge: any) => Promise<void>;
   onClose: () => void;
   isSubmitting?: boolean;
   isClaiming?: boolean;
@@ -21,6 +22,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   onSubmitResult,
   onClaimPrize,
   onJoinChallenge,
+  onCreatorFund,
   onClose,
   isSubmitting = false,
   isClaiming = false,
@@ -163,9 +165,16 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
   const statusDisplay = getStatusDisplay();
   const isParticipant = currentWallet && players.some((p: string) => p?.toLowerCase() === currentWallet?.toLowerCase());
+  const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
+  const isCreator = currentWallet && creatorWallet.toLowerCase() === currentWallet.toLowerCase();
   const maxPlayers = challenge.maxPlayers || challenge.rawData?.maxPlayers || 2;
   const isFull = players.length >= maxPlayers;
   const canJoin = !isParticipant && !isFull && (status === 'pending_waiting_for_opponent' || status === 'creator_confirmation_required' || status === 'creator_funded') && currentWallet && onJoinChallenge;
+  
+  // Check if creator can fund (status is creator_confirmation_required and deadline hasn't expired)
+  const creatorFundingDeadline = challenge.rawData?.creatorFundingDeadline || challenge.creatorFundingDeadline;
+  const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
+  const canCreatorFund = isCreator && status === 'creator_confirmation_required' && !isDeadlineExpired && onCreatorFund;
   
   const canSubmitResult = status === 'active' && players.length >= 2 && isParticipant && !hasAlreadySubmitted;
   
@@ -290,6 +299,55 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           </div>
         )}
       </div>
+
+      {/* Creator Fund Button - Show if creator needs to fund */}
+      {canCreatorFund && (
+        <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4">
+          <div className="text-center">
+            <div className="text-sm font-semibold text-amber-200 mb-2">
+              ✨ Confirm and Fund Challenge ✨
+            </div>
+            <div className="text-xs text-amber-100/80 mb-3">
+              A challenger has expressed intent to join. Fund the escrow to lock them in.
+            </div>
+            {creatorFundingDeadline && (
+              <div className="text-xs text-amber-300/70 mb-3">
+                Deadline: {new Date(creatorFundingDeadline.toMillis()).toLocaleTimeString()}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (onCreatorFund) {
+                  try {
+                    await onCreatorFund(challenge);
+                  } catch (error: any) {
+                    console.error('Failed to fund challenge:', error);
+                    alert(error.message || 'Failed to fund challenge. Please try again.');
+                  }
+                }
+              }}
+              className="w-full rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white px-4 py-3 font-semibold transition-all shadow-[0_0_15px_rgba(245,158,11,0.5)] hover:shadow-[0_0_25px_rgba(245,158,11,0.7)] border border-amber-400/30"
+            >
+              Fund Challenge ({entryFee} USDFG + Network Fee)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Deadline Expired Message for Creator */}
+      {isCreator && status === 'creator_confirmation_required' && isDeadlineExpired && (
+        <div className="rounded-xl border border-red-400/30 bg-red-500/10 p-4 text-center">
+          <div className="text-sm font-semibold text-red-200 mb-2">
+            ⚠️ Confirmation Deadline Expired
+          </div>
+          <div className="text-xs text-red-100/80">
+            The challenge has been reverted to waiting for opponent. The challenger can try joining again.
+          </div>
+        </div>
+      )}
 
       {/* Join Challenge Button - Show if user can join */}
       {canJoin && (

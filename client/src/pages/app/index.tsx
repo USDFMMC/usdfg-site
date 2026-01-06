@@ -5729,6 +5729,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     onSubmitResult={handleSubmitResult}
                     onClaimPrize={handleClaimPrize}
                     onJoinChallenge={handleDirectJoinerExpressIntent}
+                    onCreatorFund={handleDirectCreatorFund}
                     onClose={() => {
                       setShowStandardLobby(false);
                       setSelectedChallenge(null);
