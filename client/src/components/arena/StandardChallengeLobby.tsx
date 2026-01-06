@@ -176,6 +176,9 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
   const canCreatorFund = isCreator && status === 'creator_confirmation_required' && !isDeadlineExpired && onCreatorFund;
   
+  // After deadline expires, challenge reverts to pending_waiting_for_opponent, so others can join
+  const canJoinAfterExpiry = !isParticipant && !isFull && status === 'pending_waiting_for_opponent' && currentWallet && onJoinChallenge;
+  
   const canSubmitResult = status === 'active' && players.length >= 2 && isParticipant && !hasAlreadySubmitted;
   
   // Check if user won and can claim prize
@@ -343,8 +346,43 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           <div className="text-sm font-semibold text-red-200 mb-2">
             ⚠️ Confirmation Deadline Expired
           </div>
-          <div className="text-xs text-red-100/80">
-            The challenge has been reverted to waiting for opponent. The challenger can try joining again.
+          <div className="text-xs text-red-100/80 mb-3">
+            The challenge has been reverted to waiting for opponent. Someone else in the lobby can now join.
+          </div>
+          <div className="text-xs text-amber-200/80">
+            💡 The challenge is now open for anyone to join. Keep this lobby open so others can see and join.
+          </div>
+        </div>
+      )}
+      
+      {/* Show join button for others after expiry (challenge reverted to pending) */}
+      {canJoinAfterExpiry && status === 'pending_waiting_for_opponent' && (
+        <div className="rounded-xl border border-blue-400/30 bg-blue-500/10 p-4">
+          <div className="text-center">
+            <div className="text-sm font-semibold text-blue-200 mb-2">
+              Join this challenge to compete for {prizePool} USDFG
+            </div>
+            <div className="text-xs text-blue-100/70 mb-3">
+              The previous challenger's deadline expired. You can join now!
+            </div>
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (onJoinChallenge) {
+                  try {
+                    await onJoinChallenge(challenge);
+                  } catch (error: any) {
+                    console.error('Failed to join challenge:', error);
+                    alert(error.message || 'Failed to join challenge. Please try again.');
+                  }
+                }
+              }}
+              className="w-full rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-3 font-semibold transition-all shadow-[0_0_15px_rgba(59,130,246,0.5)] hover:shadow-[0_0_25px_rgba(59,130,246,0.7)] border border-blue-400/30"
+            >
+              Join Challenge ({entryFee} USDFG + Network Fee)
+            </button>
           </div>
         </div>
       )}
