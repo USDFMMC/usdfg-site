@@ -1672,13 +1672,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             return; // Already open (shouldn't happen for tournament, but safety check)
           }
           
-          // Close other lobby types
+          // Update challenge in existing lobby instead of closing (X Spaces style)
+          const merged = mergeChallengeDataForModal(challenge, challenge);
+          setSelectedChallenge(merged);
+          // If standard lobby is open, switch to tournament lobby
           if (showStandardLobby) {
             setShowStandardLobby(false);
           }
-          
-          const merged = mergeChallengeDataForModal(challenge, challenge);
-          setSelectedChallenge(merged);
           setShowTournamentLobby(true);
           console.log(`🏆 Tournament lobby opened (stage: ${stage})`);
         } catch (error) {
@@ -4835,10 +4835,21 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                   
                                   // For tournament challenges, open tournament lobby
                                   if (format === "tournament") {
+                                    // If standard lobby is open, close it first
+                                    if (showStandardLobby) {
+                                      setShowStandardLobby(false);
+                                    }
                                     setShowTournamentLobby(true);
                                   } else {
                                     // For standard challenges, always open standard lobby
-                                    setShowStandardLobby(true);
+                                    // If tournament lobby is open, close it first
+                                    if (showTournamentLobby) {
+                                      setShowTournamentLobby(false);
+                                    }
+                                    // If lobby is already open, just update the challenge (X Spaces style)
+                                    if (!showStandardLobby) {
+                                      setShowStandardLobby(true);
+                                    }
                                   }
                                 }}
                               />

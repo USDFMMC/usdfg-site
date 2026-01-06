@@ -18,26 +18,16 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Prevent body scroll when panel is open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isOpen]);
+  // Don't prevent body scroll - allow browsing while lobby is open (X Spaces style)
+  // Removed body scroll lock so users can browse the main page
 
   if (!isOpen) return null;
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Subtle backdrop - doesn't close on click, allows main page interaction */}
       <div
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity"
-        onClick={onClose}
+        className="fixed inset-0 bg-black/10 z-40 pointer-events-none"
         style={{ opacity: isOpen ? 1 : 0 }}
       />
       
