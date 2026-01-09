@@ -691,7 +691,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
             Head-to-Head: {opponentWallet ? `${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}` : 'Waiting for opponent'}
           </div>
           <p className="text-xs text-amber-100/80 mt-1">
-            Chat with your opponent and start the match. Submit results once you finish—winner takes the prize pool.
+            Chat with your opponent and start the match. Submit results once you finish—the winner receives the challenge reward.
           </p>
         </div>
       )}
@@ -738,11 +738,11 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         {/* Challenge Details Grid */}
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div className="rounded-lg border border-white/5 bg-white/5 px-3 py-2">
-            <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">Entry Fee</div>
+            <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">Challenge Amount</div>
             <div className="text-white font-semibold">{entryFee} USDFG</div>
           </div>
           <div className="rounded-lg border border-white/5 bg-white/5 px-3 py-2">
-            <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">Prize Pool</div>
+            <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">Challenge Reward</div>
             <div className="text-white font-semibold">{prizePool} USDFG</div>
           </div>
           <div className="rounded-lg border border-white/5 bg-white/5 px-3 py-2">

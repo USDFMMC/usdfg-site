@@ -803,7 +803,7 @@ const ArenaHome: React.FC = () => {
   const [leaderboardView, setLeaderboardView] = useState<'individual' | 'teams'>('individual'); // Toggle between Individual and Teams
   const [topTeams, setTopTeams] = useState<TeamStats[]>([]);
   const [loadingTopTeams, setLoadingTopTeams] = useState<boolean>(false);
-const [showTournamentLobby, setShowTournamentLobby] = useState(false);
+  const [showTournamentLobby, setShowTournamentLobby] = useState(false);
   const [showStandardLobby, setShowStandardLobby] = useState(false);
 const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string; opponentWallet: string } | null>(null);
   const [showTeamModal, setShowTeamModal] = useState<boolean>(false);
@@ -1502,7 +1502,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         setNotification({
           isOpen: true,
           title: 'Challenge Received',
-          message: `${creatorDisplayName} sent you a challenge: ${challengeTitle}. Entry Fee: ${entryFee} USDFG, Prize Pool: ${prizePool} USDFG`,
+          message: `${creatorDisplayName} sent you a challenge: ${challengeTitle}. Challenge Amount: ${entryFee} USDFG, Challenge Reward: ${prizePool} USDFG`,
           type: 'info',
         });
       }
@@ -1878,13 +1878,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Open standard lobby for active challenges only (completed challenges with prizes handled separately)
       const status = challenge.status || challenge.rawData?.status;
       if (status === 'active') {
-      setSelectedChallenge({
-        id: challenge.id,
-        title: (challenge as any).title || extractGameFromTitle((challenge as any).title || '') || "Challenge",
-        ...challenge
-      });
+        setSelectedChallenge({
+          id: challenge.id,
+          title: (challenge as any).title || extractGameFromTitle((challenge as any).title || '') || "Challenge",
+          ...challenge
+        });
         setShowStandardLobby(true);
-    }
+      }
     }
   }, [firestoreChallenges, publicKey, showSubmitResultModal, showTrustReview, showStandardLobby, showTournamentLobby, selectedChallenge?.id, isConnected]);
   
@@ -1971,8 +1971,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const confirmSend = confirm(
         `Send your challenge "${userActiveChallenge.title}" to ${playerData.displayName || playerData.name}?\n\n` +
         `Game: ${userActiveChallenge.game}\n` +
-        `Entry Fee: ${userActiveChallenge.entryFee} USDFG\n` +
-        `Prize Pool: ${userActiveChallenge.prizePool} USDFG`
+        `Challenge Amount: ${userActiveChallenge.entryFee} USDFG\n` +
+        `Challenge Reward: ${userActiveChallenge.prizePool} USDFG`
       );
       
       if (confirmSend) {
@@ -2307,13 +2307,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Debug: Firestore challenge data
       console.log("🔥 Adding challenge to Firestore...");
       console.log("🔥 Firestore Challenge Data:", firestoreChallengeData);
+      console.log("🔥 Challenge PDA being stored:", challengePDA || 'null/undefined (Founder Challenge or PDA creation failed)');
       
       // Validate required fields before sending
       if (!firestoreChallengeData.creator) {
         throw new Error("Creator wallet is required");
       }
       if (firestoreChallengeData.entryFee === undefined || firestoreChallengeData.entryFee === null) {
-        throw new Error("Entry fee is required");
+        throw new Error("Challenge amount is required");
       }
       if (!firestoreChallengeData.status) {
         throw new Error("Status is required");
@@ -2542,7 +2543,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       alert('You are the creator. Use the "Confirm and Fund Challenge" button instead.');
       return;
     }
-    
+
     // If status is creator_funded and user is the challenger, redirect to funding flow
     if (status === 'creator_funded' && isChallenger) {
       alert('The creator has funded. Please use the "Fund Challenge" button to fund your entry and start the match.');
@@ -2596,7 +2597,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       if (status === 'creator_funded') {
         alert('This challenge is already funded by the creator. Waiting for the challenger to fund their entry.');
       } else {
-        alert(`Challenge is not waiting for opponent. Current status: ${status}`);
+      alert(`Challenge is not waiting for opponent. Current status: ${status}`);
       }
       return;
     }
@@ -2662,20 +2663,33 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       if (currentStatus === 'creator_confirmation_required' && isAlreadyPendingJoiner && challengePDA && !isDeadlineExpired) {
         // Challenger already expressed intent in Firestore, but PDA didn't exist then
         // Now PDA exists, so just express intent on-chain
+        console.log('🔄 User is already pending joiner with PDA - expressing on-chain intent...');
+        console.log('📍 Challenge PDA:', challengePDA);
+        console.log('📍 Current wallet:', walletAddr);
+        console.log('📍 Status:', currentStatus);
         try {
           const { expressJoinIntent: expressJoinIntentOnChain } = await import('@/lib/chain/contract');
-          await expressJoinIntentOnChain(
+          const signature = await expressJoinIntentOnChain(
             { signTransaction, publicKey },
             connection,
             challengePDA
           );
-          console.log('✅ Join intent expressed on-chain (PDA was created after initial join)');
+          console.log('✅ Join intent expressed on-chain successfully! Signature:', signature);
           alert('✅ Join intent expressed on-chain! Creator can now fund the challenge.');
           setShowDetailSheet(false);
           return;
         } catch (onChainError: any) {
           console.error('⚠️ Failed to express intent on-chain:', onChainError);
           const errorMsg = onChainError.message || onChainError.toString() || '';
+          // Check if the error is because the challenger already expressed intent on-chain
+          if (errorMsg.includes('already expressed') || errorMsg.includes('already') || 
+              errorMsg.includes('Already') || errorMsg.includes('duplicate') ||
+              errorMsg.includes('constraint') || errorMsg.includes('Constraint')) {
+            console.log('✅ On-chain intent already expressed - this is OK');
+            alert('✅ Your join intent is already recorded on-chain! Creator can now fund the challenge.');
+            setShowDetailSheet(false);
+            return;
+          }
           if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770')) {
             // On-chain state mismatch - challenge was likely reverted
             console.log('⚠️ On-chain state mismatch - challenge may have been reverted. Firestore update succeeded.');
@@ -2683,6 +2697,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             setShowDetailSheet(false);
             return;
           }
+          // Re-throw other errors so they're handled by the outer catch
           throw onChainError;
         }
       }
@@ -2721,6 +2736,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           } catch (onChainError: any) {
             console.error('⚠️ Failed to express intent on-chain:', onChainError);
             const errorMsg = onChainError.message || onChainError.toString() || '';
+            // Check if intent was already expressed
+            if (errorMsg.includes('already expressed') || errorMsg.includes('already') || 
+                errorMsg.includes('Already') || errorMsg.includes('duplicate') ||
+                errorMsg.includes('constraint') || errorMsg.includes('Constraint')) {
+              console.log('✅ On-chain intent already expressed - this is OK');
+              alert('✅ Your join intent is already recorded on-chain! Creator can now fund the challenge.');
+              setShowDetailSheet(false);
+              return;
+            }
             if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770')) {
               throw new Error('Challenge state mismatch. The challenge may have been reverted. Please refresh and try again.');
             }
@@ -2736,7 +2760,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       if (needsFirestoreUpdate) {
         // Normal flow - user hasn't joined yet, express intent in Firestore first
-        await expressJoinIntent(challenge.id, walletAddr);
+      await expressJoinIntent(challenge.id, walletAddr);
       }
       
       // If challenge has a PDA, also express intent on-chain (or retry if already pending joiner)
@@ -2762,6 +2786,19 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         } catch (onChainError: any) {
           console.error('⚠️ Failed to express intent on-chain:', onChainError);
           const errorMsg = onChainError.message || onChainError.toString() || '';
+          // Check if intent was already expressed
+          if (errorMsg.includes('already expressed') || errorMsg.includes('already') || 
+              errorMsg.includes('Already') || errorMsg.includes('duplicate') ||
+              errorMsg.includes('constraint') || errorMsg.includes('Constraint')) {
+            console.log('✅ On-chain intent already expressed - this is OK');
+            if (needsFirestoreUpdate) {
+              alert('✅ Join intent expressed! Your on-chain intent is already recorded. Creator can now fund the challenge.');
+            } else {
+              alert('✅ Your join intent is already recorded on-chain! Creator can now fund the challenge.');
+            }
+            setShowDetailSheet(false);
+            return;
+          }
           if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770')) {
             // On-chain state mismatch - challenge was likely reverted
             // This is OK - Firestore update succeeded, on-chain will sync when creator funds
@@ -3063,12 +3100,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         // If Firestore says creator_confirmation_required but on-chain is still PendingWaitingForOpponent,
         // the joiner needs to express intent on-chain first
         try {
-          await creatorFundOnChain(
-            { signTransaction, publicKey },
-            connection,
-            challengePDA,
-            entryFee
-          );
+      await creatorFundOnChain(
+        { signTransaction, publicKey },
+        connection,
+        challengePDA,
+        entryFee
+      );
         } catch (fundError: any) {
           const errorMsg = fundError.message || fundError.toString() || '';
           // Check if error is because challenge is not in CreatorConfirmationRequired state
@@ -3943,7 +3980,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     React.useEffect(() => {
       const container = scrollContainerRef.current;
       if (!container) return;
-
+      
       // Prevent scroll restoration
       if ('scrollRestoration' in window.history) {
         window.history.scrollRestoration = 'manual';
@@ -4141,8 +4178,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             <div className="grid grid-cols-2 gap-3">
               <DetailRow label="Game" value={gameName} />
               <DetailRow label="Mode" value={challenge.mode || 'Head-to-Head'} />
-              <DetailRow label="💰 Entry Fee" value={`${challenge.entryFee} USDFG`} />
-              <DetailRow label="🏆 Prize Pool" value={`${challenge.prizePool} USDFG`} />
+              <DetailRow label="💰 Challenge Amount" value={`${challenge.entryFee} USDFG`} />
+              <DetailRow label="🏆 Challenge Reward" value={`${challenge.prizePool} USDFG`} />
               <DetailRow label="👥 Players" value={`${challenge.players || 0}/${challenge.capacity || 2}`} />
               <DetailRow label="🎮 Platform" value={`${platformIcon(challenge.platform)} ${challenge.platform || 'All'}`} />
               <DetailRow label="👤 Creator" value={challenge.username || challenge.creator?.slice(0, 8) + '...' || 'Unknown'} />
@@ -4433,6 +4470,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               const isPendingJoiner = pendingJoiner && pendingJoiner.toLowerCase() === currentWallet;
               
               // Show button if user is the pending joiner and PDA exists (meaning they need to express on-chain)
+              // BUT: Only show if PDA exists and user hasn't already expressed on-chain intent
+              // Note: We can't check on-chain state here (too expensive), so we show the button
+              // and let the handler check if intent was already expressed
               return isPendingJoiner && challengePDA;
             })() && (
               <button
@@ -4440,7 +4480,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-white font-semibold mb-2 shadow-[0_0_20px_rgba(251,146,60,0.4)] animate-pulse"
                 onClick={async (e) => {
                   e.stopPropagation();
-                  await onExpressIntent(challenge);
+                  try {
+                    await onExpressIntent(challenge);
+                  } catch (error: any) {
+                    // Error is already handled in handleDirectJoinerExpressIntent
+                    console.error('Error expressing intent:', error);
+                  }
                 }}
               >
                 ⚡ Express Intent On-Chain (PDA Created) - REQUIRED
@@ -4947,14 +4992,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                         <div className="min-w-0 flex-1">
                           <div className="text-[15px] font-semibold truncate">{gameName}</div>
                           <div className="text-xs text-white/70 truncate">{challenge.mode || 'Head-to-Head'}</div>
-                        </div>
+                                  </div>
                         <div className="flex flex-col items-end gap-1.5">
-                          <StatusPill 
-                            status={status} 
-                            isOwner={isOwner} 
-                            players={challenge.players || 0} 
-                            capacity={challenge.capacity || 2} 
-                          />
+                        <StatusPill 
+                          status={status} 
+                          isOwner={isOwner} 
+                          players={challenge.players || 0} 
+                          capacity={challenge.capacity || 2} 
+                        />
                           {/* Share button - positioned below status */}
                                         <button
                             type="button"
@@ -4971,18 +5016,18 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                             </svg>
                                         </button>
                                               </div>
-                                              </div>
+                                  </div>
 
                       <div className="mt-auto grid grid-cols-2 gap-2 text-xs">
                         <div className="rounded-lg bg-black/45 p-2">
                           <div className="text-white/70">💰 Entry</div>
                           <div className="font-semibold">{challenge.entryFee} USDFG</div>
-                                        </div>
+                                              </div>
                         <div className="rounded-lg bg-black/45 p-2">
                           <div className="text-white/70">🏆 Prize</div>
                           <div className="font-semibold">{challenge.prizePool} USDFG</div>
-                            </div>
-                          </div>
+                                              </div>
+                                        </div>
 
                       <div className="flex items-center justify-between gap-2 text-[12px] text-white/80">
                         <div className="min-w-0 truncate">
@@ -4993,15 +5038,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           <span className="text-white/60">{platformIconLocal(challenge.platform)}</span>{' '}
                           <span className="font-semibold">{challenge.platform || 'All'}</span>
                           </div>
-                              </div>
-                                  </div>
+                            </div>
+                          </div>
                                 </div>
-                              </div>
-                            );
+                  </div>
+                );
               };
 
               // Render category rows
-                            return (
+                              return (
                 <>
                   {(Object.entries(categoryGroups) as Array<[string, any[]]>).map(([categoryTitle, items]) => {
                     if (items.length === 0) return null;
@@ -5098,9 +5143,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                   }
                                 }}
                               />
-                                </div>
+                              </div>
                           ))}
-                                </div>
+                              </div>
                       </section>
                                 );
                   })}
@@ -5957,16 +6002,21 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           }
 
           // Standard challenge: render persistent lobby with inline submit form
+          const challengePlayers = selectedChallenge.players || selectedChallenge.rawData?.players || [];
+          const gameName = selectedChallenge.game || selectedChallenge.rawData?.game || 'Challenge';
+          
           return (
             <>
               {showStandardLobby && (
                 <RightSidePanel
                   isOpen={showStandardLobby}
-          onClose={() => {
+                  onClose={() => {
                     setShowStandardLobby(false);
                     setSelectedChallenge(null);
                   }}
                   title={`${selectedChallenge.title || "Challenge"} Lobby`}
+                  players={challengePlayers.map((wallet: string) => ({ wallet }))}
+                  gameName={gameName}
                 >
                   <StandardChallengeLobby
                     challenge={selectedChallenge}
@@ -6389,7 +6439,7 @@ const CreateChallengeModal: React.FC<{
         rules: ['Single elimination format', 'Best of 3 per match', 'Character lock per match', 'Tournament legal stages', 'Winner advances', 'Loser eliminated']
       },
       'First to 5': {
-        rules: ['First to 5 wins', 'Character switching allowed', 'Tournament legal stages', 'Standard round timer', 'No pause abuse', 'Winner takes all']
+        rules: ['First to 5 wins', 'Character switching allowed', 'Tournament legal stages', 'Standard round timer', 'No pause abuse', 'The winner claims the challenge reward']
       },
       'Custom Challenge': {
         rules: ['Add your own clear, fair, and balanced rules.', 'Unclear or unfair custom rules may be rejected.', 'Ensure both players understand the rules before starting.']
@@ -6423,7 +6473,7 @@ const CreateChallengeModal: React.FC<{
         rules: ['Single elimination tournament', 'Best of 3 per match', 'Character lock per set', 'Tournament stages only', 'Winner advances', 'Standard Tekken rules']
       },
       'First to 5': {
-        rules: ['First to 5 wins', 'Character switching allowed', 'Tournament legal stages', 'Standard round timer', 'No pause abuse', 'Winner takes all']
+        rules: ['First to 5 wins', 'Character switching allowed', 'Tournament legal stages', 'Standard round timer', 'No pause abuse', 'The winner claims the challenge reward']
       },
       'Custom Challenge': {
         rules: ['Add your own clear, fair, and balanced rules.', 'Unclear or unfair custom rules may be rejected.', 'Ensure both players understand the rules before starting.']
@@ -6493,7 +6543,7 @@ const CreateChallengeModal: React.FC<{
         });
       } else if (formData.mode === 'Tournament (Bracket Mode)') {
         updateFormData({
-          rules: '• Single elimination bracket\n• Winners advance automatically\n• Entry fees locked until tournament ends\n• Submit results with proof each round\n• Disconnects = round loss unless rematch agreed'
+          rules: '• Single elimination bracket\n• Winners advance automatically\n• Challenge amounts locked until tournament ends\n• Submit results with proof each round\n• Disconnects = round loss unless rematch agreed'
         });
       }
     }
@@ -6555,13 +6605,13 @@ const CreateChallengeModal: React.FC<{
     const isAdmin = publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
     
     if (isNaN(entryFeeNum)) {
-      errors.push('Entry fee must be a valid number');
+      errors.push('Challenge amount must be a valid number');
     } else if (!isAdmin && (entryFeeNum < 0.000000001 || entryFeeNum === 0)) {
-      errors.push('Entry fee must be between 0.000000001 and 1000 USDFG');
+      errors.push('Challenge amount must be between 0.000000001 and 1000 USDFG');
     } else if (isAdmin && entryFeeNum < 0) {
-      errors.push('Entry fee cannot be negative');
+      errors.push('Challenge amount cannot be negative');
     } else if (entryFeeNum > 1000) {
-      errors.push('Maximum entry fee is 1000 USDFG');
+      errors.push('Maximum challenge amount is 1000 USDFG');
     }
     
     // Allow 0 entry fee for admin (Founder Challenges)
@@ -6856,7 +6906,7 @@ const CreateChallengeModal: React.FC<{
 
                 <Field label={
                   <span className="flex items-center">
-                    <span className="mr-2">💰</span>Entry Fee <span className="text-red-400 ml-1">*</span>
+                    <span className="mr-2">💰</span>Challenge Amount <span className="text-red-400 ml-1">*</span>
                     {publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase() && (
                       <span className="text-purple-400 ml-2 text-xs">🏆 (Enter 0 for Founder Challenge)</span>
                     )}
@@ -6886,7 +6936,7 @@ const CreateChallengeModal: React.FC<{
                         }
                       }}
                       className={`w-full rounded-xl bg-white/5 border px-3 py-2 text-white mt-4 mb-1 ${
-                        hasFieldError('entry fee') ? 'border-red-500/50 bg-red-500/5' : 'border-white/10'
+                        hasFieldError('challenge amount') ? 'border-red-500/50 bg-red-500/5' : 'border-white/10'
                       }`}
                       placeholder={publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase() ? "0 for Founder Challenge" : "0.1"}
                       required
@@ -6917,9 +6967,9 @@ const CreateChallengeModal: React.FC<{
                         const isAdmin = publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
                         const entryFee = formData.entryFee || 0;
                         if (isAdmin && entryFee === 0) {
-                          return <span className="text-purple-300">🏆 Founder Challenge - Prize pool set manually</span>;
+                          return <span className="text-purple-300">🏆 Founder Challenge - Challenge reward set manually</span>;
                         }
-                        return <>Prize pool: {(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5% platform fee)</>;
+                        return <>Challenge reward: {(usdfgToUsd(formData.entryFee) * 2 * 0.95).toFixed(2)} USD (after 5% platform fee)</>;
                       })()}
                     </div>
                   </div>
@@ -6945,7 +6995,7 @@ const CreateChallengeModal: React.FC<{
                     ))}
                   </select>
                   <p className="text-xs text-gray-400 mt-1.5">
-                    Single-elimination. Prize pool = entry fee × number of players.
+                    Single-elimination. Challenge reward = challenge amount × number of players.
                   </p>
                 </div>
               )}
@@ -7050,7 +7100,7 @@ const CreateChallengeModal: React.FC<{
                       <span className="text-white font-semibold">{formData.username}</span>
                       </div>
                     <div className="flex justify-between items-center py-2 border-b border-white/10">
-                      <span className="text-gray-400">💰 Entry Fee:</span>
+                      <span className="text-gray-400">💰 Challenge Amount:</span>
                       <div className="text-right">
                         {(() => {
                           const isAdmin = publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase();

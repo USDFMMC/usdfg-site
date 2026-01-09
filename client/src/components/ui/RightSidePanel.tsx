@@ -1,5 +1,12 @@
-import React, { useEffect, useRef } from 'react';
-import { X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { X, ChevronUp } from 'lucide-react';
+import { getPlayerStats } from '@/lib/firebase/firestore';
+
+interface PlayerInfo {
+  wallet: string;
+  displayName?: string;
+  profileImage?: string;
+}
 
 interface RightSidePanelProps {
   isOpen: boolean;
@@ -7,6 +14,10 @@ interface RightSidePanelProps {
   title?: string;
   children: React.ReactNode;
   className?: string;
+  // Minimized view props (mobile only)
+  players?: PlayerInfo[];
+  gameName?: string;
+  onExpand?: () => void;
 }
 
 const RightSidePanel: React.FC<RightSidePanelProps> = ({
@@ -15,13 +26,162 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
   title,
   children,
   className = '',
+  players = [],
+  gameName,
+  onExpand,
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [playerData, setPlayerData] = useState<Record<string, { displayName?: string; profileImage?: string }>>({});
+
+  // Detect mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Fetch player stats for minimized view
+  useEffect(() => {
+    const fetchPlayerData = async () => {
+      if (!players || players.length === 0) return;
+      
+      const data: Record<string, { displayName?: string; profileImage?: string }> = {};
+      for (const player of players) {
+        if (player.wallet) {
+          try {
+            const stats = await getPlayerStats(player.wallet);
+            if (stats) {
+              data[player.wallet.toLowerCase()] = {
+                displayName: stats.displayName,
+                profileImage: stats.profileImage,
+              };
+            }
+          } catch (error) {
+            console.error(`Failed to fetch stats for ${player.wallet}:`, error);
+          }
+        }
+      }
+      setPlayerData(data);
+    };
+    
+    if (isMinimized && isMobile && players && players.length >= 2) {
+      fetchPlayerData();
+    }
+  }, [isMinimized, isMobile, players]);
+
+  // Auto-minimize on mobile when panel opens (after a brief delay to show it opened)
+  useEffect(() => {
+    if (isOpen && isMobile && players.length >= 2) {
+      // Auto-minimize after 2 seconds on mobile
+      const timer = setTimeout(() => {
+        setIsMinimized(true);
+      }, 2000);
+      return () => clearTimeout(timer);
+    } else {
+      setIsMinimized(false);
+    }
+  }, [isOpen, isMobile, players.length]);
+
+  const handleExpand = () => {
+    setIsMinimized(false);
+    if (onExpand) onExpand();
+  };
 
   // Don't prevent body scroll - allow browsing while lobby is open (X Spaces style)
   // Removed body scroll lock so users can browse the main page
 
   if (!isOpen) return null;
+
+  // Minimized view (mobile only) - shows at top like X's minimized player
+  if (isMinimized && isMobile && players.length >= 2) {
+    return (
+      <>
+        {/* Minimized bar at top - like X's minimized player */}
+        <div
+          className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-blue-600/95 to-purple-600/95 backdrop-blur-md border-b border-blue-400/30 shadow-lg md:hidden"
+          onClick={handleExpand}
+        >
+          <div className="flex items-center gap-3 px-4 py-3">
+            {/* Player avatars */}
+            <div className="flex -space-x-2">
+              {players.slice(0, 2).map((player, idx) => {
+                const stats = playerData[player.wallet.toLowerCase()] || {};
+                const displayName = stats.displayName || player.displayName || `${player.wallet.slice(0, 4)}...${player.wallet.slice(-4)}`;
+                const profileImage = stats.profileImage || player.profileImage;
+                return (
+                  <div
+                    key={player.wallet}
+                    className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400/20 to-purple-400/20 border-2 border-white/30 flex items-center justify-center overflow-hidden"
+                    style={{ zIndex: 2 - idx }}
+                  >
+                    {profileImage ? (
+                      <img 
+                        src={profileImage} 
+                        alt={displayName} 
+                        className="w-full h-full object-cover" 
+                      />
+                    ) : (
+                      <span className="text-white font-semibold text-sm">
+                        {displayName.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Game info */}
+            <div className="flex-1 min-w-0">
+              <div className="text-white font-semibold text-sm truncate">
+                {gameName || 'Challenge'}
+              </div>
+              <div className="text-blue-100 text-xs truncate">
+                {players.length === 2 
+                  ? (() => {
+                      const p1Stats = playerData[players[0]?.wallet.toLowerCase()] || {};
+                      const p2Stats = playerData[players[1]?.wallet.toLowerCase()] || {};
+                      const p1Name = p1Stats.displayName || players[0]?.displayName || players[0]?.wallet.slice(0, 6);
+                      const p2Name = p2Stats.displayName || players[1]?.displayName || players[1]?.wallet.slice(0, 6);
+                      return `${p1Name} vs ${p2Name}`;
+                    })()
+                  : `${players.length} players`
+                }
+              </div>
+            </div>
+
+            {/* Expand button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleExpand();
+              }}
+              className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+              aria-label="Expand lobby"
+            >
+              <ChevronUp className="w-5 h-5 text-white" />
+            </button>
+
+            {/* Close button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+              aria-label="Close lobby"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -41,19 +201,31 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
+        {/* Header with minimize button on mobile */}
         {title && (
           <div className="px-4 py-3 border-b border-amber-400/20 sticky top-0 bg-gray-900/98 backdrop-blur-sm z-10">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">
                 {title}
               </h2>
-              <button
-                onClick={onClose}
-                className="p-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors duration-300"
-              >
-                <X className="w-4 h-4 text-gray-400" />
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Minimize button (mobile only, when 2+ players) */}
+                {isMobile && players.length >= 2 && (
+                  <button
+                    onClick={() => setIsMinimized(true)}
+                    className="p-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors duration-300 md:hidden"
+                    aria-label="Minimize lobby"
+                  >
+                    <ChevronUp className="w-4 h-4 text-gray-400 rotate-180" />
+                  </button>
+                )}
+                <button
+                  onClick={onClose}
+                  className="p-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors duration-300"
+                >
+                  <X className="w-4 h-4 text-gray-400" />
+                </button>
+              </div>
             </div>
           </div>
         )}
