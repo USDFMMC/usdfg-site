@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { Mic, MicOff } from "lucide-react";
 import { doc, setDoc, onSnapshot, deleteDoc, getDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase/config";
@@ -8,7 +8,7 @@ interface VoiceChatProps {
   currentWallet: string;
 }
 
-export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet }) => {
+const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWallet }) => {
   const [muted, setMuted] = useState(false);
   const [connected, setConnected] = useState(false);
   const [peerConnected, setPeerConnected] = useState(false);
@@ -22,23 +22,48 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
   const maxReconnectAttempts = 3;
   const unsubscribeSignalRef = useRef<(() => void) | null>(null);
 
-  console.log("🎤 VoiceChat component mounted", { challengeId, currentWallet });
+  // Use refs to track initialization and prevent unnecessary re-initialization
+  const initializedRef = useRef(false);
+  const currentChallengeIdRef = useRef<string>('');
+  const initInProgressRef = useRef(false);
+  
+  // Memoize challengeId to prevent unnecessary re-renders
+  const memoizedChallengeId = useMemo(() => challengeId, [challengeId]);
 
   // Initialize voice chat - only if challengeId is valid
   useEffect(() => {
-    if (voiceDisabled || !challengeId || challengeId.trim() === '') {
-      console.log("🎤 VoiceChat skipped - voice disabled or invalid challengeId:", challengeId);
+    // Skip if already initialized for this challengeId or init in progress
+    if ((initializedRef.current && currentChallengeIdRef.current === memoizedChallengeId) || initInProgressRef.current) {
       return;
     }
     
-    console.log("🎤 VoiceChat useEffect triggered - initializing...");
-    initVoiceChat();
+    if (voiceDisabled || !memoizedChallengeId || memoizedChallengeId.trim() === '') {
+      return;
+    }
+    
+    // Mark as in progress to prevent duplicate initializations
+    initInProgressRef.current = true;
+    
+    // Mark as initialized for this challenge
+    initializedRef.current = true;
+    currentChallengeIdRef.current = memoizedChallengeId;
+    
+    console.log("🎤 VoiceChat initializing for challenge:", memoizedChallengeId);
+    initVoiceChat().finally(() => {
+      initInProgressRef.current = false;
+    });
     
     return () => {
-      console.log("🎤 VoiceChat useEffect cleanup");
-      cleanup();
+      // Only cleanup if challengeId actually changed
+      if (currentChallengeIdRef.current !== memoizedChallengeId) {
+        console.log("🎤 VoiceChat cleanup - challenge changed");
+        cleanup();
+        initializedRef.current = false;
+        currentChallengeIdRef.current = '';
+        initInProgressRef.current = false;
+      }
     };
-  }, [challengeId, currentWallet, voiceDisabled]);
+  }, [memoizedChallengeId, voiceDisabled]); // Only depend on memoized challengeId and voiceDisabled
 
   // Preserve audio connection when page visibility changes (backgrounding on mobile)
   useEffect(() => {
@@ -85,11 +110,13 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
   }, []);
 
   const initVoiceChat = async () => {
-    // Validate challengeId before proceeding
-    if (!challengeId || challengeId.trim() === '') {
-      console.error("❌ Invalid challengeId for voice chat:", challengeId);
+    // Use memoized challengeId
+    const validChallengeId = memoizedChallengeId;
+    if (!validChallengeId || validChallengeId.trim() === '') {
+      console.error("❌ Invalid challengeId for voice chat:", validChallengeId);
       setStatus("Error: Invalid challenge ID");
       setConnected(false);
+      initInProgressRef.current = false;
       return;
     }
 
@@ -145,7 +172,7 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
         if (event.candidate) {
           console.log("🧊 New ICE candidate:", event.candidate.type);
           const candidateKey = `candidate_${currentWallet}_${Date.now()}`;
-          await setDoc(doc(db, "voice_signals", challengeId), {
+          await setDoc(doc(db, "voice_signals", memoizedChallengeId), {
             [candidateKey]: event.candidate.toJSON(),
             timestamp: Date.now()
           }, { merge: true });
@@ -194,12 +221,12 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
       };
 
       // Listen for remote signals from the shared document
-      const signalRef = doc(db, "voice_signals", challengeId);
+      const signalRef = doc(db, "voice_signals", memoizedChallengeId);
       
       // Store unsubscribe function for cleanup
       const unsubscribe = onSnapshot(signalRef, async (snapshot) => {
         // Check if challengeId is still valid (in case it changed)
-        const currentChallengeId = challengeId; // Capture in closure
+        const currentChallengeId = memoizedChallengeId; // Capture in closure
         if (!currentChallengeId || currentChallengeId.trim() === '') {
           console.log("⚠️ challengeId became invalid during snapshot, ignoring");
           return;
@@ -328,10 +355,11 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
     }
     
     // Clean up Firestore signals document only if we have a valid challengeId
-    if (challengeId && challengeId.trim() !== '') {
+    const validChallengeId = memoizedChallengeId || challengeId;
+    if (validChallengeId && validChallengeId.trim() !== '') {
       try {
         const { deleteDoc, doc } = await import("firebase/firestore");
-        await deleteDoc(doc(db, "voice_signals", challengeId));
+        await deleteDoc(doc(db, "voice_signals", validChallengeId));
         console.log("✅ Cleaned up Firestore signals document");
       } catch (error: any) {
         // Ignore errors if document doesn't exist or is already deleted
@@ -447,4 +475,11 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({ challengeId, currentWallet
     </div>
   );
 };
+
+// Memoize component to prevent unnecessary re-renders
+export const VoiceChat = React.memo(VoiceChatComponent, (prevProps, nextProps) => {
+  // Only re-render if challengeId or currentWallet actually changed
+  return prevProps.challengeId === nextProps.challengeId && 
+         prevProps.currentWallet === nextProps.currentWallet;
+});
 

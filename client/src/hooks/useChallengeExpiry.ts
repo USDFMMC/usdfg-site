@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { updateChallengeStatus, cleanupExpiredChallenge, cleanupCompletedChallenge, archiveChallenge } from "../lib/firebase/firestore";
+import { updateChallengeStatus, cleanupExpiredChallenge, cleanupCompletedChallenge, archiveChallenge, revertCreatorTimeout } from "../lib/firebase/firestore";
 
 /**
  * Watches all active challenges and auto-marks them completed when expired.
@@ -16,6 +16,27 @@ export function useChallengeExpiry(challenges: any[]) {
       const now = Date.now();
 
       for (const challenge of challenges) {
+        // Check creator funding deadline expiry (auto-revert if deadline passed)
+        if (challenge.status === "creator_confirmation_required" && challenge.creatorFundingDeadline) {
+          const deadlineMs = challenge.creatorFundingDeadline.toMillis ? challenge.creatorFundingDeadline.toMillis() : challenge.creatorFundingDeadline;
+          if (deadlineMs < now) {
+            // Deadline expired - revert challenge to pending
+            if (!processedChallenges.current.has(challenge.id + '_revert_creator')) {
+              console.log("⏰ Creator funding deadline expired - reverting challenge:", challenge.id);
+              processedChallenges.current.add(challenge.id + '_revert_creator');
+              
+              revertCreatorTimeout(challenge.id).then(() => {
+                console.log("✅ Challenge reverted after creator deadline expiry:", challenge.id);
+                processedChallenges.current.delete(challenge.id + '_revert_creator');
+              }).catch((error) => {
+                console.error("❌ Failed to revert challenge after deadline:", error);
+                processedChallenges.current.delete(challenge.id + '_revert_creator');
+              });
+            }
+            continue; // Skip other expiry checks for this challenge
+          }
+        }
+        
         if (!challenge.expiresAt) continue;
         
         const expMs = challenge.expiresAt.toMillis ? challenge.expiresAt.toMillis() : challenge.expiresAt;

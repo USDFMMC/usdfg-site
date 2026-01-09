@@ -11,6 +11,8 @@ interface StandardChallengeLobbyProps {
   onClaimPrize: (challenge: any) => Promise<void>;
   onJoinChallenge?: (challenge: any) => Promise<void>;
   onCreatorFund?: (challenge: any) => Promise<void>;
+  onJoinerFund?: (challenge: any) => Promise<void>;
+  onCancelChallenge?: (challenge: any) => Promise<void>;
   onClose: () => void;
   isSubmitting?: boolean;
   isClaiming?: boolean;
@@ -23,6 +25,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   onClaimPrize,
   onJoinChallenge,
   onCreatorFund,
+  onJoinerFund,
+  onCancelChallenge,
   onClose,
   isSubmitting = false,
   isClaiming = false,
@@ -169,15 +173,35 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const isCreator = currentWallet && creatorWallet.toLowerCase() === currentWallet.toLowerCase();
   const maxPlayers = challenge.maxPlayers || challenge.rawData?.maxPlayers || 2;
   const isFull = players.length >= maxPlayers;
-  const canJoin = !isParticipant && !isFull && (status === 'pending_waiting_for_opponent' || status === 'creator_confirmation_required' || status === 'creator_funded') && currentWallet && onJoinChallenge;
+  
+  // Get challenger wallet for joiner funding check
+  const challengerWallet = challenge.rawData?.challenger || challenge.challenger;
+  const isChallenger = currentWallet && challengerWallet && challengerWallet.toLowerCase() === currentWallet.toLowerCase();
   
   // Check if creator can fund (status is creator_confirmation_required and deadline hasn't expired)
   const creatorFundingDeadline = challenge.rawData?.creatorFundingDeadline || challenge.creatorFundingDeadline;
   const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
   const canCreatorFund = isCreator && status === 'creator_confirmation_required' && !isDeadlineExpired && onCreatorFund;
   
-  // After deadline expires, challenge reverts to pending_waiting_for_opponent, so others can join
-  const canJoinAfterExpiry = !isParticipant && !isFull && status === 'pending_waiting_for_opponent' && currentWallet && onJoinChallenge;
+  // Check if joiner can fund (status is creator_funded, user is the challenger, and deadline hasn't expired)
+  const joinerFundingDeadline = challenge.rawData?.joinerFundingDeadline || challenge.joinerFundingDeadline;
+  const isJoinerDeadlineExpired = joinerFundingDeadline && joinerFundingDeadline.toMillis() < Date.now();
+  const canJoinerFund = isChallenger && status === 'creator_funded' && !isJoinerDeadlineExpired && onJoinerFund;
+  
+  // Can join when status is pending_waiting_for_opponent OR creator_confirmation_required (but not if user is already pending joiner)
+  const pendingJoiner = challenge.rawData?.pendingJoiner || challenge.pendingJoiner;
+  const isAlreadyPendingJoiner = pendingJoiner && currentWallet && pendingJoiner.toLowerCase() === currentWallet.toLowerCase();
+  
+  // If deadline expired, creator should be able to join their own challenge (it reverted)
+  const canCreatorJoinAfterExpiry = isCreator && status === 'creator_confirmation_required' && isDeadlineExpired && currentWallet && onJoinChallenge;
+  const canCreatorJoinPending = isCreator && status === 'pending_waiting_for_opponent' && !isParticipant && currentWallet && onJoinChallenge;
+  
+  const canJoin = !isParticipant && !isFull && !isAlreadyPendingJoiner && 
+    (status === 'pending_waiting_for_opponent' || (status === 'creator_confirmation_required' && !isAlreadyPendingJoiner && !isCreator)) && 
+    currentWallet && onJoinChallenge;
+  
+  // Creator can cancel/delete if deadline expired or status is pending (no one joined yet)
+  const canCreatorCancel = isCreator && (isDeadlineExpired || status === 'pending_waiting_for_opponent') && onCancelChallenge;
   
   const canSubmitResult = status === 'active' && players.length >= 2 && isParticipant && !hasAlreadySubmitted;
   
@@ -342,33 +366,88 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
       {/* Deadline Expired Message for Creator */}
       {isCreator && status === 'creator_confirmation_required' && isDeadlineExpired && (
-        <div className="rounded-xl border border-red-400/30 bg-red-500/10 p-4 text-center">
-          <div className="text-sm font-semibold text-red-200 mb-2">
-            ⚠️ Confirmation Deadline Expired
+        <div className="rounded-xl border border-red-400/30 bg-red-500/10 p-4 space-y-3">
+          <div className="text-center">
+            <div className="text-sm font-semibold text-red-200 mb-2">
+              ⚠️ Confirmation Deadline Expired
+            </div>
+            <div className="text-xs text-red-100/80 mb-3">
+              The challenge has been reverted to waiting for opponent. You can now join as challenger or cancel the challenge.
+            </div>
           </div>
-          <div className="text-xs text-red-100/80 mb-3">
-            The challenge has been reverted to waiting for opponent. Someone else in the lobby can now join.
-          </div>
-          <div className="text-xs text-amber-200/80">
-            💡 The challenge is now open for anyone to join. Keep this lobby open so others can see and join.
+          
+          {/* Action Buttons for Creator */}
+          <div className="flex flex-col gap-2">
+            {/* Join as Challenger Button */}
+            {(canCreatorJoinAfterExpiry || canCreatorJoinPending) && (
+              <button
+                type="button"
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  // First, try to revert the challenge if it hasn't been reverted yet
+                  try {
+                    if (status === 'creator_confirmation_required' && isDeadlineExpired) {
+                      const { revertCreatorTimeout } = await import('@/lib/firebase/firestore');
+                      await revertCreatorTimeout(challenge.id);
+                    }
+                    // Then try to join
+                    if (onJoinChallenge) {
+                      await onJoinChallenge(challenge);
+                    }
+                  } catch (error: any) {
+                    console.error('Failed to join challenge:', error);
+                    alert(error.message || 'Failed to join challenge. Please try again.');
+                  }
+                }}
+                className="w-full rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-2.5 font-semibold text-sm transition-all shadow-[0_0_15px_rgba(59,130,246,0.5)] hover:shadow-[0_0_25px_rgba(59,130,246,0.7)] border border-blue-400/30"
+              >
+                Join as Challenger ({entryFee} USDFG + Network Fee)
+              </button>
+            )}
+            
+            {/* Cancel/Delete Challenge Button */}
+            {canCreatorCancel && (
+              <button
+                type="button"
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (onCancelChallenge) {
+                    if (confirm('Are you sure you want to cancel/delete this challenge? This action cannot be undone.')) {
+                      try {
+                        await onCancelChallenge(challenge);
+                      } catch (error: any) {
+                        console.error('Failed to cancel challenge:', error);
+                        alert(error.message || 'Failed to cancel challenge. Please try again.');
+                      }
+                    }
+                  }
+                }}
+                className="w-full rounded-lg bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-4 py-2.5 font-semibold text-sm transition-all shadow-[0_0_15px_rgba(239,68,68,0.5)] hover:shadow-[0_0_25px_rgba(239,68,68,0.7)] border border-red-400/30"
+              >
+                Cancel/Delete Challenge
+              </button>
+            )}
           </div>
         </div>
       )}
       
       {/* Show join button for others after expiry (challenge reverted to pending OR deadline expired but status not updated yet) */}
-      {(canJoinAfterExpiry || (!isCreator && !isParticipant && !isFull && status === 'creator_confirmation_required' && isDeadlineExpired && currentWallet && onJoinChallenge)) && (
-        <div className="rounded-xl border border-blue-400/30 bg-blue-500/10 p-4">
+
+      {/* Joiner Fund Button - Show if creator funded and joiner needs to fund */}
+      {canJoinerFund && (
+        <div className="rounded-xl border border-green-400/30 bg-green-500/10 p-4">
           <div className="text-center">
-            <div className="text-sm font-semibold text-blue-200 mb-2">
-              Join this challenge to compete for {prizePool} USDFG
+            <div className="text-sm font-semibold text-green-200 mb-2">
+              ✨ Creator Funded - Time to Fund Your Entry ✨
             </div>
-            {status === 'creator_confirmation_required' && isDeadlineExpired ? (
-              <div className="text-xs text-blue-100/70 mb-3">
-                ⚡ The previous challenger's deadline expired. You can join now!
-              </div>
-            ) : (
-              <div className="text-xs text-blue-100/70 mb-3">
-                This challenge is open and waiting for an opponent.
+            <div className="text-xs text-green-100/80 mb-3">
+              The creator has funded their entry. Fund your entry to start the match.
+            </div>
+            {joinerFundingDeadline && (
+              <div className="text-xs text-green-300/70 mb-3">
+                Deadline: {new Date(joinerFundingDeadline.toMillis()).toLocaleTimeString()}
               </div>
             )}
             <button
@@ -376,18 +455,18 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
               onClick={async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                if (onJoinChallenge) {
+                if (onJoinerFund) {
                   try {
-                    await onJoinChallenge(challenge);
+                    await onJoinerFund(challenge);
                   } catch (error: any) {
-                    console.error('Failed to join challenge:', error);
-                    alert(error.message || 'Failed to join challenge. Please try again.');
+                    console.error('Failed to fund challenge:', error);
+                    alert(error.message || 'Failed to fund challenge. Please try again.');
                   }
                 }
               }}
-              className="w-full rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-3 font-semibold transition-all shadow-[0_0_15px_rgba(59,130,246,0.5)] hover:shadow-[0_0_25px_rgba(59,130,246,0.7)] border border-blue-400/30"
+              className="w-full rounded-lg bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-3 font-semibold transition-all shadow-[0_0_15px_rgba(34,197,94,0.5)] hover:shadow-[0_0_25px_rgba(34,197,94,0.7)] border border-green-400/30"
             >
-              Join Challenge ({entryFee} USDFG + Network Fee)
+              Fund Challenge ({entryFee} USDFG + Network Fee)
             </button>
           </div>
         </div>
@@ -400,6 +479,15 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
             <div className="text-sm font-semibold text-blue-200 mb-2">
               Join this challenge to compete for {prizePool} USDFG
             </div>
+            {(status === 'creator_confirmation_required' && isDeadlineExpired) ? (
+              <div className="text-xs text-blue-100/70 mb-3">
+                ⚡ The previous challenger's deadline expired. You can join now!
+              </div>
+            ) : (
+              <div className="text-xs text-blue-100/70 mb-3">
+                This challenge is open and waiting for an opponent.
+              </div>
+            )}
             <button
               type="button"
               onClick={async (e) => {
@@ -786,18 +874,10 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         </div>
       )}
 
-      {/* Chat and Voice - Side by side layout */}
-      <div className="flex flex-col gap-3 lg:flex-row">
-        <div className="flex-1 rounded-xl border border-white/10 bg-black/40 p-3 backdrop-blur-sm">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-300">
-            Voice Room
-          </div>
-          <VoiceChat challengeId={challenge.id} currentWallet={currentWallet || ""} />
-        </div>
-        <div className="flex-1 rounded-xl border border-white/10 bg-black/40 p-3 backdrop-blur-sm">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-300">
-            Match Chat
-          </div>
+      {/* Match Chat and Voice Room - Always stacked vertically, Match Chat first */}
+      <div className="space-y-2">
+        {/* Match Chat - First */}
+        <div className="rounded-lg border border-white/10 bg-black/40 p-2 backdrop-blur-sm">
           <ChatBox 
             challengeId={challenge.id} 
             currentWallet={currentWallet || ""} 
@@ -805,6 +885,14 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
             platform={platform}
             playersCount={players.length}
           />
+        </div>
+        
+        {/* Voice Room - Second (below Match Chat) */}
+        <div className="rounded-lg border border-white/10 bg-black/40 p-2 backdrop-blur-sm">
+          <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-300/80">
+            Voice Room
+          </div>
+          <VoiceChat challengeId={challenge.id} currentWallet={currentWallet || ""} />
         </div>
       </div>
     </div>

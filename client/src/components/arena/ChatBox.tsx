@@ -111,26 +111,26 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet, st
   };
 
   return (
-    <div className="flex flex-col bg-black/30 rounded-xl p-3 h-48 border border-gray-700">
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-semibold text-gray-400 uppercase">Chat</p>
-        <span className="text-xs text-gray-500">{messages.length} messages</span>
+    <div className="flex flex-col h-full w-full">
+      <div className="flex items-center justify-between mb-1.5 px-1">
+        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Match Chat</p>
+        <span className="text-[10px] text-gray-500">{messages.length}</span>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto space-y-2 mb-2 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
+      <div className="flex-1 overflow-y-auto space-y-1.5 mb-1.5 min-h-0 scrollbar-thin scrollbar-thumb-gray-700/50 scrollbar-track-transparent scrollbar-thumb-rounded">
         {/* Automatic gamer tag exchange message - shown when challenge is active */}
         {status === 'active' && playersCount && playersCount >= 2 && (
-          <div className="flex justify-center my-2">
-            <div className="max-w-[90%] px-4 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-xs text-yellow-300 text-center">
-              Share your PSN ID, Xbox Gamertag, Steam username, or other platform identifier.
+          <div className="flex justify-center my-1">
+            <div className="max-w-[90%] px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded text-[10px] text-amber-300/80 text-center">
+              Share your platform ID (PSN, Xbox, Steam, etc.)
             </div>
           </div>
         )}
         
         {messages.length === 0 ? (
-          <p className="text-gray-500 text-xs text-center py-4">
-            No messages yet. Start the conversation!
+          <p className="text-gray-500/70 text-[10px] text-center py-3">
+            No messages yet
           </p>
         ) : (
           messages.map((msg) => {
@@ -140,8 +140,8 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet, st
             // System messages (centered, different style)
             if (isSystem) {
               return (
-                <div key={msg.id} className="flex justify-center my-2">
-                  <div className="max-w-[90%] px-4 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-xs text-yellow-300 text-center">
+                <div key={msg.id} className="flex justify-center my-1">
+                  <div className="max-w-[90%] px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded text-[10px] text-amber-300/80 text-center">
                     {msg.text}
                   </div>
                 </div>
@@ -152,21 +152,21 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet, st
             return (
               <div
                 key={msg.id}
-                className={`flex ${isMe ? "justify-end" : "justify-start"}`}
+                className={`flex ${isMe ? "justify-end" : "justify-start"} px-0.5`}
               >
                 <div
-                  className={`max-w-[80%] px-3 py-1.5 rounded-lg text-sm ${
+                  className={`max-w-[85%] px-2 py-1 rounded-md text-[11px] leading-relaxed ${
                     isMe
-                      ? "bg-gradient-to-r from-amber-600 to-amber-700 text-white"
-                      : "bg-gray-800 text-gray-200"
+                      ? "bg-gradient-to-r from-amber-500/90 to-amber-600/90 text-white"
+                      : "bg-white/5 text-gray-300 border border-white/10"
                   }`}
                 >
                   {!isMe && (
-                    <p className="text-xs text-gray-400 mb-0.5">
+                    <p className="text-[9px] text-gray-400/70 mb-0.5 leading-tight">
                       {msg.sender.slice(0, 6)}...
                     </p>
                   )}
-                  <p className="break-words">{msg.text}</p>
+                  <p className="break-words leading-snug">{msg.text}</p>
                 </div>
               </div>
             );
@@ -176,9 +176,9 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet, st
       </div>
 
       {/* Input */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 pt-1 border-t border-white/5">
         <input
-          className="flex-1 bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-700 focus:border-amber-500 focus:outline-none placeholder-gray-500"
+          className="flex-1 bg-white/5 text-white text-[11px] px-2 py-1.5 rounded-md border border-white/10 focus:border-amber-500/50 focus:outline-none placeholder-gray-500/60 focus:bg-white/10 transition-all"
           placeholder="Type message..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -188,9 +188,9 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet, st
         <button
           onClick={sendMessage}
           disabled={!input.trim() || sending}
-          className="bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 disabled:opacity-50 disabled:cursor-not-allowed text-white p-2 rounded-lg transition-all"
+          className="bg-gradient-to-r from-amber-500/90 to-amber-600/90 hover:from-amber-600 hover:to-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white p-1.5 rounded-md transition-all flex-shrink-0"
         >
-          <Send className="w-4 h-4" />
+          <Send className="w-3 h-3" />
         </button>
       </div>
     </div>

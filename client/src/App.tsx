@@ -404,18 +404,27 @@ function App() {
     }
   }, []);
 
-  // Safari compatibility check and error handling
+  // Mobile viewport fix - prevent zoom on load
   useEffect(() => {
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-    if (isSafari) {
-      console.log('🍎 Safari detected - applying compatibility fixes');
-      
-      // Add Safari-specific meta tags
+    // Fix viewport scaling issues on mobile
+    const fixViewport = () => {
       const viewport = document.querySelector('meta[name="viewport"]');
       if (viewport) {
-        viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+        // Use a more permissive viewport that prevents initial zoom issues
+        viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=5.0, minimum-scale=1.0, user-scalable=yes, viewport-fit=cover');
       }
-    }
+    };
+    
+    fixViewport();
+    
+    // Re-apply after orientation change
+    window.addEventListener('orientationchange', () => {
+      setTimeout(fixViewport, 100);
+    });
+    
+    return () => {
+      window.removeEventListener('orientationchange', fixViewport);
+    };
   }, []);
 
   // Version monitoring - check for updates

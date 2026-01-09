@@ -995,6 +995,16 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
 
     const data = snap.data() as ChallengeData;
     
+    // If status is creator_funded, user needs to fund, not express intent
+    if (data.status === 'creator_funded') {
+      const challenger = data.challenger;
+      if (challenger && challenger.toLowerCase() === wallet.toLowerCase()) {
+        throw new Error("Challenge is already funded by creator. Please use the 'Fund Challenge' button to fund your entry and start the match.");
+      } else {
+        throw new Error(`Challenge is not waiting for opponent. Current status: ${data.status}`);
+      }
+    }
+    
     // Validate challenge is in pending state
     if (data.status !== 'pending_waiting_for_opponent') {
       throw new Error(`Challenge is not waiting for opponent. Current status: ${data.status}`);
@@ -1006,7 +1016,12 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
     }
     
     // Check if creator is trying to join their own challenge
-    if (data.creator.toLowerCase() === wallet.toLowerCase()) {
+    // BUT: Allow creator to join if deadline expired and challenge reverted to pending
+    const isCreator = data.creator.toLowerCase() === wallet.toLowerCase();
+    const deadlineExpired = data.creatorFundingDeadline && data.creatorFundingDeadline.toMillis() < Date.now();
+    const isRevertedToPending = data.status === 'pending_waiting_for_opponent' && deadlineExpired;
+    
+    if (isCreator && !isRevertedToPending) {
       throw new Error("Cannot join your own challenge");
     }
     

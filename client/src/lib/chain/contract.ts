@@ -391,34 +391,50 @@ export async function creatorFund(
   // Get creator's token account
   const creatorTokenAccount = await getAssociatedTokenAddress(USDFG_MINT, creator);
   
-  // Derive escrow authority PDA (matches deployed contract)
-  const [escrowAuthorityPDA, escrowBump] = PublicKey.findProgramAddressSync(
-    [SEEDS.ESCROW_AUTHORITY, challengeAddress.toBuffer()],
+  // Derive escrow token account PDA using the correct seeds from the contract
+  // Seeds: [ESCROW_WALLET_SEED, challenge.key(), mint.key()]
+  // The escrow_token_account is its own authority (token::authority = escrow_token_account)
+  const ESCROW_WALLET_SEED = Buffer.from('escrow_wallet');
+  const [escrowTokenAccountPDA, escrowTokenBump] = PublicKey.findProgramAddressSync(
+    [
+      ESCROW_WALLET_SEED,
+      challengeAddress.toBuffer(),
+      USDFG_MINT.toBuffer()
+    ],
     PROGRAM_ID
   );
-  console.log('📍 Escrow Authority PDA:', escrowAuthorityPDA.toString(), 'bump:', escrowBump);
-  
-  // Escrow token account is an ATA of the escrow authority
-  // The contract uses init_if_needed, so we need to derive it
-  const escrowTokenAccountPDA = await getAssociatedTokenAddress(
-    USDFG_MINT,
-    escrowAuthorityPDA,
-    true // allowOwnerOffCurve for PDA
-  );
-  console.log('📍 Escrow Token Account PDA:', escrowTokenAccountPDA.toString());
+  console.log('📍 Escrow Token Account PDA:', escrowTokenAccountPDA.toString(), 'bump:', escrowTokenBump);
   
   // Convert USDFG to lamports
   const entryFeeLamports = Math.floor(entryFeeUsdfg * Math.pow(10, 9));
   
-  // Create instruction data for creator_fund (no args in deployed contract)
+  // Create instruction data for creator_fund - takes usdfg_amount: u64 argument
   const { sha256 } = await import('@noble/hashes/sha2.js');
   const hash = sha256(new TextEncoder().encode('global:creator_fund'));
   const discriminator = Buffer.from(hash.slice(0, 8));
   
-  const instructionData = Buffer.alloc(8); // discriminator only (no args)
+  const instructionData = Buffer.alloc(8 + 8); // discriminator (8) + usdfg_amount (8 bytes for u64)
   discriminator.copy(instructionData, 0);
+  const entryFeeBuffer = numberToU64Buffer(entryFeeLamports);
+  entryFeeBuffer.copy(instructionData, 8);
+  console.log('📦 CreatorFund instruction data:', 'Discriminator:', discriminator.toString('hex'), 'Amount:', entryFeeLamports);
 
-  // Account order matches deployed contract CreatorFund struct
+  // Account order for CreatorFund - EXACT match to Rust struct
+  // Rust struct order (lib.rs line 583-602):
+  // 1. challenge
+  // 2. creator
+  // 3. creator_token_account
+  // 4. escrow_token_account
+  // 5. token_program
+  // 6. system_program
+  // 7. mint
+  // NOTE: rent has been removed from the struct
+  // 
+  // CRITICAL: This frontend code matches the LOCAL Rust code.
+  // The DEPLOYED contract still has the old struct (with rent).
+  // You MUST rebuild and redeploy the Anchor program for this to work!
+  // 
+  // After redeploy, verify the IDL includes creatorFund with this exact account order.
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
@@ -426,14 +442,25 @@ export async function creatorFund(
       { pubkey: creator, isSigner: true, isWritable: true }, // 1: creator
       { pubkey: creatorTokenAccount, isSigner: false, isWritable: true }, // 2: creator_token_account
       { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // 3: escrow_token_account
-      { pubkey: escrowAuthorityPDA, isSigner: false, isWritable: false }, // 4: escrow_authority
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // 5: token_program
-      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // 6: mint
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // 7: system_program
-      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }, // 8: rent
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // 4: token_program (EXACT struct order)
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // 5: system_program (EXACT struct order)
+      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // 6: mint (EXACT struct order)
+      // rent removed - not in current struct
     ],
     data: instructionData,
   });
+  
+  // Debug: Log all accounts to verify order matches Rust struct
+  console.log('🔍 CreatorFund instruction accounts (EXACT Rust struct order):');
+  console.log('  Rust struct order: challenge, creator, creator_token_account, escrow_token_account, token_program, system_program, mint');
+  console.log('  0. challenge:', challengeAddress.toString());
+  console.log('  1. creator:', creator.toString());
+  console.log('  2. creator_token_account:', creatorTokenAccount.toString());
+  console.log('  3. escrow_token_account:', escrowTokenAccountPDA.toString());
+  console.log('  4. token_program:', TOKEN_PROGRAM_ID.toString());
+  console.log('  5. system_program:', SystemProgram.programId.toString());
+  console.log('  6. mint:', USDFG_MINT.toString());
+  console.log('⚠️  WARNING: If deployment fails, the deployed contract may still have the old struct. Rebuild and redeploy required!');
 
   const transaction = new Transaction().add(instruction);
   const { blockhash } = await connection.getLatestBlockhash();

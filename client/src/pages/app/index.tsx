@@ -13,7 +13,7 @@ import RightSidePanel from "@/components/ui/RightSidePanel";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
-import { ChallengeData, expressJoinIntent, creatorFund, joinerFund, revertCreatorTimeout, revertJoinerTimeout, expirePendingChallenge, cleanupExpiredChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage, uploadTeamImage, updateTeamImage, upsertChallengeNotification, listenToChallengeNotifications, ChallengeNotification, fetchChallengeById, submitTournamentMatchResult } from "@/lib/firebase/firestore";
+import { ChallengeData, expressJoinIntent, creatorFund, joinerFund, revertCreatorTimeout, revertJoinerTimeout, expirePendingChallenge, cleanupExpiredChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage, uploadTeamImage, updateTeamImage, upsertChallengeNotification, listenToChallengeNotifications, ChallengeNotification, fetchChallengeById, submitTournamentMatchResult, deleteChallenge } from "@/lib/firebase/firestore";
 import { Timestamp } from "firebase/firestore";
 import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
@@ -2493,30 +2493,101 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       return;
     }
 
-    const currentWallet = publicKey.toString().toLowerCase();
-    const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
-    const isCreator = currentWallet === creatorWallet.toLowerCase();
-    
-    if (isCreator) {
-      alert('You are the creator. Use the "Confirm and Fund Challenge" button instead.');
-      return;
-    }
-
     const walletAddr = publicKey.toString();
+    const currentWallet = publicKey.toString().toLowerCase();
     const status = challenge.status || challenge.rawData?.status;
     const challengePDA = challenge.rawData?.pda || challenge.pda;
     const pendingJoiner = challenge.rawData?.pendingJoiner || challenge.pendingJoiner;
-    const isAlreadyPendingJoiner = pendingJoiner && pendingJoiner.toLowerCase() === walletAddr.toLowerCase();
+    const challenger = challenge.rawData?.challenger || challenge.challenger;
+    const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
+    const isCreator = creatorWallet.toLowerCase() === currentWallet;
+    const creatorFundingDeadline = challenge.rawData?.creatorFundingDeadline || challenge.creatorFundingDeadline;
+    const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
+    const isAlreadyPendingJoiner = pendingJoiner && pendingJoiner.toLowerCase() === currentWallet;
+    const isChallenger = challenger && challenger.toLowerCase() === currentWallet;
+    
+    // Only prevent creator from joining if deadline hasn't expired and challenge is still waiting for creator funding
+    if (isCreator && !isDeadlineExpired && status === 'creator_confirmation_required') {
+      alert('You are the creator. Use the "Confirm and Fund Challenge" button instead.');
+      return;
+    }
+    
+    // If status is creator_funded and user is the challenger, redirect to funding flow
+    if (status === 'creator_funded' && isChallenger) {
+      alert('The creator has funded. Please use the "Fund Challenge" button to fund your entry and start the match.');
+      return;
+    }
+    
+    // If creator and deadline expired, first revert the challenge then allow join
+    if (isCreator && status === 'creator_confirmation_required' && isDeadlineExpired) {
+      try {
+        // Revert the challenge first
+        await revertCreatorTimeout(challenge.id);
+        // Wait a bit for the revert to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+        // Fetch fresh data
+        const freshChallenge = await fetchChallengeById(challenge.id);
+        if (freshChallenge && freshChallenge.status === 'pending_waiting_for_opponent') {
+          // Now proceed with joining (status check below will allow it)
+          console.log('✅ Challenge reverted, creator can now join');
+        }
+      } catch (revertError) {
+        console.error('Failed to revert challenge:', revertError);
+        alert('Failed to revert challenge. Please try again.');
+        return;
+      }
+    }
+    
+    // If challenger field is set but status is creator_confirmation_required, status might be updating
+    // Check if challenger is set - if so, creator may have funded
+    if (isChallenger && status === 'creator_confirmation_required') {
+      // Try fetching fresh data to check actual status
+      try {
+        const freshChallenge = await fetchChallengeById(challenge.id);
+        if (freshChallenge && freshChallenge.status === 'creator_funded') {
+          alert('The creator has funded. Please use the "Fund Challenge" button to fund your entry and start the match.');
+          return;
+        }
+      } catch (fetchError) {
+        console.error('Failed to fetch fresh challenge data:', fetchError);
+        // Continue with current flow
+      }
+    }
     
     // Allow retry if: status is creator_confirmation_required, user is pendingJoiner, and PDA exists
     // This handles the case where Firestore was updated but on-chain express intent failed or wasn't called
-    if (status === 'creator_confirmation_required' && isAlreadyPendingJoiner && challengePDA) {
+    if (status === 'creator_confirmation_required' && isAlreadyPendingJoiner && challengePDA && !isDeadlineExpired) {
       // User already expressed intent in Firestore, but needs to express on-chain
       // This is handled below in the flow, so continue
       console.log('🔄 User is already pending joiner, will express intent on-chain');
-    } else if (status !== 'pending_waiting_for_opponent') {
-      alert(`Challenge is not waiting for opponent. Current status: ${status}`);
+    } else if (status !== 'pending_waiting_for_opponent' && status !== 'creator_confirmation_required') {
+      // If status is creator_funded and user is not the challenger, show appropriate message
+      if (status === 'creator_funded') {
+        alert('This challenge is already funded by the creator. Waiting for the challenger to fund their entry.');
+      } else {
+        alert(`Challenge is not waiting for opponent. Current status: ${status}`);
+      }
       return;
+    }
+    
+    // If deadline expired and status is creator_confirmation_required, it should be reverted now
+    // Allow join if status is pending_waiting_for_opponent (either reverted or was always pending)
+    if (status === 'creator_confirmation_required' && isDeadlineExpired) {
+      // Try to revert first if it hasn't been reverted yet
+      try {
+        await revertCreatorTimeout(challenge.id);
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const freshChallenge = await fetchChallengeById(challenge.id);
+        if (freshChallenge && freshChallenge.status === 'pending_waiting_for_opponent') {
+          // Status updated, continue with join flow below
+          console.log('✅ Challenge reverted, proceeding with join');
+        } else {
+          throw new Error('Challenge revert did not complete properly');
+        }
+      } catch (error) {
+        console.error('Failed to revert challenge before join:', error);
+        // Continue anyway - the expressJoinIntent will handle it
+      }
     }
 
     try {
@@ -2556,11 +2627,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const isAlreadyPendingJoiner = pendingJoiner && pendingJoiner.toLowerCase() === walletAddr.toLowerCase();
       
       // If user already joined in Firestore and PDA exists, just express on-chain intent
-      // This handles: PDA created after join, OR deadline expired but challenge hasn't reverted yet
-      if (currentStatus === 'creator_confirmation_required' && isAlreadyPendingJoiner && challengePDA) {
+      // BUT: Skip if deadline expired (on-chain state might be wrong)
+      if (currentStatus === 'creator_confirmation_required' && isAlreadyPendingJoiner && challengePDA && !isDeadlineExpired) {
         // Challenger already expressed intent in Firestore, but PDA didn't exist then
         // Now PDA exists, so just express intent on-chain
-        // OR: Deadline expired but challenge hasn't reverted yet - still try on-chain (might work if on-chain state is correct)
         try {
           const { expressJoinIntent: expressJoinIntentOnChain } = await import('@/lib/chain/contract');
           await expressJoinIntentOnChain(
@@ -2569,25 +2639,28 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             challengePDA
           );
           console.log('✅ Join intent expressed on-chain (PDA was created after initial join)');
-          if (isDeadlineExpired) {
-            alert('✅ Join intent expressed on-chain! However, the confirmation deadline has expired. The challenge will revert to open status soon, and you can rejoin then.');
-          } else {
-            alert('✅ Join intent expressed on-chain! Creator can now fund the challenge.');
-          }
+          alert('✅ Join intent expressed on-chain! Creator can now fund the challenge.');
           setShowDetailSheet(false);
           return;
         } catch (onChainError: any) {
           console.error('⚠️ Failed to express intent on-chain:', onChainError);
           const errorMsg = onChainError.message || onChainError.toString() || '';
-          // If deadline expired, the challenge should revert - tell user to wait
-          if (isDeadlineExpired) {
-            throw new Error('⚠️ Confirmation deadline expired. The challenge will automatically revert to open status soon. Please wait a moment and try joining again.');
-          }
           if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770')) {
-            throw new Error('Challenge state mismatch. The challenge may have been reverted. Please refresh and try again.');
+            // On-chain state mismatch - challenge was likely reverted
+            console.log('⚠️ On-chain state mismatch - challenge may have been reverted. Firestore update succeeded.');
+            alert('✅ Join intent expressed in Firestore! On-chain state may be out of sync - this will resolve when creator funds.');
+            setShowDetailSheet(false);
+            return;
           }
           throw onChainError;
         }
+      }
+      
+      // If deadline expired and user is already pending joiner, skip on-chain (state mismatch)
+      if (currentStatus === 'creator_confirmation_required' && isAlreadyPendingJoiner && isDeadlineExpired) {
+        alert('⚠️ Confirmation deadline expired. The challenge will automatically revert to open status soon. Please wait a moment and try joining again.');
+        setShowDetailSheet(false);
+        return;
       }
       
       // If deadline expired and user is NOT the pending joiner, don't try to join
@@ -2636,7 +2709,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       }
       
       // If challenge has a PDA, also express intent on-chain (or retry if already pending joiner)
-      if (challengePDA) {
+      // BUT: Skip on-chain if deadline expired and challenge was reverted (on-chain state might be wrong)
+      const shouldSkipOnChain = isDeadlineExpired && (status === 'pending_waiting_for_opponent' || currentStatus === 'pending_waiting_for_opponent');
+      
+      if (challengePDA && !shouldSkipOnChain) {
         try {
           const { expressJoinIntent: expressJoinIntentOnChain } = await import('@/lib/chain/contract');
           await expressJoinIntentOnChain(
@@ -2656,19 +2732,24 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           console.error('⚠️ Failed to express intent on-chain:', onChainError);
           const errorMsg = onChainError.message || onChainError.toString() || '';
           if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770')) {
-            if (isAlreadyPendingJoiner) {
-              // User already expressed intent in Firestore, but on-chain state doesn't match
-              // This can happen if challenge was reverted or state is out of sync
-              throw new Error('Challenge state mismatch. The challenge may have been reverted. Please refresh and try again.');
+            // On-chain state mismatch - challenge was likely reverted
+            // This is OK - Firestore update succeeded, on-chain will sync when creator funds
+            console.log('⚠️ On-chain state mismatch (challenge may have been reverted). Firestore update succeeded.');
+            if (needsFirestoreUpdate) {
+              alert('✅ Join intent expressed in Firestore! The on-chain state may be out of sync, but this will be resolved when the creator funds the challenge.');
             } else {
-              throw new Error('Failed to express intent on-chain. Please try again.');
+              alert('✅ Join intent expressed in Firestore. On-chain state may be out of sync - this will resolve when creator funds.');
             }
+            setShowDetailSheet(false);
+            return;
           }
           throw onChainError;
         }
       } else {
-        // No PDA yet - Firestore update was successful, creator will create PDA
-        if (needsFirestoreUpdate) {
+        // No PDA yet OR deadline expired (skip on-chain) - Firestore update was successful
+        if (shouldSkipOnChain) {
+          alert('✅ Join intent expressed in Firestore! The challenge was reverted, so on-chain express intent was skipped. Creator can create a new PDA when they fund.');
+        } else if (needsFirestoreUpdate) {
           alert('✅ Join intent expressed! Waiting for creator to create challenge on-chain, then you can retry to express intent on-chain.');
         } else {
           alert('✅ Join intent expressed in Firestore. Waiting for creator to create challenge on-chain.');
@@ -2775,6 +2856,56 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     } catch (err: any) {
       console.error("❌ Joiner funding failed:", err);
       alert('Failed to fund challenge: ' + (err.message || 'Unknown error'));
+    }
+  };
+
+  // Handle cancel/delete challenge (creator only, when deadline expired or no one joined)
+  const handleCancelChallenge = async (challenge: any) => {
+    if (!publicKey) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    const currentWallet = publicKey.toString().toLowerCase();
+    const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
+    const isCreator = currentWallet === creatorWallet.toLowerCase();
+    
+    if (!isCreator) {
+      alert('Only the challenge creator can cancel the challenge');
+      return;
+    }
+
+    const status = challenge.status || challenge.rawData?.status;
+    const creatorFundingDeadline = challenge.rawData?.creatorFundingDeadline || challenge.creatorFundingDeadline;
+    const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
+    
+    // Only allow cancel if deadline expired or challenge is still pending (no one joined)
+    if (status !== 'pending_waiting_for_opponent' && status !== 'creator_confirmation_required') {
+      if (status === 'creator_confirmation_required' && !isDeadlineExpired) {
+        alert('Cannot cancel challenge while waiting for your confirmation. Either fund the challenge or wait for the deadline to expire.');
+      } else {
+        alert(`Cannot cancel challenge in ${status} state. Only pending challenges can be cancelled.`);
+      }
+      return;
+    }
+
+    try {
+      // First, revert if deadline expired and status hasn't updated yet
+      if (status === 'creator_confirmation_required' && isDeadlineExpired) {
+        await revertCreatorTimeout(challenge.id);
+      }
+      
+      // Delete the challenge
+      await deleteChallenge(challenge.id);
+      
+      // Close the lobby
+      setShowStandardLobby(false);
+      setSelectedChallenge(null);
+      
+      alert('✅ Challenge cancelled and deleted successfully.');
+    } catch (err: any) {
+      console.error("❌ Cancel challenge failed:", err);
+      alert('Failed to cancel challenge: ' + (err.message || 'Unknown error'));
     }
   };
 
@@ -4665,10 +4796,17 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
                 return (
                   <div className="relative">
-                    <button
-                      type="button"
-                      className={`relative text-left rounded-xl border overflow-hidden p-3 transition active:scale-[0.99] w-[176px] h-[176px] sm:w-[180px] sm:h-[180px] ${edgeGlow}`}
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      className={`relative text-left rounded-xl border overflow-hidden p-3 transition active:scale-[0.99] w-[176px] h-[176px] sm:w-[180px] sm:h-[180px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-400/50 ${edgeGlow}`}
                       onClick={onSelect}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onSelect();
+                        }
+                      }}
                       aria-label={`Open ${gameName} challenge`}
                     >
                                     <img 
@@ -4750,7 +4888,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           </div>
                               </div>
                                   </div>
-                                </button>
+                                </div>
                               </div>
                             );
               };
@@ -5730,6 +5868,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     onClaimPrize={handleClaimPrize}
                     onJoinChallenge={handleDirectJoinerExpressIntent}
                     onCreatorFund={handleDirectCreatorFund}
+                    onJoinerFund={handleDirectJoinerFund}
+                    onCancelChallenge={handleCancelChallenge}
                     onClose={() => {
                       setShowStandardLobby(false);
                       setSelectedChallenge(null);

@@ -598,7 +598,6 @@ pub struct CreatorFund<'info> {
     pub escrow_token_account: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
-    pub rent: Sysvar<'info, Rent>,
     pub mint: Account<'info, Mint>,
 }
 
