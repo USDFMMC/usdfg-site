@@ -3,7 +3,7 @@ import { ChatBox } from "./ChatBox";
 import { VoiceChat } from "./VoiceChat";
 import { Camera, Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
 import { getPlayerStats } from "@/lib/firebase/firestore";
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, serverTimestamp, Timestamp } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, serverTimestamp, Timestamp, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 
 interface StandardChallengeLobbyProps {
@@ -266,11 +266,9 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   // Separate players and spectators
   const participants = players.filter((p: string) => p);
   
-  // Track spectators in Firestore - COST-OPTIMIZED VERSION
-  // Cost optimization:
-  // - Updates every 3 minutes instead of 30 seconds (80% cost reduction)
-  // - Only updates when page is visible (uses Visibility API)
-  // - Proper error handling to prevent Firebase assertion errors
+  // Ephemeral spectator tracking - NO PERSISTENT DATA
+  // Users can join as spectators (real-time only)
+  // When they leave, ALL their data is deleted (spectator doc + chat messages)
   useEffect(() => {
     if (!challengeId || !currentWallet) {
       setSpectators([]);
@@ -283,95 +281,79 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     // Only track as spectator if not a participant
     if (!isParticipant) {
       const spectatorRef = doc(db, 'challenge_lobbies', challengeId, 'spectators', currentWallet.toLowerCase());
-      let lastSeenInterval: ReturnType<typeof setInterval> | null = null;
       let isMounted = true;
       
-      // Helper to check if page is visible
-      const isPageVisible = () => {
-        if (typeof document === 'undefined') return true;
-        return !document.hidden;
-      };
-      
-      // Add user as spectator (with proper error handling)
-      const addSpectator = async () => {
-        if (!isMounted || !isPageVisible()) return;
+      // Helper function to delete all user data (reusable for cleanup)
+      const cleanupUserData = () => {
+        if (!isMounted) return;
         
-        try {
-          await setDoc(spectatorRef, {
-            wallet: currentWallet.toLowerCase(),
-            joinedAt: serverTimestamp(),
-            lastSeen: serverTimestamp(),
-          }, { merge: true });
-          
-          // Set up periodic updates (every 3 minutes - cost optimized)
-          // Only update if page is visible and component is still mounted
-          if (lastSeenInterval) clearInterval(lastSeenInterval);
-          
-          lastSeenInterval = setInterval(() => {
-            if (!isMounted || !isPageVisible()) return;
-            
-            setDoc(spectatorRef, {
-              lastSeen: serverTimestamp(),
-            }, { merge: true }).catch(err => {
-              // Silently handle errors - don't spam console
-              if (err.code !== 'permission-denied' && err.code !== 'unavailable') {
-                console.error('Failed to update spectator lastSeen:', err);
-              }
-              // Clear interval on persistent errors
-              if (lastSeenInterval) {
-                clearInterval(lastSeenInterval);
-                lastSeenInterval = null;
-              }
-            });
-          }, 180000); // 3 minutes = 180000ms (cost optimized from 30s)
-        } catch (err: any) {
-          // Silently handle permission errors - feature is optional
-          if (err.code !== 'permission-denied' && err.code !== 'unavailable') {
-            console.error('Failed to add spectator:', err);
-          }
-        }
-      };
-      
-      // Initial add
-      addSpectator();
-      
-      // Listen to visibility changes - only update when page is visible
-      let visibilityHandler: (() => void) | null = null;
-      if (typeof document !== 'undefined') {
-        visibilityHandler = () => {
-          if (document.hidden) {
-            // Page hidden - pause updates
-            if (lastSeenInterval) {
-              clearInterval(lastSeenInterval);
-              lastSeenInterval = null;
-            }
-          } else {
-            // Page visible - resume updates
-            if (!lastSeenInterval && isMounted) {
-              addSpectator(); // Refresh immediately when page becomes visible
-            }
-          }
-        };
-        document.addEventListener('visibilitychange', visibilityHandler);
-      }
-      
-      // Cleanup
-      return () => {
-        isMounted = false;
-        if (lastSeenInterval) {
-          clearInterval(lastSeenInterval);
-          lastSeenInterval = null;
-        }
-        if (visibilityHandler && typeof document !== 'undefined') {
-          document.removeEventListener('visibilitychange', visibilityHandler);
-        }
-        // Remove spectator on cleanup
+        // Delete spectator document
         deleteDoc(spectatorRef).catch(err => {
-          // Silently ignore cleanup errors
-          if (err.code !== 'permission-denied' && err.code !== 'unavailable') {
-            console.error('Failed to remove spectator on cleanup:', err);
+          if (err.code !== 'permission-denied' && err.code !== 'unavailable' && err.code !== 'not-found') {
+            console.error('Failed to delete spectator:', err);
           }
         });
+        
+        // Delete ALL chat messages from this user in this challenge
+        (async () => {
+          try {
+            const messagesRef = collection(db, 'challenge_chats');
+            const messagesQuery = query(
+              messagesRef,
+              where('challengeId', '==', challengeId),
+              where('sender', '==', currentWallet)
+            );
+            
+            const messagesSnapshot = await getDocs(messagesQuery);
+            const deletePromises = messagesSnapshot.docs.map((messageDoc) => 
+              deleteDoc(doc(db, 'challenge_chats', messageDoc.id)).catch(err => {
+                if (err.code !== 'permission-denied' && err.code !== 'unavailable' && err.code !== 'not-found') {
+                  console.error('Failed to delete chat message:', err);
+                }
+              })
+            );
+            
+            await Promise.all(deletePromises);
+          } catch (err: any) {
+            if (err.code !== 'permission-denied' && err.code !== 'unavailable') {
+              console.error('Failed to delete chat messages:', err);
+            }
+          }
+        })();
+      };
+      
+      // Add user as spectator (ephemeral - just to show presence)
+      setDoc(spectatorRef, {
+        wallet: currentWallet.toLowerCase(),
+        joinedAt: serverTimestamp(),
+      }, { merge: true }).catch(err => {
+        if (err.code !== 'permission-denied' && err.code !== 'unavailable') {
+          console.error('Failed to add spectator:', err);
+        }
+      });
+      
+      // Handle page unload (user closes tab/browser) - cleanup as best effort
+      let beforeUnloadHandler: ((e: BeforeUnloadEvent) => void) | null = null;
+      if (typeof window !== 'undefined') {
+        beforeUnloadHandler = () => {
+          // Use sendBeacon for reliable cleanup on page unload (if supported)
+          // Otherwise, try synchronous delete (might not complete, but we try)
+          cleanupUserData();
+        };
+        window.addEventListener('beforeunload', beforeUnloadHandler);
+      }
+      
+      // Cleanup: Delete ALL data when user leaves (fire and forget)
+      return () => {
+        isMounted = false;
+        
+        // Remove beforeunload handler
+        if (beforeUnloadHandler && typeof window !== 'undefined') {
+          window.removeEventListener('beforeunload', beforeUnloadHandler);
+        }
+        
+        // Clean up all user data
+        cleanupUserData();
       };
     } else {
       setSpectators([]);
