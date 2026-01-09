@@ -4232,6 +4232,32 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               </button>
             )}
 
+            {/* Show button for challenger who already joined in Firestore but needs to express on-chain intent */}
+            {/* CRITICAL: This button must be visible when PDA exists but challenger hasn't expressed on-chain yet */}
+            {/* Hidden on mobile - shown in sticky container instead */}
+            {(() => {
+              if (isOwner || status !== 'creator_confirmation_required' || !onExpressIntent) return false;
+              
+              const pendingJoiner = challenge.rawData?.pendingJoiner || challenge.pendingJoiner;
+              const challengePDA = challenge.rawData?.pda || challenge.pda;
+              const currentWallet = publicKey?.toString()?.toLowerCase() || '';
+              const isPendingJoiner = pendingJoiner && pendingJoiner.toLowerCase() === currentWallet;
+              
+              // Show button if user is the pending joiner and PDA exists (meaning they need to express on-chain)
+              return isPendingJoiner && challengePDA;
+            })() && (
+              <button
+                type="button"
+                className="mt-5 w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-white font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(251,146,60,0.35)] hidden sm:block"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await onExpressIntent(challenge);
+                }}
+              >
+                ⚡ Express Intent On-Chain (PDA Created)
+              </button>
+            )}
+
             {/* Show Fund button for joiner when creator has funded */}
             {/* Hidden on mobile - shown in sticky container instead */}
             {!isOwner && status === 'creator_funded' && onJoinerFund && (
@@ -4365,21 +4391,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               </button>
             )}
             
-            {/* Show Express Join Intent button for non-owners */}
-            {!isOwner && status === 'pending_waiting_for_opponent' && onExpressIntent && (
-              <button
-                type="button"
-                className="w-full rounded-xl bg-gradient-to-r from-blue-400 to-blue-500 py-3 text-white font-semibold mb-2"
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  await onExpressIntent(challenge);
-                }}
-              >
-                Express Join Intent (No Payment)
-              </button>
-            )}
-            
-            {/* Show button for challenger who already joined in Firestore but needs to express on-chain intent */}
+            {/* PRIORITY: Show button for challenger who already joined in Firestore but needs to express on-chain intent */}
+            {/* This must appear BEFORE the regular Express Join Intent button */}
             {(() => {
               if (isOwner || status !== 'creator_confirmation_required' || !onExpressIntent) return false;
               
@@ -4393,13 +4406,27 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             })() && (
               <button
                 type="button"
-                className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-white font-semibold mb-2"
+                className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-white font-semibold mb-2 shadow-[0_0_20px_rgba(251,146,60,0.4)] animate-pulse"
                 onClick={async (e) => {
                   e.stopPropagation();
                   await onExpressIntent(challenge);
                 }}
               >
-                ⚡ Express Intent On-Chain (PDA Created)
+                ⚡ Express Intent On-Chain (PDA Created) - REQUIRED
+              </button>
+            )}
+            
+            {/* Show Express Join Intent button for non-owners */}
+            {!isOwner && status === 'pending_waiting_for_opponent' && onExpressIntent && (
+              <button
+                type="button"
+                className="w-full rounded-xl bg-gradient-to-r from-blue-400 to-blue-500 py-3 text-white font-semibold mb-2"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await onExpressIntent(challenge);
+                }}
+              >
+                Express Join Intent (No Payment)
               </button>
             )}
             
