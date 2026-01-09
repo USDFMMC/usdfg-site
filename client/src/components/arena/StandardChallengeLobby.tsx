@@ -266,120 +266,16 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   // Separate players and spectators
   const participants = players.filter((p: string) => p);
   
-  // Track spectators in Firestore - users who are viewing the lobby but not participants
-  // Note: This feature requires Firestore security rules. If permissions fail, gracefully disable.
+  // Spectator tracking DISABLED - causes Firebase internal assertion errors
+  // The onSnapshot listener was causing race conditions and internal assertion failures
+  // even with proper error handling. Disabled until Firestore security rules are properly configured.
+  // TODO: Re-enable after setting up Firestore rules for:
+  // - Write access: challenge_lobbies/{challengeId}/spectators/{wallet}
+  // - Read access: challenge_lobbies/{challengeId}/spectators collection
   useEffect(() => {
-    if (!challengeId || !currentWallet) return;
-    
-    // Check if current user is a participant
-    const isParticipant = participants.some((p: string) => p?.toLowerCase() === currentWallet.toLowerCase());
-    
-    // Only track as spectator if not a participant
-    if (!isParticipant) {
-      const spectatorRef = doc(db, 'challenge_lobbies', challengeId, 'spectators', currentWallet.toLowerCase());
-      let lastSeenInterval: ReturnType<typeof setInterval> | null = null;
-      
-      // Add user as spectator (gracefully handle permission errors)
-      setDoc(spectatorRef, {
-        wallet: currentWallet.toLowerCase(),
-        joinedAt: serverTimestamp(),
-        lastSeen: serverTimestamp(),
-      }).catch(err => {
-        // Silently fail if permissions are not set up - this is a nice-to-have feature
-        if (err.code !== 'permission-denied') {
-          console.error('Failed to add spectator:', err);
-        }
-        // If we get permission denied, don't set up the interval
-        return;
-      }).then(() => {
-        // Only set up interval if initial setDoc succeeded (no permission error)
-        // Update lastSeen periodically (every 30 seconds)
-        lastSeenInterval = setInterval(() => {
-          setDoc(spectatorRef, {
-            lastSeen: serverTimestamp(),
-          }, { merge: true }).catch(err => {
-            // Silently ignore permission errors
-            if (err.code !== 'permission-denied') {
-              console.error('Failed to update spectator lastSeen:', err);
-            }
-            // If we get permission denied, clear the interval
-            if (err.code === 'permission-denied' && lastSeenInterval) {
-              clearInterval(lastSeenInterval);
-              lastSeenInterval = null;
-            }
-          });
-        }, 30000);
-      });
-      
-      // Cleanup: Remove spectator when component unmounts or user navigates away
-      return () => {
-        if (lastSeenInterval) {
-          clearInterval(lastSeenInterval);
-        }
-        deleteDoc(spectatorRef).catch(err => {
-          // Silently ignore permission errors on cleanup
-          if (err.code !== 'permission-denied') {
-            console.error('Failed to remove spectator:', err);
-          }
-        });
-      };
-    }
-  }, [challengeId, currentWallet, participants]);
-  
-  // Listen to spectators in real-time (gracefully handle permission errors)
-  useEffect(() => {
-    if (!challengeId) return;
-    
-    const spectatorsRef = collection(db, 'challenge_lobbies', challengeId, 'spectators');
-    const q = query(spectatorsRef);
-    
-    let unsubscribeFn: (() => void) | null = null;
-    let isActive = true;
-    
-    try {
-      unsubscribeFn = onSnapshot(
-        q, 
-        (snapshot) => {
-          if (!isActive) return;
-          const spectatorWallets: string[] = [];
-          snapshot.forEach((doc) => {
-            const data = doc.data();
-            const wallet = data.wallet;
-            // Only include if not a participant
-            if (wallet && !participants.some((p: string) => p?.toLowerCase() === wallet.toLowerCase())) {
-              spectatorWallets.push(wallet);
-            }
-          });
-          setSpectators(spectatorWallets);
-        }, 
-        (error) => {
-          // Silently handle permission errors - this feature is optional
-          if (error.code === 'permission-denied') {
-            // Don't log permission errors - they're expected if rules aren't set up
-            setSpectators([]); // Clear spectators on permission error
-            return;
-          }
-          console.error('Error listening to spectators:', error);
-          setSpectators([]); // Clear spectators on error
-        }
-      );
-    } catch (error) {
-      // If initial subscription fails, just clear spectators
-      console.error('Failed to subscribe to spectators:', error);
-      setSpectators([]);
-    }
-    
-    return () => {
-      isActive = false;
-      if (unsubscribeFn) {
-        try {
-          unsubscribeFn();
-        } catch (error) {
-          // Ignore cleanup errors
-        }
-      }
-    };
-  }, [challengeId, participants]);
+    // Disabled - just set empty spectators array
+    setSpectators([]);
+  }, [challengeId]);
   
   // Fetch spectator data (display names, profile images)
   useEffect(() => {
