@@ -2195,39 +2195,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         // Generate a fake PDA for Founder Challenges (won't be used on-chain)
         // We'll just use a Firestore-generated ID
         challengeId = 'founder_' + Date.now().toString();
+        challengePDA = null; // No PDA for Founder Challenges
       } else {
-        // Regular challenge - create PDA IMMEDIATELY on-chain
-        // This ensures state sync: PDA exists from the start, challengers can express intent on-chain immediately
-        try {
-          const { createChallenge } = await import("@/lib/chain/contract");
-          const { Connection } = await import("@solana/web3.js");
-          const { getRpcEndpoint } = await import("@/lib/chain/rpc");
-          
-          const connection = new Connection(getRpcEndpoint(), 'confirmed');
-          const { signTransaction, publicKey } = wallet;
-          
-          if (!signTransaction || !publicKey) {
-            throw new Error('Wallet not connected or does not support signing');
-          }
-          
-          console.log('🚀 Creating challenge PDA on-chain immediately...');
-          challengePDA = await createChallenge(
-            { signTransaction, publicKey },
-            connection,
-            challengeData.entryFee
-          );
-          console.log('✅ Challenge PDA created on-chain:', challengePDA);
-        } catch (pdaError: any) {
-          console.error('❌ Failed to create challenge PDA:', pdaError);
-          const errorMsg = pdaError.message || pdaError.toString() || '';
-          if (errorMsg.includes('InvalidProgramId') || errorMsg.includes('3008')) {
-            throw new Error('⚠️ Program ID mismatch. Please refresh the page and try again. If the issue persists, the contract may need to be redeployed.');
-          }
-          // Don't fail challenge creation if PDA creation fails - allow Firestore creation to proceed
-          // The PDA can be created later when creator funds
-          console.warn('⚠️ Challenge will be created in Firestore without PDA. PDA can be created when creator funds.');
-        }
+        // Regular challenge - create in Firestore first, PDA will be created later when creator funds
+        // This avoids requiring Solana fees during challenge creation
         challengeId = null; // Firestore will generate the ID
+        challengePDA = null; // PDA will be created later when creator funds or when joiner expresses intent
+        console.log('📝 Challenge will be created in Firestore first. PDA will be created later when creator funds.');
       }
       
       // Calculate prize pool
