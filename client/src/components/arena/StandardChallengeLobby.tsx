@@ -3,7 +3,7 @@ import { ChatBox } from "./ChatBox";
 import { VoiceChat } from "./VoiceChat";
 import { Camera, Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
 import { getPlayerStats } from "@/lib/firebase/firestore";
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, serverTimestamp, Timestamp, getDocs } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, updateDoc, onSnapshot, query, where, serverTimestamp, Timestamp, getDocs, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 
 interface StandardChallengeLobbyProps {
@@ -40,7 +40,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const [proofFile, setProofFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [playerData, setPlayerData] = useState<Record<string, { displayName?: string; profileImage?: string }>>({});
-  const [spectators, setSpectators] = useState<string[]>([]);
+  const [spectatorCount, setSpectatorCount] = useState<number>(0);
 
   const status = challenge.status || challenge.rawData?.status || 'pending_waiting_for_opponent';
   const players = challenge.rawData?.players || challenge.players || [];
@@ -271,7 +271,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   // When they leave, ALL their data is deleted (spectator doc + chat messages)
   useEffect(() => {
     if (!challengeId || !currentWallet) {
-      setSpectators([]);
+      setSpectatorCount(0);
       return;
     }
     
@@ -280,19 +280,14 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     
     // Only track as spectator if not a participant
     if (!isParticipant) {
-      const spectatorRef = doc(db, 'challenge_lobbies', challengeId, 'spectators', currentWallet.toLowerCase());
+      // Single stats document for this challenge lobby (cost-effective!)
+      const statsRef = doc(db, 'challenge_lobbies', challengeId, 'stats', 'count');
       let isMounted = true;
+      let hasJoined = false;
       
-      // Helper function to delete all user data (reusable for cleanup)
-      const cleanupUserData = () => {
+      // Helper function to delete all user chat messages
+      const cleanupChatMessages = () => {
         if (!isMounted) return;
-        
-        // Delete spectator document
-        deleteDoc(spectatorRef).catch(err => {
-          if (err.code !== 'permission-denied' && err.code !== 'unavailable' && err.code !== 'not-found') {
-            console.error('Failed to delete spectator:', err);
-          }
-        });
         
         // Delete ALL chat messages from this user in this challenge
         (async () => {
@@ -322,28 +317,48 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         })();
       };
       
-      // Add user as spectator (ephemeral - just to show presence)
-      setDoc(spectatorRef, {
-        wallet: currentWallet.toLowerCase(),
-        joinedAt: serverTimestamp(),
-      }, { merge: true }).catch(err => {
-        if (err.code !== 'permission-denied' && err.code !== 'unavailable') {
-          console.error('Failed to add spectator:', err);
+      // Increment spectator count when joining (using Firestore increment)
+      updateDoc(statsRef, {
+        spectatorCount: increment(1)
+      }).catch(async (err) => {
+        // If document doesn't exist, create it first
+        if (err.code === 'not-found') {
+          try {
+            await setDoc(statsRef, {
+              spectatorCount: 1,
+              createdAt: serverTimestamp(),
+            });
+            hasJoined = true;
+          } catch (createErr: any) {
+            if (createErr.code !== 'permission-denied' && createErr.code !== 'unavailable') {
+              console.error('Failed to create spectator count:', createErr);
+            }
+          }
+        } else if (err.code !== 'permission-denied' && err.code !== 'unavailable') {
+          console.error('Failed to increment spectator count:', err);
+        } else {
+          hasJoined = true; // Assume it worked if permission denied
         }
+      }).then(() => {
+        hasJoined = true;
       });
       
       // Handle page unload (user closes tab/browser) - cleanup as best effort
       let beforeUnloadHandler: ((e: BeforeUnloadEvent) => void) | null = null;
       if (typeof window !== 'undefined') {
         beforeUnloadHandler = () => {
-          // Use sendBeacon for reliable cleanup on page unload (if supported)
-          // Otherwise, try synchronous delete (might not complete, but we try)
-          cleanupUserData();
+          // Decrement counter and cleanup on page unload
+          if (hasJoined) {
+            updateDoc(statsRef, {
+              spectatorCount: increment(-1)
+            }).catch(() => {}); // Ignore errors on page unload
+            cleanupChatMessages();
+          }
         };
         window.addEventListener('beforeunload', beforeUnloadHandler);
       }
       
-      // Cleanup: Delete ALL data when user leaves (fire and forget)
+      // Cleanup: Decrement counter and delete chat messages when user leaves
       return () => {
         isMounted = false;
         
@@ -352,23 +367,35 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           window.removeEventListener('beforeunload', beforeUnloadHandler);
         }
         
-        // Clean up all user data
-        cleanupUserData();
+        // Decrement spectator count on leave
+        if (hasJoined) {
+          updateDoc(statsRef, {
+            spectatorCount: increment(-1)
+          }).catch(err => {
+            if (err.code !== 'permission-denied' && err.code !== 'unavailable' && err.code !== 'not-found') {
+              console.error('Failed to decrement spectator count:', err);
+            }
+          });
+        }
+        
+        // Clean up all chat messages
+        cleanupChatMessages();
       };
     } else {
-      setSpectators([]);
+      setSpectatorCount(0);
     }
   }, [challengeId, currentWallet, participants]);
   
-  // Listen to spectators in real-time - WITH PROPER ERROR HANDLING
+  // Listen to spectator count in real-time - SINGLE DOCUMENT (1 read total, NOT per spectator!)
+  // ULTRA-COST-EFFECTIVE: Only 1 read per lobby, not per spectator
   useEffect(() => {
     if (!challengeId) {
-      setSpectators([]);
+      setSpectatorCount(0);
       return;
     }
     
-    const spectatorsRef = collection(db, 'challenge_lobbies', challengeId, 'spectators');
-    const q = query(spectatorsRef);
+    // SINGLE DOCUMENT - cost-effective! 1 read total, not per spectator
+    const statsRef = doc(db, 'challenge_lobbies', challengeId, 'stats', 'count');
     
     let unsubscribeFn: (() => void) | null = null;
     let isActive = true;
@@ -380,20 +407,17 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       
       try {
         unsubscribeFn = onSnapshot(
-          q, 
+          statsRef,
           (snapshot) => {
             if (!isActive) return;
             
-            const spectatorWallets: string[] = [];
-            snapshot.forEach((doc) => {
-              const data = doc.data();
-              const wallet = data.wallet;
-              // Only include if not a participant
-              if (wallet && !participants.some((p: string) => p?.toLowerCase() === wallet.toLowerCase())) {
-                spectatorWallets.push(wallet);
-              }
-            });
-            setSpectators(spectatorWallets);
+            if (snapshot.exists()) {
+              const data = snapshot.data();
+              const count = data.spectatorCount || 0;
+              setSpectatorCount(Math.max(0, count)); // Ensure non-negative
+            } else {
+              setSpectatorCount(0);
+            }
           }, 
           (error) => {
             if (!isActive) return;
@@ -401,13 +425,13 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
             // Handle errors gracefully without causing Firebase assertion failures
             if (error.code === 'permission-denied' || error.code === 'unavailable') {
               // Expected errors - just clear spectators
-              setSpectators([]);
+              setSpectatorCount(0);
               return;
             }
             
             // For unexpected errors, log but don't throw
             console.error('Error listening to spectators:', error);
-            setSpectators([]);
+            setSpectatorCount(0);
           }
         );
       } catch (error: any) {
@@ -415,12 +439,12 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         if (!isActive) return;
         
         if (error.code === 'permission-denied' || error.code === 'unavailable') {
-          setSpectators([]);
+          setSpectatorCount(0);
           return;
         }
         
         console.error('Failed to set up spectator listener:', error);
-        setSpectators([]);
+        setSpectatorCount(0);
       }
     }, 100); // 100ms delay to prevent race conditions
     
@@ -439,13 +463,13 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         }
       }
     };
-  }, [challengeId, participants]);
+  }, [challengeId]);
   
-  // Fetch spectator data (display names, profile images)
+  // Fetch participant data (display names, profile images) - only for participants, not spectators
   useEffect(() => {
-    const fetchSpectatorData = async () => {
+    const fetchPlayerData = async () => {
       const data: Record<string, { displayName?: string; profileImage?: string }> = {};
-      for (const wallet of spectators) {
+      for (const wallet of participants) {
         if (wallet) {
           try {
             const stats = await getPlayerStats(wallet);
@@ -456,17 +480,17 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
               };
             }
           } catch (error) {
-            console.error(`Failed to fetch stats for spectator ${wallet}:`, error);
+            console.error(`Failed to fetch stats for participant ${wallet}:`, error);
           }
         }
       }
-      setPlayerData(prev => ({ ...prev, ...data }));
+      setPlayerData(data);
     };
     
-    if (spectators.length > 0) {
-      fetchSpectatorData();
+    if (participants.length > 0) {
+      fetchPlayerData();
     }
-  }, [spectators]);
+  }, [participants]);
 
   return (
     <div className="space-y-4">
@@ -513,53 +537,17 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           </div>
         </div>
         
-        {/* Spectators Section - Always show if there are any, or show empty state for current user */}
-        <div className="mt-4 pt-4 border-t border-white/5">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-2">
-            Spectators ({spectators.length})
-          </h3>
-          {spectators.length > 0 ? (
-            <div className="space-y-2">
-              {spectators.map((wallet: string) => {
-                const data = playerData[wallet.toLowerCase()] || {};
-                const displayName = data.displayName || `${wallet.slice(0, 4)}...${wallet.slice(-4)}`;
-                const isCurrentUser = currentWallet && wallet.toLowerCase() === currentWallet.toLowerCase();
-                
-                return (
-                  <div
-                    key={wallet}
-                    className={`flex items-center gap-3 p-2 rounded-lg ${
-                      isCurrentUser ? 'bg-purple-500/10 border border-purple-400/30' : 'bg-white/5'
-                    }`}
-                  >
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400/20 to-purple-600/20 border border-purple-400/30 flex items-center justify-center overflow-hidden">
-                      {data.profileImage ? (
-                        <img src={data.profileImage} alt={displayName} className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-purple-300 font-semibold text-xs">
-                          {displayName.charAt(0).toUpperCase()}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-gray-300 truncate">
-                        {displayName}
-                        {isCurrentUser && <span className="ml-2 text-xs text-purple-300">(You)</span>}
-                      </div>
-                      <div className="text-[10px] text-gray-500 truncate">
-                        {wallet.slice(0, 6)}...{wallet.slice(-4)}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
+        {/* Spectators Section - Just show count (cost-effective, no individual tracking) */}
+        {spectatorCount > 0 && (
+          <div className="mt-4 pt-4 border-t border-white/5">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-2">
+              Spectators ({spectatorCount})
+            </h3>
             <div className="text-xs text-gray-500 italic py-2">
-              No spectators yet. Others can join to watch and chat.
+              {spectatorCount} {spectatorCount === 1 ? 'person is' : 'people are'} watching
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Creator Fund Button - Show if creator needs to fund */}
