@@ -4737,7 +4737,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                         {unclaimedPrizeChallenges.length} Unclaimed Prize{unclaimedPrizeChallenges.length > 1 ? 's' : ''}!
                       </p>
                       <p className="text-emerald-300/80 text-xs mt-1">
-                        Click to claim your winnings
+                        Click to claim your rewards
                       </p>
                     </div>
                   </div>
@@ -6002,7 +6002,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           }
 
           // Standard challenge: render persistent lobby with inline submit form
-          const challengePlayers = selectedChallenge.players || selectedChallenge.rawData?.players || [];
+          const challengePlayersRaw = selectedChallenge.players || selectedChallenge.rawData?.players;
+          const challengePlayers = Array.isArray(challengePlayersRaw) ? challengePlayersRaw : [];
           const gameName = selectedChallenge.game || selectedChallenge.rawData?.game || 'Challenge';
           
           return (

@@ -35,6 +35,9 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
   const [isMobile, setIsMobile] = useState(false);
   const [playerData, setPlayerData] = useState<Record<string, { displayName?: string; profileImage?: string }>>({});
 
+  // Ensure players is always an array
+  const safePlayers = Array.isArray(players) ? players : [];
+
   // Detect mobile
   useEffect(() => {
     const checkMobile = () => {
@@ -48,10 +51,10 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
   // Fetch player stats for minimized view
   useEffect(() => {
     const fetchPlayerData = async () => {
-      if (!players || players.length === 0) return;
+      if (!safePlayers || safePlayers.length === 0) return;
       
       const data: Record<string, { displayName?: string; profileImage?: string }> = {};
-      for (const player of players) {
+      for (const player of safePlayers) {
         if (player.wallet) {
           try {
             const stats = await getPlayerStats(player.wallet);
@@ -69,14 +72,14 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
       setPlayerData(data);
     };
     
-    if (isMinimized && isMobile && players && players.length >= 2) {
+    if (isMinimized && isMobile && safePlayers && safePlayers.length >= 2) {
       fetchPlayerData();
     }
-  }, [isMinimized, isMobile, players]);
+  }, [isMinimized, isMobile, safePlayers]);
 
   // Auto-minimize on mobile when panel opens (after a brief delay to show it opened)
   useEffect(() => {
-    if (isOpen && isMobile && players.length >= 2) {
+    if (isOpen && isMobile && safePlayers.length >= 2) {
       // Auto-minimize after 2 seconds on mobile
       const timer = setTimeout(() => {
         setIsMinimized(true);
@@ -85,7 +88,7 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
     } else {
       setIsMinimized(false);
     }
-  }, [isOpen, isMobile, players.length]);
+  }, [isOpen, isMobile, safePlayers.length]);
 
   const handleExpand = () => {
     setIsMinimized(false);
@@ -98,7 +101,7 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
   if (!isOpen) return null;
 
   // Minimized view (mobile only) - shows at top like X's minimized player
-  if (isMinimized && isMobile && players.length >= 2) {
+  if (isMinimized && isMobile && safePlayers.length >= 2) {
     return (
       <>
         {/* Minimized bar at top - like X's minimized player */}
@@ -109,7 +112,7 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
           <div className="flex items-center gap-3 px-4 py-3">
             {/* Player avatars */}
             <div className="flex -space-x-2">
-              {players.slice(0, 2).map((player, idx) => {
+              {safePlayers.slice(0, 2).map((player, idx) => {
                 const stats = playerData[player.wallet.toLowerCase()] || {};
                 const displayName = stats.displayName || player.displayName || `${player.wallet.slice(0, 4)}...${player.wallet.slice(-4)}`;
                 const profileImage = stats.profileImage || player.profileImage;
@@ -141,15 +144,15 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
                 {gameName || 'Challenge'}
               </div>
               <div className="text-blue-100 text-xs truncate">
-                {players.length === 2 
+                {safePlayers.length === 2 
                   ? (() => {
-                      const p1Stats = playerData[players[0]?.wallet.toLowerCase()] || {};
-                      const p2Stats = playerData[players[1]?.wallet.toLowerCase()] || {};
-                      const p1Name = p1Stats.displayName || players[0]?.displayName || players[0]?.wallet.slice(0, 6);
-                      const p2Name = p2Stats.displayName || players[1]?.displayName || players[1]?.wallet.slice(0, 6);
+                      const p1Stats = playerData[safePlayers[0]?.wallet.toLowerCase()] || {};
+                      const p2Stats = playerData[safePlayers[1]?.wallet.toLowerCase()] || {};
+                      const p1Name = p1Stats.displayName || safePlayers[0]?.displayName || safePlayers[0]?.wallet.slice(0, 6);
+                      const p2Name = p2Stats.displayName || safePlayers[1]?.displayName || safePlayers[1]?.wallet.slice(0, 6);
                       return `${p1Name} vs ${p2Name}`;
                     })()
-                  : `${players.length} players`
+                  : `${safePlayers.length} players`
                 }
               </div>
             </div>
@@ -210,7 +213,7 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
               </h2>
               <div className="flex items-center gap-2">
                 {/* Minimize button (mobile only, when 2+ players) */}
-                {isMobile && players.length >= 2 && (
+                {isMobile && safePlayers.length >= 2 && (
                   <button
                     onClick={() => setIsMinimized(true)}
                     className="p-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors duration-300 md:hidden"
