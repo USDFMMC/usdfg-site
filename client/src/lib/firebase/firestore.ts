@@ -76,7 +76,7 @@ export interface ChallengeData {
   payoutSignature?: string;            // Transaction signature of prize claim
   payoutTimestamp?: Timestamp;        // When prize was claimed
   pda?: string;                       // Challenge PDA for smart contract
-  prizePool?: number;                 // Total prize pool amount
+  prizePool?: number;                 // Total challenge reward amount
   // UI display fields
   title?: string;                     // Challenge title (contains game info)
   game?: string;                      // Game name for display
@@ -751,7 +751,7 @@ export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'cr
       throw new Error("Creator wallet is required");
     }
     if (challengePayload.entryFee === undefined || challengePayload.entryFee === null) {
-      throw new Error("Entry fee is required");
+      throw new Error("Challenge amount is required");
     }
     if (!challengePayload.status) {
       throw new Error("Status is required");
@@ -1005,24 +1005,76 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
       }
     }
     
-    // Validate challenge is in pending state
+    // Check if creator is trying to join their own challenge (BEFORE status check)
+    // BUT: Allow creator to join if deadline expired (even if not yet reverted)
+    const isCreator = data.creator.toLowerCase() === wallet.toLowerCase();
+    const deadlineExpired = data.creatorFundingDeadline && data.creatorFundingDeadline.toMillis() < Date.now();
+    
+    if (isCreator) {
+      if (deadlineExpired && data.status === 'creator_confirmation_required') {
+        // Deadline expired and status is still creator_confirmation_required - auto-revert first
+        try {
+          const reverted = await revertCreatorTimeout(challengeId);
+          if (reverted) {
+            // Re-fetch to get updated status after revert
+            const updatedSnap = await getDoc(challengeRef);
+            if (updatedSnap.exists()) {
+              data = updatedSnap.data() as ChallengeData;
+              console.log('✅ Challenge auto-reverted, creator can now rejoin');
+            } else {
+              throw new Error("Challenge state mismatch. The challenge may have been reverted. Please refresh and try again.");
+            }
+          } else {
+            // Revert didn't happen - check if already reverted
+            const currentSnap = await getDoc(challengeRef);
+            if (currentSnap.exists()) {
+              const currentData = currentSnap.data() as ChallengeData;
+              if (currentData.status === 'pending_waiting_for_opponent') {
+                data = currentData;
+                console.log('✅ Challenge already reverted, creator can now rejoin');
+              } else {
+                throw new Error("Challenge state mismatch. The challenge may have been reverted. Please refresh and try again.");
+              }
+            } else {
+              throw new Error("Challenge state mismatch. The challenge may have been reverted. Please refresh and try again.");
+            }
+          }
+        } catch (revertError: any) {
+          console.error('Failed to auto-revert challenge:', revertError);
+          // Try to get current state anyway
+          const currentSnap = await getDoc(challengeRef);
+          if (currentSnap.exists()) {
+            const currentData = currentSnap.data() as ChallengeData;
+            if (currentData.status === 'pending_waiting_for_opponent') {
+              data = currentData;
+              console.log('✅ Challenge already reverted, creator can now rejoin');
+            } else {
+              throw new Error("Challenge state mismatch. The challenge may have been reverted. Please refresh and try again.");
+            }
+          } else {
+            throw new Error("Challenge state mismatch. The challenge may have been reverted. Please refresh and try again.");
+          }
+        }
+      } else if (deadlineExpired && data.status === 'pending_waiting_for_opponent') {
+        // Deadline expired and already reverted - creator can rejoin
+        console.log('✅ Challenge already reverted after deadline, creator can rejoin');
+      } else if (!deadlineExpired) {
+        // Deadline not expired - creator cannot join
+        throw new Error("Cannot join your own challenge");
+      } else {
+        // Deadline expired but status is something else - state mismatch
+        throw new Error("Challenge state mismatch. The challenge may have been reverted. Please refresh and try again.");
+      }
+    }
+    
+    // Validate challenge is in pending state (after possible auto-revert for creators)
     if (data.status !== 'pending_waiting_for_opponent') {
-      throw new Error(`Challenge is not waiting for opponent. Current status: ${data.status}`);
+      throw new Error(`Challenge is not waiting for opponent. Current status: ${data.status}. The challenge may have been reverted. Please refresh and try again.`);
     }
     
     // Check if challenge expired
     if (data.expirationTimer && data.expirationTimer.toMillis() < Date.now()) {
       throw new Error("Challenge has expired");
-    }
-    
-    // Check if creator is trying to join their own challenge
-    // BUT: Allow creator to join if deadline expired and challenge reverted to pending
-    const isCreator = data.creator.toLowerCase() === wallet.toLowerCase();
-    const deadlineExpired = data.creatorFundingDeadline && data.creatorFundingDeadline.toMillis() < Date.now();
-    const isRevertedToPending = data.status === 'pending_waiting_for_opponent' && deadlineExpired;
-    
-    if (isCreator && !isRevertedToPending) {
-      throw new Error("Cannot join your own challenge");
     }
     
     // Handle team challenges
@@ -1434,7 +1486,7 @@ export async function recordFounderChallengeReward(
       });
     }
 
-    // Update challenge to mark prize as transferred and set actual prize pool
+    // Update challenge to mark prize as transferred and set actual challenge reward
     const challengeRef = doc(db, 'challenges', challengeId);
     await updateDoc(challengeRef, {
       payoutTriggered: true,
@@ -1733,7 +1785,7 @@ async function cleanupChallengeData(challengeId: string, isDispute: boolean = fa
  * Logic:
  * - One YES, One NO → YES player wins (clear winner)
  * - Both YES → Dispute (both claim victory, requires review)
- * - Both NO → Both forfeit (suspicious collusion, both lose entry fees as penalty)
+ * - Both NO → Both forfeit (suspicious collusion, both lose challenge amounts as penalty)
  */
 async function determineWinner(challengeId: string, data: ChallengeData): Promise<void> {
   try {
@@ -1779,7 +1831,7 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
         winner: 'forfeit', // Special value: both players forfeit, no refund
         updatedAt: Timestamp.now(),
       });
-      console.log('⚠️ FORFEIT: Both players claim they lost - Suspicious collusion detected, both lose entry fees');
+      console.log('⚠️ FORFEIT: Both players claim they lost - Suspicious collusion detected, both lose challenge amounts');
       // Delete chat - no dispute, no need to keep
       await cleanupChallengeData(challengeId, false); // false = not dispute
       return;
@@ -1802,15 +1854,15 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     // Check if this is a team challenge
     const isTeamChallenge = data.challengeType === 'team';
     
-    // Calculate prize pool if not stored (for backward compatibility with old challenges)
+    // Calculate challenge reward if not stored (for backward compatibility with old challenges)
     let prizePool = data.prizePool;
     if (!prizePool || prizePool === 0) {
-      // Calculate from entry fee: 2x entry fee minus 5% platform fee
+      // Calculate from challenge amount: 2x challenge amount minus 5% platform fee
       const entryFee = data.entryFee || 0;
       const totalPrize = entryFee * 2;
       const platformFee = totalPrize * 0.05; // 5% platform fee
       prizePool = totalPrize - platformFee;
-      console.log(`⚠️ Prize pool not found in challenge data, calculated from entry fee: ${entryFee} USDFG → ${prizePool} USDFG`);
+      console.log(`⚠️ Challenge reward not found in challenge data, calculated from challenge amount: ${entryFee} USDFG → ${prizePool} USDFG`);
     }
     
     console.log('   Game:', data.game, 'Category:', data.category, 'Prize:', prizePool, 'Type:', isTeamChallenge ? 'Team' : 'Solo');
@@ -1846,7 +1898,7 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
       updatedAt: Timestamp.now(),
     });
     
-    console.log('💰 Prize pool ready for claim:', prizePool, 'USDFG to', winner);
+    console.log('💰 Challenge reward ready for claim:', prizePool, 'USDFG to', winner);
     console.log('✅ Winner can now claim their prize (they pay gas, not you!)');
     
   } catch (error) {
@@ -2100,7 +2152,7 @@ export const requestCancelChallenge = async (
       // Send system message to chat
       await addDoc(collection(db, 'challenge_chats'), {
         challengeId,
-        text: '🤝 Both players agreed to cancel. Challenge cancelled, entry fees will be returned.',
+        text: '🤝 Both players agreed to cancel. Challenge cancelled, challenge amounts will be returned.',
         sender: 'SYSTEM',
         timestamp: Timestamp.now(),
       });
@@ -3781,7 +3833,7 @@ export async function claimChallengePrize(
     
     console.log('✅ Validation passed - calling smart contract...');
     console.log('   Winner:', data.winner);
-    console.log('   Prize Pool:', data.prizePool, 'USDFG');
+    console.log('   Challenge Reward:', data.prizePool, 'USDFG');
     console.log('   Challenge PDA:', challengePDA);
     
     // ✅ REMOVED: Expiration check for prize claims
