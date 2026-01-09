@@ -180,17 +180,34 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   
   // Check if creator can fund (status is creator_confirmation_required and deadline hasn't expired)
   const creatorFundingDeadline = challenge.rawData?.creatorFundingDeadline || challenge.creatorFundingDeadline;
-  const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
+  const isDeadlineExpired = creatorFundingDeadline ? creatorFundingDeadline.toMillis() < Date.now() : false;
+  
+  // Get pending joiner info (needed for multiple checks below)
+  const pendingJoiner = challenge.rawData?.pendingJoiner || challenge.pendingJoiner;
+  const isAlreadyPendingJoiner = pendingJoiner && currentWallet && pendingJoiner.toLowerCase() === currentWallet.toLowerCase();
+  
   const canCreatorFund = isCreator && status === 'creator_confirmation_required' && !isDeadlineExpired && onCreatorFund;
+  
+  // Debug logging for stuck state
+  if (status === 'creator_confirmation_required') {
+    console.log('🔍 Creator Confirmation Required Debug:', {
+      isCreator,
+      status,
+      isDeadlineExpired,
+      hasDeadline: !!creatorFundingDeadline,
+      deadlineTime: creatorFundingDeadline ? new Date(creatorFundingDeadline.toMillis()).toLocaleString() : 'No deadline',
+      hasHandler: !!onCreatorFund,
+      canCreatorFund,
+      isAlreadyPendingJoiner,
+      challenger: challenge.rawData?.challenger || challenge.challenger,
+      pendingJoiner: pendingJoiner
+    });
+  }
   
   // Check if joiner can fund (status is creator_funded, user is the challenger, and deadline hasn't expired)
   const joinerFundingDeadline = challenge.rawData?.joinerFundingDeadline || challenge.joinerFundingDeadline;
   const isJoinerDeadlineExpired = joinerFundingDeadline && joinerFundingDeadline.toMillis() < Date.now();
   const canJoinerFund = isChallenger && status === 'creator_funded' && !isJoinerDeadlineExpired && onJoinerFund;
-  
-  // Can join when status is pending_waiting_for_opponent OR creator_confirmation_required (but not if user is already pending joiner)
-  const pendingJoiner = challenge.rawData?.pendingJoiner || challenge.pendingJoiner;
-  const isAlreadyPendingJoiner = pendingJoiner && currentWallet && pendingJoiner.toLowerCase() === currentWallet.toLowerCase();
   
   // If deadline expired, creator should be able to join their own challenge (it reverted)
   const canCreatorJoinAfterExpiry = isCreator && status === 'creator_confirmation_required' && isDeadlineExpired && currentWallet && onJoinChallenge;
@@ -354,12 +371,59 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                     console.error('Failed to fund challenge:', error);
                     alert(error.message || 'Failed to fund challenge. Please try again.');
                   }
+                } else {
+                  console.error('onCreatorFund handler not provided');
+                  alert('Error: Funding handler not available. Please refresh the page.');
                 }
               }}
               className="w-full rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white px-4 py-3 font-semibold transition-all shadow-[0_0_15px_rgba(245,158,11,0.5)] hover:shadow-[0_0_25px_rgba(245,158,11,0.7)] border border-amber-400/30"
             >
               Fund Challenge ({entryFee} USDFG + Network Fee)
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Waiting message for joiner when creator needs to fund */}
+      {!isCreator && status === 'creator_confirmation_required' && isAlreadyPendingJoiner && (
+        <div className="rounded-xl border border-blue-400/30 bg-blue-500/10 p-4">
+          <div className="text-center">
+            <div className="text-sm font-semibold text-blue-200 mb-2">
+              ⏳ Waiting for Creator to Fund
+            </div>
+            <div className="text-xs text-blue-100/80 mb-3">
+              You've expressed intent to join. The creator needs to fund the challenge to proceed.
+            </div>
+            {creatorFundingDeadline && (
+              <div className="text-xs text-blue-300/70 mb-3">
+                Creator deadline: {new Date(creatorFundingDeadline.toMillis()).toLocaleTimeString()}
+                {isDeadlineExpired && (
+                  <span className="ml-2 text-red-300">(Expired - challenge will revert soon)</span>
+                )}
+              </div>
+            )}
+            <div className="text-xs text-blue-100/60">
+              Once the creator funds, you'll be able to fund your entry and start the match.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Debug info for creator when status is creator_confirmation_required but button not showing */}
+      {isCreator && status === 'creator_confirmation_required' && !canCreatorFund && !isDeadlineExpired && (
+        <div className="rounded-xl border border-yellow-400/30 bg-yellow-500/10 p-4">
+          <div className="text-center">
+            <div className="text-sm font-semibold text-yellow-200 mb-2">
+              ⚠️ Funding Button Not Available
+            </div>
+            <div className="text-xs text-yellow-100/80 mb-2">
+              Status: {status} | Deadline expired: {isDeadlineExpired ? 'Yes' : 'No'} | Handler: {onCreatorFund ? 'Available' : 'Missing'}
+            </div>
+            {!onCreatorFund && (
+              <div className="text-xs text-red-300 mt-2">
+                Error: Funding handler not available. Please refresh the page.
+              </div>
+            )}
           </div>
         </div>
       )}

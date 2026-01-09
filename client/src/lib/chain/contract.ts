@@ -126,15 +126,24 @@ export async function createChallenge(
   const creator = new PublicKey(wallet.publicKey.toString());
   console.log(`👤 Creator: ${creator.toString()}`);
 
-  // CRITICAL: Deployed contract uses `init` without seeds
-  // When Anchor uses `init` without seeds, it creates a NEW account (not a PDA)
-  // The account address must be provided by the caller and will be owned by the program
-  // We need to generate a new keypair for the challenge account
-  // Anchor will initialize this account and transfer ownership to the program
-  const challengeKeypair = Keypair.generate();
-  const challengeAddress = challengeKeypair.publicKey;
-  console.log(`📍 Challenge account address: ${challengeAddress.toString()}`);
-  console.log(`📍 This will be a new account owned by the program after init`);
+  // CRITICAL: Deployed contract uses PDA with seeds [b"challenge", creator.key(), challenge_seed.key()]
+  // We need to generate a challenge_seed keypair and derive the challenge PDA
+  const challengeSeedKeypair = Keypair.generate();
+  const challengeSeedPubkey = challengeSeedKeypair.publicKey;
+  
+  // Derive challenge PDA using the same seeds as the contract
+  const [challengePDA, challengeBump] = PublicKey.findProgramAddressSync(
+    [
+      SEEDS.CHALLENGE,
+      creator.toBuffer(),
+      challengeSeedPubkey.toBuffer()
+    ],
+    PROGRAM_ID
+  );
+  const challengeAddress = challengePDA;
+  console.log(`📍 Challenge PDA derived: ${challengeAddress.toString()}`);
+  console.log(`📍 Challenge seed: ${challengeSeedPubkey.toString()}`);
+  console.log(`📍 Challenge bump: ${challengeBump}`);
 
   // Check if challenge account already exists (shouldn't, but check anyway)
   try {
@@ -165,21 +174,20 @@ export async function createChallenge(
   entryFeeBuffer.copy(instructionData, 8);
   console.log('📦 Instruction data created', 'Discriminator:', discriminator.toString('hex'));
 
-  // Create instruction - deployed contract expects exactly 3 accounts in this order:
-  // 1. challenge (Account, init, writable)
+  // Create instruction - deployed contract expects exactly 4 accounts in this order:
+  // 1. challenge (Account, init, PDA with seeds)
   // 2. creator (Signer, mut, writable)
-  // 3. system_program (Program<System>, not writable)
+  // 3. challenge_seed (Signer<'info>) - required for PDA derivation
+  // 4. system_program (Program<System>, not writable)
   const systemProgramId = SystemProgram.programId;
   
-  // CRITICAL: When using init without seeds, the account must be a signer
-  // because Anchor needs to sign the account creation instruction to System Program
-  // The account keypair will sign the transaction, then Anchor transfers ownership
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
-      { pubkey: challengeAddress, isSigner: true, isWritable: true }, // 0: challenge (Account<'info, Challenge>, init) - MUST be signer for init
+      { pubkey: challengeAddress, isSigner: false, isWritable: true }, // 0: challenge (PDA, not a signer)
       { pubkey: creator, isSigner: true, isWritable: true }, // 1: creator (Signer<'info>, mut)
-      { pubkey: systemProgramId, isSigner: false, isWritable: false }, // 2: system_program (Program<'info, System>)
+      { pubkey: challengeSeedPubkey, isSigner: true, isWritable: false }, // 2: challenge_seed (Signer<'info>)
+      { pubkey: systemProgramId, isSigner: false, isWritable: false }, // 3: system_program (Program<'info, System>)
     ],
     data: instructionData,
   });
@@ -197,9 +205,8 @@ export async function createChallenge(
   transaction.feePayer = creator;
 
   console.log('🚀 Sending transaction...');
-  // CRITICAL: The challenge account keypair must sign because it's marked as isSigner: true
-  // This allows Anchor to create the account via System Program
-  transaction.partialSign(challengeKeypair);
+  // CRITICAL: The challenge_seed keypair must sign for PDA derivation
+  transaction.partialSign(challengeSeedKeypair);
   const signedTransaction = await wallet.signTransaction(transaction);
   
   let signature: string;
@@ -394,10 +401,10 @@ export async function creatorFund(
   // Derive escrow token account PDA using the correct seeds from the contract
   // Seeds: [ESCROW_WALLET_SEED, challenge.key(), mint.key()]
   // The escrow_token_account is its own authority (token::authority = escrow_token_account)
-  const ESCROW_WALLET_SEED = Buffer.from('escrow_wallet');
+  // Contract uses ESCROW_WALLET_SEED = b"escrow_wallet"
   const [escrowTokenAccountPDA, escrowTokenBump] = PublicKey.findProgramAddressSync(
     [
-      ESCROW_WALLET_SEED,
+      SEEDS.ESCROW_WALLET,
       challengeAddress.toBuffer(),
       USDFG_MINT.toBuffer()
     ],
@@ -419,48 +426,33 @@ export async function creatorFund(
   entryFeeBuffer.copy(instructionData, 8);
   console.log('📦 CreatorFund instruction data:', 'Discriminator:', discriminator.toString('hex'), 'Amount:', entryFeeLamports);
 
-  // Account order for CreatorFund - EXACT match to Rust struct
-  // Rust struct order (lib.rs line 583-602):
-  // 1. challenge
-  // 2. creator
-  // 3. creator_token_account
-  // 4. escrow_token_account
-  // 5. token_program
-  // 6. system_program
-  // 7. mint
-  // NOTE: rent has been removed from the struct
-  // 
-  // CRITICAL: This frontend code matches the LOCAL Rust code.
-  // The DEPLOYED contract still has the old struct (with rent).
-  // You MUST rebuild and redeploy the Anchor program for this to work!
-  // 
-  // After redeploy, verify the IDL includes creatorFund with this exact account order.
+  // Account order for CreatorFund - EXACT match to Rust struct (lib.rs line 583-602):
+  // 1. challenge (Account, mut)
+  // 2. creator (Signer, mut)
+  // 3. creator_token_account (Account<TokenAccount>, mut)
+  // 4. escrow_token_account (Account<TokenAccount>, init_if_needed, PDA)
+  // 5. token_program (Program<Token>)
+  // 6. system_program (Program<System>)
+  // 7. mint (Account<Mint>)
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
       { pubkey: challengeAddress, isSigner: false, isWritable: true }, // 0: challenge
       { pubkey: creator, isSigner: true, isWritable: true }, // 1: creator
       { pubkey: creatorTokenAccount, isSigner: false, isWritable: true }, // 2: creator_token_account
-      { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // 3: escrow_token_account
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // 4: token_program (EXACT struct order)
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // 5: system_program (EXACT struct order)
-      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // 6: mint (EXACT struct order)
-      // rent removed - not in current struct
+      { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // 3: escrow_token_account (PDA)
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // 4: token_program
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // 5: system_program
+      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // 6: mint
     ],
     data: instructionData,
   });
   
-  // Debug: Log all accounts to verify order matches Rust struct
-  console.log('🔍 CreatorFund instruction accounts (EXACT Rust struct order):');
-  console.log('  Rust struct order: challenge, creator, creator_token_account, escrow_token_account, token_program, system_program, mint');
-  console.log('  0. challenge:', challengeAddress.toString());
-  console.log('  1. creator:', creator.toString());
-  console.log('  2. creator_token_account:', creatorTokenAccount.toString());
-  console.log('  3. escrow_token_account:', escrowTokenAccountPDA.toString());
-  console.log('  4. token_program:', TOKEN_PROGRAM_ID.toString());
-  console.log('  5. system_program:', SystemProgram.programId.toString());
-  console.log('  6. mint:', USDFG_MINT.toString());
-  console.log('⚠️  WARNING: If deployment fails, the deployed contract may still have the old struct. Rebuild and redeploy required!');
+  console.log('🔍 CreatorFund instruction accounts (matching deployed contract):');
+  instruction.keys.forEach((key, idx) => {
+    const accountNames = ['challenge', 'creator', 'creator_token_account', 'escrow_token_account', 'token_program', 'system_program', 'mint'];
+    console.log(`  ${idx}: ${key.pubkey.toString()} (${accountNames[idx]}, signer: ${key.isSigner}, writable: ${key.isWritable})`);
+  });
 
   const transaction = new Transaction().add(instruction);
   const { blockhash } = await connection.getLatestBlockhash();
@@ -506,18 +498,18 @@ export async function joinerFund(
   // Get challenger's token account
   const challengerTokenAccount = await getAssociatedTokenAddress(USDFG_MINT, challenger);
   
-  // Derive escrow authority PDA (matches deployed contract)
-  const [escrowAuthorityPDA] = PublicKey.findProgramAddressSync(
-    [SEEDS.ESCROW_AUTHORITY, challengeAddress.toBuffer()],
+  // Derive escrow token account PDA using the correct seeds from the contract
+  // Seeds: [ESCROW_WALLET_SEED, challenge.key(), mint.key()]
+  // Contract uses ESCROW_WALLET_SEED = b"escrow_wallet"
+  const [escrowTokenAccountPDA, escrowTokenBump] = PublicKey.findProgramAddressSync(
+    [
+      SEEDS.ESCROW_WALLET,
+      challengeAddress.toBuffer(),
+      USDFG_MINT.toBuffer()
+    ],
     PROGRAM_ID
   );
-  
-  // Escrow token account is an ATA of the escrow authority
-  const escrowTokenAccountPDA = await getAssociatedTokenAddress(
-    USDFG_MINT,
-    escrowAuthorityPDA,
-    true // allowOwnerOffCurve for PDA
-  );
+  console.log('📍 Escrow Token Account PDA:', escrowTokenAccountPDA.toString(), 'bump:', escrowTokenBump);
   
   // Convert USDFG to lamports
   const entryFeeLamports = Math.floor(entryFeeUsdfg * Math.pow(10, 9));
@@ -530,19 +522,30 @@ export async function joinerFund(
   const instructionData = Buffer.alloc(8); // discriminator only (no args)
   discriminator.copy(instructionData, 0);
 
-  // Account order matches deployed contract JoinerFund struct
+  // Account order matches deployed contract JoinerFund struct (lib.rs line 604-625):
+  // 1. challenge (Account, mut)
+  // 2. challenger (Signer, mut)
+  // 3. challenger_token_account (Account<TokenAccount>, mut)
+  // 4. escrow_token_account (Account<TokenAccount>, mut, PDA)
+  // 5. token_program (Program<Token>)
+  // 6. mint (Account<Mint>)
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
       { pubkey: challengeAddress, isSigner: false, isWritable: true }, // 0: challenge
       { pubkey: challenger, isSigner: true, isWritable: true }, // 1: challenger
       { pubkey: challengerTokenAccount, isSigner: false, isWritable: true }, // 2: challenger_token_account
-      { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // 3: escrow_token_account
-      { pubkey: escrowAuthorityPDA, isSigner: false, isWritable: false }, // 4: escrow_authority
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // 5: token_program
-      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // 6: mint
+      { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // 3: escrow_token_account (PDA)
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // 4: token_program
+      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // 5: mint
     ],
     data: instructionData,
+  });
+  
+  console.log('🔍 JoinerFund instruction accounts (matching deployed contract):');
+  instruction.keys.forEach((key, idx) => {
+    const accountNames = ['challenge', 'challenger', 'challenger_token_account', 'escrow_token_account', 'token_program', 'mint'];
+    console.log(`  ${idx}: ${key.pubkey.toString()} (${accountNames[idx]}, signer: ${key.isSigner}, writable: ${key.isWritable})`);
   });
 
   const transaction = new Transaction().add(instruction);
@@ -714,18 +717,26 @@ export async function resolveChallenge(
   
   console.log('📍 Platform wallet:', platformWallet.toString());
   
-  // Deployed contract uses ESCROW_AUTHORITY, not ESCROW_WALLET
-  const [escrowAuthorityPDA] = PublicKey.findProgramAddressSync(
-    [SEEDS.ESCROW_AUTHORITY, challengeAddress.toBuffer()],
+  // Derive escrow token account PDA using the correct seeds from the contract
+  // Seeds: [ESCROW_WALLET_SEED, challenge.key(), mint.key()]
+  const [escrowTokenAccountPDA, escrowTokenBump] = PublicKey.findProgramAddressSync(
+    [
+      SEEDS.ESCROW_WALLET,
+      challengeAddress.toBuffer(),
+      USDFG_MINT.toBuffer()
+    ],
     PROGRAM_ID
   );
   
-  // Escrow token account is an ATA of the escrow authority
-  const escrowTokenAccountPDA = await getAssociatedTokenAddress(
-    USDFG_MINT,
-    escrowAuthorityPDA,
-    true // allowOwnerOffCurve for PDA
+  // Derive escrow_wallet PDA (used in ResolveChallenge)
+  // Seeds: [ESCROW_WALLET_SEED] (single seed, not challenge-specific)
+  const [escrowWalletPDA, escrowWalletBump] = PublicKey.findProgramAddressSync(
+    [SEEDS.ESCROW_WALLET],
+    PROGRAM_ID
   );
+  
+  console.log('📍 Escrow Token Account PDA:', escrowTokenAccountPDA.toString(), 'bump:', escrowTokenBump);
+  console.log('📍 Escrow Wallet PDA:', escrowWalletPDA.toString(), 'bump:', escrowWalletBump);
   
   // Get winner's token account
   const winnerTokenAccount = await getAssociatedTokenAddress(
@@ -741,8 +752,8 @@ export async function resolveChallenge(
   
   console.log('📍 Derived accounts:');
   console.log('   Platform Wallet:', platformWallet.toString());
-  console.log('   Escrow Authority PDA:', escrowAuthorityPDA.toString());
-  console.log('   Escrow Token Account:', escrowTokenAccountPDA.toString());
+  console.log('   Escrow Wallet PDA:', escrowWalletPDA.toString());
+  console.log('   Escrow Token Account PDA:', escrowTokenAccountPDA.toString());
   console.log('   Winner Token Account:', winnerTokenAccount.toString());
   console.log('   Platform Token Account:', platformTokenAccount.toString());
   
@@ -751,35 +762,42 @@ export async function resolveChallenge(
   const hash = sha256(new TextEncoder().encode('global:resolve_challenge'));
   const discriminator = Buffer.from(hash.slice(0, 8));
   
-  // Create instruction data: discriminator + winner pubkey (32 bytes) + caller pubkey (32 bytes)
-  const instructionData = Buffer.alloc(8 + 32 + 32);
+  // Create instruction data: discriminator + winner pubkey (32 bytes)
+  // Contract signature: pub fn resolve_challenge(ctx: Context<ResolveChallenge>, winner: Pubkey)
+  const instructionData = Buffer.alloc(8 + 32); // discriminator (8) + winner (32)
   discriminator.copy(instructionData, 0);
   winnerPubkey.toBuffer().copy(instructionData, 8);
-  caller.toBuffer().copy(instructionData, 40); // Caller is the one signing (admin or winner)
   
   console.log('📦 Instruction data created');
   console.log('   Discriminator:', discriminator.toString('hex'));
+  console.log('   Winner:', winnerPubkey.toString());
   
-  // Create instruction - deployed contract ResolveChallenge struct:
+  // Create instruction - deployed contract ResolveChallenge struct (lib.rs line 634-664):
   // 1. challenge (Account, mut)
-  // 2. escrow_token_account (Account<TokenAccount>, mut)
+  // 2. escrow_token_account (Account<TokenAccount>, mut, PDA)
   // 3. winner_token_account (Account<TokenAccount>, mut)
   // 4. platform_token_account (Account<TokenAccount>, mut)
-  // 5. escrow_authority (AccountInfo, seeds = [ESCROW_AUTHORITY_SEED, challenge.key()])
+  // 5. escrow_wallet (AccountInfo, seeds = [ESCROW_WALLET_SEED])
   // 6. token_program (Program<Token>)
   // 7. mint (Account<Mint>)
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
       { pubkey: challengeAddress, isSigner: false, isWritable: true }, // 0: challenge
-      { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // 1: escrow_token_account
+      { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // 1: escrow_token_account (PDA)
       { pubkey: winnerTokenAccount, isSigner: false, isWritable: true }, // 2: winner_token_account
       { pubkey: platformTokenAccount, isSigner: false, isWritable: true }, // 3: platform_token_account
-      { pubkey: escrowAuthorityPDA, isSigner: false, isWritable: false }, // 4: escrow_authority
+      { pubkey: escrowWalletPDA, isSigner: false, isWritable: false }, // 4: escrow_wallet (PDA, single seed)
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // 5: token_program
       { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // 6: mint
     ],
     data: instructionData,
+  });
+  
+  console.log('🔍 ResolveChallenge instruction accounts (matching deployed contract):');
+  instruction.keys.forEach((key, idx) => {
+    const accountNames = ['challenge', 'escrow_token_account', 'winner_token_account', 'platform_token_account', 'escrow_wallet', 'token_program', 'mint'];
+    console.log(`  ${idx}: ${key.pubkey.toString()} (${accountNames[idx]}, signer: ${key.isSigner}, writable: ${key.isWritable})`);
   });
   
   console.log('✅ Instruction created with', instruction.keys.length, 'accounts');
