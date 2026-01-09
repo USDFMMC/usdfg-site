@@ -32,7 +32,9 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
   const contentRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [sheetY, setSheetY] = useState(0);
+  // Initialize sheetY to windowHeight (off-screen) - will be set to EXPANDED_HEIGHT when opening
+  const [windowHeight, setWindowHeight] = useState(typeof window !== 'undefined' ? window.innerHeight : 800);
+  const [sheetY, setSheetY] = useState(typeof window !== 'undefined' ? window.innerHeight : 800);
   const dragStartY = useRef(0);
   const initialSheetY = useRef(0);
 
@@ -49,26 +51,38 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Calculate initial position (collapsed to ~20% of screen, expanded to ~85%)
-  const [windowHeight, setWindowHeight] = useState(typeof window !== 'undefined' ? window.innerHeight : 800);
-  const COLLAPSED_HEIGHT = windowHeight * 0.2; // 20% visible when collapsed (shows header, user can still browse)
-  const EXPANDED_HEIGHT = windowHeight * 0.85; // 85% when expanded
-
   // Update window height on resize
   useEffect(() => {
     const handleResize = () => {
-      setWindowHeight(window.innerHeight);
+      const newHeight = window.innerHeight;
+      setWindowHeight(newHeight);
+      // If closed, keep sheet off-screen
+      if (!isOpen) {
+        setSheetY(newHeight);
+      }
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [isOpen]);
 
-  // Reset to expanded when opening
+  // Calculate heights based on current window height
+  // sheetY represents distance from TOP where visible sheet starts
+  // visibleHeight = windowHeight - sheetY = how much of sheet is visible from bottom
+  // When expanded: sheetY = 0.15 * windowHeight, visibleHeight = 0.85 * windowHeight (85% visible) ✓
+  // When collapsed: sheetY = 0.8 * windowHeight, visibleHeight = 0.2 * windowHeight (20% visible) ✓
+  const COLLAPSED_HEIGHT = windowHeight * 0.8; // 80% from top = 20% visible when collapsed
+  const EXPANDED_HEIGHT = windowHeight * 0.15; // 15% from top = 85% visible when expanded
+
+  // Initialize sheetY based on isOpen state - ensure it opens to expanded position
   useEffect(() => {
     if (isOpen && isMobile) {
+      // Start expanded when opening (15% from top = 85% visible)
       setSheetY(EXPANDED_HEIGHT);
+    } else if (!isOpen) {
+      // Start off-screen when closed (100% from top = 0% visible)
+      setSheetY(windowHeight);
     }
-  }, [isOpen, isMobile, EXPANDED_HEIGHT]);
+  }, [isOpen, isMobile, EXPANDED_HEIGHT, windowHeight]);
 
   // Touch handlers for mobile drag - only from handle area
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -148,28 +162,35 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
 
   if (!isOpen) return null;
 
-  const visibleHeight = windowHeight - sheetY;
+  // Ensure sheetY is initialized correctly - default to expanded if not set
+  // sheetY represents the distance from top where the bottom of the visible sheet should be
+  // When isOpen is true, start at EXPANDED_HEIGHT (15% from top = 85% visible)
+  // When closed, start off-screen (windowHeight = 0% visible)
+  const currentSheetY = isOpen ? (sheetY > 0 && sheetY < windowHeight ? sheetY : EXPANDED_HEIGHT) : windowHeight;
+  const visibleHeight = Math.max(200, windowHeight - currentSheetY); // Height of visible sheet (minimum 200px)
 
   // Mobile: Use bottom sheet (draggable)
   if (isMobile) {
     return (
       <>
-        {/* Backdrop - lighter so users can see the page behind */}
+        {/* Backdrop - lighter so users can see the page behind when collapsed */}
         <div
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity md:hidden"
+          className="fixed inset-0 bg-black/30 z-40 transition-opacity md:hidden"
           onClick={onClose}
-          style={{ opacity: isOpen ? 1 : 0 }}
+          style={{ opacity: isOpen ? 1 : 0, pointerEvents: isOpen ? 'auto' : 'none' }}
         />
         
-        {/* Bottom Sheet - Draggable */}
+        {/* Bottom Sheet - Draggable - FULLY OPAQUE BACKGROUND (not transparent/foggy) */}
         <div
           ref={panelRef}
-          className={`fixed left-0 right-0 z-50 bg-gradient-to-br from-gray-900/98 via-gray-900/98 to-black/98 backdrop-blur-md border-t border-amber-400/20 shadow-[0_-4px_40px_rgba(0,0,0,0.8)] md:hidden ${className}`}
+          className={`fixed left-0 right-0 z-50 border-t border-amber-400/20 shadow-[0_-4px_40px_rgba(0,0,0,0.9)] md:hidden ${className}`}
           style={{
             height: `${visibleHeight}px`,
             bottom: 0,
-            transform: `translateY(${windowHeight - sheetY}px)`,
+            transform: `translateY(${windowHeight - currentSheetY}px)`,
             transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            backgroundColor: '#0f172a', // Solid slate-900 background (fully opaque, not transparent)
+            opacity: 1, // Ensure fully opaque
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -202,17 +223,18 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
             </div>
           )}
 
-          {/* Scrollable Content - Normal scrolling, no drag interference */}
+          {/* Scrollable Content - Normal scrolling, no drag interference - SOLID BACKGROUND */}
           <div
             ref={contentRef}
-            className="overflow-y-auto h-full"
+            className="overflow-y-auto h-full bg-transparent"
             style={{ 
               height: `calc(100% - ${title ? '80px' : '50px'})`,
               touchAction: 'pan-y', // Allow vertical scrolling
               WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
+              minHeight: '200px', // Ensure minimum height so content is always visible
             }}
           >
-            <div className="p-4">
+            <div className="p-4 bg-transparent">
               {children}
             </div>
           </div>
