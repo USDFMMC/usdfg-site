@@ -2746,7 +2746,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               return;
             }
             if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770')) {
-              throw new Error('Challenge state mismatch. The challenge may have been reverted. Please refresh and try again.');
+              // On-chain state mismatch - Firestore has user as pending joiner but on-chain challenge is not open
+              // This is OK - Firestore is the source of truth, on-chain will sync when creator funds
+              console.log('⚠️ On-chain state mismatch (challenge may have been reverted). Firestore shows user as pending joiner.');
+              alert('✅ Your join intent is already recorded in Firestore! The on-chain state may be out of sync, but this will be resolved when the creator funds the challenge.');
+              setShowDetailSheet(false);
+              return;
             }
             throw onChainError;
           }

@@ -191,21 +191,11 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   
   const canCreatorFund = isCreator && status === 'creator_confirmation_required' && !isDeadlineExpired && onCreatorFund;
   
-  // Debug logging for stuck state
-  if (status === 'creator_confirmation_required') {
-    console.log('🔍 Creator Confirmation Required Debug:', {
-      isCreator,
-      status,
-      isDeadlineExpired,
-      hasDeadline: !!creatorFundingDeadline,
-      deadlineTime: creatorFundingDeadline ? new Date(creatorFundingDeadline.toMillis()).toLocaleString() : 'No deadline',
-      hasHandler: !!onCreatorFund,
-      canCreatorFund,
-      isAlreadyPendingJoiner,
-      challenger: challenge.rawData?.challenger || challenge.challenger,
-      pendingJoiner: pendingJoiner
-    });
-  }
+  // Debug logging disabled to reduce console spam
+  // Uncomment only when debugging specific issues
+  // if (status === 'creator_confirmation_required' && process.env.NODE_ENV === 'development') {
+  //   console.log('🔍 Creator Confirmation Required Debug:', { ... });
+  // }
   
   // Check if joiner can fund (status is creator_funded, user is the challenger, and deadline hasn't expired)
   const joinerFundingDeadline = challenge.rawData?.joinerFundingDeadline || challenge.joinerFundingDeadline;
