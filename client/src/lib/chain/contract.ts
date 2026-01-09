@@ -194,7 +194,7 @@ export async function createChallenge(
   
   console.log('🔍 Instruction accounts (matching deployed contract):');
   instruction.keys.forEach((key, idx) => {
-    const accountNames = ['challenge', 'creator', 'system_program'];
+    const accountNames = ['challenge', 'creator', 'challenge_seed', 'system_program'];
     console.log(`  ${idx}: ${key.pubkey.toString()} (${accountNames[idx]}, signer: ${key.isSigner}, writable: ${key.isWritable})`);
   });
 
@@ -521,13 +521,16 @@ export async function joinerFund(
   // Convert USDFG to lamports
   const entryFeeLamports = Math.floor(entryFeeUsdfg * Math.pow(10, 9));
   
-  // Create instruction data for joiner_fund (no args in deployed contract)
+  // Create instruction data for joiner_fund - takes usdfg_amount: u64 argument
   const { sha256 } = await import('@noble/hashes/sha2.js');
   const hash = sha256(new TextEncoder().encode('global:joiner_fund'));
   const discriminator = Buffer.from(hash.slice(0, 8));
   
-  const instructionData = Buffer.alloc(8); // discriminator only (no args)
+  const instructionData = Buffer.alloc(8 + 8); // discriminator (8) + usdfg_amount (8 bytes for u64)
   discriminator.copy(instructionData, 0);
+  const entryFeeBuffer = numberToU64Buffer(entryFeeLamports);
+  entryFeeBuffer.copy(instructionData, 8);
+  console.log('📦 JoinerFund instruction data:', 'Discriminator:', discriminator.toString('hex'), 'Amount:', entryFeeLamports);
 
   // Account order matches deployed contract JoinerFund struct (lib.rs line 604-625):
   // 1. challenge (Account, mut)
