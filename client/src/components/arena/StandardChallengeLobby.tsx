@@ -3,6 +3,8 @@ import { ChatBox } from "./ChatBox";
 import { VoiceChat } from "./VoiceChat";
 import { Camera, Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
 import { getPlayerStats } from "@/lib/firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, serverTimestamp, Timestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase/config";
 
 interface StandardChallengeLobbyProps {
   challenge: any;
@@ -38,6 +40,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const [proofFile, setProofFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [playerData, setPlayerData] = useState<Record<string, { displayName?: string; profileImage?: string }>>({});
+  const [spectators, setSpectators] = useState<string[]>([]);
 
   const status = challenge.status || challenge.rawData?.status || 'pending_waiting_for_opponent';
   const players = challenge.rawData?.players || challenge.players || [];
@@ -262,7 +265,97 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
   // Separate players and spectators
   const participants = players.filter((p: string) => p);
-  const spectators: string[] = []; // For now, spectators are non-participants viewing the lobby
+  
+  // Track spectators in Firestore - users who are viewing the lobby but not participants
+  useEffect(() => {
+    if (!challengeId || !currentWallet) return;
+    
+    // Check if current user is a participant
+    const isParticipant = participants.some((p: string) => p?.toLowerCase() === currentWallet.toLowerCase());
+    
+    // Only track as spectator if not a participant
+    if (!isParticipant) {
+      const spectatorRef = doc(db, 'challenge_lobbies', challengeId, 'spectators', currentWallet.toLowerCase());
+      
+      // Add user as spectator
+      setDoc(spectatorRef, {
+        wallet: currentWallet.toLowerCase(),
+        joinedAt: serverTimestamp(),
+        lastSeen: serverTimestamp(),
+      }).catch(err => {
+        console.error('Failed to add spectator:', err);
+      });
+      
+      // Update lastSeen periodically (every 30 seconds)
+      const lastSeenInterval = setInterval(() => {
+        setDoc(spectatorRef, {
+          lastSeen: serverTimestamp(),
+        }, { merge: true }).catch(err => {
+          console.error('Failed to update spectator lastSeen:', err);
+        });
+      }, 30000);
+      
+      // Cleanup: Remove spectator when component unmounts or user navigates away
+      return () => {
+        clearInterval(lastSeenInterval);
+        deleteDoc(spectatorRef).catch(err => {
+          console.error('Failed to remove spectator:', err);
+        });
+      };
+    }
+  }, [challengeId, currentWallet, participants]);
+  
+  // Listen to spectators in real-time
+  useEffect(() => {
+    if (!challengeId) return;
+    
+    const spectatorsRef = collection(db, 'challenge_lobbies', challengeId, 'spectators');
+    const q = query(spectatorsRef);
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const spectatorWallets: string[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        const wallet = data.wallet;
+        // Only include if not a participant
+        if (wallet && !participants.some((p: string) => p?.toLowerCase() === wallet.toLowerCase())) {
+          spectatorWallets.push(wallet);
+        }
+      });
+      setSpectators(spectatorWallets);
+    }, (error) => {
+      console.error('Error listening to spectators:', error);
+    });
+    
+    return () => unsubscribe();
+  }, [challengeId, participants]);
+  
+  // Fetch spectator data (display names, profile images)
+  useEffect(() => {
+    const fetchSpectatorData = async () => {
+      const data: Record<string, { displayName?: string; profileImage?: string }> = {};
+      for (const wallet of spectators) {
+        if (wallet) {
+          try {
+            const stats = await getPlayerStats(wallet);
+            if (stats) {
+              data[wallet.toLowerCase()] = {
+                displayName: stats.displayName,
+                profileImage: stats.profileImage,
+              };
+            }
+          } catch (error) {
+            console.error(`Failed to fetch stats for spectator ${wallet}:`, error);
+          }
+        }
+      }
+      setPlayerData(prev => ({ ...prev, ...data }));
+    };
+    
+    if (spectators.length > 0) {
+      fetchSpectatorData();
+    }
+  }, [spectators]);
 
   return (
     <div className="space-y-4">
@@ -309,39 +402,53 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           </div>
         </div>
         
-        {spectators.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-white/5">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-2">
-              Spectators ({spectators.length})
-            </h3>
+        {/* Spectators Section - Always show if there are any, or show empty state for current user */}
+        <div className="mt-4 pt-4 border-t border-white/5">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-2">
+            Spectators ({spectators.length})
+          </h3>
+          {spectators.length > 0 ? (
             <div className="space-y-2">
               {spectators.map((wallet: string) => {
                 const data = playerData[wallet.toLowerCase()] || {};
                 const displayName = data.displayName || `${wallet.slice(0, 4)}...${wallet.slice(-4)}`;
+                const isCurrentUser = currentWallet && wallet.toLowerCase() === currentWallet.toLowerCase();
                 
                 return (
                   <div
                     key={wallet}
-                    className="flex items-center gap-3 p-2 rounded-lg bg-white/5"
+                    className={`flex items-center gap-3 p-2 rounded-lg ${
+                      isCurrentUser ? 'bg-purple-500/10 border border-purple-400/30' : 'bg-white/5'
+                    }`}
                   >
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-400/20 to-gray-600/20 border border-gray-400/30 flex items-center justify-center overflow-hidden">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400/20 to-purple-600/20 border border-purple-400/30 flex items-center justify-center overflow-hidden">
                       {data.profileImage ? (
                         <img src={data.profileImage} alt={displayName} className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-gray-300 font-semibold text-xs">
+                        <span className="text-purple-300 font-semibold text-xs">
                           {displayName.charAt(0).toUpperCase()}
                         </span>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium text-gray-300 truncate">{displayName}</div>
+                      <div className="text-xs font-medium text-gray-300 truncate">
+                        {displayName}
+                        {isCurrentUser && <span className="ml-2 text-xs text-purple-300">(You)</span>}
+                      </div>
+                      <div className="text-[10px] text-gray-500 truncate">
+                        {wallet.slice(0, 6)}...{wallet.slice(-4)}
+                      </div>
                     </div>
                   </div>
                 );
               })}
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="text-xs text-gray-500 italic py-2">
+              No spectators yet. Others can join to watch and chat.
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Creator Fund Button - Show if creator needs to fund */}
