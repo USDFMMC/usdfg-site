@@ -266,16 +266,198 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   // Separate players and spectators
   const participants = players.filter((p: string) => p);
   
-  // Spectator tracking DISABLED - causes Firebase internal assertion errors
-  // The onSnapshot listener was causing race conditions and internal assertion failures
-  // even with proper error handling. Disabled until Firestore security rules are properly configured.
-  // TODO: Re-enable after setting up Firestore rules for:
-  // - Write access: challenge_lobbies/{challengeId}/spectators/{wallet}
-  // - Read access: challenge_lobbies/{challengeId}/spectators collection
+  // Track spectators in Firestore - COST-OPTIMIZED VERSION
+  // Cost optimization:
+  // - Updates every 3 minutes instead of 30 seconds (80% cost reduction)
+  // - Only updates when page is visible (uses Visibility API)
+  // - Proper error handling to prevent Firebase assertion errors
   useEffect(() => {
-    // Disabled - just set empty spectators array
-    setSpectators([]);
-  }, [challengeId]);
+    if (!challengeId || !currentWallet) {
+      setSpectators([]);
+      return;
+    }
+    
+    // Check if current user is a participant
+    const isParticipant = participants.some((p: string) => p?.toLowerCase() === currentWallet.toLowerCase());
+    
+    // Only track as spectator if not a participant
+    if (!isParticipant) {
+      const spectatorRef = doc(db, 'challenge_lobbies', challengeId, 'spectators', currentWallet.toLowerCase());
+      let lastSeenInterval: ReturnType<typeof setInterval> | null = null;
+      let isMounted = true;
+      
+      // Helper to check if page is visible
+      const isPageVisible = () => {
+        if (typeof document === 'undefined') return true;
+        return !document.hidden;
+      };
+      
+      // Add user as spectator (with proper error handling)
+      const addSpectator = async () => {
+        if (!isMounted || !isPageVisible()) return;
+        
+        try {
+          await setDoc(spectatorRef, {
+            wallet: currentWallet.toLowerCase(),
+            joinedAt: serverTimestamp(),
+            lastSeen: serverTimestamp(),
+          }, { merge: true });
+          
+          // Set up periodic updates (every 3 minutes - cost optimized)
+          // Only update if page is visible and component is still mounted
+          if (lastSeenInterval) clearInterval(lastSeenInterval);
+          
+          lastSeenInterval = setInterval(() => {
+            if (!isMounted || !isPageVisible()) return;
+            
+            setDoc(spectatorRef, {
+              lastSeen: serverTimestamp(),
+            }, { merge: true }).catch(err => {
+              // Silently handle errors - don't spam console
+              if (err.code !== 'permission-denied' && err.code !== 'unavailable') {
+                console.error('Failed to update spectator lastSeen:', err);
+              }
+              // Clear interval on persistent errors
+              if (lastSeenInterval) {
+                clearInterval(lastSeenInterval);
+                lastSeenInterval = null;
+              }
+            });
+          }, 180000); // 3 minutes = 180000ms (cost optimized from 30s)
+        } catch (err: any) {
+          // Silently handle permission errors - feature is optional
+          if (err.code !== 'permission-denied' && err.code !== 'unavailable') {
+            console.error('Failed to add spectator:', err);
+          }
+        }
+      };
+      
+      // Initial add
+      addSpectator();
+      
+      // Listen to visibility changes - only update when page is visible
+      let visibilityHandler: (() => void) | null = null;
+      if (typeof document !== 'undefined') {
+        visibilityHandler = () => {
+          if (document.hidden) {
+            // Page hidden - pause updates
+            if (lastSeenInterval) {
+              clearInterval(lastSeenInterval);
+              lastSeenInterval = null;
+            }
+          } else {
+            // Page visible - resume updates
+            if (!lastSeenInterval && isMounted) {
+              addSpectator(); // Refresh immediately when page becomes visible
+            }
+          }
+        };
+        document.addEventListener('visibilitychange', visibilityHandler);
+      }
+      
+      // Cleanup
+      return () => {
+        isMounted = false;
+        if (lastSeenInterval) {
+          clearInterval(lastSeenInterval);
+          lastSeenInterval = null;
+        }
+        if (visibilityHandler && typeof document !== 'undefined') {
+          document.removeEventListener('visibilitychange', visibilityHandler);
+        }
+        // Remove spectator on cleanup
+        deleteDoc(spectatorRef).catch(err => {
+          // Silently ignore cleanup errors
+          if (err.code !== 'permission-denied' && err.code !== 'unavailable') {
+            console.error('Failed to remove spectator on cleanup:', err);
+          }
+        });
+      };
+    } else {
+      setSpectators([]);
+    }
+  }, [challengeId, currentWallet, participants]);
+  
+  // Listen to spectators in real-time - WITH PROPER ERROR HANDLING
+  useEffect(() => {
+    if (!challengeId) {
+      setSpectators([]);
+      return;
+    }
+    
+    const spectatorsRef = collection(db, 'challenge_lobbies', challengeId, 'spectators');
+    const q = query(spectatorsRef);
+    
+    let unsubscribeFn: (() => void) | null = null;
+    let isActive = true;
+    let setupTimeout: ReturnType<typeof setTimeout> | null = null;
+    
+    // Delay listener setup slightly to prevent race conditions
+    setupTimeout = setTimeout(() => {
+      if (!isActive) return;
+      
+      try {
+        unsubscribeFn = onSnapshot(
+          q, 
+          (snapshot) => {
+            if (!isActive) return;
+            
+            const spectatorWallets: string[] = [];
+            snapshot.forEach((doc) => {
+              const data = doc.data();
+              const wallet = data.wallet;
+              // Only include if not a participant
+              if (wallet && !participants.some((p: string) => p?.toLowerCase() === wallet.toLowerCase())) {
+                spectatorWallets.push(wallet);
+              }
+            });
+            setSpectators(spectatorWallets);
+          }, 
+          (error) => {
+            if (!isActive) return;
+            
+            // Handle errors gracefully without causing Firebase assertion failures
+            if (error.code === 'permission-denied' || error.code === 'unavailable') {
+              // Expected errors - just clear spectators
+              setSpectators([]);
+              return;
+            }
+            
+            // For unexpected errors, log but don't throw
+            console.error('Error listening to spectators:', error);
+            setSpectators([]);
+          }
+        );
+      } catch (error: any) {
+        // Catch synchronous errors during setup
+        if (!isActive) return;
+        
+        if (error.code === 'permission-denied' || error.code === 'unavailable') {
+          setSpectators([]);
+          return;
+        }
+        
+        console.error('Failed to set up spectator listener:', error);
+        setSpectators([]);
+      }
+    }, 100); // 100ms delay to prevent race conditions
+    
+    // Cleanup
+    return () => {
+      isActive = false;
+      if (setupTimeout) {
+        clearTimeout(setupTimeout);
+      }
+      if (unsubscribeFn) {
+        try {
+          // Unsubscribe immediately - Firebase handles cleanup internally
+          unsubscribeFn();
+        } catch (error) {
+          // Ignore cleanup errors - listener may already be closed
+        }
+      }
+    };
+  }, [challengeId, participants]);
   
   // Fetch spectator data (display names, profile images)
   useEffect(() => {

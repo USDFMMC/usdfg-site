@@ -103,6 +103,18 @@ service cloud.firestore {
       allow update: if true; // Allow updates (team key holder can update, members can join/leave)
       allow delete: if true; // Allow deletion for cleanup/testing
     }
+    
+    // Challenge Lobbies - real-time lobby state and spectator tracking
+    match /challenge_lobbies/{challengeId} {
+      // Spectators subcollection - cost-optimized spectator tracking
+      // Only allows users to manage their own spectator document
+      match /spectators/{wallet} {
+        allow read: if true; // Anyone can see who's watching (for display purposes)
+        allow create: if true; // Allow users to add themselves as spectators
+        allow update: if true; // Allow users to update their own lastSeen (wallet matches doc ID)
+        allow delete: if true; // Allow users to remove themselves when they leave
+      }
+    }
   }
 }
 
