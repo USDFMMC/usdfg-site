@@ -426,9 +426,9 @@ export async function creatorFund(
   entryFeeBuffer.copy(instructionData, 8);
   console.log('📦 CreatorFund instruction data:', 'Discriminator:', discriminator.toString('hex'), 'Amount:', entryFeeLamports);
 
-  // Account order for CreatorFund - EXACT match to Rust struct (lib.rs line 583-602):
-  // Anchor automatically adds rent sysvar when init_if_needed is used
-  // The struct order in Rust is:
+  // Account order for CreatorFund - Anchor reorders accounts when init_if_needed is used
+  // Based on error, Anchor expects: challenge, creator, creator_token_account, escrow_token_account, token_program, system_program, rent, mint
+  // The Rust struct order is:
   // 1. challenge (Account, mut)
   // 2. creator (Signer, mut)
   // 3. creator_token_account (Account<TokenAccount>, mut)
@@ -437,6 +437,7 @@ export async function creatorFund(
   // 6. system_program (Program<System>)
   // 7. mint (Account<Mint>)
   // 8. rent (Sysvar<Rent>) - Anchor adds this automatically for init_if_needed
+  // BUT: Anchor places rent BEFORE mint when using init_if_needed
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
@@ -446,8 +447,8 @@ export async function creatorFund(
       { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // 3: escrow_token_account (PDA)
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // 4: token_program
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // 5: system_program
-      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // 6: mint
-      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }, // 7: rent (required for init_if_needed)
+      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }, // 6: rent (required for init_if_needed, placed before mint)
+      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // 7: mint
     ],
     data: instructionData,
   });
