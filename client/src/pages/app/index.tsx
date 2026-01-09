@@ -2188,15 +2188,46 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       let challengeId: string;
       
+      let challengePDA: string | null = null;
+      
       if (isFounderChallenge) {
         // Founder Challenge - skip on-chain creation, just create in Firestore
         // Generate a fake PDA for Founder Challenges (won't be used on-chain)
         // We'll just use a Firestore-generated ID
         challengeId = 'founder_' + Date.now().toString();
       } else {
-        // Regular challenge - create in Firestore only (no on-chain transaction)
-        // PDA will be created when creator funds the challenge
-        challengeId = null; // Will be set when creator funds
+        // Regular challenge - create PDA IMMEDIATELY on-chain
+        // This ensures state sync: PDA exists from the start, challengers can express intent on-chain immediately
+        try {
+          const { createChallenge } = await import("@/lib/chain/contract");
+          const { Connection } = await import("@solana/web3.js");
+          const { getRpcEndpoint } = await import("@/lib/chain/rpc");
+          
+          const connection = new Connection(getRpcEndpoint(), 'confirmed');
+          const { signTransaction, publicKey } = wallet;
+          
+          if (!signTransaction || !publicKey) {
+            throw new Error('Wallet not connected or does not support signing');
+          }
+          
+          console.log('🚀 Creating challenge PDA on-chain immediately...');
+          challengePDA = await createChallenge(
+            { signTransaction, publicKey },
+            connection,
+            challengeData.entryFee
+          );
+          console.log('✅ Challenge PDA created on-chain:', challengePDA);
+        } catch (pdaError: any) {
+          console.error('❌ Failed to create challenge PDA:', pdaError);
+          const errorMsg = pdaError.message || pdaError.toString() || '';
+          if (errorMsg.includes('InvalidProgramId') || errorMsg.includes('3008')) {
+            throw new Error('⚠️ Program ID mismatch. Please refresh the page and try again. If the issue persists, the contract may need to be redeployed.');
+          }
+          // Don't fail challenge creation if PDA creation fails - allow Firestore creation to proceed
+          // The PDA can be created later when creator funds
+          console.warn('⚠️ Challenge will be created in Firestore without PDA. PDA can be created when creator funds.');
+        }
+        challengeId = null; // Firestore will generate the ID
       }
       
       // Calculate prize pool
@@ -2256,7 +2287,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         format: challengeData.format || (challengeData.tournament ? 'tournament' : 'standard'),
         tournament: challengeData.format === 'tournament' ? challengeData.tournament : undefined,
         // Prize claim fields
-        pda: isFounderChallenge ? null : undefined, // PDA will be created when creator funds (null for Founder Challenges)
+        pda: isFounderChallenge ? null : challengePDA || undefined, // PDA created immediately for regular challenges (null for Founder Challenges)
         prizePool: prizePool, // Prize pool (for Founder Challenges, admin sets this)
         // Store only the title which contains game info - saves storage costs
         title: challengeTitle, // Generated title with game info
