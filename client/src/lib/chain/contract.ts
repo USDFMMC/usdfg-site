@@ -426,19 +426,18 @@ export async function creatorFund(
   entryFeeBuffer.copy(instructionData, 8);
   console.log('📦 CreatorFund instruction data:', 'Discriminator:', discriminator.toString('hex'), 'Amount:', entryFeeLamports);
 
-  // Account order for CreatorFund - CRITICAL: Match deployed contract exactly
-  // The error shows Anchor expects system_program BEFORE token_program at the deployed program
-  // This means the deployed binary was built with a different account order than the local Rust code
-  // Deployed contract expects (based on error analysis):
+  // Account order for CreatorFund - EXACT match to local Rust struct (lib.rs line 583-602)
+  // The Rust struct order is:
   // 1. challenge (Account, mut)
   // 2. creator (Signer, mut)
   // 3. creator_token_account (Account<TokenAccount>, mut)
   // 4. escrow_token_account (Account<TokenAccount>, init_if_needed, PDA)
-  // 5. system_program (Program<System>) - DEPLOYED CONTRACT HAS THIS FIRST
-  // 6. token_program (Program<Token>) - DEPLOYED CONTRACT HAS THIS SECOND
-  // 7. rent (Sysvar<Rent>) - Anchor adds this automatically for init_if_needed
-  // 8. mint (Account<Mint>)
-  // NOTE: The deployed contract was built with system_program before token_program in the struct
+  // 5. token_program (Program<Token>)
+  // 6. system_program (Program<System>)
+  // 7. mint (Account<Mint>)
+  // NOTE: When using init_if_needed, Anchor automatically adds rent sysvar, but it's NOT in the struct
+  // Anchor handles rent internally - we should NOT include it in manual instruction construction
+  // The deployed contract must match this exact order after redeployment
   const instruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
@@ -446,16 +445,15 @@ export async function creatorFund(
       { pubkey: creator, isSigner: true, isWritable: true }, // 1: creator
       { pubkey: creatorTokenAccount, isSigner: false, isWritable: true }, // 2: creator_token_account
       { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // 3: escrow_token_account (PDA)
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // 4: system_program (DEPLOYED CONTRACT ORDER)
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // 5: token_program (DEPLOYED CONTRACT ORDER)
-      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }, // 6: rent (required for init_if_needed)
-      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // 7: mint
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // 4: token_program
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // 5: system_program
+      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // 6: mint
     ],
     data: instructionData,
   });
   
-  console.log('⚠️  WARNING: Using deployed contract account order (system_program before token_program)');
-  console.log('⚠️  This differs from local Rust code. Contract needs to be redeployed to match local code.');
+  console.log('✅ Using canonical account order matching local Rust struct');
+  console.log('⚠️  NOTE: Contract must be redeployed to match this order');
   
   console.log('🔍 CreatorFund instruction accounts (matching deployed contract):');
   instruction.keys.forEach((key, idx) => {
