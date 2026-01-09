@@ -4273,9 +4273,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           
           {/* Fixed button container for mobile - ensures buttons are always visible without scroll interference */}
           <div 
-            className="fixed bottom-0 left-0 right-0 bg-neutral-900 border-t border-white/10 p-4 pb-4 sm:hidden z-10 shadow-[0_-4px_20px_rgba(0,0,0,0.5)]"
+            className="fixed bottom-0 left-0 right-0 bg-neutral-900 border-t border-white/10 p-4 pb-4 sm:hidden z-[60] shadow-[0_-4px_20px_rgba(0,0,0,0.5)]"
             style={{
-              // Ensure it's above the scroll container
+              // Ensure it's above the scroll container and modal overlay
               position: 'fixed',
               // Prevent touch events from interfering with scroll
               touchAction: 'none',
@@ -4287,6 +4287,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               e.stopPropagation();
             }}
           >
+            {/* PRIORITY: Show Delete/Cancel buttons FIRST so they're never hidden by Fund button */}
+            
             {/* Show Cancel button for creator ONLY in pending_waiting_for_opponent state */}
             {isOwner && status === 'pending_waiting_for_opponent' && (
               <button
@@ -4302,7 +4304,54 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               </button>
             )}
             
-            {/* Show button for creators when confirmation required */}
+            {/* Show Delete button for creators when deadline expired (creator_confirmation_required) - MOBILE ONLY */}
+            {isOwner && status === 'creator_confirmation_required' && isDeadlineExpired && (
+              <button
+                type="button"
+                className="w-full rounded-xl bg-red-700/30 border border-red-600/50 py-3 text-red-200 font-semibold mb-2"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  if (window.confirm("Are you sure you want to delete this challenge? This action cannot be undone.")) {
+                    try {
+                      await handleDeleteChallenge(challenge.id, challenge);
+                      onClose();
+                    } catch (error: any) {
+                      alert('Failed to delete challenge: ' + (error.message || 'Unknown error'));
+                    }
+                  }
+                }}
+              >
+                🗑️ Delete Challenge (Deadline Expired)
+              </button>
+            )}
+            
+            {/* Show Delete button for expired challenges (60-minute expiration) - MOBILE ONLY */}
+            {isOwner && status === 'pending_waiting_for_opponent' && (() => {
+              const expirationTimer = challenge.rawData?.expirationTimer || challenge.expirationTimer;
+              const isExpired = expirationTimer && expirationTimer.toMillis() < Date.now();
+              const hasPendingJoiner = challenge.rawData?.pendingJoiner || challenge.pendingJoiner;
+              return isExpired && !hasPendingJoiner;
+            })() && (
+              <button
+                type="button"
+                className="w-full rounded-xl bg-amber-700/30 border border-amber-600/50 py-3 text-amber-200 font-semibold mb-2"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  if (window.confirm("Are you sure you want to delete this expired challenge? This action cannot be undone.")) {
+                    try {
+                      await handleDeleteChallenge(challenge.id, challenge);
+                      onClose();
+                    } catch (error: any) {
+                      alert('Failed to delete challenge: ' + (error.message || 'Unknown error'));
+                    }
+                  }
+                }}
+              >
+                🗑️ Delete Expired Challenge
+              </button>
+            )}
+            
+            {/* Show button for creators when confirmation required - AFTER delete buttons */}
             {isOwner && canCreatorFund && onFund && (
               <button
                 type="button"
