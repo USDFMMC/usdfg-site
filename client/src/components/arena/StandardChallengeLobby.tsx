@@ -592,7 +592,21 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
             </div>
             {creatorFundingDeadline && (
               <div className="text-xs text-blue-300/70 mb-3">
-                Creator deadline: {new Date(creatorFundingDeadline.toMillis()).toLocaleTimeString()}
+                Creator deadline: {(() => {
+                  const now = Date.now();
+                  const deadlineMs = creatorFundingDeadline.toMillis();
+                  const diffMs = deadlineMs - now;
+                  const diffMinutes = Math.floor(diffMs / 1000 / 60);
+                  const diffHours = Math.floor(diffMinutes / 60);
+                  
+                  if (diffMs <= 0) {
+                    return 'Expired';
+                  } else if (diffHours > 0) {
+                    return `${diffHours}h ${diffMinutes % 60}m remaining`;
+                  } else {
+                    return `${diffMinutes}m remaining`;
+                  }
+                })()}
                 {isDeadlineExpired && (
                   <span className="ml-2 text-red-300">(Expired - challenge will revert soon)</span>
                 )}
