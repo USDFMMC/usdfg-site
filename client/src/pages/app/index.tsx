@@ -3040,8 +3040,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           });
           
           // Successfully created PDA - now challenger needs to express intent on-chain
-          // They can do this by refreshing and trying to join again (which will now call on-chain express intent)
-          alert(`✅ Challenge PDA created on-chain!\n\nThe challenger (${pendingJoiner.slice(0, 8)}...) needs to refresh and try joining again to express their intent on-chain. Once they do that, you'll be able to fund the challenge.`);
+          // They can do this by clicking the "Express Intent On-Chain" button in the lobby
+          const joinerShort = pendingJoiner.slice(0, 8) + '...';
+          alert(`✅ Challenge PDA created on-chain!\n\n` +
+            `The challenger (${joinerShort}) will see a button labeled "⚡ Express Intent On-Chain (PDA Created) - REQUIRED" in the challenge lobby.\n\n` +
+            `They need to click that button to complete their join intent on-chain. Once they do that, you'll be able to fund the challenge.`);
           setShowDetailSheet(false);
           return;
         } else {
@@ -3093,7 +3096,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             if (pendingJoiner) {
               // Challenger expressed intent in Firestore but not on-chain
               // Tell creator to ask challenger to retry joining (which will express on-chain intent)
-              throw new Error(`⚠️ The challenger (${pendingJoiner.slice(0, 8)}...) needs to express their join intent on-chain first.\n\nThey should click "Express Join Intent" again - it will now call the on-chain function since the PDA exists.`);
+              const joinerShort = pendingJoiner.slice(0, 8) + '...';
+              throw new Error(`⚠️ Waiting for challenger to complete on-chain join intent.\n\n` +
+                `The challenger (${joinerShort}) has expressed intent in Firestore, but needs to complete the on-chain step.\n\n` +
+                `They should see a button labeled "⚡ Express Intent On-Chain (PDA Created) - REQUIRED" in the challenge lobby.\n\n` +
+                `Once they click that button, you'll be able to fund the challenge.`);
             } else {
               throw new Error('⚠️ Challenge state mismatch. No challenger has expressed intent. Please wait for an opponent to join.');
             }
