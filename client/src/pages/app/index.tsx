@@ -2648,6 +2648,22 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             connection,
             challengePDA
           );
+          
+          // Update Firestore deadline to match on-chain timer (5 minutes from now, when on-chain executed)
+          try {
+            const { updateDoc, doc } = await import('firebase/firestore');
+            const { db } = await import('@/lib/firebase/config');
+            const { Timestamp } = await import('firebase/firestore');
+            // On-chain sets timer to now + 300 seconds (5 minutes), so sync Firestore to match
+            const onChainDeadline = Timestamp.fromDate(new Date(Date.now() + (5 * 60 * 1000)));
+            await updateDoc(doc(db, 'challenges', challenge.id), {
+              creatorFundingDeadline: onChainDeadline
+            });
+          } catch (updateError) {
+            // Non-critical - log but don't fail
+            console.error('Failed to sync Firestore deadline with on-chain timer:', updateError);
+          }
+          
           console.log('✅ Join intent expressed on-chain successfully! Signature:', signature);
           alert('✅ Join intent expressed on-chain! Creator can now fund the challenge.');
           setShowDetailSheet(false);
@@ -2703,6 +2719,22 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               connection,
               challengePDA
             );
+            
+            // Update Firestore deadline to match on-chain timer (5 minutes from now, when on-chain executed)
+            try {
+              const { updateDoc, doc } = await import('firebase/firestore');
+              const { db } = await import('@/lib/firebase/config');
+              const { Timestamp } = await import('firebase/firestore');
+              // On-chain sets timer to now + 300 seconds (5 minutes), so sync Firestore to match
+              const onChainDeadline = Timestamp.fromDate(new Date(Date.now() + (5 * 60 * 1000)));
+              await updateDoc(doc(db, 'challenges', challenge.id), {
+                creatorFundingDeadline: onChainDeadline
+              });
+            } catch (updateError) {
+              // Non-critical - log but don't fail
+              console.error('Failed to sync Firestore deadline with on-chain timer:', updateError);
+            }
+            
             console.log('✅ Join intent expressed on-chain (user already pending joiner)');
             alert('✅ Join intent expressed on-chain! Creator can now fund the challenge.');
             setShowDetailSheet(false);
@@ -2754,6 +2786,22 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             connection,
             challengePDA
           );
+          
+          // Update Firestore deadline to match on-chain timer (5 minutes from now, when on-chain executed)
+          try {
+            const { updateDoc, doc } = await import('firebase/firestore');
+            const { db } = await import('@/lib/firebase/config');
+            const { Timestamp } = await import('firebase/firestore');
+            // On-chain sets timer to now + 300 seconds (5 minutes), so sync Firestore to match
+            const onChainDeadline = Timestamp.fromDate(new Date(Date.now() + (5 * 60 * 1000)));
+            await updateDoc(doc(db, 'challenges', challenge.id), {
+              creatorFundingDeadline: onChainDeadline
+            });
+          } catch (updateError) {
+            // Non-critical - log but don't fail
+            console.error('Failed to sync Firestore deadline with on-chain timer:', updateError);
+          }
+          
           console.log('✅ Join intent expressed on-chain');
           if (needsFirestoreUpdate) {
             alert('✅ Join intent expressed! Creator can now fund the challenge.');
