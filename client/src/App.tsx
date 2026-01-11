@@ -288,26 +288,15 @@ function App() {
     const nonceB64 = url.searchParams.get("nonce");
     const dataB64 = url.searchParams.get("data");
 
-    console.log("📥 Phantom params check:", {
-      hasPhantomPubKey: !!phantomPubKey,
-      hasNonce: !!nonceB64,
-      hasData: !!dataB64,
-      hasError: !!(error || errorCode || errorMessage)
-    });
-
     if (!phantomPubKey || !nonceB64 || !dataB64) {
-      console.log("📥 Missing Phantom params, skipping");
       // Check if we were trying to connect (might be a cancellation)
       const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
       if (isConnecting) {
-        console.log("⚠️ Phantom connection was cancelled or failed");
         sessionStorage.removeItem('phantom_connecting');
         sessionStorage.removeItem('phantom_dapp_nonce');
       }
       return;
     }
-
-    console.log("📥 ✅ Phantom return detected! Decrypting payload...");
 
     const stored = localStorage.getItem("phantom_dapp_handshake");
     if (!stored) {
