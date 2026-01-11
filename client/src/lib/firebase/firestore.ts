@@ -1176,6 +1176,12 @@ export const creatorFund = async (challengeId: string, wallet: string) => {
 
     const data = snap.data() as ChallengeData;
     
+    // If already funded, return success (idempotent operation)
+    if (data.status === 'creator_funded') {
+      console.log('✅ Challenge already funded - skipping update (idempotent)');
+      return true;
+    }
+    
     // Validate challenge is in creator_confirmation_required state
     if (data.status !== 'creator_confirmation_required') {
       throw new Error(`Challenge is not waiting for creator funding. Current status: ${data.status}`);

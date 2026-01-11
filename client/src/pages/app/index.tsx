@@ -3109,8 +3109,34 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         }
       }
       
-      // Update Firestore
-      await creatorFund(challenge.id, currentWallet);
+      // Update Firestore - wrap in try-catch to handle errors gracefully
+      try {
+        await creatorFund(challenge.id, currentWallet);
+      } catch (firestoreError: any) {
+        // If Firestore update fails but on-chain succeeded, we have a state mismatch
+        // Check if the challenge status might have changed (e.g., already funded)
+        console.error('❌ Firestore update failed after on-chain funding:', firestoreError);
+        
+        // Try to fetch fresh challenge data to see current state
+        try {
+          const freshCheck = await fetchChallengeById(challenge.id);
+          if (freshCheck && freshCheck.status === 'creator_funded') {
+            // Status is already correct - on-chain succeeded and Firestore was updated elsewhere
+            console.log('✅ Challenge status is already creator_funded - sync succeeded');
+            // Continue with success flow
+          } else {
+            // Status mismatch - on-chain funded but Firestore not updated
+            const errorMsg = firestoreError.message || firestoreError.toString() || '';
+            throw new Error(`⚠️ On-chain funding succeeded, but Firestore update failed.\n\n` +
+              `The challenge was funded on-chain, but the status couldn't be updated in Firestore.\n\n` +
+              `Error: ${errorMsg}\n\n` +
+              `Please refresh the page - the status should sync automatically. If it doesn't, contact support.`);
+          }
+        } catch (checkError) {
+          // If we can't check, throw the original error
+          throw firestoreError;
+        }
+      }
       
       // Refresh balance
       setTimeout(() => {
