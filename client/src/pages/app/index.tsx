@@ -4982,17 +4982,19 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                       draggable={false}
                       key={`${challenge.id}-${gameName}-${imagePath}`}
                                       onError={(e) => {
-                                        const target = e.currentTarget as HTMLImageElement;
-                        console.error(`❌ Failed to load image: ${imagePath} for game: ${gameName}, challenge: ${challenge.id}`);
+                        const target = e.currentTarget as HTMLImageElement;
+                        // Only log errors in development
+                        if (process.env.NODE_ENV === 'development') {
+                          console.error(`❌ Failed to load image: ${imagePath} for game: ${gameName}, challenge: ${challenge.id}`);
+                        }
                         target.src = '/assets/usdfg-logo-transparent.png';
                       }}
                       onLoad={() => {
-                        if (gameName.toLowerCase().includes('nba') || gameName.toLowerCase().includes('2k')) {
+                        // Remove excessive logging - images are cached by browser anyway
+                        // Only log for problematic games in development mode
+                        if (process.env.NODE_ENV === 'development' && (gameName.toLowerCase().includes('nba') || gameName.toLowerCase().includes('2k'))) {
                           console.log(`✅ Successfully loaded image: ${imagePath} for game: ${gameName}`);
                         }
-                      }}
-                      onLoad={() => {
-                        console.log(`✅ Loaded image: ${imagePath} for game: ${gameName}`);
                       }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/75 to-black/40" />
