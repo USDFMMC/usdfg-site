@@ -308,9 +308,9 @@ const Whitepaper: React.FC = () => {
               <div className="prose prose-invert max-w-none">
                 <h2 className="text-2xl font-bold text-cyan-400 mb-6 flex items-center gap-2"><FaChartLine className="text-purple-400" /> What's Ahead for USDFG</h2>
                 <ul className="list-disc pl-6 text-gray-300 space-y-2 mb-6">
-                  <li>Launching head-to-head challenges with verified payouts and full non-custodial control.</li>
+                  <li>Launching head-to-head challenges with verified rewards and full non-custodial control.</li>
                   <li>Expanding game categories to unlock new skill-based arenas.</li>
-                  <li>Rolling out competitive leaderboards and limited-supply prize pools.</li>
+                  <li>Rolling out competitive leaderboards and limited-supply challenge rewards.</li>
                   <li>Staying fully legal, skill-based, and founder-led — no governance tokens, no staking, no hype games.</li>
                 </ul>
                 <p className="text-cyan-300 font-bold mt-4">USDFG doesn't grow on hype — it grows with pressure. That's the roadmap.</p>

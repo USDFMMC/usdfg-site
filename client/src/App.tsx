@@ -22,12 +22,12 @@ import { resetNavigationGuard } from "@/lib/wallet/mobile";
 function RoutesWithLogging() {
   const location = useLocation();
   
-  useEffect(() => {
-    console.log('🔍 RoutesWithLogging mounted');
-    console.log('🔍 Current URL:', window.location.href);
-    console.log('🔍 Current pathname:', window.location.pathname);
-    console.log('🔍 React Router location:', location.pathname);
-  }, [location]);
+  // Removed excessive route logging - only needed for debugging
+  // useEffect(() => {
+  //   if (process.env.NODE_ENV === 'development') {
+  //     console.log('🔍 Route changed:', location.pathname);
+  //   }
+  // }, [location]);
 
   return (
       <Routes>
@@ -56,11 +56,12 @@ function RoutesWithLogging() {
 }
 
 function AppRouter() {
-  useEffect(() => {
-    console.log('🔍 AppRouter component mounted');
-    console.log('🔍 Current URL:', window.location.href);
-    console.log('🔍 Current pathname:', window.location.pathname);
-  }, []);
+  // Removed excessive logging - only needed for debugging
+  // useEffect(() => {
+  //   if (process.env.NODE_ENV === 'development') {
+  //     console.log('🔍 AppRouter mounted');
+  //   }
+  // }, []);
 
   return (
     <Router>
@@ -112,36 +113,16 @@ function App() {
       sessionStorage.removeItem('phantom_redirect_count');
     }
     
-    console.log("📥 App.tsx Phantom return handler checking...");
-    console.log("📥 Current URL:", window.location.href);
-    console.log("📥 Current pathname:", window.location.pathname);
-    console.log("📥 Current search:", window.location.search);
-    console.log("📥 Search length:", window.location.search.length);
-    console.log("📥 Is this a NEW tab?", !isOriginalTab);
-    console.log("📥 Redirect count:", redirectCount);
-    console.log("📥 Document referrer:", document.referrer);
-    console.log("📥 Window name:", window.name);
-    
+    // Removed excessive Phantom debugging logs - only log critical errors
     // Check if we just attempted to connect (detect silent Phantom rejection)
     const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
     // isConnecting already declared above, don't redeclare
     const hasSearchParams = window.location.search.length > 0;
     const timeSinceConnect = connectTimestamp ? Date.now() - parseInt(connectTimestamp) : null;
     
-    console.log("📥 Connection state:", {
-      connectTimestamp,
-      isConnecting,
-      hasSearchParams,
-      timeSinceConnect,
-      searchString: window.location.search,
-      fullHref: window.location.href
-    });
-    
     // Check EVERY possible Phantom return parameter
     const urlParams = new URLSearchParams(window.location.search);
     const allParams = Object.fromEntries(urlParams.entries());
-    console.log("📥 ALL URL parameters (including empty):", allParams);
-    console.log("📥 Parameter count:", urlParams.toString().split('&').filter(p => p).length);
     
     // Detect silent rejection - even in new tabs (connectTimestamp persists in localStorage)
     // Check if we have a recent connection attempt but no params
@@ -170,13 +151,6 @@ function App() {
         console.error("   5. If still fails, try using Phantom's in-app browser instead");
       }
     }
-    console.log("📥 Full window.location:", {
-      href: window.location.href,
-      pathname: window.location.pathname,
-      search: window.location.search,
-      hash: window.location.hash,
-      origin: window.location.origin
-    });
     
     // Check if we were trying to connect (detect if Phantom closed without returning)
     const hasPendingNonce = sessionStorage.getItem('phantom_dapp_nonce');
@@ -218,9 +192,7 @@ function App() {
           try {
             window.close();
           } catch (e) {
-            // Can't close - show message and stay on page
-            console.log("⚠️ Cannot close tab - user should manually close this tab");
-            console.log("⚠️ Please return to the original tab");
+            // Can't close - silently fail (user can manually close)
           }
         }, 1000);
         return;
@@ -261,7 +233,6 @@ function App() {
     const path = window.location.pathname.replace(/\/+$/, "") || "/";
     // Accept both / and /app for Phantom return (backwards compatibility)
     if (path !== "/" && path !== "/app") {
-      console.log("📥 Not on root or /app route, skipping handler");
       return;
     }
 
@@ -299,7 +270,6 @@ function App() {
       
       // If we're on root / with error, redirect to /app so user can try again
       if (window.location.pathname === '/' && (error || errorCode || errorMessage)) {
-        console.log("🔄 Redirecting to /app after Phantom error");
         window.history.replaceState({}, "", "/app");
         // Trigger a page reload to clear the error state
         window.location.href = "/app";
@@ -352,7 +322,7 @@ function App() {
       const dataBytes = base64ToUint8Array(dataB64);
       const phantomPubKeyBytes = base64ToUint8Array(phantomPubKey);
 
-      console.log("🔐 Attempting decryption...");
+      // Attempting decryption...
 
       const decrypted = nacl.box.open(
         dataBytes,
@@ -367,13 +337,11 @@ function App() {
       }
 
       const payload = JSON.parse(new TextDecoder().decode(decrypted));
-      console.log("🔥 ✅ Phantom payload decrypted successfully:", payload);
 
       if (payload.public_key) {
         localStorage.setItem("publicKey", payload.public_key);
         localStorage.setItem("phantom_connected", "true");
         localStorage.setItem("phantom_public_key", payload.public_key);
-        console.log("✅ Phantom public key stored:", payload.public_key);
         
         // CRITICAL: Clear all connecting flags so UI can update
         sessionStorage.removeItem('phantom_connecting');
@@ -388,8 +356,6 @@ function App() {
         // Trigger a storage event to notify other components
         window.dispatchEvent(new Event('storage'));
         window.dispatchEvent(new Event('phantom_connected'));
-        
-        console.log("✅ Connection state cleared and events dispatched");
       }
 
       // Cleanup
@@ -398,7 +364,6 @@ function App() {
       // CRITICAL: Stay on root / - app is now on root (like smithii.io)
       // This allows Phantom to return to Safari properly
       window.history.replaceState({}, "", "/");
-      console.log("✅ Cleaned URL, staying on root / (app is on root)");
     } catch (error) {
       console.error("❌ Error decrypting Phantom payload:", error);
     }
@@ -429,9 +394,7 @@ function App() {
 
   // Version monitoring - check for updates
   useEffect(() => {
-    console.log('🔄 Initializing version monitoring...');
     const cleanup = startVersionMonitoring(() => {
-      console.log('🆕 New version available - showing update banner');
       setShowUpdateBanner(true);
     });
     

@@ -208,31 +208,31 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     let rules = '';
     
     if (mode === 'Full Match') {
-      rules = '• Full game duration\n• Standard game settings\n• No substitutions\n• Winner takes all';
+      rules = '• Full game duration\n• Standard game settings\n• No substitutions\n• The winner claims the challenge reward';
     } else if (mode === 'Quick Match (No halftime)') {
-      rules = '• Shortened duration\n• No halftime breaks\n• Fast-paced action\n• Winner takes all';
+      rules = '• Shortened duration\n• No halftime breaks\n• Fast-paced action\n• The winner claims the challenge reward';
     } else if (mode === '2v2 Challenge') {
       rules = '• Team coordination required\n• Communication essential\n• No solo play\n• Team victory';
     } else if (mode === 'Best Lap Time') {
       rules = '• Race against clock\n• Best time wins\n• No collisions\n• Precision required';
     } else if (mode === '1v1 Race to Finish') {
-      rules = '• Direct head-to-head racing\n• No assists\n• Pure speed and skill\n• Winner takes all';
+      rules = '• Direct head-to-head racing\n• No assists\n• Pure speed and skill\n• The winner claims the challenge reward';
     } else if (mode === 'Best of 3') {
       rules = '• First to win 2 games\n• No breaks between games\n• Standard settings\n• Winner advances';
     } else if (mode === 'Mirror Match') {
-      rules = '• Same character for both players\n• Pure skill competition\n• No character advantages\n• Winner takes all';
+      rules = '• Same character for both players\n• Pure skill competition\n• No character advantages\n• The winner claims the challenge reward';
     } else if (mode === '2v2 Team Fight') {
       rules = '• Team coordination required\n• Communication essential\n• Team strategy\n• Team victory';
     } else if (mode === 'Run the Fade') {
-      rules = '• 1v1 combat\n• No teammates\n• Pure skill and reflexes\n• Winner takes all';
+      rules = '• 1v1 combat\n• No teammates\n• Pure skill and reflexes\n• The winner claims the challenge reward';
     } else if (mode === '10 and Done') {
-      rules = '• First to 10 kills wins\n• Fast-paced action\n• Clear victory conditions\n• Winner takes all';
+      rules = '• First to 10 kills wins\n• Fast-paced action\n• Clear victory conditions\n• The winner claims the challenge reward';
     } else if (mode === 'Snipers Only') {
-      rules = '• Sniper rifles only\n• Precision and patience\n• No other weapons\n• Winner takes all';
+      rules = '• Sniper rifles only\n• Precision and patience\n• No other weapons\n• The winner claims the challenge reward';
     } else if (mode === 'Tournament (Bracket Mode)') {
-      rules = '• Single elimination bracket\n• Winners advance automatically\n• Entry fees locked for all participants\n• Submit results with proof after each match\n• Disconnects = round loss unless opponents agree to rematch';
+      rules = '• Single elimination bracket\n• Winners advance automatically\n• Challenge amounts locked for all participants\n• Submit results with proof after each match\n• Disconnects = round loss unless opponents agree to rematch';
     } else {
-      rules = '• Custom rules\n• Flexible format\n• Your own challenge\n• Winner takes all';
+      rules = '• Custom rules\n• Flexible format\n• Your own challenge\n• The winner claims the challenge reward';
     }
     
     handleInputChange('rules', rules);
@@ -264,16 +264,16 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
       const isAdmin = currentWallet && currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
       
       if (isNaN(entryFee)) {
-        errors.push('Entry fee must be a valid number');
+        errors.push('Challenge amount must be a valid number');
       } else if (!isAdmin && (entryFee < 0.000000001 || entryFee === 0)) {
-        errors.push('Minimum entry fee is 0.000000001 USDFG (1 lamport - smallest unit)');
+        errors.push('Minimum challenge amount is 0.000000001 USDFG (1 lamport - smallest unit)');
       } else if (isAdmin && entryFee < 0) {
-        errors.push('Entry fee cannot be negative');
+        errors.push('Challenge amount cannot be negative');
       } else if (entryFee > 1000) {
-        errors.push('Maximum entry fee is 1000 USDFG');
+        errors.push('Maximum challenge amount is 1000 USDFG');
       }
       
-      // Allow 0 entry fee for admin (Founder Challenges)
+      // Allow 0 challenge amount for admin (Founder Challenges)
       if (isAdmin && entryFee === 0) {
         // Valid - no error for Founder Challenges
       }
@@ -521,7 +521,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                   ))}
                 </select>
                 <p className="text-xs text-zinc-400 mt-2">
-                  Single-elimination bracket. Prize pool = entry fee × number of players. Winners advance automatically.
+                  Single-elimination bracket. Challenge reward = challenge amount × number of players. Winners advance automatically.
                 </p>
               </div>
             )}
@@ -664,7 +664,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
 
             <div>
               <label className="block text-xs font-medium text-gray-300 mb-1.5">
-                Entry Fee (USDFG)
+                Challenge Amount (USDFG)
                 {currentWallet && (() => {
                   const isAdmin = currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
                   return isAdmin ? <span className="text-purple-400 ml-1.5 text-xs">🏆 (Founder: Enter 0 for free entry)</span> : null;
@@ -716,12 +716,12 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                   const isAdmin = currentWallet && currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
                   const entryFee = typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) || 0 : formData.entryFee || 0;
                   if (isAdmin && entryFee === 0) {
-                    return <span className="text-purple-300">🏆 Founder Challenge - Set prize pool manually when transferring USDFG</span>;
+                    return <span className="text-purple-300">🏆 Founder Challenge - Set challenge reward manually when transferring USDFG</span>;
                   }
                   if (isTournamentMode) {
-                    return <>Prize Pool: {entryFee * formData.tournamentMaxPlayers} USDFG (entry fee × {formData.tournamentMaxPlayers} players)</>;
+                    return <>Challenge Reward: {entryFee * formData.tournamentMaxPlayers} USDFG (challenge amount × {formData.tournamentMaxPlayers} players)</>;
                   }
-                  return <>Prize Pool: {entryFee * 2} USDFG (2x entry fee)</>;
+                  return <>Challenge Reward: {entryFee * 2} USDFG (2x challenge amount)</>;
                 })()}
               </div>
             </div>

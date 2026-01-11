@@ -529,7 +529,7 @@ export async function joinChallengeOnChain(
   wallet: { signTransaction: (transaction: Transaction) => Promise<Transaction>, publicKey: PublicKey }
 ): Promise<boolean> {
   try {
-    console.log(`💸 Joining challenge ${challengeId} with entry fee ${entryFee} USDFG`);
+    console.log(`💸 Joining challenge ${challengeId} with challenge amount ${entryFee} USDFG`);
     console.log(`👤 Wallet: ${walletAddress}`);
     
     // Import the acceptChallenge function from contract.ts

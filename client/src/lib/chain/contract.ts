@@ -95,7 +95,7 @@ export async function derivePDAs(creator: PublicKey) {
  * 
  * @param wallet - Connected wallet
  * @param connection - Solana connection
- * @param entryFeeUsdfg - Entry fee in USDFG tokens (e.g., 0.001 for 0.001 USDFG)
+ * @param entryFeeUsdfg - Challenge amount in USDFG tokens (e.g., 0.001 for 0.001 USDFG)
  * @returns Challenge account address (derived by Anchor)
  */
 export async function createChallenge(
@@ -104,7 +104,7 @@ export async function createChallenge(
   entryFeeUsdfg: number
 ): Promise<string> {
   console.log('🚀 Creating challenge on smart contract...');
-  console.log(`Entry fee: ${entryFeeUsdfg} USDFG`);
+  console.log(`Challenge amount: ${entryFeeUsdfg} USDFG`);
 
   if (!wallet || !wallet.publicKey) {
     throw new Error('Wallet not connected');
@@ -112,12 +112,12 @@ export async function createChallenge(
 
   console.log(`✅ Wallet connected: ${wallet.publicKey.toString()}`);
 
-  // Validate entry fee (matches contract requirement: 0.000000001 USDFG minimum (1 lamport), 1000 USDFG maximum)
+  // Validate challenge amount (matches contract requirement: 0.000000001 USDFG minimum (1 lamport), 1000 USDFG maximum)
   if (entryFeeUsdfg < 0.000000001 || entryFeeUsdfg > 1000) {
-    throw new Error('Entry fee must be between 0.000000001 and 1000 USDFG');
+    throw new Error('Challenge amount must be between 0.000000001 and 1000 USDFG');
   }
 
-  console.log(`✅ Entry fee valid: ${entryFeeUsdfg} USDFG`);
+  console.log(`✅ Challenge amount valid: ${entryFeeUsdfg} USDFG`);
 
   if (!wallet.signTransaction) {
     throw new Error('Wallet does not support transaction signing');
@@ -160,7 +160,7 @@ export async function createChallenge(
 
   // Convert USDFG to lamports
   const entryFeeLamports = Math.floor(entryFeeUsdfg * Math.pow(10, 9)); // 9 decimals
-  console.log('💰 Entry fee in lamports:', entryFeeLamports);
+  console.log('💰 Challenge amount in lamports:', entryFeeLamports);
 
   // Create instruction data for create_challenge
   // Anchor uses sha256("global:create_challenge")[0..8] for instruction discriminator
@@ -293,11 +293,25 @@ export async function expressJoinIntent(
   transaction.feePayer = challenger;
 
   const signedTransaction = await wallet.signTransaction(transaction);
-  const signature = await connection.sendRawTransaction(signedTransaction.serialize());
-  await connection.confirmTransaction(signature);
   
-  console.log('✅ Join intent expressed successfully!');
-  return signature;
+  try {
+    const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+    await connection.confirmTransaction(signature);
+    console.log('✅ Join intent expressed successfully! Signature:', signature);
+    return signature;
+  } catch (error: any) {
+    // Check if the error is because the challenger already expressed intent
+    const errorMsg = error.message || error.toString() || '';
+    if (errorMsg.includes('already') || errorMsg.includes('Already') || 
+        errorMsg.includes('duplicate') || errorMsg.includes('Constraint') ||
+        errorMsg.includes('constraint')) {
+      console.log('ℹ️ Join intent already expressed on-chain - this is OK');
+      // Return a special value to indicate intent was already expressed
+      throw new Error('Join intent already expressed on-chain');
+    }
+    // Re-throw other errors
+    throw error;
+  }
 }
 
 /**
@@ -959,7 +973,7 @@ export async function transferTournamentEntryFee(
   const signature = await connection.sendRawTransaction(signedTransaction.serialize());
   await connection.confirmTransaction(signature);
   
-  console.log('✅ Tournament entry fee transferred to escrow!');
+  console.log('✅ Tournament challenge amount transferred to escrow!');
   console.log('🔗 Transaction:', `https://explorer.solana.com/tx/${signature}?cluster=devnet`);
   
   return signature;

@@ -769,7 +769,7 @@ const Terms: React.FC = () => {
                       <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 61. Third-Party Hosted Events</h3>
                     </div>
                     <div className="border-t border-cyan-400/30 mb-4"></div>
-                    <p>Tournaments or challenges hosted by external partners, streamers, or organizations using USDFG's infrastructure remain subject to these Terms. USDFG is not liable for payouts, results, or communications managed by third-party hosts. Users must verify host credibility before joining.</p>
+                    <p>Tournaments or challenges hosted by external partners, streamers, or organizations using USDFG's infrastructure remain subject to these Terms. USDFG is not liable for rewards, results, or communications managed by third-party hosts. Users must verify host credibility before joining.</p>
                   </div>
 
                   <div id="section-64" className="animate-fade-in">

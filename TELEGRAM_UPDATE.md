@@ -34,9 +34,9 @@ We've just rolled out major improvements to our Tournament (Bracket Mode) system
 2. Players Join → Tournament lobby opens automatically
 3. Round 1 Starts → When bracket fills, matches begin
 4. Submit Results → Both players submit, winner advances
-5. Champion Crowned → Last player standing wins the prize pool!
+5. Champion Crowned → Last player standing receives the challenge reward!
 
-💰 **Prize Pool = Entry Fee × Number of Players**
+💰 **Challenge Reward = Challenge Amount × Number of Players**
 
 Ready to compete? Create your first tournament challenge now! 🚀
 

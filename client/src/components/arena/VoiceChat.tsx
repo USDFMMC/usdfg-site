@@ -124,9 +124,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWall
     try {
       // Get user's microphone
       setStatus("Requesting mic permission...");
-      console.log("🎤 Requesting microphone permission...");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      console.log("✅ Microphone permission granted!");
       localStream.current = stream;
       setConnected(true);
       setStatus("Mic ready, waiting for opponent...");
@@ -170,37 +168,30 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWall
       const iceCandidatesRef = { sent: new Set<string>() };
       pc.onicecandidate = async (event) => {
         if (event.candidate) {
-          console.log("🧊 New ICE candidate:", event.candidate.type);
           const candidateKey = `candidate_${currentWallet}_${Date.now()}`;
           await setDoc(doc(db, "voice_signals", memoizedChallengeId), {
             [candidateKey]: event.candidate.toJSON(),
             timestamp: Date.now()
           }, { merge: true });
-        } else {
-          console.log("🧊 All ICE candidates sent");
         }
       };
 
       // Monitor connection state
       pc.onconnectionstatechange = () => {
-        console.log("🔌 Connection state:", pc.connectionState);
         if (pc.connectionState === 'connected') {
           setPeerConnected(true);
           setStatus("Voice connected!");
           reconnectAttempts.current = 0; // Reset on success
-          console.log("✅ Voice chat connected!");
         } else if (pc.connectionState === 'connecting') {
           setStatus("Connecting to opponent...");
         } else if (pc.connectionState === 'disconnected') {
           setPeerConnected(false);
           setStatus("Disconnected, reconnecting...");
-          console.log("⚠️ Voice chat disconnected - attempting reconnect");
         } else if (pc.connectionState === 'failed') {
           setPeerConnected(false);
           if (reconnectAttempts.current < maxReconnectAttempts) {
             reconnectAttempts.current++;
             setStatus(`Connection failed, retry ${reconnectAttempts.current}/${maxReconnectAttempts}...`);
-            console.log(`❌ Voice chat connection failed - retry attempt ${reconnectAttempts.current}`);
             // Attempt to restart ICE
             pc.restartIce();
           } else {
@@ -212,10 +203,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWall
 
       // Monitor ICE connection state
       pc.oniceconnectionstatechange = () => {
-        console.log("🧊 ICE connection state:", pc.iceConnectionState);
-        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
-          console.log("✅ ICE connection established!");
-        } else if (pc.iceConnectionState === 'failed') {
+        if (pc.iceConnectionState === 'failed') {
           console.error("❌ ICE connection failed - may need better TURN servers");
         }
       };
@@ -262,10 +250,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWall
             if (key.startsWith('candidate_') && !key.includes(currentWallet)) {
               try {
                 if (pc.remoteDescription) {
-                  console.log("🧊 Adding remote ICE candidate");
                   await pc.addIceCandidate(new RTCIceCandidate(data[key]));
-                } else {
-                  console.log("⏳ Queuing ICE candidate (no remote description yet)");
                 }
               } catch (err) {
                 console.error("❌ Failed to add ICE candidate:", err);
@@ -345,13 +330,10 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWall
   };
 
   const cleanup = async () => {
-    console.log("🧹 Cleaning up voice chat...");
-    
     // Unsubscribe from Firestore signals listener first
     if (unsubscribeSignalRef.current) {
       unsubscribeSignalRef.current();
       unsubscribeSignalRef.current = null;
-      console.log("✅ Unsubscribed from Firestore signals");
     }
     
     // Clean up Firestore signals document only if we have a valid challengeId
@@ -360,7 +342,6 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWall
       try {
         const { deleteDoc, doc } = await import("firebase/firestore");
         await deleteDoc(doc(db, "voice_signals", validChallengeId));
-        console.log("✅ Cleaned up Firestore signals document");
       } catch (error: any) {
         // Ignore errors if document doesn't exist or is already deleted
         if (error.code !== 'not-found' && !error.message?.includes('not found')) {

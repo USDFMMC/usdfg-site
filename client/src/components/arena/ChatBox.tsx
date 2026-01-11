@@ -33,7 +33,6 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet, st
   useEffect(() => {
     // Skip if challengeId is invalid
     if (!challengeId || challengeId.trim() === '') {
-      console.log("📨 ChatBox skipped - invalid challengeId:", challengeId);
       setMessages([]);
       return;
     }
@@ -48,11 +47,9 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet, st
     const unsubscribe = onSnapshot(
       q, 
       (snapshot) => {
-        console.log("📨 Received messages:", snapshot.size);
         const newMessages: Message[] = [];
         snapshot.forEach((doc) => {
           const data = doc.data();
-          console.log("💬 Message:", data);
           newMessages.push({ id: doc.id, ...data } as Message);
         });
         
@@ -62,12 +59,6 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet, st
           const bTime = b.timestamp?.seconds || 0;
           return aTime - bTime;
         });
-        
-        console.log("✅ Messages sorted and ready:", newMessages.length);
-        
-        // Debug: Check for system messages
-        const systemMsgs = newMessages.filter(m => m.sender === 'SYSTEM');
-        console.log("🟡 System messages found:", systemMsgs.length, systemMsgs);
         
         setMessages(newMessages);
       },
@@ -86,14 +77,12 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet, st
 
     setSending(true);
     try {
-      console.log("📤 Sending message:", { challengeId, text: input.trim(), sender: currentWallet });
       await addDoc(collection(db, "challenge_chats"), {
         challengeId,
         text: input.trim(),
         sender: currentWallet,
         timestamp: serverTimestamp(),
       });
-      console.log("✅ Message sent successfully");
       setInput("");
     } catch (error) {
       console.error("❌ Failed to send message:", error);

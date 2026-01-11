@@ -145,7 +145,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
           </div>
           <p className="mt-1 text-xs text-amber-100/80">
             {playerMatch.round.roundNumber === bracket.length 
-              ? "🏆 This is the FINAL! Winner takes the entire prize pool. Submit your result when ready."
+              ? "🏆 This is the FINAL! The winner receives the entire challenge reward. Submit your result when ready."
               : "Chat with your opponent and start the match. Submit results once you finish—winner advances automatically."}
           </p>
           {onOpenSubmitResult ? (
