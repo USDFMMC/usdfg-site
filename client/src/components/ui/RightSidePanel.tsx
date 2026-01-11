@@ -66,23 +66,35 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
   }, [isOpen]);
 
   // Calculate heights based on current window height
-  // sheetY represents distance from TOP where visible sheet starts
-  // visibleHeight = windowHeight - sheetY = how much of sheet is visible from bottom
-  // When expanded: sheetY = 0.15 * windowHeight, visibleHeight = 0.85 * windowHeight (85% visible) ✓
-  // When collapsed: sheetY = 0.8 * windowHeight, visibleHeight = 0.2 * windowHeight (20% visible) ✓
-  const COLLAPSED_HEIGHT = windowHeight * 0.8; // 80% from top = 20% visible when collapsed
-  const EXPANDED_HEIGHT = windowHeight * 0.15; // 15% from top = 85% visible when expanded
+  // For bottom sheet: we want to show X% of screen height from the bottom
+  // When expanded: show 85% of screen (visibleHeight = 0.85 * windowHeight)
+  // When collapsed: show 20% of screen (visibleHeight = 0.2 * windowHeight)
+  // sheetY represents translateY - positive moves UP (hides), negative moves DOWN (shows)
+  // For expanded: translateY should be small (15% hidden = 0.15 * windowHeight)
+  // For collapsed: translateY should be large (80% hidden = 0.8 * windowHeight)
+  const EXPANDED_VISIBLE_HEIGHT = windowHeight * 0.85; // 85% visible when expanded
+  const COLLAPSED_VISIBLE_HEIGHT = windowHeight * 0.2; // 20% visible when collapsed
+  
+  // sheetY = how much to translate UP from bottom (positive = hidden, negative = visible)
+  // When expanded: hide 15% = translateY(15% of windowHeight)
+  // When collapsed: hide 80% = translateY(80% of windowHeight)
+  const EXPANDED_SHEET_Y = windowHeight - EXPANDED_VISIBLE_HEIGHT; // 15% hidden = 85% visible
+  const COLLAPSED_SHEET_Y = windowHeight - COLLAPSED_VISIBLE_HEIGHT; // 80% hidden = 20% visible
 
   // Initialize sheetY based on isOpen state - ensure it opens to expanded position
   useEffect(() => {
     if (isOpen && isMobile) {
-      // Start expanded when opening (15% from top = 85% visible)
-      setSheetY(EXPANDED_HEIGHT);
+      // Start expanded when opening (15% hidden = 85% visible)
+      // Use a small delay to ensure windowHeight is set
+      const timer = setTimeout(() => {
+        setSheetY(EXPANDED_SHEET_Y);
+      }, 0);
+      return () => clearTimeout(timer);
     } else if (!isOpen) {
-      // Start off-screen when closed (100% from top = 0% visible)
+      // Start completely off-screen when closed (100% hidden)
       setSheetY(windowHeight);
     }
-  }, [isOpen, isMobile, EXPANDED_HEIGHT, windowHeight]);
+  }, [isOpen, isMobile, EXPANDED_SHEET_Y, windowHeight]);
 
   // Touch handlers for mobile drag - only from handle area
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -97,27 +109,29 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
     e.preventDefault(); // Prevent scrolling while dragging
     
     const currentTouchY = e.touches[0].clientY;
-    const deltaY = currentTouchY - dragStartY.current;
-    const newY = Math.max(COLLAPSED_HEIGHT, Math.min(EXPANDED_HEIGHT, initialSheetY.current + deltaY));
+    const deltaY = currentTouchY - dragStartY.current; // Positive = dragging down, Negative = dragging up
+    // When dragging down (positive deltaY), we want to hide more (increase sheetY)
+    // When dragging up (negative deltaY), we want to show more (decrease sheetY)
+    const newY = Math.max(COLLAPSED_SHEET_Y, Math.min(EXPANDED_SHEET_Y, initialSheetY.current + deltaY));
     
     setSheetY(newY);
-  }, [isDragging, COLLAPSED_HEIGHT, EXPANDED_HEIGHT]);
+  }, [isDragging, COLLAPSED_SHEET_Y, EXPANDED_SHEET_Y]);
 
   const handleTouchEnd = useCallback(() => {
     if (!isDragging) return;
     
     setIsDragging(false);
-    const threshold = (EXPANDED_HEIGHT - COLLAPSED_HEIGHT) / 2;
-    const midPoint = COLLAPSED_HEIGHT + threshold;
+    const threshold = (EXPANDED_SHEET_Y - COLLAPSED_SHEET_Y) / 2;
+    const midPoint = EXPANDED_SHEET_Y + threshold;
     
     if (sheetY < midPoint) {
-      // Snap to expanded
-      setSheetY(EXPANDED_HEIGHT);
+      // Closer to expanded - snap to expanded (85% visible)
+      setSheetY(EXPANDED_SHEET_Y);
     } else {
-      // Snap to collapsed (user can still browse site)
-      setSheetY(COLLAPSED_HEIGHT);
+      // Closer to collapsed - snap to collapsed (20% visible)
+      setSheetY(COLLAPSED_SHEET_Y);
     }
-  }, [isDragging, sheetY, COLLAPSED_HEIGHT, EXPANDED_HEIGHT]);
+  }, [isDragging, sheetY, COLLAPSED_SHEET_Y, EXPANDED_SHEET_Y]);
 
   // Mouse drag support for desktop testing
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -129,25 +143,25 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging) return;
     
-    const deltaY = e.clientY - dragStartY.current;
-    const newY = Math.max(COLLAPSED_HEIGHT, Math.min(EXPANDED_HEIGHT, initialSheetY.current + deltaY));
+    const deltaY = e.clientY - dragStartY.current; // Positive = dragging down
+    const newY = Math.max(COLLAPSED_SHEET_Y, Math.min(EXPANDED_SHEET_Y, initialSheetY.current + deltaY));
     
     setSheetY(newY);
-  }, [isDragging, COLLAPSED_HEIGHT, EXPANDED_HEIGHT]);
+  }, [isDragging, COLLAPSED_SHEET_Y, EXPANDED_SHEET_Y]);
 
   const handleMouseUp = useCallback(() => {
     if (!isDragging) return;
     
     setIsDragging(false);
-    const threshold = (EXPANDED_HEIGHT - COLLAPSED_HEIGHT) / 2;
-    const midPoint = COLLAPSED_HEIGHT + threshold;
+    const threshold = (EXPANDED_SHEET_Y - COLLAPSED_SHEET_Y) / 2;
+    const midPoint = EXPANDED_SHEET_Y + threshold;
     
     if (sheetY < midPoint) {
-      setSheetY(EXPANDED_HEIGHT);
+      setSheetY(EXPANDED_SHEET_Y);
     } else {
-      setSheetY(COLLAPSED_HEIGHT);
+      setSheetY(COLLAPSED_SHEET_Y);
     }
-  }, [isDragging, sheetY, COLLAPSED_HEIGHT, EXPANDED_HEIGHT]);
+  }, [isDragging, sheetY, COLLAPSED_SHEET_Y, EXPANDED_SHEET_Y]);
 
   useEffect(() => {
     if (isDragging) {
@@ -163,11 +177,12 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
   if (!isOpen) return null;
 
   // Ensure sheetY is initialized correctly - default to expanded if not set
-  // sheetY represents the distance from top where the bottom of the visible sheet should be
-  // When isOpen is true, start at EXPANDED_HEIGHT (15% from top = 85% visible)
-  // When closed, start off-screen (windowHeight = 0% visible)
-  const currentSheetY = isOpen ? (sheetY > 0 && sheetY < windowHeight ? sheetY : EXPANDED_HEIGHT) : windowHeight;
-  const visibleHeight = Math.max(200, windowHeight - currentSheetY); // Height of visible sheet (minimum 200px)
+  // sheetY = translateY value: how much to move UP from bottom (positive = hide more, negative = show more)
+  // When expanded: translateY should be small (15% of windowHeight = hides 15%, shows 85%)
+  // When collapsed: translateY should be large (80% of windowHeight = hides 80%, shows 20%)
+  // When closed: translateY = 100% of windowHeight (completely hidden)
+  const currentSheetY = isOpen && isMobile ? (sheetY >= 0 && sheetY <= windowHeight ? sheetY : EXPANDED_SHEET_Y) : windowHeight;
+  const visibleHeight = Math.max(200, windowHeight - currentSheetY); // How much is visible from bottom (minimum 200px)
 
   // Mobile: Use bottom sheet (draggable)
   if (isMobile) {
@@ -185,12 +200,13 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
           ref={panelRef}
           className={`fixed left-0 right-0 z-50 border-t border-amber-400/20 shadow-[0_-4px_40px_rgba(0,0,0,0.9)] md:hidden ${className}`}
           style={{
-            height: `${visibleHeight}px`,
+            height: `${windowHeight}px`, // Full height sheet that we translate
             bottom: 0,
-            transform: `translateY(${windowHeight - currentSheetY}px)`,
+            transform: `translateY(${currentSheetY}px)`, // Translate UP to hide/show
             transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             backgroundColor: '#0f172a', // Solid slate-900 background (fully opaque, not transparent)
             opacity: 1, // Ensure fully opaque
+            overflow: 'hidden', // Prevent content from showing outside visible area
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -226,12 +242,13 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
           {/* Scrollable Content - Normal scrolling, no drag interference - SOLID BACKGROUND */}
           <div
             ref={contentRef}
-            className="overflow-y-auto h-full bg-transparent"
+            className="overflow-y-auto bg-transparent"
             style={{ 
-              height: `calc(100% - ${title ? '80px' : '50px'})`,
+              height: `${visibleHeight - (title ? 80 : 50)}px`, // Use visibleHeight minus header
+              maxHeight: `${visibleHeight - (title ? 80 : 50)}px`, // Ensure it doesn't exceed visible area
               touchAction: 'pan-y', // Allow vertical scrolling
               WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
-              minHeight: '200px', // Ensure minimum height so content is always visible
+              minHeight: '150px', // Ensure minimum height so content is always visible
             }}
           >
             <div className="p-4 bg-transparent">
@@ -239,8 +256,8 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
             </div>
           </div>
           
-          {/* Collapsed state indicator - Show when collapsed (when sheet is more than 50% down) */}
-          {sheetY > COLLAPSED_HEIGHT + ((EXPANDED_HEIGHT - COLLAPSED_HEIGHT) * 0.5) && (
+          {/* Collapsed state indicator - Show when collapsed (when sheet is more than 50% hidden) */}
+          {sheetY > EXPANDED_SHEET_Y + ((COLLAPSED_SHEET_Y - EXPANDED_SHEET_Y) * 0.5) && (
             <div className="absolute top-14 left-0 right-0 px-4 py-1.5 bg-amber-500/10 border-b border-amber-400/20 z-10">
               <p className="text-[10px] text-amber-300/70 text-center">
                 Drag up ↑ to expand • Browse site below
