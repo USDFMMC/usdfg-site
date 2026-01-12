@@ -456,15 +456,42 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       logWalletEvent('disconnecting', {});
       await disconnect();
   
-      // Clear disconnect flag
+      // Clear ALL connection state - critical for proper state updates
+      localStorage.removeItem('phantom_connected');
+      localStorage.removeItem('phantom_public_key');
+      localStorage.removeItem('wallet_connected');
+      localStorage.removeItem('wallet_address');
       localStorage.setItem('wallet_disconnected', 'true');
+      
+      // Clear session storage
+      sessionStorage.removeItem('last_logged_wallet');
+      sessionStorage.removeItem('phantom_connecting');
+      sessionStorage.removeItem('phantom_connect_timestamp');
+      
+      // Update mobile connection state immediately
+      if (mobile) {
+        setMobileConnectionState({ connected: false, publicKey: null });
+      }
+      
+      // Trigger disconnect event
       window.dispatchEvent(new Event('walletDisconnected'));
+      
+      // Call parent's onDisconnect callback to update parent state
+      onDisconnect();
       
       logWalletEvent('disconnected', {});
     } catch (error) {
       console.error('Disconnect error:', error);
-      // Set disconnect flag even on error
+      // Clear state even on error
+      localStorage.removeItem('phantom_connected');
+      localStorage.removeItem('phantom_public_key');
+      localStorage.removeItem('wallet_connected');
+      localStorage.removeItem('wallet_address');
       localStorage.setItem('wallet_disconnected', 'true');
+      if (mobile) {
+        setMobileConnectionState({ connected: false, publicKey: null });
+      }
+      onDisconnect();
     }
   };
 
@@ -513,35 +540,18 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       );
     }
     
-    // Full mode for desktop - same design, green colors
+    // Full mode for desktop - same design, green colors, compact
     return (
-      <div className="flex items-center space-x-3">
-        <div className="text-right">
-          <div className="text-sm text-gray-400">
-            {effectivePublicKey.toString().slice(0, 8)}...{effectivePublicKey.toString().slice(-8)}
-          </div>
-          <div className="flex items-center gap-3">
-            <div>
-              <div className="text-cyan-400 font-bold text-sm">
-                {usdfgBalance !== null ? `${usdfgBalance.toLocaleString()} USDFG` : "Loading..."}
-              </div>
-              <div className="text-gray-400 text-xs">
-                {balance !== null ? `${balance.toFixed(4)} SOL` : "Loading..."}
-              </div>
-            </div>
-          </div>
-        </div>
-        <button
-          onClick={handleDisconnect}
-          className="px-4 py-1.5 bg-gradient-to-r from-green-500/20 to-emerald-600/20 text-green-300 font-light tracking-wide rounded-md hover:from-green-500/30 hover:to-emerald-600/30 transition-all border border-green-500/50 shadow-sm shadow-green-500/10 text-sm backdrop-blur-sm"
-          style={{ 
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent'
-          }}
-        >
-          {shortAddress}
-        </button>
-      </div>
+      <button
+        onClick={handleDisconnect}
+        className="px-4 py-1.5 bg-gradient-to-r from-green-500/20 to-emerald-600/20 text-green-300 font-light tracking-wide rounded-md hover:from-green-500/30 hover:to-emerald-600/30 transition-all border border-green-500/50 shadow-sm shadow-green-500/10 text-sm backdrop-blur-sm"
+        style={{ 
+          touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent'
+        }}
+      >
+        {shortAddress}
+      </button>
     );
   }
   

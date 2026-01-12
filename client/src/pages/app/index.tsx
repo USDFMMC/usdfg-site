@@ -4625,10 +4625,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               isConnected={isConnected}
               onConnect={() => {
                 localStorage.setItem('wallet_connected', 'true');
+                // Force state update
+                setPhantomConnectionState(prev => ({ ...prev }));
               }}
               onDisconnect={() => {
                 localStorage.removeItem('wallet_connected');
                 localStorage.removeItem('wallet_address');
+                localStorage.removeItem('phantom_connected');
+                localStorage.removeItem('phantom_public_key');
+                // Force state update
+                setPhantomConnectionState({ connected: false, publicKey: null });
               }}
             />
             
@@ -4658,10 +4664,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               isConnected={isConnected}
               onConnect={() => {
                 localStorage.setItem('wallet_connected', 'true');
+                // Force state update
+                setPhantomConnectionState(prev => ({ ...prev }));
               }}
               onDisconnect={() => {
                 localStorage.removeItem('wallet_connected');
                 localStorage.removeItem('wallet_address');
+                localStorage.removeItem('phantom_connected');
+                localStorage.removeItem('phantom_public_key');
+                // Force state update
+                setPhantomConnectionState({ connected: false, publicKey: null });
               }}
               compact={true}
             />
