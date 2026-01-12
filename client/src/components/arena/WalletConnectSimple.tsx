@@ -226,13 +226,23 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   }, [connected, publicKey, isConnected, mobile, mobileConnectionState, onConnect, onDisconnect, connection]);
 
   // Calculate derived values (needed before conditional returns)
+  // CRITICAL: Check multiple sources to ensure we detect connection correctly
   const effectivePublicKey = publicKey || 
     (mobile && mobileConnectionState.publicKey ? new PublicKey(mobileConnectionState.publicKey) : null) ||
     (mobile && typeof window !== 'undefined' && localStorage.getItem('phantom_public_key')
       ? new PublicKey(localStorage.getItem('phantom_public_key')!)
       : null);
-  const actuallyConnected = Boolean(isConnected || (connected && effectivePublicKey) || 
-    (mobile && (mobileConnectionState.connected || (typeof window !== 'undefined' && localStorage.getItem('phantom_connected') === 'true')) && effectivePublicKey));
+  
+  // Check connection from multiple sources (prop, hook, localStorage) - most reliable detection
+  const actuallyConnected = Boolean(
+    isConnected || // Parent prop
+    (connected && publicKey) || // Wallet adapter hook
+    (mobile && mobileConnectionState.connected && mobileConnectionState.publicKey) || // Mobile state
+    (mobile && typeof window !== 'undefined' && 
+      localStorage.getItem('phantom_connected') === 'true' && 
+      localStorage.getItem('phantom_public_key') && 
+      effectivePublicKey) // Mobile localStorage
+  );
 
   // Calculate mobile-specific connection state
   const isMobile = isMobileSafari();
@@ -458,27 +468,50 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     }
   };
 
+  // If connecting, show connecting state
+  if (connecting || isPhantomConnecting) {
+    return (
+      <div className="flex flex-col space-y-2">
+        {compact ? (
+          <div className="px-2.5 py-1.5 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-md text-xs text-center">
+            Connecting...
+          </div>
+        ) : (
+          <div className="px-3 py-2 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-lg text-sm text-center">
+            Connecting to Phantom...
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // Show connected state if connected
   if (actuallyConnected && effectivePublicKey) {
+    const shortAddress = `${effectivePublicKey.toString().slice(0, 4)}...${effectivePublicKey.toString().slice(-4)}`;
+    
     // Compact mode for mobile
     if (compact) {
-        return (
-          <div className="flex flex-col items-end gap-1">
-            {usdfgBalance !== null && (
-              <div className="text-xs text-amber-300 font-semibold">
-                {usdfgBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDFG
-              </div>
-            )}
+      return (
+        <div className="flex flex-col items-end gap-1">
+          {usdfgBalance !== null && (
+            <div className="text-xs text-amber-300 font-semibold">
+              {usdfgBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDFG
+            </div>
+          )}
           <button
-              onClick={handleDisconnect}
-            className="px-2 py-1.5 bg-green-500/20 text-green-400 border border-green-500/30 rounded-md text-xs font-medium hover:bg-green-500/30 transition-colors flex items-center gap-1"
+            onClick={handleDisconnect}
+            className="px-2 py-1.5 bg-green-500/20 text-green-400 border border-green-500/30 rounded-md text-xs font-medium hover:bg-green-500/30 active:bg-green-500/40 transition-colors flex items-center gap-1 touch-manipulation"
+            style={{ 
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent'
+            }}
           >
             <span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
-              <span className="hidden sm:inline">{effectivePublicKey.toString().slice(0, 4)}...</span>
+            <span className="hidden sm:inline">{shortAddress}</span>
             <span className="sm:hidden">Connected</span>
           </button>
-          </div>
-        );
+        </div>
+      );
     }
     
     // Full mode for desktop
@@ -508,42 +541,6 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         >
           Disconnect
         </button>
-      </div>
-    );
-  }
-
-  // If connecting, show connecting state
-  if (connecting) {
-    return (
-      <div className="flex flex-col space-y-2">
-        <div className={`px-${compact ? '2.5' : '3'} py-${compact ? '1.5' : '2'} bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-${compact ? 'md' : 'lg'} text-${compact ? 'xs' : 'sm'} text-center`}>
-          Connecting to Phantom...
-        </div>
-      </div>
-    );
-  }
-  
-  // Show connection button
-  
-  if (actuallyConnected && effectivePublicKey) {
-    const shortAddress = `${effectivePublicKey.toString().slice(0, 4)}...${effectivePublicKey.toString().slice(-4)}`;
-    return (
-      <div className="flex flex-col space-y-2">
-        {compact ? (
-          <button
-            onClick={handleDisconnect}
-            className="px-3 py-1 bg-green-500/10 text-green-300 border border-green-500/40 rounded-md text-xs font-normal hover:bg-green-500/20 hover:border-green-500/60 transition-all backdrop-blur-sm"
-          >
-            {shortAddress}
-          </button>
-        ) : (
-          <button
-            onClick={handleDisconnect}
-            className="px-4 py-1.5 bg-gradient-to-r from-green-500/20 to-green-600/20 text-green-300 font-light tracking-wide rounded-md hover:from-green-500/30 hover:to-green-600/30 transition-all border border-green-500/50 shadow-sm shadow-green-500/10 text-sm backdrop-blur-sm"
-          >
-            {shortAddress}
-          </button>
-        )}
       </div>
     );
   }

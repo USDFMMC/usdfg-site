@@ -1001,7 +1001,7 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
       if (challenger && challenger.toLowerCase() === wallet.toLowerCase()) {
         throw new Error("Challenge is already funded by creator. Please use the 'Fund Challenge' button to fund your entry and start the match.");
       } else {
-        throw new Error(`Challenge is not waiting for opponent. Current status: ${data.status}`);
+      throw new Error(`Challenge is not waiting for opponent. Current status: ${data.status}`);
       }
     }
     
@@ -1685,8 +1685,8 @@ export const submitChallengeResult = async (
 
     // CRITICAL FIX: Re-fetch from Firestore to get the actual current state
     // Don't use local results object - it might be stale
-    const updatedSnap = await getDoc(challengeRef);
-    const updatedData = updatedSnap.data() as ChallengeData;
+      const updatedSnap = await getDoc(challengeRef);
+      const updatedData = updatedSnap.data() as ChallengeData;
     const currentResults = updatedData.results || {};
     const currentPlayers = updatedData.players || [];
     
@@ -1699,7 +1699,7 @@ export const submitChallengeResult = async (
       
       if (bothSubmitted) {
         console.log('🎯 Both players submitted! Determining winner...');
-        await determineWinner(challengeId, updatedData);
+      await determineWinner(challengeId, updatedData);
       } else {
         console.log('⏳ Waiting for opponent to submit result...');
       }

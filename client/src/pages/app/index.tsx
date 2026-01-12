@@ -803,7 +803,7 @@ const ArenaHome: React.FC = () => {
   const [leaderboardView, setLeaderboardView] = useState<'individual' | 'teams'>('individual'); // Toggle between Individual and Teams
   const [topTeams, setTopTeams] = useState<TeamStats[]>([]);
   const [loadingTopTeams, setLoadingTopTeams] = useState<boolean>(false);
-  const [showTournamentLobby, setShowTournamentLobby] = useState(false);
+const [showTournamentLobby, setShowTournamentLobby] = useState(false);
   const [showStandardLobby, setShowStandardLobby] = useState(false);
 const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string; opponentWallet: string } | null>(null);
   const [showTeamModal, setShowTeamModal] = useState<boolean>(false);
@@ -1878,13 +1878,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Open standard lobby for active challenges only (completed challenges with prizes handled separately)
       const status = challenge.status || challenge.rawData?.status;
       if (status === 'active') {
-        setSelectedChallenge({
-          id: challenge.id,
-          title: (challenge as any).title || extractGameFromTitle((challenge as any).title || '') || "Challenge",
-          ...challenge
-        });
+      setSelectedChallenge({
+        id: challenge.id,
+        title: (challenge as any).title || extractGameFromTitle((challenge as any).title || '') || "Challenge",
+        ...challenge
+      });
         setShowStandardLobby(true);
-      }
+    }
     }
   }, [firestoreChallenges, publicKey, showSubmitResultModal, showTrustReview, showStandardLobby, showTournamentLobby, selectedChallenge?.id, isConnected]);
   
@@ -2523,7 +2523,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       alert('The creator has funded. Please use the "Fund Challenge" button to fund your entry and start the match.');
       return;
     }
-    
+
     // Optimized: Combine status checks and reduce redundant fetches
     // If creator and deadline expired, revert first (expressJoinIntent will handle this too, but do it here for speed)
     if (isCreator && status === 'creator_confirmation_required' && isDeadlineExpired) {
@@ -2546,9 +2546,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       } else {
         alert(`Challenge is not waiting for opponent. Current status: ${status}`);
       }
-      return;
-    }
-    
+        return;
+      }
+      
     try {
       const walletAddr = publicKey.toString();
       
@@ -2571,13 +2571,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         
         // If PDA exists, try to express on-chain intent (user already expressed in Firestore)
         if (challengePDA && currentStatus === 'creator_confirmation_required') {
-          try {
-            const { expressJoinIntent: expressJoinIntentOnChain } = await import('@/lib/chain/contract');
+        try {
+          const { expressJoinIntent: expressJoinIntentOnChain } = await import('@/lib/chain/contract');
             const signature = await expressJoinIntentOnChain(
-              { signTransaction, publicKey },
-              connection,
-              challengePDA
-            );
+            { signTransaction, publicKey },
+            connection,
+            challengePDA
+          );
             
             // Update Firestore deadline to match on-chain timer (5 minutes from now)
             try {
@@ -2594,10 +2594,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             
             console.log('✅ Join intent expressed on-chain successfully! Signature:', signature);
             alert('✅ Join intent expressed on-chain! Creator can now fund the challenge.');
-            setShowDetailSheet(false);
-            return;
-          } catch (onChainError: any) {
-            const errorMsg = onChainError.message || onChainError.toString() || '';
+          setShowDetailSheet(false);
+          return;
+        } catch (onChainError: any) {
+          const errorMsg = onChainError.message || onChainError.toString() || '';
             
             // If user rejected the transaction, allow retry (don't close sheet)
             if (errorMsg.includes('User rejected') || errorMsg.includes('User cancelled') || 
@@ -2619,15 +2619,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             }
             
             // If on-chain state mismatch, that's OK - Firestore is source of truth
-            if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770')) {
+          if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770')) {
               console.log('⚠️ On-chain state mismatch - Firestore shows user as pending joiner.');
               alert('✅ Your join intent is already recorded in Firestore! The on-chain state may be out of sync, but this will be resolved when the creator funds the challenge.');
               setShowDetailSheet(false);
               return;
-            }
+          }
             
             // Other errors - re-throw to be handled by outer catch
-            throw onChainError;
+          throw onChainError;
           }
         } else {
           // No PDA yet or status is different - user already expressed intent, just wait
@@ -2663,8 +2663,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         // Founder Challenge - express intent in Firestore only
         await expressJoinIntent(challenge.id, walletAddr, true);
         alert('✅ Join intent expressed! Waiting for creator to confirm.');
-        setShowDetailSheet(false);
-        return;
+            setShowDetailSheet(false);
+            return;
       }
       
       // OPTIMIZED FLOW: Firestore update first (instant, no fee), then on-chain if needed (one fee only)
@@ -3053,12 +3053,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         // If Firestore says creator_confirmation_required but on-chain is still PendingWaitingForOpponent,
         // the joiner needs to express intent on-chain first
         try {
-      await creatorFundOnChain(
-        { signTransaction, publicKey },
-        connection,
-        challengePDA,
-        entryFee
-      );
+          await creatorFundOnChain(
+            { signTransaction, publicKey },
+            connection,
+            challengePDA,
+            entryFee
+          );
         } catch (fundError: any) {
           const errorMsg = fundError.message || fundError.toString() || '';
           // Check if error is because challenge is not in CreatorConfirmationRequired state
@@ -3082,7 +3082,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       // Update Firestore - wrap in try-catch to handle errors gracefully
       try {
-        await creatorFund(challenge.id, currentWallet);
+      await creatorFund(challenge.id, currentWallet);
       } catch (firestoreError: any) {
         // If Firestore update fails but on-chain succeeded, we have a state mismatch
         // Check if the challenge status might have changed (e.g., already funded)
@@ -3963,7 +3963,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     React.useEffect(() => {
       const container = scrollContainerRef.current;
       if (!container) return;
-      
+
       // Prevent scroll restoration
       if ('scrollRestoration' in window.history) {
         window.history.scrollRestoration = 'manual';
@@ -4464,7 +4464,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 onClick={async (e) => {
                   e.stopPropagation();
                   try {
-                    await onExpressIntent(challenge);
+                  await onExpressIntent(challenge);
                   } catch (error: any) {
                     // Error is already handled in handleDirectJoinerExpressIntent
                     console.error('Error expressing intent:', error);
@@ -4953,10 +4953,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                       draggable={false}
                       key={`${challenge.id}-${gameName}-${imagePath}`}
                                       onError={(e) => {
-                        const target = e.currentTarget as HTMLImageElement;
+                                        const target = e.currentTarget as HTMLImageElement;
                         // Only log errors in development
                         if (process.env.NODE_ENV === 'development') {
-                          console.error(`❌ Failed to load image: ${imagePath} for game: ${gameName}, challenge: ${challenge.id}`);
+                        console.error(`❌ Failed to load image: ${imagePath} for game: ${gameName}, challenge: ${challenge.id}`);
                         }
                         target.src = '/assets/usdfg-logo-transparent.png';
                       }}
@@ -4977,14 +4977,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                         <div className="min-w-0 flex-1">
                           <div className="text-[15px] font-semibold truncate">{gameName}</div>
                           <div className="text-xs text-white/70 truncate">{challenge.mode || 'Head-to-Head'}</div>
-                                  </div>
+                        </div>
                         <div className="flex flex-col items-end gap-1.5">
-                        <StatusPill 
-                          status={status} 
-                          isOwner={isOwner} 
-                          players={challenge.players || 0} 
-                          capacity={challenge.capacity || 2} 
-                        />
+                          <StatusPill 
+                            status={status} 
+                            isOwner={isOwner} 
+                            players={challenge.players || 0} 
+                            capacity={challenge.capacity || 2} 
+                          />
                           {/* Share button - positioned below status */}
                                         <button
                             type="button"
@@ -5001,18 +5001,18 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                             </svg>
                                         </button>
                                               </div>
-                                  </div>
+                                              </div>
 
                       <div className="mt-auto grid grid-cols-2 gap-2 text-xs">
                         <div className="rounded-lg bg-black/45 p-2">
                           <div className="text-white/70">💰 Entry</div>
                           <div className="font-semibold">{challenge.entryFee} USDFG</div>
-                                              </div>
+                                        </div>
                         <div className="rounded-lg bg-black/45 p-2">
                           <div className="text-white/70">🏆 Prize</div>
                           <div className="font-semibold">{challenge.prizePool} USDFG</div>
-                                              </div>
-                                        </div>
+                            </div>
+                          </div>
 
                       <div className="flex items-center justify-between gap-2 text-[12px] text-white/80">
                         <div className="min-w-0 truncate">
@@ -5023,15 +5023,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           <span className="text-white/60">{platformIconLocal(challenge.platform)}</span>{' '}
                           <span className="font-semibold">{challenge.platform || 'All'}</span>
                           </div>
-                            </div>
-                          </div>
+                              </div>
+                                  </div>
                                 </div>
-                  </div>
-                );
+                              </div>
+                            );
               };
 
               // Render category rows
-                              return (
+                            return (
                 <>
                   {(Object.entries(categoryGroups) as Array<[string, any[]]>).map(([categoryTitle, items]) => {
                     if (items.length === 0) return null;
@@ -5128,9 +5128,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                   }
                                 }}
                               />
-                              </div>
+                                </div>
                           ))}
-                              </div>
+                                </div>
                       </section>
                                 );
                   })}
@@ -6017,7 +6017,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               {showStandardLobby && (
                 <RightSidePanel
                   isOpen={showStandardLobby}
-                  onClose={() => {
+          onClose={() => {
                     setShowStandardLobby(false);
                     setSelectedChallenge(null);
                   }}
