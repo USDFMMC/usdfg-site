@@ -2586,7 +2586,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
       const isAlreadyPendingJoiner = pendingJoiner && pendingJoiner.toLowerCase() === walletAddr.toLowerCase();
       
-      // If user is already a pending joiner, handle it immediately and return
+      // If user is already a pending joiner, confirm and return (no fee needed!)
       if (isAlreadyPendingJoiner) {
         // If deadline expired, tell user to wait for revert
         if (isDeadlineExpired) {
@@ -2595,72 +2595,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           return;
         }
         
-        // If PDA exists, try to express on-chain intent (user already expressed in Firestore)
-        if (challengePDA && currentStatus === 'creator_confirmation_required') {
-        try {
-          const { expressJoinIntent: expressJoinIntentOnChain } = await import('@/lib/chain/contract');
-            const signature = await expressJoinIntentOnChain(
-            { signTransaction, publicKey },
-            connection,
-            challengePDA
-          );
-            
-            // Update Firestore deadline to match on-chain timer (5 minutes from now)
-            try {
-              const { updateDoc, doc } = await import('firebase/firestore');
-              const { db } = await import('@/lib/firebase/config');
-              const { Timestamp } = await import('firebase/firestore');
-              const onChainDeadline = Timestamp.fromDate(new Date(Date.now() + (5 * 60 * 1000)));
-              await updateDoc(doc(db, 'challenges', challenge.id), {
-                creatorFundingDeadline: onChainDeadline
-              });
-            } catch (updateError) {
-              console.error('Failed to sync Firestore deadline with on-chain timer:', updateError);
-            }
-            
-            console.log('✅ Join intent expressed on-chain successfully! Signature:', signature);
-            alert('✅ Join intent expressed on-chain! Creator can now fund the challenge.');
-          setShowDetailSheet(false);
-          return;
-        } catch (onChainError: any) {
-          const errorMsg = onChainError.message || onChainError.toString() || '';
-            
-            // If user rejected the transaction, allow retry (don't close sheet)
-            if (errorMsg.includes('User rejected') || errorMsg.includes('User cancelled') || 
-                errorMsg.includes('rejected the request') || errorMsg.includes('cancelled')) {
-              console.log('⚠️ User rejected on-chain transaction - allowing retry');
-              alert('⚠️ Transaction cancelled. Your join intent is saved in Firestore, but on-chain confirmation is still needed. You can try again by clicking "Express Intent" again.');
-              // Don't close sheet - allow user to retry
-              return;
-            }
-            
-            // If already expressed on-chain, that's OK
-            if (errorMsg.includes('already expressed') || errorMsg.includes('already') || 
-                errorMsg.includes('Already') || errorMsg.includes('duplicate') ||
-                errorMsg.includes('constraint') || errorMsg.includes('Constraint')) {
-              console.log('✅ On-chain intent already expressed - this is OK');
-              alert('✅ Your join intent is already recorded on-chain! Creator can now fund the challenge.');
-              setShowDetailSheet(false);
-              return;
-            }
-            
-            // If on-chain state mismatch, that's OK - Firestore is source of truth
-          if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770')) {
-              console.log('⚠️ On-chain state mismatch - Firestore shows user as pending joiner.');
-              alert('✅ Your join intent is already recorded in Firestore! The on-chain state may be out of sync, but this will be resolved when the creator funds the challenge.');
-              setShowDetailSheet(false);
-              return;
-          }
-            
-            // Other errors - re-throw to be handled by outer catch
-          throw onChainError;
-          }
-        } else {
-          // No PDA yet or status is different - user already expressed intent, just wait
-          alert('✅ You have already expressed intent to join this challenge. Waiting for creator to fund.');
-          setShowDetailSheet(false);
-          return;
-        }
+        // User already expressed intent in Firestore - no on-chain call needed (saves fees!)
+        // On-chain will sync when creator funds
+        alert('✅ You have already expressed intent to join this challenge. Waiting for creator to fund.');
+        setShowDetailSheet(false);
+        return;
       }
       
       // If deadline expired and user is NOT the pending joiner, don't try to join
@@ -2693,104 +2632,24 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             return;
       }
       
-      // OPTIMIZED FLOW: Firestore update first (instant, no fee), then on-chain if needed (one fee only)
-      // This ensures UI updates immediately while on-chain transaction processes
+      // JOIN INTENT: Firestore only (NO SOLANA FEE!)
+      // Express intent in Firestore - this is sufficient for the creator to see and fund
+      // On-chain express intent will happen automatically when creator funds the challenge
       const needsFirestoreUpdate = status === 'pending_waiting_for_opponent' && !isAlreadyPendingJoiner;
       
-      // Express intent in Firestore first (fast, no Solana fee, updates UI immediately)
       if (needsFirestoreUpdate) {
         await expressJoinIntent(challenge.id, walletAddr);
         // Firestore update completes instantly - real-time listener updates UI immediately
         // Creator sees "Fund Challenge" button appear right away
-      }
-      
-      // Then express intent on-chain (requires Solana fee - only ONE call)
-      // Skip on-chain if deadline expired and challenge was reverted
-      const shouldSkipOnChain = isDeadlineExpired && (status === 'pending_waiting_for_opponent' || currentStatus === 'pending_waiting_for_opponent');
-      
-      if (challengePDA && !shouldSkipOnChain) {
-        try {
-          // SINGLE on-chain call - prevents duplicate fees
-          const { expressJoinIntent: expressJoinIntentOnChain } = await import('@/lib/chain/contract');
-          await expressJoinIntentOnChain(
-            { signTransaction, publicKey },
-            connection,
-            challengePDA
-          );
-          
-          // Update Firestore deadline to match on-chain timer (5 minutes from now, when on-chain executed)
-          try {
-            const { updateDoc, doc } = await import('firebase/firestore');
-            const { db } = await import('@/lib/firebase/config');
-            const { Timestamp } = await import('firebase/firestore');
-            // On-chain sets timer to now + 300 seconds (5 minutes), so sync Firestore to match
-            const onChainDeadline = Timestamp.fromDate(new Date(Date.now() + (5 * 60 * 1000)));
-            await updateDoc(doc(db, 'challenges', challenge.id), {
-              creatorFundingDeadline: onChainDeadline
-            });
-          } catch (updateError) {
-            // Non-critical - log but don't fail
-            console.error('Failed to sync Firestore deadline with on-chain timer:', updateError);
-          }
-          
-          console.log('✅ Join intent expressed on-chain');
-          if (needsFirestoreUpdate) {
-            alert('✅ Join intent expressed! Creator can now fund the challenge.');
-          } else {
-            alert('✅ Join intent expressed on-chain! Creator can now fund the challenge.');
-          }
-          setShowDetailSheet(false);
-          return;
-        } catch (onChainError: any) {
-          console.error('⚠️ Failed to express intent on-chain:', onChainError);
-          const errorMsg = onChainError.message || onChainError.toString() || '';
-          
-          // If user rejected the transaction, allow retry (don't close sheet)
-          if (errorMsg.includes('User rejected') || errorMsg.includes('User cancelled') || 
-              errorMsg.includes('rejected the request') || errorMsg.includes('cancelled')) {
-            console.log('⚠️ User rejected on-chain transaction - allowing retry');
-            alert('⚠️ Transaction cancelled. Your join intent is saved in Firestore, but on-chain confirmation is still needed. You can try again by clicking "Express Intent" again.');
-            // Don't close sheet - allow user to retry
-            return;
-          }
-          
-          // Check if intent was already expressed
-          if (errorMsg.includes('already expressed') || errorMsg.includes('already') || 
-              errorMsg.includes('Already') || errorMsg.includes('duplicate') ||
-              errorMsg.includes('constraint') || errorMsg.includes('Constraint')) {
-            console.log('✅ On-chain intent already expressed - this is OK');
-            if (needsFirestoreUpdate) {
-              alert('✅ Join intent expressed! Your on-chain intent is already recorded. Creator can now fund the challenge.');
-            } else {
-              alert('✅ Your join intent is already recorded on-chain! Creator can now fund the challenge.');
-            }
-            setShowDetailSheet(false);
-            return;
-          }
-          if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770')) {
-            // On-chain state mismatch - challenge was likely reverted
-            // This is OK - Firestore update succeeded, on-chain will sync when creator funds
-            console.log('⚠️ On-chain state mismatch (challenge may have been reverted). Firestore update succeeded.');
-            if (needsFirestoreUpdate) {
-              alert('✅ Join intent expressed in Firestore! The on-chain state may be out of sync, but this will be resolved when the creator funds the challenge.');
-            } else {
-              alert('✅ Join intent expressed in Firestore. On-chain state may be out of sync - this will resolve when creator funds.');
-            }
-            setShowDetailSheet(false);
-            return;
-          }
-          throw onChainError;
-        }
+        alert('✅ Join intent expressed! Creator can now fund the challenge.');
       } else {
-        // No PDA yet OR deadline expired (skip on-chain) - Firestore update was successful
-        if (shouldSkipOnChain) {
-          alert('✅ Join intent expressed in Firestore! The challenge was reverted, so on-chain express intent was skipped. Creator can create a new PDA when they fund.');
-        } else if (needsFirestoreUpdate) {
-          alert('✅ Join intent expressed! Waiting for creator to create challenge on-chain, then you can retry to express intent on-chain.');
-        } else {
-          alert('✅ Join intent expressed in Firestore. Waiting for creator to create challenge on-chain.');
-        }
+        // Already expressed intent - just confirm
+        alert('✅ You have already expressed intent to join this challenge. Waiting for creator to fund.');
       }
+      
+      // NO ON-CHAIN CALL FOR JOIN INTENT - saves users Solana fees!
+      // On-chain express intent will happen when creator funds, or can be done later if needed
+      // This makes joining free and instant!
       
       setShowDetailSheet(false);
     } catch (err: any) {
