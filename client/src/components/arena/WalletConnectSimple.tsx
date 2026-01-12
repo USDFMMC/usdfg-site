@@ -516,25 +516,34 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   if (actuallyConnected && effectivePublicKey) {
     const shortAddress = `${effectivePublicKey.toString().slice(0, 4)}...${effectivePublicKey.toString().slice(-4)}`;
     
-    // Compact mode for mobile - same design, green colors
+    // Compact mode for mobile - same design, green colors, horizontal layout
     if (compact) {
       return (
-        <div className="flex flex-col items-end gap-1">
-          {usdfgBalance !== null && (
-            <div className="text-xs text-amber-300 font-semibold">
-              {usdfgBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDFG
+        <div className="flex items-center gap-2">
+          {/* Balances - compact inline */}
+          {(usdfgBalance !== null || balance !== null) && (
+            <div className="text-right hidden xs:block">
+              {usdfgBalance !== null && (
+                <div className="text-[10px] text-cyan-400 font-semibold leading-tight">
+                  {usdfgBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} USDFG
+                </div>
+              )}
+              {balance !== null && (
+                <div className="text-[9px] text-gray-400 leading-tight">
+                  {balance.toFixed(2)} SOL
+                </div>
+              )}
             </div>
           )}
           <button
             onClick={handleDisconnect}
-            className="px-3 py-1 bg-gradient-to-r from-green-500/20 to-emerald-600/20 text-green-300 font-light tracking-wide rounded-md hover:from-green-500/30 hover:to-emerald-600/30 transition-all border border-green-500/50 shadow-sm shadow-green-500/10 text-xs backdrop-blur-sm touch-manipulation"
+            className="px-2.5 py-1.5 bg-gradient-to-r from-green-500/20 to-emerald-600/20 text-green-300 font-light tracking-wide rounded-md hover:from-green-500/30 hover:to-emerald-600/30 transition-all border border-green-500/50 shadow-sm shadow-green-500/10 text-xs backdrop-blur-sm touch-manipulation whitespace-nowrap"
             style={{ 
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent'
             }}
           >
-            <span className="hidden sm:inline">{shortAddress}</span>
-            <span className="sm:hidden">Connected</span>
+            {shortAddress}
           </button>
         </div>
       );
