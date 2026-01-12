@@ -399,6 +399,32 @@ const ArenaHome: React.FC = () => {
 
   // Check for stored Phantom connection (mobile deep link)
   // Also listen for BroadcastChannel messages from new tabs opened by Phantom
+  // Listen for wallet adapter connection changes
+  useEffect(() => {
+    if (connected && publicKey) {
+      // Wallet adapter connected - update state
+      setPhantomConnectionState({
+        connected: true,
+        publicKey: publicKey.toString()
+      });
+      // Also update localStorage for consistency
+      localStorage.setItem('phantom_connected', 'true');
+      localStorage.setItem('phantom_public_key', publicKey.toString());
+    } else if (!connected && !publicKey) {
+      // Wallet adapter disconnected - check localStorage
+      const storedConnected = localStorage.getItem('phantom_connected') === 'true';
+      const storedPublicKey = localStorage.getItem('phantom_public_key');
+      
+      if (!storedConnected || !storedPublicKey) {
+        // No stored connection - clear state
+        setPhantomConnectionState({
+          connected: false,
+          publicKey: null
+        });
+      }
+    }
+  }, [connected, publicKey]);
+
   useEffect(() => {
     const checkPhantomConnection = () => {
       const isPhantomConnected = localStorage.getItem('phantom_connected') === 'true';
