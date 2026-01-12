@@ -398,30 +398,66 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         })();
       };
       
-      // Increment spectator count when joining (using Firestore increment)
-      updateDoc(statsRef, {
-        spectatorCount: increment(1)
-      }).catch(async (err) => {
-        // If document doesn't exist, create it first
-        if (err.code === 'not-found') {
-          try {
-            await setDoc(statsRef, {
-              spectatorCount: 1,
-              createdAt: serverTimestamp(),
-            });
-            hasJoined = true;
-          } catch (createErr: any) {
-            if (createErr.code !== 'permission-denied' && createErr.code !== 'unavailable') {
-              console.error('Failed to create spectator count:', createErr);
+      // Check current count before incrementing (prevent exceeding 69 limit)
+      getDoc(statsRef).then((snap) => {
+        const currentCount = snap.exists() ? (snap.data().spectatorCount || 0) : 0;
+        
+        // Only increment if under limit
+        if (currentCount < MAX_SPECTATORS) {
+          // Increment spectator count when joining (using Firestore increment)
+          updateDoc(statsRef, {
+            spectatorCount: increment(1)
+          }).catch(async (err) => {
+            // If document doesn't exist, create it first
+            if (err.code === 'not-found') {
+              try {
+                await setDoc(statsRef, {
+                  spectatorCount: 1,
+                  createdAt: serverTimestamp(),
+                });
+                hasJoined = true;
+              } catch (createErr: any) {
+                if (createErr.code !== 'permission-denied' && createErr.code !== 'unavailable') {
+                  console.error('Failed to create spectator count:', createErr);
+                }
+              }
+            } else if (err.code !== 'permission-denied' && err.code !== 'unavailable') {
+              console.error('Failed to increment spectator count:', err);
+            } else {
+              hasJoined = true; // Assume it worked if permission denied
             }
-          }
-        } else if (err.code !== 'permission-denied' && err.code !== 'unavailable') {
-          console.error('Failed to increment spectator count:', err);
+          }).then(() => {
+            hasJoined = true;
+          });
         } else {
-          hasJoined = true; // Assume it worked if permission denied
+          // Limit reached - user cannot join as spectator
+          console.log(`⚠️ Spectator limit reached (${MAX_SPECTATORS}). Cannot join as spectator.`);
         }
-      }).then(() => {
-        hasJoined = true;
+      }).catch(() => {
+        // If getDoc fails, try to increment anyway (optimistic - limit will be enforced by listener)
+        updateDoc(statsRef, {
+          spectatorCount: increment(1)
+        }).catch(async (err) => {
+          if (err.code === 'not-found') {
+            try {
+              await setDoc(statsRef, {
+                spectatorCount: 1,
+                createdAt: serverTimestamp(),
+              });
+              hasJoined = true;
+            } catch (createErr: any) {
+              if (createErr.code !== 'permission-denied' && createErr.code !== 'unavailable') {
+                console.error('Failed to create spectator count:', createErr);
+              }
+            }
+          } else if (err.code !== 'permission-denied' && err.code !== 'unavailable') {
+            console.error('Failed to increment spectator count:', err);
+          } else {
+            hasJoined = true;
+          }
+        }).then(() => {
+          hasJoined = true;
+        });
       });
       
       // Handle page unload (user closes tab/browser) - cleanup as best effort
