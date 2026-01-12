@@ -112,8 +112,8 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
   if (!isOpen) return null;
 
   // Minimized view (mobile only) - shows at top like X's minimized player
-  // Show when minimized and challenge is created (1+ players) on mobile
-  if (isOpen && isMobile && safePlayers.length >= 1 && isMinimized) {
+  // Show when minimized on mobile (will display once players data loads)
+  if (isOpen && isMobile && isMinimized) {
     return (
       <>
         {/* Minimized bar at top - like X's minimized player */}
