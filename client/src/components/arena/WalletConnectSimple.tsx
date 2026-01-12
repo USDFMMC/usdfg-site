@@ -540,18 +540,30 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       );
     }
     
-    // Full mode for desktop - same design, green colors, compact
+    // Full mode for desktop - same design, green colors, with balances
     return (
-      <button
-        onClick={handleDisconnect}
-        className="px-4 py-1.5 bg-gradient-to-r from-green-500/20 to-emerald-600/20 text-green-300 font-light tracking-wide rounded-md hover:from-green-500/30 hover:to-emerald-600/30 transition-all border border-green-500/50 shadow-sm shadow-green-500/10 text-sm backdrop-blur-sm"
-        style={{ 
-          touchAction: 'manipulation',
-          WebkitTapHighlightColor: 'transparent'
-        }}
-      >
-        {shortAddress}
-      </button>
+      <div className="flex items-center gap-3">
+        {/* Balances - compact display */}
+        <div className="text-right hidden lg:block">
+          <div className="text-cyan-400 font-semibold text-xs leading-tight">
+            {usdfgBalance !== null ? `${usdfgBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} USDFG` : "Loading..."}
+          </div>
+          <div className="text-gray-400 text-[10px] leading-tight">
+            {balance !== null ? `${balance.toFixed(4)} SOL` : "Loading..."}
+          </div>
+        </div>
+        {/* Wallet address button */}
+        <button
+          onClick={handleDisconnect}
+          className="px-4 py-1.5 bg-gradient-to-r from-green-500/20 to-emerald-600/20 text-green-300 font-light tracking-wide rounded-md hover:from-green-500/30 hover:to-emerald-600/30 transition-all border border-green-500/50 shadow-sm shadow-green-500/10 text-sm backdrop-blur-sm"
+          style={{ 
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent'
+          }}
+        >
+          {shortAddress}
+        </button>
+      </div>
     );
   }
   
