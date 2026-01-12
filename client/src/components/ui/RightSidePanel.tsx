@@ -72,18 +72,19 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
       setPlayerData(data);
     };
     
-    if (isMinimized && isMobile && safePlayers && safePlayers.length >= 2) {
+    // Show minimized view as soon as challenge is created (1+ players)
+    if (isMinimized && isMobile && safePlayers && safePlayers.length >= 1) {
       fetchPlayerData();
     }
   }, [isMinimized, isMobile, safePlayers]);
 
-  // Auto-minimize on mobile when panel opens and there are 2+ players
+  // Auto-minimize on mobile when panel opens (as soon as challenge is created)
   // Show minimized view immediately for better UX (like X/Twitter)
   useEffect(() => {
-    if (isOpen && isMobile && safePlayers.length >= 2) {
+    if (isOpen && isMobile && safePlayers.length >= 1) {
       // Show minimized view immediately (no delay) for consistent visibility
       setIsMinimized(true);
-    } else if (!isOpen || !isMobile || safePlayers.length < 2) {
+    } else if (!isOpen || !isMobile || safePlayers.length < 1) {
       setIsMinimized(false);
     }
   }, [isOpen, isMobile, safePlayers.length]);
@@ -99,8 +100,8 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
   if (!isOpen) return null;
 
   // Minimized view (mobile only) - shows at top like X's minimized player
-  // Show when minimized and there are 2+ players on mobile
-  if (isOpen && isMobile && safePlayers.length >= 2 && isMinimized) {
+  // Show when minimized and challenge is created (1+ players) on mobile
+  if (isOpen && isMobile && safePlayers.length >= 1 && isMinimized) {
     return (
       <>
         {/* Minimized bar at top - like X's minimized player */}
@@ -111,7 +112,7 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
           style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
         >
           <div className="flex items-center gap-3 px-4 py-3">
-            {/* Player avatars */}
+            {/* Player avatars - show creator, and joiner if available */}
             <div className="flex -space-x-2">
               {safePlayers.slice(0, 2).map((player, idx) => {
                 const stats = playerData[player.wallet.toLowerCase()] || {};
@@ -137,6 +138,12 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
                   </div>
                 );
               })}
+              {/* Show placeholder for second player if only 1 player */}
+              {safePlayers.length === 1 && (
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400/20 to-purple-400/20 border-2 border-white/30 border-dashed flex items-center justify-center">
+                  <span className="text-white/50 text-xs">+</span>
+                </div>
+              )}
             </div>
 
             {/* Game info */}
@@ -152,6 +159,12 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
                       const p1Name = p1Stats.displayName || safePlayers[0]?.displayName || safePlayers[0]?.wallet.slice(0, 6);
                       const p2Name = p2Stats.displayName || safePlayers[1]?.displayName || safePlayers[1]?.wallet.slice(0, 6);
                       return `${p1Name} vs ${p2Name}`;
+                    })()
+                  : safePlayers.length === 1
+                  ? (() => {
+                      const p1Stats = playerData[safePlayers[0]?.wallet.toLowerCase()] || {};
+                      const p1Name = p1Stats.displayName || safePlayers[0]?.displayName || safePlayers[0]?.wallet.slice(0, 6);
+                      return `${p1Name} • Waiting for opponent`;
                     })()
                   : `${safePlayers.length} players`
                 }
@@ -213,8 +226,8 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
                 {title}
               </h2>
               <div className="flex items-center gap-2">
-                {/* Minimize button (mobile only, when 2+ players) */}
-                {isMobile && safePlayers.length >= 2 && (
+                {/* Minimize button (mobile only, when challenge is created) */}
+                {isMobile && safePlayers.length >= 1 && (
                   <button
                     onClick={() => setIsMinimized(true)}
                     className="p-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors duration-300 md:hidden"
