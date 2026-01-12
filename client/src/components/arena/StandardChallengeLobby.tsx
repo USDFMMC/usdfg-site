@@ -49,6 +49,15 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   useEffect(() => {
     if (challenge) {
       setLiveChallenge(challenge);
+      // Debug: Log when challenge prop changes
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔄 Challenge prop updated:', {
+          challengeId: challenge.id,
+          status: challenge.status || challenge.rawData?.status,
+          pendingJoiner: challenge.pendingJoiner || challenge.rawData?.pendingJoiner,
+          creator: challenge.creator || challenge.rawData?.creator
+        });
+      }
     }
   }, [challenge]);
   
@@ -264,19 +273,24 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   
   const canCreatorFund = isCreator && status === 'creator_confirmation_required' && !isDeadlineExpired && onCreatorFund;
   
-  // Debug logging for creator fund button (temporary - remove after confirming fix)
-  if (isCreator && process.env.NODE_ENV === 'development') {
-    console.log('🔍 Creator Fund Button Debug:', {
-      isCreator,
-      status,
-      isDeadlineExpired,
-      hasOnCreatorFund: !!onCreatorFund,
-      pendingJoiner: pendingJoinerWallet,
-      canCreatorFund,
-      liveChallengeStatus: liveChallenge?.status || liveChallenge?.rawData?.status,
-      propChallengeStatus: challenge?.status || challenge?.rawData?.status
-    });
-  }
+  // Debug logging for creator fund button (always log to help diagnose - remove after fixing)
+  useEffect(() => {
+    if (isCreator) {
+      console.log('🔍 Creator Fund Button Debug:', {
+        isCreator,
+        status,
+        isDeadlineExpired,
+        hasOnCreatorFund: !!onCreatorFund,
+        pendingJoiner: pendingJoinerWallet,
+        canCreatorFund,
+        liveChallengeStatus: liveChallenge?.status || liveChallenge?.rawData?.status,
+        propChallengeStatus: challenge?.status || challenge?.rawData?.status,
+        activeChallengeStatus: activeChallenge?.status || activeChallenge?.rawData?.status,
+        creatorWallet,
+        currentWallet
+      });
+    }
+  }, [isCreator, status, isDeadlineExpired, onCreatorFund, pendingJoinerWallet, canCreatorFund, liveChallenge, challenge, activeChallenge, creatorWallet, currentWallet]);
   
   // Debug logging disabled to reduce console spam
   // Uncomment only when debugging specific issues
