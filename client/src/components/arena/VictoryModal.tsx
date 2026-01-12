@@ -118,17 +118,17 @@ const VictoryModal: React.FC<VictoryModalProps> = ({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed left-1/2 top-1/2 z-[111] w-[95vw] max-w-md -translate-x-1/2 -translate-y-1/2 max-h-[90vh] overflow-y-auto"
+            className="fixed left-1/2 top-1/2 z-[111] w-[95vw] max-w-md -translate-x-1/2 -translate-y-1/2"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="relative overflow-hidden rounded-xl border border-amber-400/30 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black shadow-[0_0_60px_rgba(255,215,0,0.15)]">
+            <div className="relative overflow-hidden rounded-lg border border-amber-400/30 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black shadow-[0_0_40px_rgba(255,215,0,0.12)]">
               {/* Gold glow effect around edges */}
-              <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-amber-500/10 via-transparent to-amber-500/10" />
-              <div className="absolute inset-0 rounded-xl bg-gradient-to-b from-amber-500/10 via-transparent to-amber-500/10" />
+              <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-amber-500/10 via-transparent to-amber-500/10" />
+              <div className="absolute inset-0 rounded-lg bg-gradient-to-b from-amber-500/10 via-transparent to-amber-500/10" />
               
-              {/* Content - Mobile responsive padding and sizing */}
-              <div className="relative p-4 sm:p-6 md:p-8 text-center">
-                {/* Trophy Icon with pulse animation - Smaller on mobile */}
+              {/* Content - Compact mobile sizing to match claim prize box */}
+              <div className="relative p-2.5 text-center">
+                {/* Trophy Icon - Compact size to match claim prize box */}
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
@@ -138,7 +138,7 @@ const VictoryModal: React.FC<VictoryModalProps> = ({
                     stiffness: 200, 
                     damping: 15 
                   }}
-                  className="mb-3 sm:mb-4 md:mb-6 flex justify-center"
+                  className="mb-1.5 flex justify-center"
                 >
                   <div className="relative">
                     <motion.div
@@ -153,52 +153,39 @@ const VictoryModal: React.FC<VictoryModalProps> = ({
                       }}
                       className="absolute inset-0 rounded-full bg-amber-400/20 blur-xl"
                     />
-                    <Trophy className="relative h-10 w-10 sm:h-12 sm:w-12 md:h-16 md:w-16 text-amber-400 drop-shadow-[0_0_20px_rgba(255,215,0,0.5)]" />
+                    <Trophy className="relative h-6 w-6 text-amber-400 drop-shadow-[0_0_15px_rgba(255,215,0,0.4)]" />
                   </div>
                 </motion.div>
 
-                {/* Header - Smaller text on mobile */}
+                {/* Header - Compact text to match claim prize box */}
                 <motion.h2
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
-                  className="mb-2 sm:mb-3 md:mb-4 text-xl sm:text-2xl md:text-3xl font-bold text-white"
+                  className="mb-1 text-sm font-bold text-white"
                 >
-                  🏆 Victory Confirmed
+                  You Won!
                 </motion.h2>
 
-                {/* Body Copy - Smaller text and spacing on mobile */}
+                {/* Body Copy - Compact spacing to match claim prize box */}
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
-                  className="mb-4 sm:mb-6 md:mb-8 space-y-1.5 sm:space-y-2 text-zinc-300"
+                  className="mb-2 text-zinc-300"
                 >
                   {autoWon ? (
-                    <>
-                      <p className="text-sm sm:text-base">
-                        {opponentName 
-                          ? `Your opponent submitted a loss. Trust review recorded automatically.`
-                          : `Your opponent submitted a loss. Trust review recorded automatically.`
-                        }
-                      </p>
-                      <p className="text-xs sm:text-sm text-zinc-400">
-                        Your reward is ready in the lobby.
-                      </p>
-                    </>
+                    <p className="text-xs text-zinc-300">
+                      Your opponent submitted a loss. Trust review recorded automatically.
+                    </p>
                   ) : (
-                    <>
-                      <p className="text-sm sm:text-base">
-                        You won the match! Trust review recorded.
-                      </p>
-                      <p className="text-xs sm:text-sm text-zinc-400">
-                        Your reward is ready in the lobby.
-                      </p>
-                    </>
+                    <p className="text-xs text-zinc-300">
+                      You won the match! Trust review recorded.
+                    </p>
                   )}
                 </motion.div>
 
-                {/* CTA Button - Smaller on mobile */}
+                {/* CTA Button - Compact to match claim prize box */}
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -206,9 +193,9 @@ const VictoryModal: React.FC<VictoryModalProps> = ({
                 >
                   <Button
                     onClick={handleClaimReward}
-                    className="w-full bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold py-3 sm:py-4 md:py-6 text-sm sm:text-base md:text-lg shadow-[0_0_30px_rgba(255,215,0,0.3)] hover:from-amber-400 hover:to-amber-500 hover:shadow-[0_0_40px_rgba(255,215,0,0.5)] transition-all duration-300"
+                    className="w-full bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold py-2 text-xs shadow-[0_0_20px_rgba(255,215,0,0.25)] hover:from-amber-400 hover:to-amber-500 hover:shadow-[0_0_30px_rgba(255,215,0,0.4)] transition-all duration-300"
                   >
-                    <Sparkles className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                    <Sparkles className="mr-1.5 h-3.5 w-3.5" />
                     Claim Reward
                   </Button>
                 </motion.div>

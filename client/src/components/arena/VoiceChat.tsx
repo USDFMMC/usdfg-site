@@ -9,6 +9,7 @@ interface VoiceChatProps {
 }
 
 const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWallet }) => {
+  // Remove mount logging - excessive logging removed
   const [muted, setMuted] = useState(false);
   const [connected, setConnected] = useState(false);
   const [peerConnected, setPeerConnected] = useState(false);
@@ -48,7 +49,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWall
     initializedRef.current = true;
     currentChallengeIdRef.current = memoizedChallengeId;
     
-    console.log("🎤 VoiceChat initializing for challenge:", memoizedChallengeId);
+    // Removed mount logging - excessive logging removed
     initVoiceChat().finally(() => {
       initInProgressRef.current = false;
     });
@@ -56,7 +57,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWall
     return () => {
       // Only cleanup if challengeId actually changed
       if (currentChallengeIdRef.current !== memoizedChallengeId) {
-        console.log("🎤 VoiceChat cleanup - challenge changed");
+        // Removed cleanup logging - excessive logging removed
         cleanup();
         initializedRef.current = false;
         currentChallengeIdRef.current = '';
@@ -120,7 +121,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWall
       return;
     }
 
-    console.log("🎤 Starting voice chat initialization...");
+    // Removed initialization logging - excessive logging removed
     try {
       // Get user's microphone
       setStatus("Requesting mic permission...");

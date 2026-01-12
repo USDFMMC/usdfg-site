@@ -1014,34 +1014,18 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
       if (deadlineExpired && data.status === 'creator_confirmation_required') {
         // Deadline expired and status is still creator_confirmation_required - auto-revert first
         try {
-          const reverted = await revertCreatorTimeout(challengeId);
-          if (reverted) {
-            // Re-fetch to get updated status after revert
-            const updatedSnap = await getDoc(challengeRef);
-            if (updatedSnap.exists()) {
-              data = updatedSnap.data() as ChallengeData;
-              console.log('✅ Challenge auto-reverted, creator can now rejoin');
-            } else {
-              throw new Error("Challenge state mismatch. The challenge may have been reverted. Please refresh and try again.");
-            }
+          await revertCreatorTimeout(challengeId);
+          // Single re-fetch after revert (optimized - removed redundant checks)
+          const updatedSnap = await getDoc(challengeRef);
+          if (updatedSnap.exists()) {
+            data = updatedSnap.data() as ChallengeData;
+            console.log('✅ Challenge auto-reverted, creator can now rejoin');
           } else {
-            // Revert didn't happen - check if already reverted
-            const currentSnap = await getDoc(challengeRef);
-            if (currentSnap.exists()) {
-              const currentData = currentSnap.data() as ChallengeData;
-              if (currentData.status === 'pending_waiting_for_opponent') {
-                data = currentData;
-                console.log('✅ Challenge already reverted, creator can now rejoin');
-              } else {
-                throw new Error("Challenge state mismatch. The challenge may have been reverted. Please refresh and try again.");
-              }
-            } else {
-              throw new Error("Challenge state mismatch. The challenge may have been reverted. Please refresh and try again.");
-            }
+            throw new Error("Challenge not found after revert. Please refresh and try again.");
           }
         } catch (revertError: any) {
           console.error('Failed to auto-revert challenge:', revertError);
-          // Try to get current state anyway
+          // Single check if already reverted (optimized)
           const currentSnap = await getDoc(challengeRef);
           if (currentSnap.exists()) {
             const currentData = currentSnap.data() as ChallengeData;
@@ -1049,10 +1033,10 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
               data = currentData;
               console.log('✅ Challenge already reverted, creator can now rejoin');
             } else {
-              throw new Error("Challenge state mismatch. The challenge may have been reverted. Please refresh and try again.");
+              throw new Error("Challenge state mismatch. Please refresh and try again.");
             }
           } else {
-            throw new Error("Challenge state mismatch. The challenge may have been reverted. Please refresh and try again.");
+            throw new Error("Challenge not found. Please refresh and try again.");
           }
         }
       } else if (deadlineExpired && data.status === 'pending_waiting_for_opponent') {
@@ -1063,7 +1047,7 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
         throw new Error("Cannot join your own challenge");
       } else {
         // Deadline expired but status is something else - state mismatch
-        throw new Error("Challenge state mismatch. The challenge may have been reverted. Please refresh and try again.");
+        throw new Error("Challenge state mismatch. Please refresh and try again.");
       }
     }
     

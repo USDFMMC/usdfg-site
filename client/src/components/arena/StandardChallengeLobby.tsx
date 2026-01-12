@@ -1,8 +1,8 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { ChatBox } from "./ChatBox";
 import { VoiceChat } from "./VoiceChat";
 import { Camera, Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
-import { getPlayerStats } from "@/lib/firebase/firestore";
+import { getPlayerStats, fetchChallengeById } from "@/lib/firebase/firestore";
 import { collection, doc, setDoc, deleteDoc, updateDoc, onSnapshot, query, where, serverTimestamp, Timestamp, getDocs, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 
@@ -41,15 +41,49 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [playerData, setPlayerData] = useState<Record<string, { displayName?: string; profileImage?: string }>>({});
   const [spectatorCount, setSpectatorCount] = useState<number>(0);
+  
+  // Real-time challenge data - ensures button visibility updates immediately
+  const [liveChallenge, setLiveChallenge] = useState<any>(challenge);
+  
+  // Listen to real-time challenge updates to ensure button visibility is always accurate
+  useEffect(() => {
+    if (!challenge?.id) return;
+    
+    const challengeRef = doc(db, 'challenges', challenge.id);
+    const unsubscribe = onSnapshot(
+      challengeRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const updatedData = { id: snapshot.id, ...snapshot.data(), rawData: snapshot.data() };
+          setLiveChallenge(updatedData);
+        }
+      },
+      (error) => {
+        // Non-critical error - just log it
+        if (error.code !== 'permission-denied' && error.code !== 'unavailable') {
+          console.error('Error listening to challenge updates:', error);
+        }
+      }
+    );
+    
+    return () => unsubscribe();
+  }, [challenge?.id]);
+  
+  // Use live challenge data if available, fallback to prop
+  const activeChallenge = liveChallenge || challenge;
 
-  const status = challenge.status || challenge.rawData?.status || 'pending_waiting_for_opponent';
-  const players = challenge.rawData?.players || challenge.players || [];
-  const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
-  const prizePool = challenge.prizePool || challenge.rawData?.prizePool || (entryFee * 2);
-  const game = challenge.game || challenge.rawData?.game || 'USDFG Arena';
-  const mode = challenge.mode || challenge.rawData?.mode || 'Head-to-Head';
-  const platform = challenge.platform || challenge.rawData?.platform || 'All Platforms';
-  const challengeId = challenge.id;
+  const status = activeChallenge.status || activeChallenge.rawData?.status || 'pending_waiting_for_opponent';
+  const players = activeChallenge.rawData?.players || activeChallenge.players || [];
+  const entryFee = activeChallenge.entryFee || activeChallenge.rawData?.entryFee || 0;
+  const prizePool = activeChallenge.prizePool || activeChallenge.rawData?.prizePool || (entryFee * 2);
+  const game = activeChallenge.game || activeChallenge.rawData?.game || 'USDFG Arena';
+  const mode = activeChallenge.mode || activeChallenge.rawData?.mode || 'Head-to-Head';
+  const platform = activeChallenge.platform || activeChallenge.rawData?.platform || 'All Platforms';
+  const challengeId = activeChallenge.id;
+  
+  // Memoize props to prevent VoiceChat from remounting unnecessarily
+  const voiceChatChallengeId = useMemo(() => challengeId, [challengeId]);
+  const voiceChatCurrentWallet = useMemo(() => currentWallet || "", [currentWallet]);
 
   // Check if user already submitted result (moved up for use in handleSubmit)
   const results = challenge.rawData?.results || challenge.results || {};
@@ -172,21 +206,21 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
   const statusDisplay = getStatusDisplay();
   const isParticipant = currentWallet && players.some((p: string) => p?.toLowerCase() === currentWallet?.toLowerCase());
-  const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
+  const creatorWallet = activeChallenge.creator || activeChallenge.rawData?.creator || '';
   const isCreator = currentWallet && creatorWallet.toLowerCase() === currentWallet.toLowerCase();
-  const maxPlayers = challenge.maxPlayers || challenge.rawData?.maxPlayers || 2;
+  const maxPlayers = activeChallenge.maxPlayers || activeChallenge.rawData?.maxPlayers || 2;
   const isFull = players.length >= maxPlayers;
   
   // Get challenger wallet for joiner funding check
-  const challengerWallet = challenge.rawData?.challenger || challenge.challenger;
+  const challengerWallet = activeChallenge.rawData?.challenger || activeChallenge.challenger;
   const isChallenger = currentWallet && challengerWallet && challengerWallet.toLowerCase() === currentWallet.toLowerCase();
   
   // Check if creator can fund (status is creator_confirmation_required and deadline hasn't expired)
-  const creatorFundingDeadline = challenge.rawData?.creatorFundingDeadline || challenge.creatorFundingDeadline;
+  const creatorFundingDeadline = activeChallenge.rawData?.creatorFundingDeadline || activeChallenge.creatorFundingDeadline;
   const isDeadlineExpired = creatorFundingDeadline ? creatorFundingDeadline.toMillis() < Date.now() : false;
   
   // Get pending joiner info (needed for multiple checks below)
-  const pendingJoiner = challenge.rawData?.pendingJoiner || challenge.pendingJoiner;
+  const pendingJoiner = activeChallenge.rawData?.pendingJoiner || activeChallenge.pendingJoiner;
   const isAlreadyPendingJoiner = pendingJoiner && currentWallet && pendingJoiner.toLowerCase() === currentWallet.toLowerCase();
   
   const canCreatorFund = isCreator && status === 'creator_confirmation_required' && !isDeadlineExpired && onCreatorFund;
@@ -216,10 +250,10 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const canSubmitResult = status === 'active' && players.length >= 2 && isParticipant && !hasAlreadySubmitted;
   
   // Check if user won and can claim prize
-  const winner = challenge.rawData?.winner || challenge.winner;
+  const winner = activeChallenge.rawData?.winner || activeChallenge.winner;
   const userWon = currentWallet && winner && winner.toLowerCase() === currentWallet.toLowerCase();
   const canClaimPrize = status === 'completed' && userWon && isParticipant;
-  const prizeClaimed = challenge.rawData?.prizeClaimed || challenge.prizeClaimed;
+  const prizeClaimed = activeChallenge.rawData?.prizeClaimed || activeChallenge.prizeClaimed;
   
   // Get opponent wallet for display
   const opponentWallet = players.length >= 2 && currentWallet 
@@ -483,14 +517,14 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   }, [participants]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {/* Players & Spectators List - X Spaces style */}
-      <div className="rounded-xl border border-white/10 bg-black/40 p-4 backdrop-blur-sm">
-        <div className="mb-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-300 mb-2">
+      <div className="rounded-lg border border-white/10 bg-black/40 p-2.5 backdrop-blur-sm">
+        <div className="mb-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-300 mb-1.5">
             Participants ({participants.length})
           </h3>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {participants.map((wallet: string) => {
               const data = playerData[wallet.toLowerCase()] || {};
               const displayName = data.displayName || `${wallet.slice(0, 4)}...${wallet.slice(-4)}`;
@@ -499,25 +533,25 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
               return (
                 <div
                   key={wallet}
-                  className={`flex items-center gap-3 p-2 rounded-lg ${
+                  className={`flex items-center gap-2 p-1.5 rounded-md ${
                     isCurrentUser ? 'bg-amber-500/10 border border-amber-400/30' : 'bg-white/5'
                   }`}
                 >
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400/20 to-amber-600/20 border border-amber-400/30 flex items-center justify-center overflow-hidden">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400/20 to-amber-600/20 border border-amber-400/30 flex items-center justify-center overflow-hidden flex-shrink-0">
                     {data.profileImage ? (
                       <img src={data.profileImage} alt={displayName} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-amber-300 font-semibold text-sm">
+                      <span className="text-amber-300 font-semibold text-xs">
                         {displayName.charAt(0).toUpperCase()}
                       </span>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-white truncate">
+                    <div className="text-xs font-semibold text-white truncate">
                       {displayName}
-                      {isCurrentUser && <span className="ml-2 text-xs text-amber-300">(You)</span>}
+                      {isCurrentUser && <span className="ml-1.5 text-[10px] text-amber-300">(You)</span>}
                     </div>
-                    <div className="text-xs text-gray-400 truncate">
+                    <div className="text-[10px] text-gray-400 truncate">
                       {wallet.slice(0, 6)}...{wallet.slice(-4)}
                     </div>
                   </div>
@@ -529,11 +563,11 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         
         {/* Spectators Section - Just show count (cost-effective, no individual tracking) */}
         {spectatorCount > 0 && (
-          <div className="mt-4 pt-4 border-t border-white/5">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-2">
+          <div className="mt-2 pt-2 border-t border-white/5">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">
               Spectators ({spectatorCount})
             </h3>
-            <div className="text-xs text-gray-500 italic py-2">
+            <div className="text-[10px] text-gray-500 italic py-1">
               {spectatorCount} {spectatorCount === 1 ? 'person is' : 'people are'} watching
             </div>
           </div>
@@ -542,16 +576,16 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
       {/* Creator Fund Button - Show if creator needs to fund */}
       {canCreatorFund && (
-        <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4">
+        <div className="rounded-lg border border-amber-400/30 bg-amber-500/10 p-2.5">
           <div className="text-center">
-            <div className="text-sm font-semibold text-amber-200 mb-2">
+            <div className="text-xs font-semibold text-amber-200 mb-1.5">
               ✨ Confirm and Fund Challenge ✨
             </div>
-            <div className="text-xs text-amber-100/80 mb-3">
+            <div className="text-[10px] text-amber-100/80 mb-2">
               A challenger has expressed intent to join. Fund the escrow to lock them in.
             </div>
             {creatorFundingDeadline && (
-              <div className="text-xs text-amber-300/70 mb-3">
+              <div className="text-[10px] text-amber-300/70 mb-2">
                 Deadline: {(() => {
                   const now = Date.now();
                   const deadlineMs = creatorFundingDeadline.toMillis();
@@ -576,7 +610,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                 e.stopPropagation();
                 if (onCreatorFund) {
                   try {
-                    await onCreatorFund(challenge);
+                    await onCreatorFund(activeChallenge);
                   } catch (error: any) {
                     console.error('Failed to fund challenge:', error);
                     alert(error.message || 'Failed to fund challenge. Please try again.');
@@ -586,7 +620,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                   alert('Error: Funding handler not available. Please refresh the page.');
                 }
               }}
-              className="w-full rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white px-4 py-3 font-semibold transition-all shadow-[0_0_15px_rgba(245,158,11,0.5)] hover:shadow-[0_0_25px_rgba(245,158,11,0.7)] border border-amber-400/30"
+              className="w-full rounded-md bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white px-3 py-2 text-xs font-semibold transition-all shadow-[0_0_10px_rgba(245,158,11,0.4)] hover:shadow-[0_0_15px_rgba(245,158,11,0.6)] border border-amber-400/30"
             >
               Fund Challenge ({entryFee} USDFG + Network Fee)
             </button>
@@ -596,16 +630,16 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
       {/* Waiting message for joiner when creator needs to fund */}
       {!isCreator && status === 'creator_confirmation_required' && isAlreadyPendingJoiner && (
-        <div className="rounded-xl border border-blue-400/30 bg-blue-500/10 p-4">
+        <div className="rounded-lg border border-blue-400/30 bg-blue-500/10 p-2.5">
           <div className="text-center">
-            <div className="text-sm font-semibold text-blue-200 mb-2">
+            <div className="text-xs font-semibold text-blue-200 mb-1.5">
               ⏳ Waiting for Creator to Fund
             </div>
-            <div className="text-xs text-blue-100/80 mb-3">
+            <div className="text-[10px] text-blue-100/80 mb-2">
               You've expressed intent to join. The creator needs to fund the challenge to proceed.
             </div>
             {creatorFundingDeadline && (
-              <div className="text-xs text-blue-300/70 mb-3">
+              <div className="text-[10px] text-blue-300/70 mb-2">
                 Creator deadline: {(() => {
                   const now = Date.now();
                   const deadlineMs = creatorFundingDeadline.toMillis();
@@ -626,7 +660,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                 )}
               </div>
             )}
-            <div className="text-xs text-blue-100/60">
+            <div className="text-[10px] text-blue-100/60">
               Once the creator funds, you'll be able to fund your entry and start the match.
             </div>
           </div>
@@ -635,16 +669,16 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
       {/* Debug info for creator when status is creator_confirmation_required but button not showing */}
       {isCreator && status === 'creator_confirmation_required' && !canCreatorFund && !isDeadlineExpired && (
-        <div className="rounded-xl border border-yellow-400/30 bg-yellow-500/10 p-4">
+        <div className="rounded-lg border border-yellow-400/30 bg-yellow-500/10 p-2.5">
           <div className="text-center">
-            <div className="text-sm font-semibold text-yellow-200 mb-2">
+            <div className="text-xs font-semibold text-yellow-200 mb-1.5">
               ⚠️ Funding Button Not Available
             </div>
-            <div className="text-xs text-yellow-100/80 mb-2">
+            <div className="text-[10px] text-yellow-100/80 mb-1.5">
               Status: {status} | Deadline expired: {isDeadlineExpired ? 'Yes' : 'No'} | Handler: {onCreatorFund ? 'Available' : 'Missing'}
             </div>
             {!onCreatorFund && (
-              <div className="text-xs text-red-300 mt-2">
+              <div className="text-[10px] text-red-300 mt-1.5">
                 Error: Funding handler not available. Please refresh the page.
               </div>
             )}
@@ -654,18 +688,18 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
       {/* Deadline Expired Message for Creator */}
       {isCreator && status === 'creator_confirmation_required' && isDeadlineExpired && (
-        <div className="rounded-xl border border-red-400/30 bg-red-500/10 p-4 space-y-3">
+        <div className="rounded-lg border border-red-400/30 bg-red-500/10 p-2.5 space-y-2">
           <div className="text-center">
-            <div className="text-sm font-semibold text-red-200 mb-2">
-              ⚠️ Confirmation Deadline Expired
-            </div>
-            <div className="text-xs text-red-100/80 mb-3">
+          <div className="text-xs font-semibold text-red-200 mb-1.5">
+            ⚠️ Confirmation Deadline Expired
+          </div>
+          <div className="text-[10px] text-red-100/80 mb-2">
               The challenge has been reverted to waiting for opponent. You can now join as challenger or cancel the challenge.
-            </div>
+          </div>
           </div>
           
           {/* Action Buttons for Creator */}
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             {/* Join as Challenger Button */}
             {(canCreatorJoinAfterExpiry || canCreatorJoinPending) && (
               <button
@@ -681,14 +715,14 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                     }
                     // Then try to join
                     if (onJoinChallenge) {
-                      await onJoinChallenge(challenge);
+                      await onJoinChallenge(activeChallenge);
                     }
                   } catch (error: any) {
                     console.error('Failed to join challenge:', error);
                     alert(error.message || 'Failed to join challenge. Please try again.');
                   }
                 }}
-                className="w-full rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-2.5 font-semibold text-sm transition-all shadow-[0_0_15px_rgba(59,130,246,0.5)] hover:shadow-[0_0_25px_rgba(59,130,246,0.7)] border border-blue-400/30"
+                className="w-full rounded-md bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-3 py-2 text-xs font-semibold transition-all shadow-[0_0_10px_rgba(59,130,246,0.4)] hover:shadow-[0_0_15px_rgba(59,130,246,0.6)] border border-blue-400/30"
               >
                 Join as Challenger ({entryFee} USDFG + Network Fee)
               </button>
@@ -704,7 +738,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                   if (onCancelChallenge) {
                     if (confirm('Are you sure you want to cancel/delete this challenge? This action cannot be undone.')) {
                       try {
-                        await onCancelChallenge(challenge);
+                        await onCancelChallenge(activeChallenge);
                       } catch (error: any) {
                         console.error('Failed to cancel challenge:', error);
                         alert(error.message || 'Failed to cancel challenge. Please try again.');
@@ -712,7 +746,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                     }
                   }
                 }}
-                className="w-full rounded-lg bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-4 py-2.5 font-semibold text-sm transition-all shadow-[0_0_15px_rgba(239,68,68,0.5)] hover:shadow-[0_0_25px_rgba(239,68,68,0.7)] border border-red-400/30"
+                className="w-full rounded-md bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-3 py-2 text-xs font-semibold transition-all shadow-[0_0_10px_rgba(239,68,68,0.4)] hover:shadow-[0_0_15px_rgba(239,68,68,0.6)] border border-red-400/30"
               >
                 Cancel/Delete Challenge
               </button>
@@ -725,16 +759,16 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
       {/* Joiner Fund Button - Show if creator funded and joiner needs to fund */}
       {canJoinerFund && (
-        <div className="rounded-xl border border-green-400/30 bg-green-500/10 p-4">
+        <div className="rounded-lg border border-green-400/30 bg-green-500/10 p-2.5">
           <div className="text-center">
-            <div className="text-sm font-semibold text-green-200 mb-2">
+            <div className="text-xs font-semibold text-green-200 mb-1.5">
               ✨ Creator Funded - Time to Fund Your Entry ✨
             </div>
-            <div className="text-xs text-green-100/80 mb-3">
+            <div className="text-[10px] text-green-100/80 mb-2">
               The creator has funded their entry. Fund your entry to start the match.
-            </div>
+              </div>
             {joinerFundingDeadline && (
-              <div className="text-xs text-green-300/70 mb-3">
+              <div className="text-[10px] text-green-300/70 mb-2">
                 Deadline: {new Date(joinerFundingDeadline.toMillis()).toLocaleTimeString()}
               </div>
             )}
@@ -745,14 +779,14 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                 e.stopPropagation();
                 if (onJoinerFund) {
                   try {
-                    await onJoinerFund(challenge);
+                    await onJoinerFund(activeChallenge);
                   } catch (error: any) {
                     console.error('Failed to fund challenge:', error);
                     alert(error.message || 'Failed to fund challenge. Please try again.');
                   }
                 }
               }}
-              className="w-full rounded-lg bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-3 font-semibold transition-all shadow-[0_0_15px_rgba(34,197,94,0.5)] hover:shadow-[0_0_25px_rgba(34,197,94,0.7)] border border-green-400/30"
+              className="w-full rounded-md bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-3 py-2 text-xs font-semibold transition-all shadow-[0_0_10px_rgba(34,197,94,0.4)] hover:shadow-[0_0_15px_rgba(34,197,94,0.6)] border border-green-400/30"
             >
               Fund Challenge ({entryFee} USDFG + Network Fee)
             </button>
@@ -760,19 +794,53 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         </div>
       )}
 
+      {/* Creator Delete Button - Show when challenge is pending and creator is viewing */}
+      {isCreator && status === 'pending_waiting_for_opponent' && canCreatorCancel && (
+        <div className="rounded-lg border border-red-400/30 bg-red-500/10 p-2.5">
+          <div className="text-center">
+            <div className="text-xs font-semibold text-red-200 mb-1.5">
+              Your Challenge is Waiting for an Opponent
+            </div>
+            <div className="text-[10px] text-red-100/80 mb-2">
+              No one has joined yet. You can delete this challenge if you no longer want to wait.
+            </div>
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (onCancelChallenge) {
+                  if (confirm('Are you sure you want to delete this challenge? This action cannot be undone.')) {
+                    try {
+                      await onCancelChallenge(activeChallenge);
+                    } catch (error: any) {
+                      console.error('Failed to delete challenge:', error);
+                      alert(error.message || 'Failed to delete challenge. Please try again.');
+                    }
+                  }
+                }
+              }}
+              className="w-full rounded-md bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-3 py-2 text-xs font-semibold transition-all shadow-[0_0_10px_rgba(239,68,68,0.4)] hover:shadow-[0_0_15px_rgba(239,68,68,0.6)] border border-red-400/30"
+            >
+              🗑️ Delete Challenge
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Join Challenge Button - Show if user can join */}
       {canJoin && (
-        <div className="rounded-xl border border-blue-400/30 bg-blue-500/10 p-4">
+        <div className="rounded-lg border border-blue-400/30 bg-blue-500/10 p-2.5">
           <div className="text-center">
-            <div className="text-sm font-semibold text-blue-200 mb-2">
+            <div className="text-xs font-semibold text-blue-200 mb-1.5">
               Join this challenge to compete for {prizePool} USDFG
             </div>
             {(status === 'creator_confirmation_required' && isDeadlineExpired) ? (
-              <div className="text-xs text-blue-100/70 mb-3">
+              <div className="text-[10px] text-blue-100/70 mb-2">
                 ⚡ The previous challenger's deadline expired. You can join now!
               </div>
             ) : (
-              <div className="text-xs text-blue-100/70 mb-3">
+              <div className="text-[10px] text-blue-100/70 mb-2">
                 This challenge is open and waiting for an opponent.
               </div>
             )}
@@ -783,14 +851,14 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                 e.stopPropagation();
                 if (onJoinChallenge) {
                   try {
-                    await onJoinChallenge(challenge);
+                    await onJoinChallenge(activeChallenge);
                   } catch (error: any) {
                     console.error('Failed to join challenge:', error);
                     alert(error.message || 'Failed to join challenge. Please try again.');
                   }
                 }
               }}
-              className="w-full rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-3 font-semibold transition-all shadow-[0_0_15px_rgba(59,130,246,0.5)] hover:shadow-[0_0_25px_rgba(59,130,246,0.7)] border border-blue-400/30"
+              className="w-full rounded-md bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-3 py-2 text-xs font-semibold transition-all shadow-[0_0_10px_rgba(59,130,246,0.4)] hover:shadow-[0_0_15px_rgba(59,130,246,0.6)] border border-blue-400/30"
             >
               Join Challenge ({entryFee} USDFG + Network Fee)
             </button>
@@ -800,27 +868,27 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
       {/* Status Banner - Prominent display */}
       {status === 'active' && isParticipant && opponentWallet && (
-        <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">
-          <div className="text-xs uppercase tracking-widest text-amber-300 mb-2">
+        <div className="rounded-lg border border-amber-400/30 bg-amber-500/10 p-2.5 text-xs text-amber-100">
+          <div className="text-[10px] uppercase tracking-widest text-amber-300 mb-1.5">
             🎮 You're locked in
           </div>
-          <div className="text-base font-semibold text-white mb-1">
+          <div className="text-sm font-semibold text-white mb-1">
             Head-to-Head: {opponentWallet ? `${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}` : 'Waiting for opponent'}
           </div>
-          <p className="text-xs text-amber-100/80 mt-1">
+          <p className="text-[10px] text-amber-100/80 mt-0.5">
             Chat with your opponent and start the match. Submit results once you finish—the winner receives the challenge reward.
           </p>
         </div>
       )}
 
       {/* Challenge Header Card */}
-      <div className="rounded-xl border border-white/10 bg-black/40 p-4 backdrop-blur-sm">
-        <div className="flex items-start justify-between mb-4">
+      <div className="rounded-lg border border-white/10 bg-black/40 p-2.5 backdrop-blur-sm">
+        <div className="flex items-start justify-between mb-2">
           <div className="flex-1 min-w-0">
-            <h2 className="text-xl font-bold text-white mb-1 truncate">
+            <h2 className="text-base font-bold text-white mb-0.5 truncate">
               {challenge.title || `${game} ${mode}`}
             </h2>
-            <div className="flex items-center gap-2 text-sm text-gray-400 flex-wrap">
+            <div className="flex items-center gap-1.5 text-xs text-gray-400 flex-wrap">
               <span>{game}</span>
               <span>•</span>
               <span>{mode}</span>
@@ -838,14 +906,14 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         </div>
 
         {/* Status Card - Enhanced styling */}
-        <div className={`rounded-lg border p-3 mb-4 ${statusDisplay.bgClass} ${statusDisplay.borderClass}`}>
-          <div className="flex items-center gap-2">
-            <span className="text-xl">{statusDisplay.icon}</span>
+        <div className={`rounded-md border p-2 mb-2 ${statusDisplay.bgClass} ${statusDisplay.borderClass}`}>
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm">{statusDisplay.icon}</span>
             <div className="flex-1">
-              <div className={`text-xs uppercase tracking-widest ${statusDisplay.headerClass} mb-0.5`}>
+              <div className={`text-[10px] uppercase tracking-widest ${statusDisplay.headerClass} mb-0.5`}>
                 Status
               </div>
-              <div className={`text-sm font-semibold ${statusDisplay.textClass}`}>
+              <div className={`text-xs font-semibold ${statusDisplay.textClass}`}>
                 {statusDisplay.text}
               </div>
             </div>
@@ -853,22 +921,22 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         </div>
 
         {/* Challenge Details Grid */}
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div className="rounded-lg border border-white/5 bg-white/5 px-3 py-2">
-            <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">Challenge Amount</div>
-            <div className="text-white font-semibold">{entryFee} USDFG</div>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="rounded-md border border-white/5 bg-white/5 px-2 py-1.5">
+            <div className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Challenge Amount</div>
+            <div className="text-white font-semibold text-xs">{entryFee} USDFG</div>
           </div>
-          <div className="rounded-lg border border-white/5 bg-white/5 px-3 py-2">
-            <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">Challenge Reward</div>
-            <div className="text-white font-semibold">{prizePool} USDFG</div>
+          <div className="rounded-md border border-white/5 bg-white/5 px-2 py-1.5">
+            <div className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Challenge Reward</div>
+            <div className="text-white font-semibold text-xs">{prizePool} USDFG</div>
           </div>
-          <div className="rounded-lg border border-white/5 bg-white/5 px-3 py-2">
-            <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">Players</div>
+          <div className="rounded-md border border-white/5 bg-white/5 px-2 py-1.5">
+            <div className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Players</div>
             <div className="text-white font-semibold">{players.length}/2</div>
           </div>
-          <div className="rounded-lg border border-white/5 bg-white/5 px-3 py-2">
-            <div className="text-xs uppercase tracking-wide text-gray-400 mb-1">Format</div>
-            <div className="text-white font-semibold">Standard</div>
+          <div className="rounded-md border border-white/5 bg-white/5 px-2 py-1.5">
+            <div className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Format</div>
+            <div className="text-white font-semibold text-xs">Standard</div>
           </div>
         </div>
       </div>
@@ -882,7 +950,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
             e.stopPropagation();
             setShowSubmitForm(true);
           }}
-          className="relative w-full rounded-lg bg-amber-400/20 px-4 py-3 text-sm font-semibold text-amber-200 transition-all hover:bg-amber-400/30 hover:shadow-[0_0_12px_rgba(255,215,130,0.3)] border border-amber-400/40 cursor-pointer active:scale-[0.98]"
+          className="relative w-full rounded-md bg-amber-400/20 px-3 py-2 text-xs font-semibold text-amber-200 transition-all hover:bg-amber-400/30 hover:shadow-[0_0_8px_rgba(255,215,130,0.25)] border border-amber-400/40 cursor-pointer active:scale-[0.98]"
         >
           🏆 Submit Result
         </button>
@@ -890,11 +958,11 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
       {/* Show message if already submitted */}
       {hasAlreadySubmitted && status === 'active' && isParticipant && (
-        <div className="rounded-xl border border-green-400/30 bg-green-500/10 p-4 text-center text-sm text-green-100">
-          <div className="text-base font-semibold text-white mb-1">
+        <div className="rounded-lg border border-green-400/30 bg-green-500/10 p-2.5 text-center text-xs text-green-100">
+          <div className="text-sm font-semibold text-white mb-0.5">
             ✅ Result Submitted
           </div>
-          <p className="text-xs text-green-100/80 mt-1">
+          <p className="text-[10px] text-green-100/80 mt-0.5">
             You have already submitted your result. Waiting for opponent...
           </p>
         </div>
@@ -902,9 +970,9 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
       {/* Submit Result Form - Inline in lobby */}
       {canSubmitResult && showSubmitForm && !hasAlreadySubmitted && (
-        <div className="rounded-xl border border-amber-400/30 bg-gradient-to-br from-gray-900/95 via-amber-900/10 to-gray-900/95 p-4 space-y-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+        <div className="rounded-lg border border-amber-400/30 bg-gradient-to-br from-gray-900/95 via-amber-900/10 to-gray-900/95 p-2.5 space-y-2">
+          <div className="flex items-center justify-between mb-1.5">
+            <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
               🏆 Submit Result
             </h3>
             <button
@@ -914,27 +982,27 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                 setProofImage(null);
                 setProofFile(null);
               }}
-              className="text-gray-400 hover:text-white transition-colors p-1"
+              className="text-gray-400 hover:text-white transition-colors p-0.5"
               title="Cancel"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
           {/* Result Selection */}
           <div>
-            <div className="bg-gradient-to-r from-amber-500/5 to-amber-600/5 border border-amber-500/20 rounded-lg p-2 mb-3">
-              <p className="text-sm font-semibold text-white text-center">
+            <div className="bg-gradient-to-r from-amber-500/5 to-amber-600/5 border border-amber-500/20 rounded-md p-1.5 mb-2">
+              <p className="text-xs font-semibold text-white text-center">
                 Did you win this match?
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-1.5">
               <button
                 onClick={() => setSelectedResult(true)}
                 disabled={isLoading || isSubmitting}
                 className={`
-                  relative overflow-hidden p-3 rounded-lg border transition-all duration-200
+                  relative overflow-hidden p-2 rounded-md border transition-all duration-200
                   disabled:opacity-50 disabled:cursor-not-allowed
                   ${
                     selectedResult === true
@@ -944,13 +1012,13 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                 `}
               >
                 <div className="text-center">
-                  <div className="text-2xl mb-1">🏆</div>
-                  <p className="text-sm font-bold text-white">YES</p>
-                  <p className="text-xs text-gray-400 mt-0.5">I won</p>
+                  <div className="text-xl mb-0.5">🏆</div>
+                  <p className="text-xs font-bold text-white">YES</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">I won</p>
                 </div>
                 {selectedResult === true && (
-                  <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-                    <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="absolute top-1 right-1 w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
+                    <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
@@ -961,7 +1029,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                 onClick={() => setSelectedResult(false)}
                 disabled={isLoading || isSubmitting}
                 className={`
-                  relative overflow-hidden p-3 rounded-lg border transition-all duration-200
+                  relative overflow-hidden p-2 rounded-md border transition-all duration-200
                   disabled:opacity-50 disabled:cursor-not-allowed
                   ${
                     selectedResult === false
@@ -971,13 +1039,13 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                 `}
               >
                 <div className="text-center">
-                  <div className="text-2xl mb-1">😔</div>
-                  <p className="text-sm font-bold text-white">NO</p>
-                  <p className="text-xs text-gray-400 mt-0.5">I lost</p>
+                  <div className="text-xl mb-0.5">😔</div>
+                  <p className="text-xs font-bold text-white">NO</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">I lost</p>
                 </div>
                 {selectedResult === false && (
-                  <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
-                    <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
+                    <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
@@ -1010,9 +1078,9 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-gradient-to-r from-amber-600/90 to-amber-700/90 hover:from-amber-700 hover:to-amber-800 text-white rounded-lg transition-all text-xs font-medium"
+                      className="flex items-center justify-center gap-1 px-2 py-1.5 bg-gradient-to-r from-amber-600/90 to-amber-700/90 hover:from-amber-700 hover:to-amber-800 text-white rounded-md transition-all text-[10px] font-medium"
                     >
-                      <Camera className="w-3.5 h-3.5" />
+                      <Camera className="w-3 h-3" />
                       <span>Take Photo</span>
                     </button>
 
@@ -1024,14 +1092,14 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                           fileInputRef.current.click();
                         }
                       }}
-                      className="flex items-center justify-center gap-1.5 px-2 py-1.5 bg-amber-700/90 hover:bg-amber-800 text-white rounded-lg transition-all text-xs font-medium"
+                      className="flex items-center justify-center gap-1 px-2 py-1.5 bg-amber-700/90 hover:bg-amber-800 text-white rounded-md transition-all text-[10px] font-medium"
                     >
-                      <Upload className="w-3.5 h-3.5" />
+                      <Upload className="w-3 h-3" />
                       <span>Upload</span>
                     </button>
                   </div>
 
-                  <p className="text-xs text-gray-400 text-center mt-1.5">
+                  <p className="text-[10px] text-gray-400 text-center mt-1">
                     Screenshot of victory screen or match result
                   </p>
                 </div>
@@ -1040,17 +1108,17 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                   <img
                     src={proofImage}
                     alt="Proof"
-                    className="w-full h-32 object-cover rounded-lg"
+                    className="w-full h-24 object-cover rounded-md"
                   />
                   <button
                     type="button"
                     onClick={removeImage}
-                    className="absolute top-1.5 right-1.5 p-1.5 bg-red-600/90 hover:bg-red-700 rounded-full text-white transition-all"
+                    className="absolute top-1 right-1 p-1 bg-red-600/90 hover:bg-red-700 rounded-full text-white transition-all"
                   >
-                    <X className="w-3 h-3" />
+                    <X className="w-2.5 h-2.5" />
                   </button>
-                  <div className="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 bg-green-600/90 rounded text-xs text-white flex items-center gap-1">
-                    <ImageIcon className="w-2.5 h-2.5" />
+                  <div className="absolute bottom-1 left-1 px-1 py-0.5 bg-green-600/90 rounded text-[10px] text-white flex items-center gap-0.5">
+                    <ImageIcon className="w-2 h-2" />
                     Proof uploaded
                   </div>
                 </div>
@@ -1059,8 +1127,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           )}
 
           {/* Info Box */}
-          <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-2">
-            <p className="text-xs text-blue-300 text-center">
+          <div className="bg-blue-500/5 border border-blue-500/20 rounded-md p-1.5">
+            <p className="text-[10px] text-blue-300 text-center">
               ⏰ Your opponent has 2 hours to submit their result
             </p>
           </div>
@@ -1070,7 +1138,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
             onClick={handleSubmit}
             disabled={selectedResult === null || isLoading || isSubmitting || hasAlreadySubmitted}
             className={`
-              w-full py-2 rounded-lg font-semibold text-sm transition-all duration-200 border
+              w-full py-1.5 rounded-md font-semibold text-xs transition-all duration-200 border
               disabled:opacity-50 disabled:cursor-not-allowed
               ${
                 selectedResult !== null
@@ -1081,7 +1149,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           >
             {isLoading || isSubmitting ? (
               <span className="flex items-center justify-center gap-1.5">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <Loader2 className="w-3 h-3 animate-spin" />
                 Submitting...
               </span>
             ) : (
@@ -1090,7 +1158,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           </button>
 
           {/* Warning */}
-          <p className="text-xs text-gray-500 text-center">
+          <p className="text-[10px] text-gray-500 text-center">
             ⚠️ Results are final and cannot be changed after submission
           </p>
         </div>
@@ -1098,28 +1166,28 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
       {/* Prize Claiming Section - Show when challenge is completed and user won */}
       {canClaimPrize && !prizeClaimed && (
-        <div className="rounded-xl border border-emerald-400/30 bg-gradient-to-br from-emerald-500/10 to-green-500/10 p-4 space-y-3">
+        <div className="rounded-lg border border-emerald-400/30 bg-gradient-to-br from-emerald-500/10 to-green-500/10 p-2.5 space-y-2">
           <div className="text-center">
-            <div className="text-3xl mb-2">🏆</div>
-            <h3 className="text-lg font-bold text-emerald-200 mb-1">You Won!</h3>
-            <p className="text-sm text-emerald-100/80 mb-3">
+            <div className="text-2xl mb-1.5">🏆</div>
+            <h3 className="text-sm font-bold text-emerald-200 mb-1">You Won!</h3>
+            <p className="text-xs text-emerald-100/80 mb-2">
               Claim your prize of <span className="font-semibold text-white">{prizePool} USDFG</span>
             </p>
             <button
               type="button"
               onClick={async () => {
                 try {
-                  await onClaimPrize(challenge);
+                  await onClaimPrize(activeChallenge);
                 } catch (error) {
                   console.error('Error claiming prize:', error);
                 }
               }}
               disabled={isClaiming}
-              className="w-full rounded-lg bg-gradient-to-r from-emerald-500/90 to-green-500/90 hover:from-emerald-600 hover:to-green-600 text-white px-4 py-3 font-semibold transition-all shadow-[0_0_20px_rgba(34,197,94,0.3)] border border-emerald-400/30 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full rounded-md bg-gradient-to-r from-emerald-500/90 to-green-500/90 hover:from-emerald-600 hover:to-green-600 text-white px-3 py-2 text-xs font-semibold transition-all shadow-[0_0_10px_rgba(34,197,94,0.25)] border border-emerald-400/30 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isClaiming ? (
-                <span className="flex items-center justify-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="flex items-center justify-center gap-1.5">
+                  <Loader2 className="w-3 h-3 animate-spin" />
                   Claiming Prize...
                 </span>
               ) : (
@@ -1132,9 +1200,9 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
       {/* Prize Claimed Message */}
       {canClaimPrize && prizeClaimed && (
-        <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-center">
-          <div className="text-2xl mb-2">✅</div>
-          <p className="text-sm font-semibold text-emerald-200">
+        <div className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 p-2.5 text-center">
+          <div className="text-xl mb-1.5">✅</div>
+          <p className="text-xs font-semibold text-emerald-200">
             Prize claimed! Check your wallet for {prizePool} USDFG
           </p>
         </div>
@@ -1142,8 +1210,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
       {/* Status message when can't submit or claim */}
       {!canSubmitResult && !canClaimPrize && (
-        <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-center">
-          <div className="text-xs text-gray-400">
+        <div className="rounded-lg border border-white/10 bg-white/5 p-2 text-center">
+          <div className="text-[10px] text-gray-400">
             {status !== 'active' && status !== 'completed' && `Status: ${statusDisplay.text}`}
             {status === 'active' && players.length < 2 && 'Waiting for players to join...'}
             {status === 'active' && players.length >= 2 && !currentWallet && 'Connect wallet to submit results'}
@@ -1167,7 +1235,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         {/* Match Chat - First */}
         <div className="rounded-lg border border-white/10 bg-black/40 p-2 backdrop-blur-sm">
           <ChatBox 
-            challengeId={challenge.id} 
+            challengeId={activeChallenge.id} 
             currentWallet={currentWallet || ""} 
             status={status}
             platform={platform}
@@ -1180,7 +1248,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-300/80">
             Voice Room
           </div>
-          <VoiceChat challengeId={challenge.id} currentWallet={currentWallet || ""} />
+          <VoiceChat challengeId={voiceChatChallengeId} currentWallet={voiceChatCurrentWallet} />
         </div>
       </div>
     </div>

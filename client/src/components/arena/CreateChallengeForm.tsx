@@ -159,6 +159,9 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     'F1 2023': ['Best Lap Time', '1v1 Race to Finish', 'Tournament (Bracket Mode)', 'Custom Challenge'],
     'Mario Kart': ['Best Lap Time', '1v1 Race to Finish', 'Tournament (Bracket Mode)', 'Custom Challenge'],
     'Gran Turismo 7': ['Best Lap Time', '1v1 Race to Finish', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Forza Horizon 5': ['Time Trial', 'Head-to-Head Race', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Forza Horizon': ['Time Trial', 'Head-to-Head Race', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Forza Motorsport': ['Time Trial', 'Head-to-Head Race', 'Tournament (Bracket Mode)', 'Custom Challenge'],
     'Mortal Kombat 1': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Tournament (Bracket Mode)', 'Custom Challenge'],
     'Street Fighter 6': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Tournament (Bracket Mode)', 'Custom Challenge'],
     'Tekken 8': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Tournament (Bracket Mode)', 'Custom Challenge'],
@@ -178,6 +181,8 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
       // Racing modes
       'Best Lap Time': 'Race against the clock to set the fastest lap time. Precision and speed matter most.',
       '1v1 Race to Finish': 'Direct head-to-head racing competition. Pure speed and skill determine the winner.',
+      'Time Trial': 'Race against the clock to set the fastest lap time. Precision and speed matter most.',
+      'Head-to-Head Race': 'Direct head-to-head racing competition. First player to cross the finish line wins. No shortcuts or exploits allowed.',
       
       // Fighting modes
       'Best of 3': 'Tournament-style series where first to win 2 games advances. High stakes, high rewards.',
@@ -217,6 +222,10 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
       rules = '• Race against clock\n• Best time wins\n• No collisions\n• Precision required';
     } else if (mode === '1v1 Race to Finish') {
       rules = '• Direct head-to-head racing\n• No assists\n• Pure speed and skill\n• The winner claims the challenge reward';
+    } else if (mode === 'Time Trial') {
+      rules = '• Race against clock\n• Best time wins\n• No collisions\n• Precision required';
+    } else if (mode === 'Head-to-Head Race') {
+      rules = '• Direct head-to-head racing\n• First to cross the finish line wins\n• No shortcuts, exploits, or glitches\n• Standard race settings only\n• The winner claims the challenge reward';
     } else if (mode === 'Best of 3') {
       rules = '• First to win 2 games\n• No breaks between games\n• Standard settings\n• Winner advances';
     } else if (mode === 'Mirror Match') {
@@ -642,12 +651,15 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                 <div className="mt-1.5 pt-1.5 border-t border-zinc-700/50">
                   <ElegantButton
                     onClick={handleAutoRules}
-                    variant="secondary"
+                    variant="warning"
                     size="sm"
-                    className="text-xs px-2 py-1"
+                    className="text-xs px-3 py-1.5 font-semibold hover:scale-105 active:scale-95 transition-all shadow-lg hover:shadow-xl hover:brightness-110"
                   >
-                    Auto-Generate Rules
+                    ✨ Auto-Generate Rules
                   </ElegantButton>
+                  <p className="text-[10px] text-amber-300/70 mt-1 text-center">
+                    Click to instantly generate rules for this mode
+                  </p>
                 </div>
               </div>
             </div>
