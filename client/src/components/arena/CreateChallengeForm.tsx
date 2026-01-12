@@ -37,12 +37,23 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
   // Use the most reliable connection state (adapter > hook > prop)
   const isConnected = adapterConnected || walletConnected || propIsConnected || !!adapterPublicKey;
   
+  // Get first preset mode for the default game
+  const getFirstPresetMode = (game: string) => {
+    const modes = gameModes[game as keyof typeof gameModes];
+    if (modes && modes.length > 0) {
+      // Filter out 'Tournament (Bracket Mode)' and 'Custom Challenge', return first preset
+      const presetModes = modes.filter(mode => mode !== 'Tournament (Bracket Mode)' && mode !== 'Custom Challenge');
+      return presetModes[0] || 'Full Match';
+    }
+    return 'Full Match';
+  };
+
   const [formData, setFormData] = useState({
-    game: 'NBA 2K25',
+    game: 'NBA 2K26',
     platform: 'PS5',
     username: userGamerTag || '',
     entryFee: 50,
-    mode: 'Head-to-Head',
+    mode: getFirstPresetMode('NBA 2K26'), // Use first preset mode (Full Match) instead of 'Head-to-Head'
     customMode: '',
     customGame: '', // Custom game name when "Custom" is selected
     customPlatform: '', // Custom platform name when "Other/Custom" is selected
@@ -202,7 +213,16 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
   };
 
   const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value };
+      
+      // When game changes, update mode to first preset mode for that game
+      if (field === 'game') {
+        updated.mode = getFirstPresetMode(value);
+      }
+      
+      return updated;
+    });
     if (attemptedNext) {
       setValidationErrors([]);
     }
@@ -657,9 +677,6 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                   >
                     ✨ Auto-Generate Rules
                   </ElegantButton>
-                  <p className="text-[10px] text-amber-300/70 mt-1 text-center">
-                    Click to instantly generate rules for this mode
-                  </p>
                 </div>
               </div>
             </div>

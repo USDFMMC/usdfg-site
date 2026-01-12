@@ -1652,7 +1652,8 @@ export const submitChallengeResult = async (
 
     console.log('✅ Result submitted:', { challengeId, wallet, didWin });
 
-    // NEW: If player submitted "I lost", automatically mark opponent as winner
+    // CRITICAL FIX: Only auto-determine winner if player submitted "I lost"
+    // If player claims "I won", we MUST wait for opponent to submit
     if (!didWin && data.players && data.players.length === 2) {
       const opponentWallet = data.players.find((p: string) => p !== wallet);
       
@@ -1682,13 +1683,28 @@ export const submitChallengeResult = async (
       }
     }
 
-    // Check if both players have submitted
-    if (Object.keys(results).length === data.maxPlayers) {
-      console.log('🎯 Both players submitted! Determining winner...');
-      // Re-fetch the updated data to pass to determineWinner
-      const updatedSnap = await getDoc(challengeRef);
-      const updatedData = updatedSnap.data() as ChallengeData;
-      await determineWinner(challengeId, updatedData);
+    // CRITICAL FIX: Re-fetch from Firestore to get the actual current state
+    // Don't use local results object - it might be stale
+    const updatedSnap = await getDoc(challengeRef);
+    const updatedData = updatedSnap.data() as ChallengeData;
+    const currentResults = updatedData.results || {};
+    const currentPlayers = updatedData.players || [];
+    
+    // Only determine winner if BOTH players have actually submitted
+    // This prevents the exploit where first player to claim win gets rewarded immediately
+    const submittedPlayers = Object.keys(currentResults);
+    if (submittedPlayers.length === currentPlayers.length && currentPlayers.length === 2) {
+      // Verify both players in the challenge have submitted
+      const bothSubmitted = currentPlayers.every((p: string) => currentResults[p] !== undefined);
+      
+      if (bothSubmitted) {
+        console.log('🎯 Both players submitted! Determining winner...');
+        await determineWinner(challengeId, updatedData);
+      } else {
+        console.log('⏳ Waiting for opponent to submit result...');
+      }
+    } else {
+      console.log('⏳ Waiting for opponent to submit result...');
     }
   } catch (error) {
     console.error('❌ Error submitting result:', error);

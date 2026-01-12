@@ -45,9 +45,18 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   // Real-time challenge data - ensures button visibility updates immediately
   const [liveChallenge, setLiveChallenge] = useState<any>(challenge);
   
+  // Initialize liveChallenge immediately when challenge prop changes (for faster button visibility)
+  useEffect(() => {
+    if (challenge) {
+      setLiveChallenge(challenge);
+    }
+  }, [challenge]);
+  
   // Listen to real-time challenge updates to ensure button visibility is always accurate
   useEffect(() => {
-    if (!challenge?.id) return;
+    if (!challenge?.id) {
+      return;
+    }
     
     const challengeRef = doc(db, 'challenges', challenge.id);
     const unsubscribe = onSnapshot(
@@ -56,10 +65,13 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         if (snapshot.exists()) {
           const updatedData = { id: snapshot.id, ...snapshot.data(), rawData: snapshot.data() };
           setLiveChallenge(updatedData);
+        } else {
+          // If document doesn't exist, fallback to prop
+          setLiveChallenge(challenge);
         }
       },
       (error) => {
-        // Non-critical error - just log it
+        // Non-critical error - don't update on error, keep current state
         if (error.code !== 'permission-denied' && error.code !== 'unavailable') {
           console.error('Error listening to challenge updates:', error);
         }
@@ -86,7 +98,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const voiceChatCurrentWallet = useMemo(() => currentWallet || "", [currentWallet]);
 
   // Check if user already submitted result (moved up for use in handleSubmit)
-  const results = challenge.rawData?.results || challenge.results || {};
+  const results = activeChallenge.rawData?.results || activeChallenge.results || {};
   const userResult = currentWallet ? results[currentWallet.toLowerCase()] : null;
   const hasAlreadySubmitted = !!userResult;
 
