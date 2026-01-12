@@ -75,18 +75,18 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     const defaultMode = gameModes[defaultGame as keyof typeof gameModes]?.[0] || 'Full Match';
     return {
       game: defaultGame,
-      platform: 'PS5',
-      username: userGamerTag || '',
-      entryFee: 50,
+    platform: 'PS5',
+    username: userGamerTag || '',
+    entryFee: 50,
       mode: defaultMode, // Use first preset mode (Full Match) instead of 'Head-to-Head'
-      customMode: '',
-      customGame: '', // Custom game name when "Custom" is selected
-      customPlatform: '', // Custom platform name when "Other/Custom" is selected
-      rules: '',
-      customRules: false,
-      challengeType: 'solo' as 'solo' | 'team' | 'tournament', // Toggle between solo, team, and tournament challenge
-      teamOnly: false, // For team challenges: true = only teams can accept, false = open to anyone
-      tournamentMaxPlayers: 8 as 4 | 8 | 16,
+    customMode: '',
+    customGame: '', // Custom game name when "Custom" is selected
+    customPlatform: '', // Custom platform name when "Other/Custom" is selected
+    rules: '',
+    customRules: false,
+    challengeType: 'solo' as 'solo' | 'team' | 'tournament', // Toggle between solo, team, and tournament challenge
+    teamOnly: false, // For team challenges: true = only teams can accept, false = open to anyone
+    tournamentMaxPlayers: 8 as 4 | 8 | 16,
     };
   });
 

@@ -2576,25 +2576,25 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       }
       
     try {
-      const walletAddr = publicKey.toString();
+    const walletAddr = publicKey.toString();
       
       // Get challenge data once (avoid redundant checks)
-      const challengePDA = challenge.rawData?.pda || challenge.pda;
+    const challengePDA = challenge.rawData?.pda || challenge.pda;
       const currentStatus = challenge.status || challenge.rawData?.status;
-      const pendingJoiner = challenge.rawData?.pendingJoiner || challenge.pendingJoiner;
+    const pendingJoiner = challenge.rawData?.pendingJoiner || challenge.pendingJoiner;
       const creatorFundingDeadline = challenge.rawData?.creatorFundingDeadline || challenge.creatorFundingDeadline;
       const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
-      const isAlreadyPendingJoiner = pendingJoiner && pendingJoiner.toLowerCase() === walletAddr.toLowerCase();
-      
+    const isAlreadyPendingJoiner = pendingJoiner && pendingJoiner.toLowerCase() === walletAddr.toLowerCase();
+    
       // If user is already a pending joiner, confirm and return (no fee needed!)
       if (isAlreadyPendingJoiner) {
         // If deadline expired, tell user to wait for revert
         if (isDeadlineExpired) {
           alert('⚠️ Confirmation deadline expired. The challenge will automatically revert to open status soon. Please wait a moment and try joining again.');
           setShowDetailSheet(false);
-          return;
-        }
-        
+      return;
+    }
+
         // User already expressed intent in Firestore - no on-chain call needed (saves fees!)
         // On-chain will sync when creator funds
         alert('✅ You have already expressed intent to join this challenge. Waiting for creator to fund.');
@@ -2628,8 +2628,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         // Founder Challenge - express intent in Firestore only
         await expressJoinIntent(challenge.id, walletAddr, true);
         alert('✅ Join intent expressed! Waiting for creator to confirm.');
-            setShowDetailSheet(false);
-            return;
+        setShowDetailSheet(false);
+        return;
       }
       
       // JOIN INTENT: Firestore only (NO SOLANA FEE!)
@@ -2641,11 +2641,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         await expressJoinIntent(challenge.id, walletAddr);
         // Firestore update completes instantly - real-time listener updates UI immediately
         // Creator sees "Fund Challenge" button appear right away
-        alert('✅ Join intent expressed! Creator can now fund the challenge.');
-      } else {
+            alert('✅ Join intent expressed! Creator can now fund the challenge.');
+          } else {
         // Already expressed intent - just confirm
         alert('✅ You have already expressed intent to join this challenge. Waiting for creator to fund.');
-      }
+            }
       
       // NO ON-CHAIN CALL FOR JOIN INTENT - saves users Solana fees!
       // On-chain express intent will happen when creator funds, or can be done later if needed

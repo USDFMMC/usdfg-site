@@ -58,7 +58,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWall
       // Only cleanup if challengeId actually changed
       if (currentChallengeIdRef.current !== memoizedChallengeId) {
         // Removed cleanup logging - excessive logging removed
-        cleanup();
+      cleanup();
         initializedRef.current = false;
         currentChallengeIdRef.current = '';
         initInProgressRef.current = false;

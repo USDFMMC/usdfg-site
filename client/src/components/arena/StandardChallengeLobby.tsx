@@ -264,6 +264,20 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   
   const canCreatorFund = isCreator && status === 'creator_confirmation_required' && !isDeadlineExpired && onCreatorFund;
   
+  // Debug logging for creator fund button (temporary - remove after confirming fix)
+  if (isCreator && process.env.NODE_ENV === 'development') {
+    console.log('🔍 Creator Fund Button Debug:', {
+      isCreator,
+      status,
+      isDeadlineExpired,
+      hasOnCreatorFund: !!onCreatorFund,
+      pendingJoiner: pendingJoinerWallet,
+      canCreatorFund,
+      liveChallengeStatus: liveChallenge?.status || liveChallenge?.rawData?.status,
+      propChallengeStatus: challenge?.status || challenge?.rawData?.status
+    });
+  }
+  
   // Debug logging disabled to reduce console spam
   // Uncomment only when debugging specific issues
   // if (status === 'creator_confirmation_required' && process.env.NODE_ENV === 'development') {

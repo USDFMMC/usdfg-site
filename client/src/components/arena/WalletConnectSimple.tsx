@@ -514,12 +514,12 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     
     // Compact mode for mobile - same design, green colors, horizontal layout
     if (compact) {
-      return (
+        return (
         <div className="flex items-center gap-2">
           {/* Balances - compact inline */}
           {(usdfgBalance !== null || balance !== null) && (
             <div className="text-right hidden xs:block">
-              {usdfgBalance !== null && (
+            {usdfgBalance !== null && (
                 <div className="text-[10px] text-cyan-400 font-semibold leading-tight">
                   {usdfgBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} USDFG
                 </div>
@@ -529,10 +529,10 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
                   {balance.toFixed(2)} SOL
                 </div>
               )}
-            </div>
-          )}
+              </div>
+            )}
           <button
-            onClick={handleDisconnect}
+              onClick={handleDisconnect}
             className="px-2.5 py-1.5 bg-gradient-to-r from-green-500/20 to-emerald-600/20 text-green-300 font-light tracking-wide rounded-md hover:from-green-500/30 hover:to-emerald-600/30 transition-all border border-green-500/50 shadow-sm shadow-green-500/10 text-xs backdrop-blur-sm touch-manipulation whitespace-nowrap"
             style={{ 
               touchAction: 'manipulation',
@@ -541,8 +541,8 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           >
             {shortAddress}
           </button>
-        </div>
-      );
+          </div>
+        );
     }
     
     // Full mode for desktop - same design, green colors, with balances
@@ -554,7 +554,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
             {usdfgBalance !== null ? `${usdfgBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} USDFG` : "Loading..."}
           </div>
           <div className="text-gray-400 text-[10px] leading-tight">
-            {balance !== null ? `${balance.toFixed(4)} SOL` : "Loading..."}
+                {balance !== null ? `${balance.toFixed(4)} SOL` : "Loading..."}
           </div>
         </div>
         {/* Wallet address button */}
@@ -571,7 +571,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       </div>
     );
   }
-  
+
   // Disconnected state - original amber design
   return (
     <div className="flex flex-col space-y-2">

@@ -248,12 +248,12 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
                     <ChevronUp className="w-4 h-4 text-gray-400 rotate-180" />
                   </button>
                 )}
-                <button
-                  onClick={onClose}
-                  className="p-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors duration-300"
-                >
-                  <X className="w-4 h-4 text-gray-400" />
-                </button>
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors duration-300"
+              >
+                <X className="w-4 h-4 text-gray-400" />
+              </button>
               </div>
             </div>
           </div>
