@@ -882,11 +882,15 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
             </div>
             {(status === 'creator_confirmation_required' && isDeadlineExpired) ? (
               <div className="text-[10px] text-blue-100/70 mb-2">
-                ⚡ The previous challenger's deadline expired. You can join now!
+                ⚡ The previous challenger's deadline expired. First to join wins!
+              </div>
+            ) : (status === 'creator_confirmation_required' && !isDeadlineExpired) ? (
+              <div className="text-[10px] text-blue-100/70 mb-2">
+                ⚡ Someone expressed intent, but you can still try! First transaction wins (first-come-first-served).
               </div>
             ) : (
               <div className="text-[10px] text-blue-100/70 mb-2">
-                This challenge is open and waiting for an opponent.
+                This challenge is open and waiting for an opponent. First to join wins!
               </div>
             )}
             <button
