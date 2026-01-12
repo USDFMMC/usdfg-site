@@ -1,26 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
-import { X, Menu } from "lucide-react";
-import { lockBodyScroll, unlockBodyScroll } from "@/lib/ui/scrollLock";
 
 const Navbar: React.FC = () => {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen((prev) => !prev);
-  };
-
-  useEffect(() => {
-    if (mobileMenuOpen) {
-      lockBodyScroll();
-    } else {
-      unlockBodyScroll();
-    }
-
-    return () => {
-      unlockBodyScroll();
-    };
-  }, [mobileMenuOpen]);
 
   return (
     <>
@@ -52,52 +33,14 @@ const Navbar: React.FC = () => {
             </span>
           </Link>
 
-          {/* Mobile "Enter the Arena" Button - Always Visible */}
-          <Link to="/app" className="lg:hidden">
-            <button className="elite-btn neocore-button px-4 py-2 text-sm text-amber-300 hover:text-amber-200">
-              <span role="img" aria-label="controller">🎮</span> Enter Arena
-            </button>
-          </Link>
-
-          {/* Mobile Menu Button - Hidden (no longer needed but keeping for future links) */}
-          <button
-            onClick={toggleMobileMenu}
-            className="hidden p-2 rounded-md text-muted-foreground hover:text-primary focus:outline-none"
-            aria-label="Toggle menu"
-          >
-            <Menu className="w-6 h-6" />
-          </button>
-
-          {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center space-x-6" role="navigation" aria-label="Main Navigation">
+          {/* Navigation - "Enter the Arena" Button */}
+          <nav className="flex items-center space-x-6" role="navigation" aria-label="Main Navigation">
             <Link to="/app">
-              <button className="elite-btn neocore-button px-5 py-2 text-amber-300 hover:text-amber-200">
-                <span role="img" aria-label="controller">🎮</span> Enter the Arena
+              <button className="elite-btn neocore-button px-4 py-2 text-sm lg:px-5 lg:py-2 text-amber-300 hover:text-amber-200">
+                <span role="img" aria-label="controller">🎮</span> <span className="hidden sm:inline">Enter the Arena</span><span className="sm:hidden">Enter Arena</span>
               </button>
             </Link>
           </nav>
-
-          {/* Mobile Navigation */}
-          {mobileMenuOpen && (
-            <div className="fixed inset-0 bg-black/95 z-50 lg:hidden">
-              <div className="container mx-auto px-4 pt-20 pb-8">
-                <button
-                  onClick={toggleMobileMenu}
-                  className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-primary"
-                  aria-label="Close menu"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-                <nav className="flex flex-col space-y-4">
-                  <Link to="/app" onClick={toggleMobileMenu}>
-                    <button className="elite-btn neocore-button w-full px-5 py-2 text-amber-300 hover:text-amber-200">
-                      <span role="img" aria-label="controller">🎮</span> Enter the Arena
-                    </button>
-                  </Link>
-                </nav>
-              </div>
-            </div>
-          )}
         </div>
       </header>
     </>
