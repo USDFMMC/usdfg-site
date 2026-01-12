@@ -5967,13 +5967,20 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           const creator = selectedChallenge.creator || selectedChallenge.rawData?.creator;
           
           // Build comprehensive players list: creator, challenger, pending joiner, and confirmed players
+          // CRITICAL: Always include creator first (even if players array is empty) to ensure minimized header shows
           const allPlayersSet = new Set<string>();
-          if (creator) allPlayersSet.add(creator);
+          if (creator) allPlayersSet.add(creator); // Always add creator first
           if (challenger) allPlayersSet.add(challenger);
           if (pendingJoiner) allPlayersSet.add(pendingJoiner);
           challengePlayers.forEach((p: string) => allPlayersSet.add(p));
           
+          // Ensure we always have at least the creator (challenge always has a creator)
           const allPlayers = Array.from(allPlayersSet).map((wallet: string) => ({ wallet }));
+          
+          // Fallback: if somehow no players, use creator as fallback (should never happen, but safety check)
+          if (allPlayers.length === 0 && creator) {
+            allPlayers.push({ wallet: creator });
+          }
           const gameName = selectedChallenge.game || selectedChallenge.rawData?.game || 'Challenge';
           
           return (

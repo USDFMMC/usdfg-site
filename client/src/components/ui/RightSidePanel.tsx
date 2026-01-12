@@ -86,10 +86,17 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
   // Auto-minimize on mobile when panel opens (as soon as challenge is created)
   // Show minimized view immediately for better UX (like X/Twitter)
   useEffect(() => {
-    if (isOpen && isMobile && safePlayers.length >= 1) {
-      // Show minimized view immediately (no delay) for consistent visibility
-      setIsMinimized(true);
-    } else if (!isOpen || !isMobile || safePlayers.length < 1) {
+    if (isOpen && isMobile) {
+      // Always show minimized view on mobile when panel opens (even if players array is still loading)
+      // The minimized view will show once players data loads
+      if (safePlayers.length >= 1) {
+        setIsMinimized(true);
+      } else {
+        // If no players yet, still set minimized (will show once creator loads)
+        // This ensures it shows immediately when challenge is created
+        setIsMinimized(true);
+      }
+    } else if (!isOpen || !isMobile) {
       setIsMinimized(false);
     }
   }, [isOpen, isMobile, safePlayers.length]);
