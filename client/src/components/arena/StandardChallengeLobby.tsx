@@ -53,17 +53,24 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   }, [challenge]);
   
   // Listen to real-time challenge updates to ensure button visibility is always accurate
+  // Set up listener immediately (no delay) for instant updates when someone expresses intent
   useEffect(() => {
     if (!challenge?.id) {
       return;
     }
     
     const challengeRef = doc(db, 'challenges', challenge.id);
+    
+    // Set up listener immediately - no delays for instant button visibility
     const unsubscribe = onSnapshot(
       challengeRef,
+      {
+        includeMetadataChanges: false, // Only listen to actual data changes, not metadata
+      },
       (snapshot) => {
         if (snapshot.exists()) {
           const updatedData = { id: snapshot.id, ...snapshot.data(), rawData: snapshot.data() };
+          // Update immediately - no debouncing or delays
           setLiveChallenge(updatedData);
         } else {
           // If document doesn't exist, fallback to prop
