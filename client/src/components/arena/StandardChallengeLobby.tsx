@@ -3,7 +3,7 @@ import { ChatBox } from "./ChatBox";
 import { VoiceChat } from "./VoiceChat";
 import { Camera, Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
 import { getPlayerStats, fetchChallengeById } from "@/lib/firebase/firestore";
-import { collection, doc, setDoc, deleteDoc, updateDoc, onSnapshot, query, where, serverTimestamp, Timestamp, getDocs, increment } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, updateDoc, onSnapshot, query, where, serverTimestamp, Timestamp, getDocs, getDoc, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 
 interface StandardChallengeLobbyProps {
@@ -495,7 +495,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
             if (snapshot.exists()) {
               const data = snapshot.data();
               const count = data.spectatorCount || 0;
-              setSpectatorCount(Math.max(0, count)); // Ensure non-negative
+              // Cap at MAX_SPECTATORS (shouldn't happen, but safety check)
+              setSpectatorCount(Math.max(0, Math.min(count, MAX_SPECTATORS)));
             } else {
               setSpectatorCount(0);
             }
