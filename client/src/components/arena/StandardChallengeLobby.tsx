@@ -267,9 +267,19 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const canCreatorJoinAfterExpiry = isCreator && status === 'creator_confirmation_required' && isDeadlineExpired && currentWallet && onJoinChallenge;
   const canCreatorJoinPending = isCreator && status === 'pending_waiting_for_opponent' && !isParticipant && currentWallet && onJoinChallenge;
   
-  const canJoin = !isParticipant && !isFull && !isAlreadyPendingJoiner && 
-    (status === 'pending_waiting_for_opponent' || (status === 'creator_confirmation_required' && !isAlreadyPendingJoiner && !isCreator)) && 
-    currentWallet && onJoinChallenge;
+  // Intent to join should always be available (first-come-first-served)
+  // Allow joining if:
+  // - User is not already a participant
+  // - Challenge is not full
+  // - Challenge is in a joinable state (pending, or creator_confirmation_required with expired deadline)
+  // - User is not the creator (unless deadline expired and challenge reverted)
+  // Note: Even if someone already expressed intent, others can try (first transaction wins)
+  const canJoin = !isParticipant && !isFull && currentWallet && onJoinChallenge &&
+    (
+      status === 'pending_waiting_for_opponent' || 
+      (status === 'creator_confirmation_required' && (isDeadlineExpired || !isCreator)) ||
+      (status === 'creator_funded' && isJoinerDeadlineExpired) // If joiner deadline expired, challenge reverts and others can join
+    );
   
   // Creator can cancel/delete if deadline expired or status is pending (no one joined yet)
   const canCreatorCancel = isCreator && (isDeadlineExpired || status === 'pending_waiting_for_opponent') && onCancelChallenge;
