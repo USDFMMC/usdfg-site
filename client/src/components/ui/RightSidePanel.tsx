@@ -104,10 +104,11 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
     return (
       <>
         {/* Minimized bar at top - like X's minimized player */}
+        {/* Tap anywhere on the bar to expand */}
         <div
-          className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-blue-600/95 to-purple-600/95 backdrop-blur-md border-b border-blue-400/30 shadow-lg md:hidden"
+          className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-blue-600/95 to-purple-600/95 backdrop-blur-md border-b border-blue-400/30 shadow-lg md:hidden touch-manipulation active:opacity-90"
           onClick={handleExpand}
-          style={{ cursor: 'pointer' }}
+          style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
         >
           <div className="flex items-center gap-3 px-4 py-3">
             {/* Player avatars */}
