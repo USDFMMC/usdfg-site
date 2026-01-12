@@ -62,15 +62,14 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     const challengeRef = doc(db, 'challenges', challenge.id);
     
     // Set up listener immediately - no delays for instant button visibility
+    // onSnapshot fires immediately when document changes, ensuring instant updates
     const unsubscribe = onSnapshot(
       challengeRef,
-      {
-        includeMetadataChanges: false, // Only listen to actual data changes, not metadata
-      },
       (snapshot) => {
         if (snapshot.exists()) {
           const updatedData = { id: snapshot.id, ...snapshot.data(), rawData: snapshot.data() };
           // Update immediately - no debouncing or delays
+          // This ensures "Fund Challenge" button appears instantly when someone expresses intent
           setLiveChallenge(updatedData);
         } else {
           // If document doesn't exist, fallback to prop
