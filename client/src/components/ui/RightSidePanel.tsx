@@ -77,15 +77,13 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
     }
   }, [isMinimized, isMobile, safePlayers]);
 
-  // Auto-minimize on mobile when panel opens (after a brief delay to show it opened)
+  // Auto-minimize on mobile when panel opens and there are 2+ players
+  // Show minimized view immediately for better UX (like X/Twitter)
   useEffect(() => {
     if (isOpen && isMobile && safePlayers.length >= 2) {
-      // Auto-minimize after 2 seconds on mobile
-      const timer = setTimeout(() => {
-        setIsMinimized(true);
-      }, 2000);
-      return () => clearTimeout(timer);
-    } else {
+      // Show minimized view immediately (no delay) for consistent visibility
+      setIsMinimized(true);
+    } else if (!isOpen || !isMobile || safePlayers.length < 2) {
       setIsMinimized(false);
     }
   }, [isOpen, isMobile, safePlayers.length]);
@@ -101,13 +99,15 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
   if (!isOpen) return null;
 
   // Minimized view (mobile only) - shows at top like X's minimized player
-  if (isMinimized && isMobile && safePlayers.length >= 2) {
+  // Show when minimized and there are 2+ players on mobile
+  if (isOpen && isMobile && safePlayers.length >= 2 && isMinimized) {
     return (
       <>
         {/* Minimized bar at top - like X's minimized player */}
         <div
           className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-blue-600/95 to-purple-600/95 backdrop-blur-md border-b border-blue-400/30 shadow-lg md:hidden"
           onClick={handleExpand}
+          style={{ cursor: 'pointer' }}
         >
           <div className="flex items-center gap-3 px-4 py-3">
             {/* Player avatars */}
@@ -157,13 +157,13 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
               </div>
             </div>
 
-            {/* Expand button */}
+            {/* Expand button - tap to expand */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 handleExpand();
               }}
-              className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+              className="p-2 rounded-lg bg-white/10 hover:bg-white/20 active:bg-white/30 transition-colors touch-manipulation"
               aria-label="Expand lobby"
             >
               <ChevronUp className="w-5 h-5 text-white" />
@@ -175,7 +175,7 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
                 e.stopPropagation();
                 onClose();
               }}
-              className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+              className="p-2 rounded-lg bg-white/10 hover:bg-white/20 active:bg-white/30 transition-colors touch-manipulation"
               aria-label="Close lobby"
             >
               <X className="w-5 h-5 text-white" />
