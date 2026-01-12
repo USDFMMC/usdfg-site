@@ -485,11 +485,11 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     );
   }
 
-  // Show connected state if connected
+  // Show connected state if connected - using same button design but green
   if (actuallyConnected && effectivePublicKey) {
     const shortAddress = `${effectivePublicKey.toString().slice(0, 4)}...${effectivePublicKey.toString().slice(-4)}`;
     
-    // Compact mode for mobile
+    // Compact mode for mobile - same design, green colors
     if (compact) {
       return (
         <div className="flex flex-col items-end gap-1">
@@ -500,13 +500,12 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           )}
           <button
             onClick={handleDisconnect}
-            className="px-2 py-1.5 bg-green-500/20 text-green-400 border border-green-500/30 rounded-md text-xs font-medium hover:bg-green-500/30 active:bg-green-500/40 transition-colors flex items-center gap-1 touch-manipulation"
+            className="px-3 py-1 bg-gradient-to-r from-green-500/20 to-emerald-600/20 text-green-300 font-light tracking-wide rounded-md hover:from-green-500/30 hover:to-emerald-600/30 transition-all border border-green-500/50 shadow-sm shadow-green-500/10 text-xs backdrop-blur-sm touch-manipulation"
             style={{ 
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent'
             }}
           >
-            <span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
             <span className="hidden sm:inline">{shortAddress}</span>
             <span className="sm:hidden">Connected</span>
           </button>
@@ -514,7 +513,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       );
     }
     
-    // Full mode for desktop
+    // Full mode for desktop - same design, green colors
     return (
       <div className="flex items-center space-x-3">
         <div className="text-right">
@@ -532,26 +531,28 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
             </div>
           </div>
         </div>
-        <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
-          🟢 Connected
-        </span>
         <button
           onClick={handleDisconnect}
-          className="px-3 py-1 border border-gray-600 text-white rounded hover:bg-gray-800 transition-colors"
+          className="px-4 py-1.5 bg-gradient-to-r from-green-500/20 to-emerald-600/20 text-green-300 font-light tracking-wide rounded-md hover:from-green-500/30 hover:to-emerald-600/30 transition-all border border-green-500/50 shadow-sm shadow-green-500/10 text-sm backdrop-blur-sm"
+          style={{ 
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent'
+          }}
         >
-          Disconnect
+          {shortAddress}
         </button>
       </div>
     );
   }
   
+  // Disconnected state - original amber design
   return (
     <div className="flex flex-col space-y-2">
       {compact ? (
           <button
           onClick={handleConnect}
           disabled={isButtonDisabled}
-            className="px-3 py-1 bg-amber-500/10 text-amber-300 border border-amber-500/40 rounded-md text-xs font-normal hover:bg-amber-500/20 hover:border-amber-500/60 transition-all disabled:opacity-50 backdrop-blur-sm"
+            className="px-3 py-1 bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-300 font-light tracking-wide rounded-md hover:from-amber-500/30 hover:to-amber-600/30 transition-all disabled:opacity-50 border border-amber-500/50 shadow-sm shadow-amber-500/10 text-xs backdrop-blur-sm touch-manipulation"
           style={{ 
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent'
