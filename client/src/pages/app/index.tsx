@@ -2658,22 +2658,24 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         return;
       }
       
-      // Check if we need to express intent in Firestore or just on-chain
+      // OPTIMIZED FLOW: Firestore update first (instant, no fee), then on-chain if needed (one fee only)
+      // This ensures UI updates immediately while on-chain transaction processes
       const needsFirestoreUpdate = status === 'pending_waiting_for_opponent' && !isAlreadyPendingJoiner;
       
+      // Express intent in Firestore first (fast, no Solana fee, updates UI immediately)
       if (needsFirestoreUpdate) {
-        // Normal flow - user hasn't joined yet, express intent in Firestore first
         await expressJoinIntent(challenge.id, walletAddr);
-        // Firestore update is fast - real-time listener will pick it up immediately
-        // No need to wait or fetch - the listener in StandardChallengeLobby will update the UI
+        // Firestore update completes instantly - real-time listener updates UI immediately
+        // Creator sees "Fund Challenge" button appear right away
       }
       
-      // If challenge has a PDA, also express intent on-chain (or retry if already pending joiner)
-      // BUT: Skip on-chain if deadline expired and challenge was reverted (on-chain state might be wrong)
+      // Then express intent on-chain (requires Solana fee - only ONE call)
+      // Skip on-chain if deadline expired and challenge was reverted
       const shouldSkipOnChain = isDeadlineExpired && (status === 'pending_waiting_for_opponent' || currentStatus === 'pending_waiting_for_opponent');
       
       if (challengePDA && !shouldSkipOnChain) {
         try {
+          // SINGLE on-chain call - prevents duplicate fees
           const { expressJoinIntent: expressJoinIntentOnChain } = await import('@/lib/chain/contract');
           await expressJoinIntentOnChain(
             { signTransaction, publicKey },
