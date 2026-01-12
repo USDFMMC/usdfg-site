@@ -37,6 +37,27 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
   // Use the most reliable connection state (adapter > hook > prop)
   const isConnected = adapterConnected || walletConnected || propIsConnected || !!adapterPublicKey;
   
+  // Game-specific modes - MUST be defined before getFirstPresetMode
+  const gameModes = {
+    'EA UFC 6': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'FC 26': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Madden 26': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'NBA 2K26': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'F1 2023': ['Best Lap Time', '1v1 Race to Finish', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Mario Kart': ['Best Lap Time', '1v1 Race to Finish', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Gran Turismo 7': ['Best Lap Time', '1v1 Race to Finish', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Forza Horizon 5': ['Time Trial', 'Head-to-Head Race', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Forza Horizon': ['Time Trial', 'Head-to-Head Race', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Forza Motorsport': ['Time Trial', 'Head-to-Head Race', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Mortal Kombat 1': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Street Fighter 6': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Tekken 8': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'COD MW3': ['Run the Fade', '10 and Done', 'Snipers Only', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Fortnite': ['Run the Fade', '10 and Done', 'Snipers Only', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Valorant': ['Run the Fade', '10 and Done', 'Snipers Only', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Custom': ['Custom Challenge', 'Tournament (Bracket Mode)']
+  };
+  
   // Get first preset mode for the default game
   const getFirstPresetMode = (game: string) => {
     const modes = gameModes[game as keyof typeof gameModes];
@@ -48,20 +69,25 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     return 'Full Match';
   };
 
-  const [formData, setFormData] = useState({
-    game: 'NBA 2K26',
-    platform: 'PS5',
-    username: userGamerTag || '',
-    entryFee: 50,
-    mode: getFirstPresetMode('NBA 2K26'), // Use first preset mode (Full Match) instead of 'Head-to-Head'
-    customMode: '',
-    customGame: '', // Custom game name when "Custom" is selected
-    customPlatform: '', // Custom platform name when "Other/Custom" is selected
-    rules: '',
-    customRules: false,
-    challengeType: 'solo' as 'solo' | 'team' | 'tournament', // Toggle between solo, team, and tournament challenge
-    teamOnly: false, // For team challenges: true = only teams can accept, false = open to anyone
-    tournamentMaxPlayers: 8 as 4 | 8 | 16,
+  // Initialize form data with first preset mode
+  const [formData, setFormData] = useState(() => {
+    const defaultGame = 'NBA 2K26';
+    const defaultMode = gameModes[defaultGame as keyof typeof gameModes]?.[0] || 'Full Match';
+    return {
+      game: defaultGame,
+      platform: 'PS5',
+      username: userGamerTag || '',
+      entryFee: 50,
+      mode: defaultMode, // Use first preset mode (Full Match) instead of 'Head-to-Head'
+      customMode: '',
+      customGame: '', // Custom game name when "Custom" is selected
+      customPlatform: '', // Custom platform name when "Other/Custom" is selected
+      rules: '',
+      customRules: false,
+      challengeType: 'solo' as 'solo' | 'team' | 'tournament', // Toggle between solo, team, and tournament challenge
+      teamOnly: false, // For team challenges: true = only teams can accept, false = open to anyone
+      tournamentMaxPlayers: 8 as 4 | 8 | 16,
+    };
   });
 
   const tournamentPlayerOptions: Array<4 | 8 | 16> = [4, 8, 16];
@@ -159,27 +185,6 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
       { label: "Snipers Only" },
       { label: "Custom Challenge", tooltip: "Manual review required. Use only when standard modes don't apply." }
     ]
-  };
-
-  // Game-specific modes - Enhanced with competitive options
-  const gameModes = {
-    'EA UFC 6': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Tournament (Bracket Mode)', 'Custom Challenge'],
-    'FC 26': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Tournament (Bracket Mode)', 'Custom Challenge'],
-    'Madden 26': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Tournament (Bracket Mode)', 'Custom Challenge'],
-    'NBA 2K26': ['Full Match', 'Quick Match (No halftime)', '2v2 Challenge', 'Tournament (Bracket Mode)', 'Custom Challenge'],
-    'F1 2023': ['Best Lap Time', '1v1 Race to Finish', 'Tournament (Bracket Mode)', 'Custom Challenge'],
-    'Mario Kart': ['Best Lap Time', '1v1 Race to Finish', 'Tournament (Bracket Mode)', 'Custom Challenge'],
-    'Gran Turismo 7': ['Best Lap Time', '1v1 Race to Finish', 'Tournament (Bracket Mode)', 'Custom Challenge'],
-    'Forza Horizon 5': ['Time Trial', 'Head-to-Head Race', 'Tournament (Bracket Mode)', 'Custom Challenge'],
-    'Forza Horizon': ['Time Trial', 'Head-to-Head Race', 'Tournament (Bracket Mode)', 'Custom Challenge'],
-    'Forza Motorsport': ['Time Trial', 'Head-to-Head Race', 'Tournament (Bracket Mode)', 'Custom Challenge'],
-    'Mortal Kombat 1': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Tournament (Bracket Mode)', 'Custom Challenge'],
-    'Street Fighter 6': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Tournament (Bracket Mode)', 'Custom Challenge'],
-    'Tekken 8': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Tournament (Bracket Mode)', 'Custom Challenge'],
-    'COD MW3': ['Run the Fade', '10 and Done', 'Snipers Only', 'Tournament (Bracket Mode)', 'Custom Challenge'],
-    'Fortnite': ['Run the Fade', '10 and Done', 'Snipers Only', 'Tournament (Bracket Mode)', 'Custom Challenge'],
-    'Valorant': ['Run the Fade', '10 and Done', 'Snipers Only', 'Tournament (Bracket Mode)', 'Custom Challenge'],
-    'Custom': ['Custom Challenge', 'Tournament (Bracket Mode)']
   };
 
   const getModeExplanation = (mode: string) => {

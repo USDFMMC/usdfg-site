@@ -993,7 +993,7 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
       throw new Error("Challenge not found");
     }
 
-    const data = snap.data() as ChallengeData;
+    let data = snap.data() as ChallengeData;
     
     // If status is creator_funded, user needs to fund, not express intent
     if (data.status === 'creator_funded') {
