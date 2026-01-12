@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddress } from '@solana/spl-token';
 import { useConnection } from '@solana/wallet-adapter-react';
@@ -86,21 +86,35 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   }, []);
 
   // Listen for localStorage changes (when Phantom sets connection)
+  // OPTIMIZED: Reduced polling frequency and added state change detection
   useEffect(() => {
     if (!mobile || typeof window === 'undefined') return;
+    
+    let lastState: { connected: boolean; publicKey: string | null } = { 
+      connected: false, 
+      publicKey: null 
+    };
     
     const checkConnection = () => {
       const isPhantomConnected = localStorage.getItem('phantom_connected') === 'true';
       const storedPublicKey = localStorage.getItem('phantom_public_key');
       
-      console.log("🔍 [Mobile] Checking connection:", { isPhantomConnected, hasPublicKey: !!storedPublicKey });
+      // Only update state if it actually changed (prevents unnecessary re-renders)
+      if (lastState.connected === isPhantomConnected && lastState.publicKey === storedPublicKey) {
+        return; // No change, skip update
+      }
+      
+      // Update last state
+      lastState = {
+        connected: isPhantomConnected,
+        publicKey: storedPublicKey
+      };
       
       // If connected, clear any connecting flags
       if (isPhantomConnected && storedPublicKey) {
         sessionStorage.removeItem('phantom_connecting');
         sessionStorage.removeItem('phantom_connect_timestamp');
         sessionStorage.removeItem('phantom_connect_attempt');
-        console.log("✅ [Mobile] Connection detected - updating state");
       }
       
       setMobileConnectionState({
@@ -109,7 +123,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       });
       
       // Force parent component re-render by calling onConnect if newly connected
-      if (isPhantomConnected && storedPublicKey) {
+      if (isPhantomConnected && storedPublicKey && !lastState.connected) {
         onConnect();
       }
     };
@@ -120,22 +134,20 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     // Listen for storage events (from other tabs/windows)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'phantom_connected' || e.key === 'phantom_public_key') {
-        console.log("📢 [Mobile] Storage event detected:", e.key);
         checkConnection();
       }
     };
     
     // Listen for custom phantom_connected event
     const handlePhantomConnected = () => {
-      console.log("📢 [Mobile] Received phantom_connected event");
       checkConnection();
     };
     
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('phantom_connected', handlePhantomConnected);
     
-    // Poll more aggressively on mobile (every 300ms instead of 500ms)
-    const interval = setInterval(checkConnection, 300);
+    // OPTIMIZED: Reduced polling from 300ms to 2000ms (2 seconds) - still responsive but much less frequent
+    const interval = setInterval(checkConnection, 2000);
     
     return () => {
       window.removeEventListener('storage', handleStorageChange);
@@ -294,23 +306,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     isButtonDisabled = connecting || actuallyConnected || isPhantomConnecting;
   }
 
-  // Only log button state changes (not on every render) - reduces console spam
-  // CRITICAL: This hook must be called BEFORE any conditional returns
-  useEffect(() => {
-    if (isMobile && typeof window !== "undefined") {
-      const stateKey = `${actuallyConnected}-${connecting}-${isPhantomConnecting}-${isButtonDisabled}`;
-      const lastState = sessionStorage.getItem('last_button_state');
-      if (lastState !== stateKey) {
-        console.log("🔍 Button state changed:", {
-          actuallyConnected,
-          connecting,
-          isPhantomConnecting,
-          isButtonDisabled
-        });
-        sessionStorage.setItem('last_button_state', stateKey);
-      }
-    }
-  }, [actuallyConnected, connecting, isPhantomConnecting, isButtonDisabled, isMobile]);
+  // Removed button state logging useEffect - was causing unnecessary re-renders on mobile
 
   // Handle wallet connection
   // CRITICAL: On mobile, be VERY permissive - allow connection attempts

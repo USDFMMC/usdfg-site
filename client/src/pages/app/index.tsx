@@ -4974,11 +4974,21 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                       tabIndex={0}
                       className={`relative text-left rounded-xl border overflow-hidden p-3 transition active:scale-[0.99] w-[176px] h-[176px] sm:w-[180px] sm:h-[180px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-400/50 ${edgeGlow}`}
                       onClick={onSelect}
+                      onTouchStart={(e) => {
+                        // Prevent double-tap zoom on mobile
+                        e.currentTarget.style.touchAction = 'manipulation';
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
                           onSelect();
                         }
+                      }}
+                      style={{
+                        touchAction: 'manipulation',
+                        WebkitTapHighlightColor: 'transparent',
+                        zIndex: 1,
+                        position: 'relative'
                       }}
                       aria-label={`Open ${gameName} challenge`}
                     >
@@ -5006,9 +5016,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                         }
                       }}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/75 to-black/40" />
-                    <div className="absolute inset-0 shadow-[inset_0_0_80px_rgba(0,0,0,0.9)]" />
-                    <div className="absolute inset-0 ring-1 ring-white/5 rounded-xl" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/75 to-black/40 pointer-events-none" />
+                    <div className="absolute inset-0 shadow-[inset_0_0_80px_rgba(0,0,0,0.9)] pointer-events-none" />
+                    <div className="absolute inset-0 ring-1 ring-white/5 rounded-xl pointer-events-none" />
 
                     <div className="relative z-10 flex h-full flex-col gap-2">
                       <div className="flex items-start justify-between gap-2">
@@ -5085,7 +5095,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
                         <div 
                           className="flex gap-3 overflow-x-auto pb-2 px-4 md:px-0" 
-                          style={{ WebkitOverflowScrolling: 'touch' }}
+                          style={{ 
+                            WebkitOverflowScrolling: 'touch',
+                            touchAction: 'pan-x',
+                            scrollbarWidth: 'none',
+                            msOverflowStyle: 'none'
+                          }}
                         >
                           {items.map((challenge) => (
                             <div 
