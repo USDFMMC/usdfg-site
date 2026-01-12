@@ -1,4 +1,5 @@
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { WalletReadyState } from "@solana/wallet-adapter-base";
 import { isMobileSafari } from "../utils/isMobileSafari";
 import { phantomMobileConnect } from "./mobile";
 import { PublicKey } from "@solana/web3.js";
@@ -8,6 +9,11 @@ export function useUSDFGWallet() {
   // ConnectionProvider is always available (even on mobile, we provide it)
   const { connection } = useConnection();
   const mobile = isMobileSafari();
+  // On iOS Safari inside Phantom's in-app browser, window.solana exists and
+  // the wallet-adapter flow works. In that case we should NOT rely on deep-link
+  // localStorage state (which may not be set).
+  const hasWindowSolana = typeof window !== "undefined" && !!(window as any).solana;
+  const useAdapterOnMobile = mobile && hasWindowSolana;
 
   async function connect() {
     // Only clear stuck connection states (older than 10 seconds)
@@ -92,7 +98,7 @@ export function useUSDFGWallet() {
       }
       
       // Check adapter ready state
-      if (phantomWallet.adapter.readyState === "NotFound") {
+      if (phantomWallet.adapter.readyState === WalletReadyState.NotDetected) {
         const errorMsg = "Phantom wallet extension not found. Please install Phantom from https://phantom.app";
         console.error("❌", errorMsg);
         throw new Error(errorMsg);
@@ -114,13 +120,16 @@ export function useUSDFGWallet() {
       // Check adapter ready state before attempting selection
       console.log("🔍 Phantom adapter readyState:", phantomWallet.adapter.readyState);
       
-      if (phantomWallet.adapter.readyState === "NotFound") {
+      if (phantomWallet.adapter.readyState === WalletReadyState.NotDetected) {
         const errorMsg = "Phantom wallet extension not found. Please install Phantom from https://phantom.app and refresh the page.";
         console.error("❌", errorMsg);
         throw new Error(errorMsg);
       }
       
-      if (phantomWallet.adapter.readyState === "Installed" || phantomWallet.adapter.readyState === "Loadable") {
+      if (
+        phantomWallet.adapter.readyState === WalletReadyState.Installed ||
+        phantomWallet.adapter.readyState === WalletReadyState.Loadable
+      ) {
         console.log("🔍 Selecting Phantom wallet...");
         try {
           await wallet.select(phantomWallet.adapter.name);
@@ -194,7 +203,11 @@ export function useUSDFGWallet() {
     if (!mobile) {
       return wallet.disconnect();
     }
-    // On mobile, connection state is already cleared above
+    // On mobile, if we're in Phantom's in-app browser, also disconnect adapter.
+    // If we're using deep links, connection state is already cleared above.
+    if (useAdapterOnMobile) {
+      return wallet.disconnect();
+    }
   }
 
   // On mobile, check for stored connection from deep link return
@@ -206,12 +219,14 @@ export function useUSDFGWallet() {
   return {
     connect,
     disconnect,
-    connected: mobile ? mobileConnected : wallet.connected,
-    publicKey: mobile 
-      ? (mobilePublicKey ? new PublicKey(mobilePublicKey) : null)
+    connected: mobile ? (useAdapterOnMobile ? wallet.connected : mobileConnected) : wallet.connected,
+    publicKey: mobile
+      ? (useAdapterOnMobile
+          ? (wallet.publicKey as PublicKey | null)
+          : (mobilePublicKey ? new PublicKey(mobilePublicKey) : null))
       : (wallet.publicKey as PublicKey | null),
     mobile,
-    connecting: mobile ? false : wallet.connecting,
+    connecting: mobile ? (useAdapterOnMobile ? wallet.connecting : false) : wallet.connecting,
     connection,
   };
 }

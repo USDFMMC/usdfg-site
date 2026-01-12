@@ -233,6 +233,9 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       : null);
   const actuallyConnected = Boolean(isConnected || (connected && effectivePublicKey) || 
     (mobile && (mobileConnectionState.connected || (typeof window !== 'undefined' && localStorage.getItem('phantom_connected') === 'true')) && effectivePublicKey));
+  // Fallback: if some upstream state says "connected" but we don't have a public key yet,
+  // still render a disconnect action instead of a disabled "Connect Wallet" button.
+  const connectedWithoutPublicKey = Boolean((isConnected || connected || (mobile && mobileConnectionState.connected)) && !effectivePublicKey);
 
   // Calculate mobile-specific connection state
   const isMobile = isMobileSafari();
@@ -457,6 +460,37 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       localStorage.setItem('wallet_disconnected', 'true');
     }
   };
+
+  // If connected but missing public key, still allow disconnect
+  if (connectedWithoutPublicKey) {
+    if (compact) {
+      return (
+        <div className="flex flex-col items-end gap-1">
+          <button
+            onClick={handleDisconnect}
+            className="px-2 py-1.5 bg-green-500/20 text-green-400 border border-green-500/30 rounded-md text-xs font-medium hover:bg-green-500/30 transition-colors flex items-center gap-1"
+          >
+            <span className="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
+            <span>Connected</span>
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center space-x-3">
+        <span className="px-2 py-1 bg-green-500/20 text-green-400 border border-green-500/30 rounded text-xs">
+          🟢 Connected
+        </span>
+        <button
+          onClick={handleDisconnect}
+          className="px-3 py-1 border border-gray-600 text-white rounded hover:bg-gray-800 transition-colors"
+        >
+          Disconnect
+        </button>
+      </div>
+    );
+  }
 
   // Show connected state if connected
   if (actuallyConnected && effectivePublicKey) {
