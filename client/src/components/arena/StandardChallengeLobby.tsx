@@ -74,20 +74,9 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           // Update immediately - no debouncing or delays
           // This ensures "Fund Challenge" button appears instantly when someone expresses intent
           // Priority: This listener > prop updates (for instant button visibility)
-          setLiveChallenge(prev => {
-            // Only update if data actually changed to prevent unnecessary re-renders
-            const newStatus = updatedData.status || updatedData.rawData?.status;
-            const newPendingJoiner = updatedData.pendingJoiner || updatedData.rawData?.pendingJoiner;
-            const prevStatus = prev?.status || prev?.rawData?.status;
-            const prevPendingJoiner = prev?.pendingJoiner || prev?.rawData?.pendingJoiner;
-            
-            // Update if status or pendingJoiner changed (critical for button visibility)
-            if (newStatus !== prevStatus || newPendingJoiner !== prevPendingJoiner) {
-              return updatedData;
-            }
-            // Also update if other critical fields changed
-            return updatedData;
-          });
+          // CRITICAL: Always update liveChallenge immediately - don't check for changes first
+          // This prevents any delay in button visibility
+          setLiveChallenge(updatedData);
         } else {
           // If document doesn't exist, fallback to prop
           setLiveChallenge(challenge);
