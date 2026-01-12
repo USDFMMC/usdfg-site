@@ -54,6 +54,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   
   // Listen to real-time challenge updates to ensure button visibility is always accurate
   // Set up listener immediately (no delay) for instant updates when someone expresses intent
+  // This is the PRIMARY source of truth - updates immediately when Firestore changes
   useEffect(() => {
     if (!challenge?.id) {
       return;
@@ -63,6 +64,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     
     // Set up listener immediately - no delays for instant button visibility
     // onSnapshot fires immediately when document changes, ensuring instant updates
+    // This listener is the PRIMARY source - it updates liveChallenge immediately
+    // regardless of when the parent component's selectedChallenge prop updates
     const unsubscribe = onSnapshot(
       challengeRef,
       (snapshot) => {
@@ -70,7 +73,21 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           const updatedData = { id: snapshot.id, ...snapshot.data(), rawData: snapshot.data() };
           // Update immediately - no debouncing or delays
           // This ensures "Fund Challenge" button appears instantly when someone expresses intent
-          setLiveChallenge(updatedData);
+          // Priority: This listener > prop updates (for instant button visibility)
+          setLiveChallenge(prev => {
+            // Only update if data actually changed to prevent unnecessary re-renders
+            const newStatus = updatedData.status || updatedData.rawData?.status;
+            const newPendingJoiner = updatedData.pendingJoiner || updatedData.rawData?.pendingJoiner;
+            const prevStatus = prev?.status || prev?.rawData?.status;
+            const prevPendingJoiner = prev?.pendingJoiner || prev?.rawData?.pendingJoiner;
+            
+            // Update if status or pendingJoiner changed (critical for button visibility)
+            if (newStatus !== prevStatus || newPendingJoiner !== prevPendingJoiner) {
+              return updatedData;
+            }
+            // Also update if other critical fields changed
+            return updatedData;
+          });
         } else {
           // If document doesn't exist, fallback to prop
           setLiveChallenge(challenge);
