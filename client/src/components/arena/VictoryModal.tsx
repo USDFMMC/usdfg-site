@@ -112,23 +112,24 @@ const VictoryModal: React.FC<VictoryModalProps> = ({
             onClick={onClose}
           />
 
-          {/* Modal */}
+          {/* Modal - Match claim prize box sizing exactly for mobile */}
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed left-1/2 top-1/2 z-[111] w-[95vw] max-w-md -translate-x-1/2 -translate-y-1/2"
+            className="fixed left-1/2 top-1/2 z-[111] w-[calc(100vw-1rem)] max-w-sm -translate-x-1/2 -translate-y-1/2"
             onClick={(e) => e.stopPropagation()}
+            style={{ maxHeight: '90vh' }}
           >
             <div className="relative overflow-hidden rounded-lg border border-amber-400/30 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black shadow-[0_0_40px_rgba(255,215,0,0.12)]">
               {/* Gold glow effect around edges */}
               <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-amber-500/10 via-transparent to-amber-500/10" />
               <div className="absolute inset-0 rounded-lg bg-gradient-to-b from-amber-500/10 via-transparent to-amber-500/10" />
               
-              {/* Content - Compact mobile sizing to match claim prize box */}
-              <div className="relative p-2.5 text-center">
-                {/* Trophy Icon - Compact size to match claim prize box */}
+              {/* Content - Match claim prize box sizing exactly */}
+              <div className="relative p-2.5 text-center space-y-2">
+                {/* Trophy Icon - Match claim prize box (text-2xl emoji size) */}
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
@@ -138,7 +139,7 @@ const VictoryModal: React.FC<VictoryModalProps> = ({
                     stiffness: 200, 
                     damping: 15 
                   }}
-                  className="mb-1.5 flex justify-center"
+                  className="flex justify-center"
                 >
                   <div className="relative">
                     <motion.div
@@ -153,39 +154,38 @@ const VictoryModal: React.FC<VictoryModalProps> = ({
                       }}
                       className="absolute inset-0 rounded-full bg-amber-400/20 blur-xl"
                     />
-                    <Trophy className="relative h-6 w-6 text-amber-400 drop-shadow-[0_0_15px_rgba(255,215,0,0.4)]" />
+                    <div className="text-2xl relative">🏆</div>
                   </div>
                 </motion.div>
 
-                {/* Header - Compact text to match claim prize box */}
+                {/* Header - Match claim prize box exactly */}
                 <motion.h2
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
-                  className="mb-1 text-sm font-bold text-white"
+                  className="text-sm font-bold text-emerald-200"
                 >
                   You Won!
                 </motion.h2>
 
-                {/* Body Copy - Compact spacing to match claim prize box */}
+                {/* Body Copy - Match claim prize box exactly */}
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
-                  className="mb-2 text-zinc-300"
                 >
                   {autoWon ? (
-                    <p className="text-xs text-zinc-300">
+                    <p className="text-xs text-emerald-100/80">
                       Your opponent submitted a loss. Trust review recorded automatically.
                     </p>
                   ) : (
-                    <p className="text-xs text-zinc-300">
+                    <p className="text-xs text-emerald-100/80">
                       You won the match! Trust review recorded.
                     </p>
                   )}
                 </motion.div>
 
-                {/* CTA Button - Compact to match claim prize box */}
+                {/* CTA Button - Match claim prize box exactly */}
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -193,9 +193,9 @@ const VictoryModal: React.FC<VictoryModalProps> = ({
                 >
                   <Button
                     onClick={handleClaimReward}
-                    className="w-full bg-gradient-to-r from-amber-500 to-amber-600 text-white font-semibold py-2 text-xs shadow-[0_0_20px_rgba(255,215,0,0.25)] hover:from-amber-400 hover:to-amber-500 hover:shadow-[0_0_30px_rgba(255,215,0,0.4)] transition-all duration-300"
+                    className="w-full rounded-md bg-gradient-to-r from-emerald-500/90 to-green-500/90 hover:from-emerald-600 hover:to-green-600 text-white px-3 py-2 text-xs font-semibold transition-all shadow-[0_0_10px_rgba(34,197,94,0.25)] border border-emerald-400/30"
                   >
-                    <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                    <Sparkles className="mr-1.5 h-3 w-3" />
                     Claim Reward
                   </Button>
                 </motion.div>
