@@ -217,9 +217,20 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   };
 
   const statusDisplay = getStatusDisplay();
-  const isParticipant = currentWallet && players.some((p: string) => p?.toLowerCase() === currentWallet?.toLowerCase());
+  
+  // Check if user is a participant - must check players array AND creator/challenger/pendingJoiner fields
+  // because players array is only populated when joiner funds, but they're participants before that
   const creatorWallet = activeChallenge.creator || activeChallenge.rawData?.creator || '';
+  const challengerWallet = activeChallenge.rawData?.challenger || activeChallenge.challenger;
+  const pendingJoinerWallet = activeChallenge.rawData?.pendingJoiner || activeChallenge.pendingJoiner;
+  
   const isCreator = currentWallet && creatorWallet.toLowerCase() === currentWallet.toLowerCase();
+  const isChallenger = currentWallet && challengerWallet && challengerWallet.toLowerCase() === currentWallet.toLowerCase();
+  const isPendingJoiner = currentWallet && pendingJoinerWallet && pendingJoinerWallet.toLowerCase() === currentWallet.toLowerCase();
+  const isInPlayersArray = currentWallet && players.some((p: string) => p?.toLowerCase() === currentWallet?.toLowerCase());
+  
+  // User is a participant if they're in players array, OR they're the creator, challenger, or pending joiner
+  const isParticipant = isInPlayersArray || isCreator || isChallenger || isPendingJoiner;
   const maxPlayers = activeChallenge.maxPlayers || activeChallenge.rawData?.maxPlayers || 2;
   const isFull = players.length >= maxPlayers;
   
@@ -232,8 +243,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const isDeadlineExpired = creatorFundingDeadline ? creatorFundingDeadline.toMillis() < Date.now() : false;
   
   // Get pending joiner info (needed for multiple checks below)
-  const pendingJoiner = activeChallenge.rawData?.pendingJoiner || activeChallenge.pendingJoiner;
-  const isAlreadyPendingJoiner = pendingJoiner && currentWallet && pendingJoiner.toLowerCase() === currentWallet.toLowerCase();
+  // Note: pendingJoinerWallet already defined above
+  const isAlreadyPendingJoiner = isPendingJoiner;
   
   const canCreatorFund = isCreator && status === 'creator_confirmation_required' && !isDeadlineExpired && onCreatorFund;
   
