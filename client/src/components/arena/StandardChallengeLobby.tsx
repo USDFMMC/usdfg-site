@@ -232,11 +232,15 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   // User is a participant if they're in players array, OR they're the creator, challenger, or pending joiner
   const isParticipant = isInPlayersArray || isCreator || isChallenger || isPendingJoiner;
   const maxPlayers = activeChallenge.maxPlayers || activeChallenge.rawData?.maxPlayers || 2;
-  const isFull = players.length >= maxPlayers;
   
-  // Get challenger wallet for joiner funding check
-  const challengerWallet = activeChallenge.rawData?.challenger || activeChallenge.challenger;
-  const isChallenger = currentWallet && challengerWallet && challengerWallet.toLowerCase() === currentWallet.toLowerCase();
+  // Calculate actual participant count (including creator, challenger, pendingJoiner, and players array)
+  const allParticipantsSet = new Set<string>();
+  if (creatorWallet) allParticipantsSet.add(creatorWallet.toLowerCase());
+  if (challengerWallet) allParticipantsSet.add(challengerWallet.toLowerCase());
+  if (pendingJoinerWallet) allParticipantsSet.add(pendingJoinerWallet.toLowerCase());
+  players.forEach((p: string) => allParticipantsSet.add(p.toLowerCase()));
+  const actualParticipantCount = allParticipantsSet.size;
+  const isFull = actualParticipantCount >= maxPlayers;
   
   // Check if creator can fund (status is creator_confirmation_required and deadline hasn't expired)
   const creatorFundingDeadline = activeChallenge.rawData?.creatorFundingDeadline || activeChallenge.creatorFundingDeadline;
