@@ -622,10 +622,13 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         {spectatorCount > 0 && (
           <div className="mt-2 pt-2 border-t border-white/5">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">
-              Spectators ({spectatorCount})
+              Spectators ({spectatorCount}/{MAX_SPECTATORS})
             </h3>
             <div className="text-[10px] text-gray-500 italic py-1">
               {spectatorCount} {spectatorCount === 1 ? 'person is' : 'people are'} watching
+              {spectatorCount >= MAX_SPECTATORS && (
+                <span className="block text-amber-400 mt-0.5">⚠️ Spectator limit reached</span>
+              )}
             </div>
           </div>
         )}
