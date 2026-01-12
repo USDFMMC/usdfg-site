@@ -2599,6 +2599,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           } catch (onChainError: any) {
             const errorMsg = onChainError.message || onChainError.toString() || '';
             
+            // If user rejected the transaction, allow retry (don't close sheet)
+            if (errorMsg.includes('User rejected') || errorMsg.includes('User cancelled') || 
+                errorMsg.includes('rejected the request') || errorMsg.includes('cancelled')) {
+              console.log('⚠️ User rejected on-chain transaction - allowing retry');
+              alert('⚠️ Transaction cancelled. Your join intent is saved in Firestore, but on-chain confirmation is still needed. You can try again by clicking "Express Intent" again.');
+              // Don't close sheet - allow user to retry
+              return;
+            }
+            
             // If already expressed on-chain, that's OK
             if (errorMsg.includes('already expressed') || errorMsg.includes('already') || 
                 errorMsg.includes('Already') || errorMsg.includes('duplicate') ||
@@ -2751,6 +2760,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     } catch (err: any) {
       console.error("❌ Express join intent failed:", err);
       const errorMessage = err.message || err.toString() || 'Failed to express join intent. Please try again.';
+      
+      // If user rejected transaction, don't show error - they can retry
+      if (errorMessage.includes('User rejected') || errorMessage.includes('User cancelled') || 
+          errorMessage.includes('rejected the request') || errorMessage.includes('cancelled')) {
+        // Error already handled in inner catch - don't show again
+        return;
+      }
+      
       alert('Failed to express join intent: ' + errorMessage);
     }
   };
