@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, Suspense } from 'react';
 import { X, ChevronUp } from 'lucide-react';
 import { getPlayerStats } from '@/lib/firebase/firestore';
 
@@ -18,6 +18,9 @@ interface RightSidePanelProps {
   players?: PlayerInfo[];
   gameName?: string;
   onExpand?: () => void;
+  // Voice chat props - keep active even when minimized
+  voiceChatChallengeId?: string;
+  voiceChatCurrentWallet?: string;
 }
 
 const RightSidePanel: React.FC<RightSidePanelProps> = ({
@@ -29,6 +32,8 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
   players = [],
   gameName,
   onExpand,
+  voiceChatChallengeId,
+  voiceChatCurrentWallet,
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -152,7 +157,7 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
                 {gameName || 'Challenge'}
               </div>
               <div className="text-blue-100 text-xs truncate">
-                {safePlayers.length === 2 
+                {safePlayers.length >= 2 
                   ? (() => {
                       const p1Stats = playerData[safePlayers[0]?.wallet.toLowerCase()] || {};
                       const p2Stats = playerData[safePlayers[1]?.wallet.toLowerCase()] || {};
@@ -166,7 +171,7 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
                       const p1Name = p1Stats.displayName || safePlayers[0]?.displayName || safePlayers[0]?.wallet.slice(0, 6);
                       return `${p1Name} • Waiting for opponent`;
                     })()
-                  : `${safePlayers.length} players`
+                  : 'No players yet'
                 }
               </div>
             </div>

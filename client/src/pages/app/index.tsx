@@ -5960,6 +5960,20 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           // Standard challenge: render persistent lobby with inline submit form
           const challengePlayersRaw = selectedChallenge.players || selectedChallenge.rawData?.players;
           const challengePlayers = Array.isArray(challengePlayersRaw) ? challengePlayersRaw : [];
+          
+          // Include pending joiner and challenger in the players list for the minimized header
+          const pendingJoiner = selectedChallenge.pendingJoiner || selectedChallenge.rawData?.pendingJoiner;
+          const challenger = selectedChallenge.challenger || selectedChallenge.rawData?.challenger;
+          const creator = selectedChallenge.creator || selectedChallenge.rawData?.creator;
+          
+          // Build comprehensive players list: creator, challenger, pending joiner, and confirmed players
+          const allPlayersSet = new Set<string>();
+          if (creator) allPlayersSet.add(creator);
+          if (challenger) allPlayersSet.add(challenger);
+          if (pendingJoiner) allPlayersSet.add(pendingJoiner);
+          challengePlayers.forEach((p: string) => allPlayersSet.add(p));
+          
+          const allPlayers = Array.from(allPlayersSet).map((wallet: string) => ({ wallet }));
           const gameName = selectedChallenge.game || selectedChallenge.rawData?.game || 'Challenge';
           
           return (
@@ -5972,8 +5986,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     setSelectedChallenge(null);
                   }}
                   title={`${selectedChallenge.title || "Challenge"} Lobby`}
-                  players={challengePlayers.map((wallet: string) => ({ wallet }))}
+                  players={allPlayers}
                   gameName={gameName}
+                  voiceChatChallengeId={selectedChallenge.id}
+                  voiceChatCurrentWallet={publicKey?.toString() || ""}
                 >
                   <StandardChallengeLobby
                     challenge={selectedChallenge}
