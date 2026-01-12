@@ -314,8 +314,16 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     }
   }, [players]);
 
-  // Separate players and spectators
-  const participants = players.filter((p: string) => p);
+  // Build participants list - includes creator, challenger, pendingJoiner, and players array
+  // This ensures both players show as participants even before joiner funds
+  const participantsSet = new Set<string>();
+  if (creatorWallet) participantsSet.add(creatorWallet);
+  if (challengerWallet) participantsSet.add(challengerWallet);
+  if (pendingJoinerWallet) participantsSet.add(pendingJoinerWallet);
+  players.forEach((p: string) => {
+    if (p) participantsSet.add(p);
+  });
+  const participants = Array.from(participantsSet);
   
   // Ephemeral spectator tracking - NO PERSISTENT DATA
   // Users can join as spectators (real-time only)
