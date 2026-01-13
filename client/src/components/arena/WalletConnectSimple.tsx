@@ -240,19 +240,22 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         setUsdfgBalance(0);
         });
     } else if (!actuallyConnected) {
-      // Wallet adapter says disconnected - clear everything
-      // Only call onDisconnect if we were previously connected
+      // Wallet adapter says disconnected - clear everything including stale localStorage
       const lastLoggedWallet = sessionStorage.getItem('last_logged_wallet');
       if (lastLoggedWallet) {
         sessionStorage.removeItem('last_logged_wallet');
-        // Clear localStorage state to prevent showing stale wallet
+        // CRITICAL: Clear stale localStorage to prevent showing wrong wallet address
         clearPhantomConnectionState();
+        // Clear mobile connection state
+        if (mobile) {
+          setMobileConnectionState({ connected: false, publicKey: null });
+        }
         onDisconnect();
       }
       setBalance(null);
       setUsdfgBalance(null);
     }
-  }, [connected, publicKey, onConnect, onDisconnect, connection]);
+  }, [connected, publicKey, onConnect, onDisconnect, connection, mobile]);
 
   // Calculate derived values (needed before conditional returns)
   // CRITICAL: ONLY use wallet adapter's publicKey - do NOT trust localStorage
