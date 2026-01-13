@@ -282,7 +282,10 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   // Note: pendingJoinerWallet already defined above
   const isAlreadyPendingJoiner = isPendingJoiner;
   
-  const canCreatorFund = isCreator && status === 'creator_confirmation_required' && !isDeadlineExpired && onCreatorFund;
+  const canCreatorFund = !!(isCreator && status === 'creator_confirmation_required' && !isDeadlineExpired && onCreatorFund);
+  
+  // Force re-render check - log actual boolean value
+  console.log('🎯 canCreatorFund BOOLEAN VALUE:', canCreatorFund, typeof canCreatorFund);
   
   // ALWAYS log creator fund button conditions (helps diagnose why button isn't showing)
   console.log('💰 Creator Fund Button Check:', {
