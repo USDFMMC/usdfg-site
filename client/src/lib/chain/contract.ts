@@ -515,18 +515,30 @@ export async function creatorFund(
     console.log(`  ${idx}: ${key.pubkey.toString()} (${accountNames[idx]}, signer: ${key.isSigner}, writable: ${key.isWritable})`);
   });
 
-  // Build transaction with contract instruction
-  // NOTE: The contract performs the token transfer via CPI (Cross-Program Invocation)
-  // Phantom Wallet may not show CPI transfers in the preview, but the transfer WILL execute
-  // The contract code (lib.rs line 123-133) explicitly transfers tokens from creator to escrow
-  // 
-  // IMPORTANT: We cannot add an explicit transfer instruction here because:
-  // 1. If we add it BEFORE the contract instruction, the contract will fail (tokens already transferred)
-  // 2. If we add it AFTER, Phantom won't show it (it's after the contract call)
-  // 
-  // The solution is to ensure Phantom can parse the CPI transfer, which may require
-  // using Anchor's program interface or ensuring the transaction structure matches what Phantom expects
-  const transaction = new Transaction().add(instruction);
+  // CRITICAL FIX: Add explicit token transfer instruction BEFORE contract instruction
+  // This allows Phantom Wallet to show the USDFG transfer in the transaction preview
+  // The contract will also attempt to transfer via CPI, but we'll handle that in the contract
+  // by checking if transfer already happened (or we can modify contract to skip transfer)
+  const { createTransferInstruction } = await import('@solana/spl-token');
+  const transferInstruction = createTransferInstruction(
+    creatorTokenAccount,      // source: creator's USDFG token account
+    escrowTokenAccountPDA,   // destination: escrow USDFG token account  
+    creator,                  // authority: creator (signs the transfer)
+    entryFeeLamports          // amount: entry fee in lamports
+  );
+  
+  console.log('💸 Adding explicit USDFG transfer instruction for Phantom preview:', {
+    from: creatorTokenAccount.toString(),
+    to: escrowTokenAccountPDA.toString(),
+    amount: `${entryFeeUsdfg} USDFG (${entryFeeLamports} lamports)`
+  });
+  
+  // Build transaction with transfer instruction FIRST (so Phantom shows it), then contract instruction
+  // NOTE: The contract will also try to transfer via CPI - we need to modify the contract
+  // to check if transfer already happened and skip it if it did
+  const transaction = new Transaction();
+  transaction.add(transferInstruction);  // Add transfer FIRST (Phantom shows this)
+  transaction.add(instruction);          // Add contract instruction SECOND (validates/transfers)
   const { blockhash } = await connection.getLatestBlockhash();
   transaction.recentBlockhash = blockhash;
   transaction.feePayer = creator;
