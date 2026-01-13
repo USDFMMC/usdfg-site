@@ -539,8 +539,33 @@ export async function creatorFund(
   const transaction = new Transaction();
   transaction.add(transferInstruction);  // Add transfer FIRST (Phantom shows this)
   transaction.add(instruction);          // Add contract instruction SECOND (validates/transfers)
-  const { blockhash } = await connection.getLatestBlockhash();
-  transaction.recentBlockhash = blockhash;
+  
+  // Get blockhash with retry logic for rate limiting (429 errors)
+  let blockhash: string;
+  let retries = 0;
+  const maxRetries = 3;
+  while (retries <= maxRetries) {
+    try {
+      const result = await connection.getLatestBlockhash();
+      blockhash = result.blockhash;
+      break;
+    } catch (error: any) {
+      if (error.message?.includes('429') || error.message?.includes('Too many requests')) {
+        retries++;
+        if (retries > maxRetries) {
+          throw new Error('Rate limited by Solana RPC. Please wait a moment and try again, or use a custom RPC endpoint.');
+        }
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = Math.pow(2, retries - 1) * 1000;
+        console.warn(`⚠️ Rate limited (429). Retrying in ${delay}ms... (${retries}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        throw error;
+      }
+    }
+  }
+  
+  transaction.recentBlockhash = blockhash!;
   transaction.feePayer = creator;
 
   const signedTransaction = await wallet.signTransaction(transaction);

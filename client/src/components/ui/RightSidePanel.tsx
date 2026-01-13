@@ -83,23 +83,17 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
     }
   }, [isMinimized, isMobile, safePlayers]);
 
-  // Auto-minimize on mobile when panel opens (as soon as challenge is created)
-  // Show minimized view immediately for better UX (like X/Twitter)
+  // Reset to expanded (full lobby) when panel opens
+  // Users can manually minimize to nav bar if they want to scroll the site
   useEffect(() => {
-    if (isOpen && isMobile) {
-      // Always show minimized view on mobile when panel opens (even if players array is still loading)
-      // The minimized view will show once players data loads
-      if (safePlayers.length >= 1) {
-        setIsMinimized(true);
-      } else {
-        // If no players yet, still set minimized (will show once creator loads)
-        // This ensures it shows immediately when challenge is created
-        setIsMinimized(true);
-      }
-    } else if (!isOpen || !isMobile) {
+    if (isOpen) {
+      // Always start in expanded (full lobby) state when panel opens
+      setIsMinimized(false);
+    } else {
+      // Reset when panel closes so next time it opens full
       setIsMinimized(false);
     }
-  }, [isOpen, isMobile, safePlayers.length]);
+  }, [isOpen]);
 
   const handleExpand = () => {
     setIsMinimized(false);

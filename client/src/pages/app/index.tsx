@@ -2599,6 +2599,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         // On-chain will sync when creator funds
         alert('✅ You have already expressed intent to join this challenge. Waiting for creator to fund.');
         setShowDetailSheet(false);
+        
+        // Open minimized nav bar lobby first (auto-minimizes on mobile)
+        setSelectedChallenge({
+          id: challenge.id,
+          title: challenge.title || extractGameFromTitle(challenge.title || '') || "Challenge",
+          ...challenge,
+          rawData: challenge.rawData || challenge
+        });
+        setShowStandardLobby(true);
         return;
       }
       
@@ -2629,6 +2638,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         await expressJoinIntent(challenge.id, walletAddr, true);
         alert('✅ Join intent expressed! Waiting for creator to confirm.');
         setShowDetailSheet(false);
+        
+        // Open minimized nav bar lobby first (auto-minimizes on mobile)
+        setSelectedChallenge({
+          id: challenge.id,
+          title: challenge.title || extractGameFromTitle(challenge.title || '') || "Challenge",
+          ...challenge,
+          rawData: challenge.rawData || challenge
+        });
+        setShowStandardLobby(true);
         return;
       }
       
@@ -2652,6 +2670,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // This makes joining free and instant!
       
       setShowDetailSheet(false);
+      
+      // Open minimized nav bar lobby first (auto-minimizes on mobile)
+      // This shows the nav bar at the top, user can expand to see full lobby
+      setSelectedChallenge({
+        id: challenge.id,
+        title: challenge.title || extractGameFromTitle(challenge.title || '') || "Challenge",
+        ...challenge,
+        rawData: challenge.rawData || challenge
+      });
+      setShowStandardLobby(true);
     } catch (err: any) {
       console.error("❌ Express join intent failed:", err);
       const errorMessage = err.message || err.toString() || 'Failed to express join intent. Please try again.';
