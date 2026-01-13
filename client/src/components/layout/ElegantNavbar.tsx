@@ -13,10 +13,10 @@ const ElegantNavbar: React.FC<ElegantNavbarProps> = ({ children }) => {
           {/* Logo */}
           <Link 
             to="/" 
-            className="flex items-center space-x-1.5 group"
+            className="flex items-center gap-1 group"
             title="Built for the ones who don't blink."
           >
-            <div className="relative">
+            <div className="relative flex-shrink-0">
               <img 
                 src="/assets/usdfgToken2.png" 
                 alt="USDFG Logo" 
@@ -25,7 +25,7 @@ const ElegantNavbar: React.FC<ElegantNavbarProps> = ({ children }) => {
               />
               <div className="absolute inset-0 bg-gradient-to-r from-amber-300 to-yellow-200 rounded-lg blur-md opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
             </div>
-            <span className="bg-gradient-to-r from-amber-300 to-yellow-200 bg-clip-text text-transparent font-extrabold text-xl tracking-tight">
+            <span className="bg-gradient-to-r from-amber-300 to-yellow-200 bg-clip-text text-transparent font-extrabold text-xl tracking-tight whitespace-nowrap">
               USDFG
             </span>
           </Link>
