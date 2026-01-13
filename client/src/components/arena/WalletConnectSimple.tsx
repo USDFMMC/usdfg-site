@@ -180,10 +180,9 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       : (isConnected || (connected && publicKey)); // Desktop uses adapter or prop
     
     // Get the effective public key (from hook, localStorage, or prop)
-    const phantomState = mobile ? getPhantomConnectionState() : null;
-    const effectivePublicKey = publicKey || 
-      (mobile && mobileConnectionState.publicKey ? new PublicKey(mobileConnectionState.publicKey) : null) ||
-      (mobile && phantomState?.publicKey ? new PublicKey(phantomState.publicKey) : null);
+    // CRITICAL: ONLY use wallet adapter's publicKey - do NOT trust localStorage
+    // This prevents showing random/stale wallet addresses like "8MJW...k5Tx" when not connected
+    const effectivePublicKey = publicKey; // ONLY trust adapter - localStorage can be stale
     
     if (actuallyConnected && effectivePublicKey) {
       // Clear disconnect flag when user successfully connects
