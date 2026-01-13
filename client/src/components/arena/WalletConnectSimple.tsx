@@ -29,17 +29,53 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   
   // CRITICAL: On mobile, check localStorage directly for Phantom connection
   // This ensures we detect connections even if parent component state is stale
+  // BUT: Validate on mount - if localStorage says connected but no valid connection, clear it
   const [mobileConnectionState, setMobileConnectionState] = useState(() => {
     if (!mobile || typeof window === 'undefined') return { connected: false, publicKey: null };
+    
+    // CRITICAL FIX: Validate localStorage connection state on mount
+    // If localStorage says connected but wallet adapter says not connected, clear stale state
+    const storedConnected = localStorage.getItem('phantom_connected') === 'true';
+    const storedPublicKey = localStorage.getItem('phantom_public_key');
+    const walletDisconnected = localStorage.getItem('wallet_disconnected') === 'true';
+    
+    // If user explicitly disconnected or localStorage is stale, clear it
+    if (walletDisconnected || (storedConnected && !storedPublicKey)) {
+      console.log('🧹 Clearing stale localStorage connection state on mount');
+      localStorage.removeItem('phantom_connected');
+      localStorage.removeItem('phantom_public_key');
+      return { connected: false, publicKey: null };
+    }
+    
     return {
-      connected: localStorage.getItem('phantom_connected') === 'true',
-      publicKey: localStorage.getItem('phantom_public_key')
+      connected: storedConnected && !!storedPublicKey,
+      publicKey: storedPublicKey
     };
   });
 
   // Clean up stuck connection states on mount - be aggressive on Safari
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    
+    // CRITICAL FIX: Validate localStorage connection state matches actual state
+    // If localStorage says connected but adapter/hook says not connected, clear stale state
+    const storedConnected = localStorage.getItem('phantom_connected') === 'true';
+    const storedPublicKey = localStorage.getItem('phantom_public_key');
+    const walletDisconnected = localStorage.getItem('wallet_disconnected') === 'true';
+    
+    // If localStorage says connected but adapter says not connected, clear stale state
+    if (storedConnected && (!connected || !publicKey) && !walletDisconnected) {
+      // Check if this is a fresh page load (no recent connection activity)
+      const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
+      const isRecentConnection = connectTimestamp && (Date.now() - parseInt(connectTimestamp) < 10000);
+      
+      if (!isRecentConnection) {
+        console.log('🧹 Clearing stale localStorage connection state - adapter says not connected');
+        localStorage.removeItem('phantom_connected');
+        localStorage.removeItem('phantom_public_key');
+        setMobileConnectionState({ connected: false, publicKey: null });
+      }
+    }
     
     // Clear stuck connection states that are older than 5 seconds (more aggressive)
     const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
@@ -83,7 +119,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     setTimeout(() => {
       window.dispatchEvent(new Event('storage'));
     }, 100);
-  }, []);
+  }, [connected, publicKey, mobile]);
 
   // Listen for localStorage changes (when Phantom sets connection)
   // OPTIMIZED: Reduced polling frequency and added state change detection
