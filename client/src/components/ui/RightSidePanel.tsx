@@ -232,12 +232,12 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
                 {title}
               </h2>
               <div className="flex items-center gap-2">
-                {/* Minimize button (mobile only, when challenge is created) */}
-                {isMobile && safePlayers.length >= 1 && (
+                {/* Minimize button (mobile only) - allows users to minimize to nav bar to scroll site */}
+                {isMobile && (
                   <button
                     onClick={() => setIsMinimized(true)}
                     className="p-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors duration-300 md:hidden"
-                    aria-label="Minimize lobby"
+                    aria-label="Minimize lobby to nav bar"
                   >
                     <ChevronUp className="w-4 h-4 text-gray-400 rotate-180" />
                   </button>

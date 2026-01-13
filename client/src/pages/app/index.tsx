@@ -2650,26 +2650,40 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         return;
       }
       
-      // JOIN INTENT: Firestore only (NO SOLANA FEE!)
-      // Express intent in Firestore - this is sufficient for the creator to see and fund
-      // On-chain express intent will happen automatically when creator funds the challenge
-      const needsFirestoreUpdate = status === 'pending_waiting_for_opponent' && !isAlreadyPendingJoiner;
-      
-      if (needsFirestoreUpdate) {
-        await expressJoinIntent(challenge.id, walletAddr);
-        // Firestore update completes instantly - real-time listener updates UI immediately
-        // Creator sees "Fund Challenge" button appear right away
-            alert('✅ Join intent expressed! Creator can now fund the challenge.');
-          } else {
-        // Already expressed intent - just confirm
-        alert('✅ You have already expressed intent to join this challenge. Waiting for creator to fund.');
+            // JOIN INTENT: Firestore only (NO SOLANA FEE!)
+            // Express intent in Firestore - this is sufficient for the creator to see and fund
+            // On-chain express intent will happen automatically when creator funds the challenge
+            const needsFirestoreUpdate = status === 'pending_waiting_for_opponent' && !isAlreadyPendingJoiner;
+            
+            if (needsFirestoreUpdate) {
+              await expressJoinIntent(challenge.id, walletAddr);
+              
+              // CRITICAL: Immediately update selectedChallenge to trigger UI update
+              // This ensures the "Fund Challenge" button appears instantly for the creator
+              // The onSnapshot listener will also update, but this ensures no delay
+              const updatedChallenge = await fetchChallengeById(challenge.id);
+              if (updatedChallenge) {
+                setSelectedChallenge({
+                  id: updatedChallenge.id,
+                  title: updatedChallenge.title || extractGameFromTitle(updatedChallenge.title || '') || "Challenge",
+                  ...updatedChallenge,
+                  rawData: updatedChallenge.rawData || updatedChallenge
+                });
+              }
+              
+              // Firestore update completes instantly - real-time listener updates UI immediately
+              // Creator sees "Fund Challenge" button appear right away
+              alert('✅ Join intent expressed! Creator can now fund the challenge.');
+            } else {
+              // Already expressed intent - just confirm
+              alert('✅ You have already expressed intent to join this challenge. Waiting for creator to fund.');
             }
-      
-      // NO ON-CHAIN CALL FOR JOIN INTENT - saves users Solana fees!
-      // On-chain express intent will happen when creator funds, or can be done later if needed
-      // This makes joining free and instant!
-      
-      setShowDetailSheet(false);
+            
+            // NO ON-CHAIN CALL FOR JOIN INTENT - saves users Solana fees!
+            // On-chain express intent will happen when creator funds, or can be done later if needed
+            // This makes joining free and instant!
+            
+            setShowDetailSheet(false);
       
       // Open minimized nav bar lobby first (auto-minimizes on mobile)
       // This shows the nav bar at the top, user can expand to see full lobby

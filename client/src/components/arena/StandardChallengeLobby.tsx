@@ -71,7 +71,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     
     const challengeRef = doc(db, 'challenges', challenge.id);
     
-    // Set up listener immediately - no delays for instant button visibility
+    // CRITICAL: Set up listener with includeMetadataChanges to catch ALL updates
+    // This ensures we get updates immediately, even metadata changes
     // onSnapshot fires immediately when document changes, ensuring instant updates
     // This listener is the PRIMARY source - it updates liveChallenge immediately
     // regardless of when the parent component's selectedChallenge prop updates
@@ -80,12 +81,23 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       (snapshot) => {
         if (snapshot.exists()) {
           const updatedData = { id: snapshot.id, ...snapshot.data(), rawData: snapshot.data() };
-          // Update immediately - no debouncing or delays
+          const newStatus = updatedData.status || updatedData.rawData?.status;
+          const newPendingJoiner = updatedData.pendingJoiner || updatedData.rawData?.pendingJoiner;
+          
+          // CRITICAL: Always update liveChallenge immediately - no conditions
           // This ensures "Fund Challenge" button appears instantly when someone expresses intent
           // Priority: This listener > prop updates (for instant button visibility)
-          // CRITICAL: Always update liveChallenge immediately - don't check for changes first
-          // This prevents any delay in button visibility
+          // Don't check for changes - always update to prevent any delay
           setLiveChallenge(updatedData);
+          
+          // Debug: Log when status changes to creator_confirmation_required
+          if (newStatus === 'creator_confirmation_required' && newPendingJoiner) {
+            console.log('✅ Join intent detected - Fund Challenge button should appear NOW:', {
+              status: newStatus,
+              pendingJoiner: newPendingJoiner,
+              challengeId: challenge.id
+            });
+          }
         } else {
           // If document doesn't exist, fallback to prop
           setLiveChallenge(challenge);
