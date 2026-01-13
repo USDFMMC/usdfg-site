@@ -3044,6 +3044,18 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         }
       }
       
+      // CRITICAL: Immediately refresh challenge data so challenger sees "Fund Challenge" button instantly
+      // This ensures both users see the update immediately (onSnapshot listener also updates, but this ensures no delay)
+      const updatedChallenge = await fetchChallengeById(challenge.id);
+      if (updatedChallenge) {
+        setSelectedChallenge({
+          id: updatedChallenge.id,
+          title: updatedChallenge.title || extractGameFromTitle(updatedChallenge.title || '') || "Challenge",
+          ...updatedChallenge,
+          rawData: updatedChallenge.rawData || updatedChallenge
+        });
+      }
+      
       // Refresh balance
       setTimeout(() => {
         refreshUSDFGBalance().catch(() => {});
