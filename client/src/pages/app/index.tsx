@@ -22,6 +22,25 @@ import { PublicKey } from '@solana/web3.js';
 import { getAssociatedTokenAddress } from '@solana/spl-token';
 import { testFirestoreConnection } from "@/lib/firebase/firestore";
 import { getWalletScopedValue, setWalletScopedValue, clearWalletScopedValue, PROFILE_STORAGE_KEYS } from "@/lib/storage/profile";
+import { getPhantomConnectionState, setPhantomConnectionState, clearPhantomConnectionState } from "@/lib/utils/wallet-state";
+import { 
+  getChallengeStatus, 
+  getChallengeCreator, 
+  isChallengeCreator, 
+  getChallengeEntryFee, 
+  getChallengePrizePool,
+  getChallengePDA,
+  getChallengeChallenger,
+  isChallengeChallenger,
+  getChallengePendingJoiner,
+  isPendingJoiner,
+  getCreatorFundingDeadline,
+  isCreatorFundingDeadlineExpired,
+  isChallengeActive,
+  isChallengeWaitingForPlayers,
+  isChallengeInProgress,
+  canCancelChallenge
+} from "@/lib/utils/challenge-helpers";
 import ElegantButton from "@/components/ui/ElegantButton";
 import ElegantModal from "@/components/ui/ElegantModal";
 import CreateChallengeForm from "@/components/arena/CreateChallengeForm";
@@ -166,15 +185,12 @@ const ArenaHome: React.FC = () => {
   // State to track stored Phantom connection (forces re-render when changed)
   const [phantomConnectionState, setPhantomConnectionState] = useState(() => {
     if (typeof window === 'undefined') return { connected: false, publicKey: null };
-    return {
-      connected: localStorage.getItem('phantom_connected') === 'true',
-      publicKey: localStorage.getItem('phantom_public_key')
-    };
+    return getPhantomConnectionState();
   });
   
   // Check for stored Phantom connection (mobile deep link)
   // On mobile Safari, adapter.connect() doesn't work, so we use stored public key
-  const hasStoredPhantomConnection = phantomConnectionState.connected || localStorage.getItem('phantom_connected') === 'true';
+  const hasStoredPhantomConnection = phantomConnectionState.connected || getPhantomConnectionState().connected;
   const storedPhantomPublicKey = phantomConnectionState.publicKey || localStorage.getItem('phantom_public_key');
   
   // Use adapter connection OR stored Phantom connection
@@ -191,7 +207,7 @@ const ArenaHome: React.FC = () => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('phantom_connected') === 'true') {
       console.log("📨 Detected redirect from closed new tab - checking for connection state");
-      const hasConnection = localStorage.getItem('phantom_connected') === 'true';
+      const hasConnection = getPhantomConnectionState().connected;
       if (hasConnection) {
         const publicKey = localStorage.getItem('phantom_public_key');
         if (publicKey) {
@@ -274,8 +290,7 @@ const ArenaHome: React.FC = () => {
             
             // Mark wallet as connected in localStorage (for UI state)
             // This makes the app think it's connected even if adapter.connect() fails
-            localStorage.setItem('phantom_connected', 'true');
-            localStorage.setItem('phantom_public_key', result.publicKey);
+            setPhantomConnectionState(true, result.publicKey);
             
             // Check if we're in a new tab (Phantom opened new tab)
             // The original tab would have 'phantom_original_tab' marker
@@ -408,14 +423,12 @@ const ArenaHome: React.FC = () => {
         publicKey: publicKey.toString()
       });
       // Also update localStorage for consistency
-      localStorage.setItem('phantom_connected', 'true');
-      localStorage.setItem('phantom_public_key', publicKey.toString());
+      setPhantomConnectionState(true, publicKey.toString());
     } else if (!connected && !publicKey) {
       // Wallet adapter disconnected - check localStorage
-      const storedConnected = localStorage.getItem('phantom_connected') === 'true';
-      const storedPublicKey = localStorage.getItem('phantom_public_key');
+      const storedState = getPhantomConnectionState();
       
-      if (!storedConnected || !storedPublicKey) {
+      if (!storedState.connected || !storedState.publicKey) {
         // No stored connection - clear state
         setPhantomConnectionState({
           connected: false,
@@ -2527,16 +2540,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
     const walletAddr = publicKey.toString();
     const currentWallet = publicKey.toString().toLowerCase();
-    const status = challenge.status || challenge.rawData?.status;
-    const challengePDA = challenge.rawData?.pda || challenge.pda;
-    const pendingJoiner = challenge.rawData?.pendingJoiner || challenge.pendingJoiner;
-    const challenger = challenge.rawData?.challenger || challenge.challenger;
-    const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
-    const isCreator = creatorWallet.toLowerCase() === currentWallet;
-    const creatorFundingDeadline = challenge.rawData?.creatorFundingDeadline || challenge.creatorFundingDeadline;
-    const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
-    const isAlreadyPendingJoiner = pendingJoiner && pendingJoiner.toLowerCase() === currentWallet;
-    const isChallenger = challenger && challenger.toLowerCase() === currentWallet;
+    const status = getChallengeStatus(challenge);
+    const challengePDA = getChallengePDA(challenge);
+    const pendingJoiner = getChallengePendingJoiner(challenge);
+    const challenger = getChallengeChallenger(challenge);
+    const creatorWallet = getChallengeCreator(challenge);
+    const isCreator = isChallengeCreator(challenge, currentWallet);
+    const creatorFundingDeadline = getCreatorFundingDeadline(challenge);
+    const isDeadlineExpired = isCreatorFundingDeadlineExpired(challenge);
+    const isAlreadyPendingJoiner = isPendingJoiner(challenge, currentWallet);
+    const isChallenger = isChallengeChallenger(challenge, currentWallet);
     
     // Only prevent creator from joining if deadline hasn't expired and challenge is still waiting for creator funding
     if (isCreator && !isDeadlineExpired && status === 'creator_confirmation_required') {
@@ -2628,8 +2641,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       }
       
       // Check if Founder Challenge
-      const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
-      const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
+      const creatorWallet = getChallengeCreator(challenge);
+      const entryFee = getChallengeEntryFee(challenge);
       const isAdmin = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
       const isFounderChallenge = isAdmin && (entryFee === 0 || entryFee < 0.000000001);
       
@@ -2731,7 +2744,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       return;
     }
 
-    const status = challenge.status || challenge.rawData?.status;
+    const status = getChallengeStatus(challenge);
     if (status !== 'creator_funded') {
       alert(`Challenge is not waiting for joiner funding. Current status: ${status}`);
       return;
@@ -2739,8 +2752,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
     try {
       const walletAddr = publicKey.toString();
-      const challengePDA = challenge.rawData?.pda || challenge.pda;
-      const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
+      const challengePDA = getChallengePDA(challenge);
+      const entryFee = getChallengeEntryFee(challenge);
       
       if (!challengePDA) {
         throw new Error('Challenge has no on-chain PDA.');
@@ -2812,17 +2825,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
 
     const currentWallet = publicKey.toString().toLowerCase();
-    const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
-    const isCreator = currentWallet === creatorWallet.toLowerCase();
+    const creatorWallet = getChallengeCreator(challenge);
+    const isCreator = isChallengeCreator(challenge, currentWallet);
     
     if (!isCreator) {
       alert('Only the challenge creator can cancel the challenge');
       return;
     }
 
-    const status = challenge.status || challenge.rawData?.status;
-    const creatorFundingDeadline = challenge.rawData?.creatorFundingDeadline || challenge.creatorFundingDeadline;
-    const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
+    const status = getChallengeStatus(challenge);
+    const isDeadlineExpired = isCreatorFundingDeadlineExpired(challenge);
     
     // Only allow cancel if deadline expired or challenge is still pending (no one joined)
     if (status !== 'pending_waiting_for_opponent' && status !== 'creator_confirmation_required') {
@@ -2868,15 +2880,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
 
     const currentWallet = publicKey.toString().toLowerCase();
-    const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
-    const isCreator = currentWallet === creatorWallet.toLowerCase();
+    const creatorWallet = getChallengeCreator(challenge);
+    const isCreator = isChallengeCreator(challenge, currentWallet);
     
     if (!isCreator) {
       alert('Only the challenge creator can fund the challenge');
       return;
     }
 
-    const status = challenge.status || challenge.rawData?.status;
+    const status = getChallengeStatus(challenge);
     if (status !== 'creator_confirmation_required') {
       alert(`Challenge is not waiting for creator funding. Current status: ${status}`);
       return;
@@ -4552,8 +4564,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               onDisconnect={() => {
                 localStorage.removeItem('wallet_connected');
                 localStorage.removeItem('wallet_address');
-                localStorage.removeItem('phantom_connected');
-                localStorage.removeItem('phantom_public_key');
+                clearPhantomConnectionState();
                 // Force state update
                 setPhantomConnectionState({ connected: false, publicKey: null });
               }}
@@ -4591,8 +4602,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               onDisconnect={() => {
                 localStorage.removeItem('wallet_connected');
                 localStorage.removeItem('wallet_address');
-                localStorage.removeItem('phantom_connected');
-                localStorage.removeItem('phantom_public_key');
+                clearPhantomConnectionState();
                 // Force state update
                 setPhantomConnectionState({ connected: false, publicKey: null });
               }}

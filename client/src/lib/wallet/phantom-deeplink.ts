@@ -12,6 +12,7 @@ console.log('🔍 DEEPLINK MODULE LOADED - phantom-deeplink.ts imported');
 
 import nacl from "tweetnacl";
 import { PublicKey } from '@solana/web3.js';
+import { isPhantomConnecting, setPhantomConnecting } from "../utils/wallet-state";
 
 const PHANTOM_DEEPLINK_BASE = 'https://phantom.app/ul/v1/connect';
 const SESSION_STORAGE_KEY = 'phantom_dapp_keypair';
@@ -83,8 +84,7 @@ export function launchPhantomDeepLink(): void {
   console.log('🚀 Launching Phantom deep link...');
 
   // Check if we're already connecting (prevent multiple attempts)
-  const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
-  if (isConnecting) {
+  if (isPhantomConnecting()) {
     console.warn('⚠️ Already connecting to Phantom - ignoring duplicate request');
     return;
   }

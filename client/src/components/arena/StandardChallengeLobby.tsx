@@ -5,6 +5,17 @@ import { Camera, Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
 import { getPlayerStats, fetchChallengeById } from "@/lib/firebase/firestore";
 import { collection, doc, setDoc, deleteDoc, updateDoc, onSnapshot, query, where, serverTimestamp, Timestamp, getDocs, getDoc, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
+import { 
+  getChallengeStatus, 
+  getChallengePendingJoiner,
+  getChallengeCreator,
+  isChallengeCreator,
+  getChallengeEntryFee,
+  getChallengeChallenger,
+  isChallengeChallenger,
+  getCreatorFundingDeadline,
+  isCreatorFundingDeadlineExpired
+} from "@/lib/utils/challenge-helpers";
 
 interface StandardChallengeLobbyProps {
   challenge: any;
@@ -72,8 +83,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       (snapshot) => {
         if (snapshot.exists()) {
           const updatedData = { id: snapshot.id, ...snapshot.data(), rawData: snapshot.data() };
-          const newStatus = updatedData.status || updatedData.rawData?.status;
-          const newPendingJoiner = updatedData.pendingJoiner || updatedData.rawData?.pendingJoiner;
+          const newStatus = getChallengeStatus(updatedData);
+          const newPendingJoiner = getChallengePendingJoiner(updatedData);
           
           // CRITICAL: Always update liveChallenge immediately - no conditions
           // This ensures "Fund Challenge" button appears instantly when someone expresses intent

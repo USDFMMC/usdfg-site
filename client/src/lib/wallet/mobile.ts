@@ -16,6 +16,13 @@
  */
 
 import nacl from "tweetnacl";
+import { 
+  isPhantomConnecting, 
+  getPhantomConnectTimestamp, 
+  setPhantomConnecting, 
+  clearPhantomConnectingState,
+  isRecentPhantomConnection
+} from "../utils/wallet-state";
 
 function encodeBase64(u8: Uint8Array): string {
   let binary = "";
@@ -52,17 +59,15 @@ export function phantomMobileConnect() {
   // CRITICAL: Check if we're already connecting, but only if it's very recent (not stuck)
   // Be more lenient - allow retries if first attempt failed
   if (typeof window !== "undefined") {
-    const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
-    const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
+    const isConnecting = isPhantomConnecting();
+    const connectTimestamp = getPhantomConnectTimestamp();
     
     if (isConnecting) {
       if (connectTimestamp) {
-        const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
+        const timeSinceConnect = Date.now() - connectTimestamp;
         // If connection state is older than 2 seconds, consider it stuck and clear it (more aggressive)
         if (timeSinceConnect > 2000) {
-          sessionStorage.removeItem('phantom_connecting');
-          sessionStorage.removeItem('phantom_connect_timestamp');
-          sessionStorage.removeItem('phantom_connect_attempt');
+          clearPhantomConnectingState();
           // Allow connection to proceed
         } else {
           // Very recent (within 2 seconds) - block to prevent double-clicks
@@ -70,7 +75,7 @@ export function phantomMobileConnect() {
         }
       } else {
         // No timestamp but marked as connecting - clear orphaned state immediately
-        sessionStorage.removeItem('phantom_connecting');
+        clearPhantomConnectingState();
         // Allow connection to proceed
       }
     }
@@ -91,9 +96,7 @@ export function phantomMobileConnect() {
   isNavigating = true;
   navigationStartTime = Date.now();
   const now = Date.now();
-  sessionStorage.setItem('phantom_connecting', 'true');
-  sessionStorage.setItem('phantom_connect_timestamp', now.toString());
-  sessionStorage.setItem('phantom_connect_attempt', new Date().toISOString());
+  setPhantomConnecting(true, now);
   // Mark this as the original tab (so we can detect if Phantom opens a new tab)
   sessionStorage.setItem('phantom_original_tab', 'true');
   // Reset redirect count (for detecting loops)

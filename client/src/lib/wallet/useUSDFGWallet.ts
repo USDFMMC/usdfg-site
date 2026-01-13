@@ -2,6 +2,7 @@ import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { isMobileSafari } from "../utils/isMobileSafari";
 import { phantomMobileConnect } from "./mobile";
 import { PublicKey } from "@solana/web3.js";
+import { getPhantomConnectionState } from "../utils/wallet-state";
 
 export function useUSDFGWallet() {
   const wallet = useWallet();
@@ -198,10 +199,9 @@ export function useUSDFGWallet() {
   }
 
   // On mobile, check for stored connection from deep link return
-  const mobileConnected = mobile && typeof window !== 'undefined' && 
-    localStorage.getItem('phantom_connected') === 'true';
-  const mobilePublicKey = mobile && typeof window !== 'undefined' && 
-    localStorage.getItem('phantom_public_key');
+  const phantomState = mobile ? getPhantomConnectionState() : null;
+  const mobileConnected = mobile && phantomState?.connected || false;
+  const mobilePublicKey = mobile && phantomState?.publicKey || null;
 
   return {
     connect,
