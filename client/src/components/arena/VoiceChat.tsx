@@ -123,38 +123,69 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWall
 
     // Removed initialization logging - excessive logging removed
     try {
-      // Get user's microphone
-      setStatus("Requesting mic permission...");
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      localStream.current = stream;
-      setConnected(true);
-      setStatus("Mic ready, waiting for opponent...");
-
-      // Create peer connection with optimized STUN and TURN servers
-      const configuration: RTCConfiguration = {
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          // Free TURN server from Open Relay Project (most reliable)
-          { 
-            urls: [
-              'turn:openrelay.metered.ca:80',
-              'turn:openrelay.metered.ca:443',
-              'turn:openrelay.metered.ca:443?transport=tcp'
-            ],
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-          }
-        ],
-        iceCandidatePoolSize: 10
-      };
+      // Check if we already have an active stream (prevents duplicate mic permission popups)
+      let stream = localStream.current;
       
-      const pc = new RTCPeerConnection(configuration);
-      peerConnection.current = pc;
+      // Check if existing stream is still active
+      if (stream) {
+        const audioTracks = stream.getAudioTracks();
+        const hasActiveTrack = audioTracks.some(track => track.readyState === 'live');
+        
+        if (hasActiveTrack) {
+          console.log("✅ Reusing existing microphone stream (no permission popup needed)");
+          setConnected(true);
+          setStatus("Mic ready, waiting for opponent...");
+        } else {
+          // Stream exists but tracks are not live, get new stream
+          stream = null;
+        }
+      }
+      
+      // Only request mic permission if we don't have an active stream
+      if (!stream) {
+        setStatus("Requesting mic permission...");
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        localStream.current = stream;
+        setConnected(true);
+        setStatus("Mic ready, waiting for opponent...");
+      }
 
-      // Add local stream to peer connection
-      stream.getTracks().forEach((track) => {
-        pc.addTrack(track, stream);
-      });
+      // Only create new peer connection if we don't have one or if challengeId changed
+      let pc = peerConnection.current;
+      if (!pc || pc.connectionState === 'closed' || pc.connectionState === 'failed') {
+        // Create peer connection with optimized STUN and TURN servers
+        const configuration: RTCConfiguration = {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            // Free TURN server from Open Relay Project (most reliable)
+            { 
+              urls: [
+                'turn:openrelay.metered.ca:80',
+                'turn:openrelay.metered.ca:443',
+                'turn:openrelay.metered.ca:443?transport=tcp'
+              ],
+              username: 'openrelayproject',
+              credential: 'openrelayproject'
+            }
+          ],
+          iceCandidatePoolSize: 10
+        };
+        
+        pc = new RTCPeerConnection(configuration);
+        peerConnection.current = pc;
+      }
+
+      // Add local stream to peer connection (only if not already added)
+      const existingSenders = pc.getSenders();
+      const hasAudioTrack = existingSenders.some(sender => 
+        sender.track && sender.track.kind === 'audio' && sender.track.readyState === 'live'
+      );
+      
+      if (!hasAudioTrack) {
+        stream.getTracks().forEach((track) => {
+          pc.addTrack(track, stream);
+        });
+      }
 
       // Handle incoming tracks
       pc.ontrack = (event) => {
@@ -211,6 +242,13 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWall
 
       // Listen for remote signals from the shared document
       const signalRef = doc(db, "voice_signals", memoizedChallengeId);
+      
+      // Only set up new listener if we don't already have one for this challenge
+      if (unsubscribeSignalRef.current) {
+        // Clean up old listener first
+        unsubscribeSignalRef.current();
+        unsubscribeSignalRef.current = null;
+      }
       
       // Store unsubscribe function for cleanup
       const unsubscribe = onSnapshot(signalRef, async (snapshot) => {

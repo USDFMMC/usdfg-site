@@ -515,37 +515,17 @@ export async function creatorFund(
     console.log(`  ${idx}: ${key.pubkey.toString()} (${accountNames[idx]}, signer: ${key.isSigner}, writable: ${key.isWritable})`);
   });
 
-  // CRITICAL: Add explicit token transfer instruction so Phantom Wallet can show USDFG transfer in preview
-  // The contract does the transfer via CPI, but Phantom needs to see it explicitly to show in preview
-  // This makes the transaction preview show: "Transfer X USDFG" + network fee
-  const { createTransferInstruction } = await import('@solana/spl-token');
-  const transferInstruction = createTransferInstruction(
-    creatorTokenAccount,      // source: creator's USDFG token account
-    escrowTokenAccountPDA,   // destination: escrow USDFG token account
-    creator,                  // authority: creator (signs the transfer)
-    entryFeeLamports          // amount: entry fee in lamports
-  );
-  
-  console.log('💸 Added explicit USDFG transfer instruction for Phantom preview:', {
-    from: creatorTokenAccount.toString(),
-    to: escrowTokenAccountPDA.toString(),
-    amount: `${entryFeeUsdfg} USDFG (${entryFeeLamports} lamports)`
-  });
-
-  // Build transaction with BOTH instructions:
-  // 1. Explicit transfer (so Phantom shows it)
-  // 2. Contract instruction (which will do the transfer again via CPI, but that's OK - the contract validates)
-  // Actually wait - we can't do this because the contract will try to transfer again and fail
-  // Instead, we need to make sure the contract instruction is what Phantom recognizes
-  
-  // Let me check if we should add the transfer instruction separately or if the contract handles it
-  // The contract DOES handle the transfer via CPI, so we shouldn't add a separate transfer
-  // The issue is that Phantom might not recognize CPI transfers in preview
-  
-  // SOLUTION: We'll keep the contract instruction as-is (it works correctly)
-  // But we'll add logging to confirm the amount is being passed correctly
-  // Phantom may not show CPI transfers in preview, but the transfer WILL execute
-  
+  // Build transaction with contract instruction
+  // NOTE: The contract performs the token transfer via CPI (Cross-Program Invocation)
+  // Phantom Wallet may not show CPI transfers in the preview, but the transfer WILL execute
+  // The contract code (lib.rs line 123-133) explicitly transfers tokens from creator to escrow
+  // 
+  // IMPORTANT: We cannot add an explicit transfer instruction here because:
+  // 1. If we add it BEFORE the contract instruction, the contract will fail (tokens already transferred)
+  // 2. If we add it AFTER, Phantom won't show it (it's after the contract call)
+  // 
+  // The solution is to ensure Phantom can parse the CPI transfer, which may require
+  // using Anchor's program interface or ensuring the transaction structure matches what Phantom expects
   const transaction = new Transaction().add(instruction);
   const { blockhash } = await connection.getLatestBlockhash();
   transaction.recentBlockhash = blockhash;
