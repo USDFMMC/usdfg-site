@@ -106,6 +106,17 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const activeChallenge = liveChallenge || challenge;
 
   const status = activeChallenge.status || activeChallenge.rawData?.status || 'pending_waiting_for_opponent';
+  
+  // ALWAYS log status and creator info (helps diagnose button visibility)
+  console.log('🔍 StandardChallengeLobby Status Check:', {
+    status,
+    challengeId: activeChallenge.id,
+    creator: activeChallenge.creator || activeChallenge.rawData?.creator,
+    currentWallet: currentWallet?.toLowerCase(),
+    pendingJoiner: activeChallenge.pendingJoiner || activeChallenge.rawData?.pendingJoiner,
+    hasLiveChallenge: !!liveChallenge,
+    liveChallengeStatus: liveChallenge?.status || liveChallenge?.rawData?.status
+  });
   const players = activeChallenge.rawData?.players || activeChallenge.players || [];
   const entryFee = activeChallenge.entryFee || activeChallenge.rawData?.entryFee || 0;
   const prizePool = activeChallenge.prizePool || activeChallenge.rawData?.prizePool || (entryFee * 2);
@@ -273,24 +284,18 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   
   const canCreatorFund = isCreator && status === 'creator_confirmation_required' && !isDeadlineExpired && onCreatorFund;
   
-  // Debug logging for creator fund button (always log to help diagnose - remove after fixing)
-  useEffect(() => {
-    if (isCreator) {
-      console.log('🔍 Creator Fund Button Debug:', {
-        isCreator,
-        status,
-        isDeadlineExpired,
-        hasOnCreatorFund: !!onCreatorFund,
-        pendingJoiner: pendingJoinerWallet,
-        canCreatorFund,
-        liveChallengeStatus: liveChallenge?.status || liveChallenge?.rawData?.status,
-        propChallengeStatus: challenge?.status || challenge?.rawData?.status,
-        activeChallengeStatus: activeChallenge?.status || activeChallenge?.rawData?.status,
-        creatorWallet,
-        currentWallet
-      });
-    }
-  }, [isCreator, status, isDeadlineExpired, onCreatorFund, pendingJoinerWallet, canCreatorFund, liveChallenge, challenge, activeChallenge, creatorWallet, currentWallet]);
+  // ALWAYS log creator fund button conditions (helps diagnose why button isn't showing)
+  console.log('💰 Creator Fund Button Check:', {
+    isCreator,
+    status,
+    isDeadlineExpired,
+    hasOnCreatorFund: !!onCreatorFund,
+    pendingJoiner: pendingJoinerWallet,
+    canCreatorFund,
+    creatorWallet: creatorWallet?.toLowerCase(),
+    currentWallet: currentWallet?.toLowerCase(),
+    match: creatorWallet?.toLowerCase() === currentWallet?.toLowerCase()
+  });
   
   // Debug logging disabled to reduce console spam
   // Uncomment only when debugging specific issues
