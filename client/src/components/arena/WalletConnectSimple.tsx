@@ -410,6 +410,16 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     }
 
     (async () => {
+      // CRITICAL FIX: Clear ALL stale state before connecting
+      // This ensures clean connection state, especially on mobile after disconnect
+      localStorage.removeItem('wallet_disconnected');
+      // Don't clear phantom_connected/phantom_public_key here - let Phantom set them
+      
+      // Update mobile connection state to ensure button shows correct state
+      if (mobile) {
+        setMobileConnectionState({ connected: false, publicKey: null });
+      }
+      
       // CRITICAL: On mobile, DON'T set connecting state here
       // Let phantomMobileConnect() set it when it actually navigates
       // This prevents the guard from blocking the first call
@@ -486,9 +496,9 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const handleDisconnect = async () => {
     try {
       logWalletEvent('disconnecting', {});
-      await disconnect();
-  
-      // Clear ALL connection state - critical for proper state updates
+      
+      // CRITICAL FIX: Clear state BEFORE calling disconnect to ensure immediate UI update
+      // This prevents the "stuck connected" state on mobile
       localStorage.removeItem('phantom_connected');
       localStorage.removeItem('phantom_public_key');
       localStorage.removeItem('wallet_connected');
@@ -499,10 +509,19 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       sessionStorage.removeItem('last_logged_wallet');
       sessionStorage.removeItem('phantom_connecting');
       sessionStorage.removeItem('phantom_connect_timestamp');
+      sessionStorage.removeItem('phantom_connect_attempt');
       
-      // Update mobile connection state immediately
+      // Update mobile connection state immediately (BEFORE disconnect call)
       if (mobile) {
         setMobileConnectionState({ connected: false, publicKey: null });
+      }
+      
+      // Now call disconnect (may fail, but state is already cleared)
+      try {
+        await disconnect();
+      } catch (disconnectError) {
+        console.warn('Disconnect call failed, but state already cleared:', disconnectError);
+        // State is already cleared, continue
       }
       
       // Trigger disconnect event
@@ -514,12 +533,16 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       logWalletEvent('disconnected', {});
     } catch (error) {
       console.error('Disconnect error:', error);
-      // Clear state even on error
+      // Clear state even on error - ensure clean state
       localStorage.removeItem('phantom_connected');
       localStorage.removeItem('phantom_public_key');
       localStorage.removeItem('wallet_connected');
       localStorage.removeItem('wallet_address');
       localStorage.setItem('wallet_disconnected', 'true');
+      sessionStorage.removeItem('last_logged_wallet');
+      sessionStorage.removeItem('phantom_connecting');
+      sessionStorage.removeItem('phantom_connect_timestamp');
+      sessionStorage.removeItem('phantom_connect_attempt');
       if (mobile) {
         setMobileConnectionState({ connected: false, publicKey: null });
       }
