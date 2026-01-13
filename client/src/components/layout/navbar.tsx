@@ -17,15 +17,12 @@ const Navbar: React.FC = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-3 group" title="Built for the ones who don't blink.">
             <div className="relative">
-              <picture>
-                <source srcSet="/assets/usdfg-logo-transparent.webp" type="image/webp" />
-                <img 
-                  src="/assets/usdfg-logo-transparent.png" 
-                  alt="USDFG Logo" 
-                  className="w-10 h-10 object-contain transition-transform duration-300 group-hover:scale-110"
-                  loading="lazy" decoding="async"
-                />
-              </picture>
+              <img 
+                src="/assets/usdfgToken2.png" 
+                alt="USDFG Logo" 
+                className="w-10 h-10 object-contain transition-transform duration-300 group-hover:scale-110"
+                loading="lazy" decoding="async"
+              />
               <div className="absolute inset-0 bg-gradient-to-r from-amber-300 to-yellow-200 rounded-lg blur-md opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
             </div>
             <span className="bg-gradient-to-r from-amber-300 to-yellow-200 bg-clip-text text-transparent font-extrabold text-xl tracking-wide">
