@@ -429,6 +429,16 @@ export async function creatorFund(
   // Convert USDFG to lamports
   const entryFeeLamports = Math.floor(entryFeeUsdfg * Math.pow(10, 9));
   
+  // CRITICAL: Log the USDFG amount being transferred
+  console.log('💰💰💰 CREATOR FUNDING WITH USDFG:', {
+    entryFeeUsdfg,
+    entryFeeLamports,
+    usdfgAmount: `${entryFeeUsdfg} USDFG`,
+    lamports: entryFeeLamports,
+    creatorTokenAccount: creatorTokenAccount.toString(),
+    escrowTokenAccount: escrowTokenAccountPDA.toString()
+  });
+  
   // Create instruction data for creator_fund - takes usdfg_amount: u64 argument
   const { sha256 } = await import('@noble/hashes/sha2.js');
   const hash = sha256(new TextEncoder().encode('global:creator_fund'));
@@ -438,7 +448,7 @@ export async function creatorFund(
   discriminator.copy(instructionData, 0);
   const entryFeeBuffer = numberToU64Buffer(entryFeeLamports);
   entryFeeBuffer.copy(instructionData, 8);
-  console.log('📦 CreatorFund instruction data:', 'Discriminator:', discriminator.toString('hex'), 'Amount:', entryFeeLamports);
+  console.log('📦 CreatorFund instruction data:', 'Discriminator:', discriminator.toString('hex'), 'Amount (lamports):', entryFeeLamports, 'Amount (USDFG):', entryFeeUsdfg);
 
   // Account order for CreatorFund - EXACT match to local Rust struct (lib.rs line 583-602)
   // The Rust struct order is:

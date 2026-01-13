@@ -2937,6 +2937,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         // PDA exists - check if on-chain state needs to be synced
         // If Firestore says creator_confirmation_required but on-chain is still PendingWaitingForOpponent,
         // the joiner needs to express intent on-chain first
+        // CRITICAL: Log entry fee before calling on-chain function
+        console.log('🚀 CREATOR FUNDING - Entry Fee:', {
+          entryFee,
+          entryFeeUSDFG: `${entryFee} USDFG`,
+          challengePDA,
+          challengeId: challenge.id
+        });
+        
         try {
           await creatorFundOnChain(
             { signTransaction, publicKey },
