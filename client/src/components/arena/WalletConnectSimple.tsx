@@ -296,19 +296,19 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       : null);
   
   // Check connection from multiple sources (prop, hook, localStorage) - most reliable detection
-  // CRITICAL FIX: On mobile, be more strict - only show connected if wallet adapter confirms OR we have valid localStorage with no disconnect flag
+  // CRITICAL FIX: On mobile, prioritize wallet adapter - only show connected if adapter confirms
+  // This prevents showing "connected" when localStorage is stale but adapter says disconnected
   const actuallyConnected = Boolean(
-    isConnected || // Parent prop
-    (connected && publicKey) || // Wallet adapter hook (most reliable)
-    // On mobile, only trust localStorage if wallet adapter also confirms OR if there's no disconnect flag
-    (mobile && mobileConnectionState.connected && mobileConnectionState.publicKey && 
-     (connected || localStorage.getItem('wallet_disconnected') !== 'true')) || // Mobile state with validation
-    (mobile && typeof window !== 'undefined' && 
-      localStorage.getItem('phantom_connected') === 'true' && 
-      localStorage.getItem('phantom_public_key') && 
-      localStorage.getItem('wallet_disconnected') !== 'true' && // CRITICAL: Don't show connected if explicitly disconnected
-      effectivePublicKey && 
-      (connected || publicKey)) // CRITICAL: Only trust localStorage if adapter also confirms
+    // Most reliable: wallet adapter hook (always trust this)
+    (connected && publicKey) ||
+    // Parent prop (if provided and adapter confirms)
+    (isConnected && (connected || publicKey)) ||
+    // Mobile localStorage: only trust if adapter ALSO confirms (prevents stale state)
+    (mobile && 
+     mobileConnectionState.connected && 
+     mobileConnectionState.publicKey && 
+     (connected || publicKey) && // CRITICAL: Adapter must confirm
+     localStorage.getItem('wallet_disconnected') !== 'true')
   );
 
   // Calculate mobile-specific connection state
@@ -340,25 +340,22 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   }
   
   // Calculate button disabled state
+  // CRITICAL: Only disable if actually connecting or already connected
+  // On mobile, be more permissive - allow connection attempts even if there's stale state
   let isButtonDisabled = false;
   if (mobile) {
-    const veryRecentConnection = isPhantomConnecting && typeof window !== "undefined";
-    if (veryRecentConnection) {
+    // Only disable if very recently connecting (within 2 seconds) to prevent double-clicks
+    if (isPhantomConnecting) {
       const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
       if (connectTimestamp) {
         const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
-        if (timeSinceConnect > 2000) {
-          isButtonDisabled = false;
-        } else {
-          isButtonDisabled = true;
-        }
+        isButtonDisabled = timeSinceConnect < 2000; // Disable only if very recent (within 2s)
       }
     }
-    if (actuallyConnected) {
-      isButtonDisabled = true;
-    }
+    // Don't disable if actuallyConnected - let the connected state UI handle it
+    // This ensures button is always clickable when not connected
   } else {
-    isButtonDisabled = connecting || actuallyConnected || isPhantomConnecting;
+    isButtonDisabled = connecting || isPhantomConnecting;
   }
 
   // Removed button state logging useEffect - was causing unnecessary re-renders on mobile
@@ -587,7 +584,8 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   }
 
   // Show connected state if connected - using same button design but green
-  if (actuallyConnected && effectivePublicKey) {
+  // CRITICAL: Must have BOTH actuallyConnected AND effectivePublicKey to show connected state
+  if (actuallyConnected && effectivePublicKey && (connected || publicKey)) {
     const shortAddress = `${effectivePublicKey.toString().slice(0, 4)}...${effectivePublicKey.toString().slice(-4)}`;
     
     // Compact mode for mobile - same design, green colors, horizontal layout
@@ -651,16 +649,19 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   }
 
   // Disconnected state - original amber design
+  // CRITICAL: Always show "Connect Wallet" button when not connected (ensures users can always connect)
   return (
     <div className="flex flex-col space-y-2">
       {compact ? (
           <button
           onClick={handleConnect}
           disabled={isButtonDisabled}
-            className="px-3 py-1 bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-300 font-light tracking-wide rounded-md hover:from-amber-500/30 hover:to-amber-600/30 transition-all disabled:opacity-50 border border-amber-500/50 shadow-sm shadow-amber-500/10 text-xs backdrop-blur-sm touch-manipulation"
+            className="px-3 py-1 bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-300 font-light tracking-wide rounded-md hover:from-amber-500/30 hover:to-amber-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-amber-500/50 shadow-sm shadow-amber-500/10 text-xs backdrop-blur-sm touch-manipulation"
           style={{ 
             touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent'
+            WebkitTapHighlightColor: 'transparent',
+            position: 'relative',
+            zIndex: 10
           }}
           >
           {connecting || isPhantomConnecting ? "Connecting..." : "Connect Wallet"}
@@ -669,10 +670,12 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           <button
           onClick={handleConnect}
           disabled={isButtonDisabled}
-                className="px-4 py-1.5 bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-300 font-light tracking-wide rounded-md hover:from-amber-500/30 hover:to-amber-600/30 transition-all disabled:opacity-50 border border-amber-500/50 shadow-sm shadow-amber-500/10 text-sm backdrop-blur-sm"
+                className="px-4 py-1.5 bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-300 font-light tracking-wide rounded-md hover:from-amber-500/30 hover:to-amber-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-amber-500/50 shadow-sm shadow-amber-500/10 text-sm backdrop-blur-sm"
           style={{ 
             touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent'
+            WebkitTapHighlightColor: 'transparent',
+            position: 'relative',
+            zIndex: 10
           }}
               >
           {connecting || isPhantomConnecting ? "Connecting..." : "Connect Wallet"}
