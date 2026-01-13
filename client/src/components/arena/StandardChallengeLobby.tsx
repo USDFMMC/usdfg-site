@@ -319,9 +319,23 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   // }
   
   // Check if joiner can fund (status is creator_funded, user is the challenger, and deadline hasn't expired)
-  const joinerFundingDeadline = challenge.rawData?.joinerFundingDeadline || challenge.joinerFundingDeadline;
+  // CRITICAL: Use activeChallenge (liveChallenge) not challenge prop to get real-time updates
+  const joinerFundingDeadline = activeChallenge.rawData?.joinerFundingDeadline || activeChallenge.joinerFundingDeadline;
   const isJoinerDeadlineExpired = joinerFundingDeadline && joinerFundingDeadline.toMillis() < Date.now();
   const canJoinerFund = isChallenger && status === 'creator_funded' && !isJoinerDeadlineExpired && onJoinerFund;
+  
+  // Debug: Log when status changes to creator_funded for challenger
+  if (status === 'creator_funded' && isChallenger && process.env.NODE_ENV === 'development') {
+    console.log('✅ Creator funded detected - Joiner Fund button should appear NOW:', {
+      status,
+      isChallenger,
+      challengerWallet,
+      currentWallet: currentWallet?.toLowerCase(),
+      canJoinerFund,
+      joinerFundingDeadline: joinerFundingDeadline?.toMillis(),
+      isJoinerDeadlineExpired
+    });
+  }
   
   // If deadline expired, creator should be able to join their own challenge (it reverted)
   const canCreatorJoinAfterExpiry = isCreator && status === 'creator_confirmation_required' && isDeadlineExpired && currentWallet && onJoinChallenge;
