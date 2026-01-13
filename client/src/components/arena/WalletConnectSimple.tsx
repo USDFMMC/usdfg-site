@@ -41,7 +41,6 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     
     // If user explicitly disconnected or localStorage is stale, clear it
     if (walletDisconnected || (storedConnected && !storedPublicKey)) {
-      console.log('🧹 Clearing stale localStorage connection state on mount');
       localStorage.removeItem('phantom_connected');
       localStorage.removeItem('phantom_public_key');
       return { connected: false, publicKey: null };
@@ -70,7 +69,6 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       const isRecentConnection = connectTimestamp && (Date.now() - parseInt(connectTimestamp) < 10000);
       
       if (!isRecentConnection) {
-        console.log('🧹 Clearing stale localStorage connection state - adapter says not connected');
         localStorage.removeItem('phantom_connected');
         localStorage.removeItem('phantom_public_key');
         setMobileConnectionState({ connected: false, publicKey: null });
@@ -82,7 +80,6 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     if (connectTimestamp) {
       const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
       if (timeSinceConnect > 5000) {
-        console.log("🧹 Clearing stuck connection state on mount (older than 5 seconds)");
         sessionStorage.removeItem('phantom_connecting');
         sessionStorage.removeItem('phantom_connect_timestamp');
         sessionStorage.removeItem('phantom_connect_attempt');
@@ -95,7 +92,6 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       // No timestamp but marked as connecting - clear orphaned state immediately
       const isConnecting = sessionStorage.getItem('phantom_connecting') === 'true';
       if (isConnecting) {
-        console.log("🧹 Clearing orphaned connection state on mount immediately");
         sessionStorage.removeItem('phantom_connecting');
         // If there's no timestamp, Phantom probably didn't open - clear original tab marker
         sessionStorage.removeItem('phantom_original_tab');

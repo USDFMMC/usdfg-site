@@ -49,15 +49,6 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   useEffect(() => {
     if (challenge) {
       setLiveChallenge(challenge);
-      // Debug: Log when challenge prop changes
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔄 Challenge prop updated:', {
-          challengeId: challenge.id,
-          status: challenge.status || challenge.rawData?.status,
-          pendingJoiner: challenge.pendingJoiner || challenge.rawData?.pendingJoiner,
-          creator: challenge.creator || challenge.rawData?.creator
-        });
-      }
     }
   }, [challenge]);
   
@@ -90,14 +81,6 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           // Don't check for changes - always update to prevent any delay
           setLiveChallenge(updatedData);
           
-          // Debug: Log when status changes to creator_confirmation_required
-          if (newStatus === 'creator_confirmation_required' && newPendingJoiner) {
-            console.log('✅ Join intent detected - Fund Challenge button should appear NOW:', {
-              status: newStatus,
-              pendingJoiner: newPendingJoiner,
-              challengeId: challenge.id
-            });
-          }
         } else {
           // If document doesn't exist, fallback to prop
           setLiveChallenge(challenge);
@@ -119,16 +102,6 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
   const status = activeChallenge.status || activeChallenge.rawData?.status || 'pending_waiting_for_opponent';
   
-  // ALWAYS log status and creator info (helps diagnose button visibility)
-  console.log('🔍 StandardChallengeLobby Status Check:', {
-    status,
-    challengeId: activeChallenge.id,
-    creator: activeChallenge.creator || activeChallenge.rawData?.creator,
-    currentWallet: currentWallet?.toLowerCase(),
-    pendingJoiner: activeChallenge.pendingJoiner || activeChallenge.rawData?.pendingJoiner,
-    hasLiveChallenge: !!liveChallenge,
-    liveChallengeStatus: liveChallenge?.status || liveChallenge?.rawData?.status
-  });
   const players = activeChallenge.rawData?.players || activeChallenge.players || [];
   const entryFee = activeChallenge.entryFee || activeChallenge.rawData?.entryFee || 0;
   const prizePool = activeChallenge.prizePool || activeChallenge.rawData?.prizePool || (entryFee * 2);
@@ -171,7 +144,6 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     
     // Prevent double submission - check if already submitted or currently loading
     if (isLoading || hasAlreadySubmitted) {
-      console.log("⚠️ Submission prevented - already submitted or in progress");
       return;
     }
     
@@ -184,7 +156,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       setProofImage(null);
       setProofFile(null);
     } catch (error: any) {
-      console.error("❌ Error submitting result:", error);
+      console.error("Error submitting result:", error);
       alert(error.message || "Failed to submit result. Please try again.");
     } finally {
       setIsLoading(false);
@@ -296,46 +268,12 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   
   const canCreatorFund = !!(isCreator && status === 'creator_confirmation_required' && !isDeadlineExpired && onCreatorFund);
   
-  // Force re-render check - log actual boolean value
-  console.log('🎯 canCreatorFund BOOLEAN VALUE:', canCreatorFund, typeof canCreatorFund);
-  
-  // ALWAYS log creator fund button conditions (helps diagnose why button isn't showing)
-  console.log('💰 Creator Fund Button Check:', {
-    isCreator,
-    status,
-    isDeadlineExpired,
-    hasOnCreatorFund: !!onCreatorFund,
-    pendingJoiner: pendingJoinerWallet,
-    canCreatorFund,
-    creatorWallet: creatorWallet?.toLowerCase(),
-    currentWallet: currentWallet?.toLowerCase(),
-    match: creatorWallet?.toLowerCase() === currentWallet?.toLowerCase()
-  });
-  
-  // Debug logging disabled to reduce console spam
-  // Uncomment only when debugging specific issues
-  // if (status === 'creator_confirmation_required' && process.env.NODE_ENV === 'development') {
-  //   console.log('🔍 Creator Confirmation Required Debug:', { ... });
-  // }
-  
   // Check if joiner can fund (status is creator_funded, user is the challenger, and deadline hasn't expired)
   // CRITICAL: Use activeChallenge (liveChallenge) not challenge prop to get real-time updates
   const joinerFundingDeadline = activeChallenge.rawData?.joinerFundingDeadline || activeChallenge.joinerFundingDeadline;
   const isJoinerDeadlineExpired = joinerFundingDeadline && joinerFundingDeadline.toMillis() < Date.now();
   const canJoinerFund = isChallenger && status === 'creator_funded' && !isJoinerDeadlineExpired && onJoinerFund;
   
-  // Debug: Log when status changes to creator_funded for challenger
-  if (status === 'creator_funded' && isChallenger && process.env.NODE_ENV === 'development') {
-    console.log('✅ Creator funded detected - Joiner Fund button should appear NOW:', {
-      status,
-      isChallenger,
-      challengerWallet,
-      currentWallet: currentWallet?.toLowerCase(),
-      canJoinerFund,
-      joinerFundingDeadline: joinerFundingDeadline?.toMillis(),
-      isJoinerDeadlineExpired
-    });
-  }
   
   // If deadline expired, creator should be able to join their own challenge (it reverted)
   const canCreatorJoinAfterExpiry = isCreator && status === 'creator_confirmation_required' && isDeadlineExpired && currentWallet && onJoinChallenge;
@@ -736,8 +674,6 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       {/* Creator Fund Button - Show if creator needs to fund */}
       {canCreatorFund && (
         <div className="rounded-lg border border-amber-400/30 bg-amber-500/10 p-2.5" style={{ display: 'block' }}>
-          {/* Debug: Force button to show */}
-          {console.log('🎯 RENDERING CREATOR FUND BUTTON - canCreatorFund is TRUE')}
           <div className="text-center">
             <div className="text-xs font-semibold text-amber-200 mb-1.5">
               ✨ Confirm and Fund Challenge ✨

@@ -41,12 +41,10 @@ export function phantomMobileConnect() {
   // CRITICAL: STRONG guard - prevent multiple navigations
   if (isNavigating) {
     const timeSinceNav = Date.now() - navigationStartTime;
-    if (timeSinceNav < 10000) { // Within 10 seconds of navigation
-      console.warn("⚠️ Navigation already in progress - BLOCKING duplicate call");
-    return;
+      if (timeSinceNav < 10000) { // Within 10 seconds of navigation
+      return;
     } else {
       // Navigation started more than 10 seconds ago - reset guard
-      console.log("🧹 Resetting navigation guard (stale)");
       isNavigating = false;
     }
   }
@@ -62,19 +60,16 @@ export function phantomMobileConnect() {
         const timeSinceConnect = Date.now() - parseInt(connectTimestamp);
         // If connection state is older than 2 seconds, consider it stuck and clear it (more aggressive)
         if (timeSinceConnect > 2000) {
-          console.log("🧹 Clearing stuck connection state in phantomMobileConnect() (older than 2s)");
           sessionStorage.removeItem('phantom_connecting');
           sessionStorage.removeItem('phantom_connect_timestamp');
           sessionStorage.removeItem('phantom_connect_attempt');
           // Allow connection to proceed
         } else {
           // Very recent (within 2 seconds) - block to prevent double-clicks
-          console.warn("⚠️ Phantom connection very recent (within 2s) - blocking duplicate call");
-    return;
+          return;
         }
       } else {
         // No timestamp but marked as connecting - clear orphaned state immediately
-        console.log("🧹 Clearing orphaned connection state in phantomMobileConnect()");
         sessionStorage.removeItem('phantom_connecting');
         // Allow connection to proceed
       }
@@ -83,14 +78,13 @@ export function phantomMobileConnect() {
   
   // Check if we recently navigated (within last 3 seconds - STRICT)
   const lastAttempt = sessionStorage.getItem('phantom_connect_attempt');
-  if (lastAttempt) {
-    const lastAttemptTime = new Date(lastAttempt).getTime();
-    const now = Date.now();
-    if (now - lastAttemptTime < 3000) {
-      console.warn("⚠️ Phantom connect called too soon after last attempt (within 3s) - BLOCKING");
-      return;
+    if (lastAttempt) {
+      const lastAttemptTime = new Date(lastAttempt).getTime();
+      const now = Date.now();
+      if (now - lastAttemptTime < 3000) {
+        return;
+      }
     }
-  }
   
   // Set navigation guard BEFORE any async operations
   // CRITICAL: Do this synchronously, before any async operations
