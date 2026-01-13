@@ -121,16 +121,38 @@ pub mod usdfg_smart_contract {
         );
 
         // Transfer creator's tokens to escrow
-        let cpi_accounts = Transfer {
-            from: ctx.accounts.creator_token_account.to_account_info(),
-            to: ctx.accounts.escrow_token_account.to_account_info(),
-            authority: ctx.accounts.creator.to_account_info(),
-        };
-        let cpi_ctx = CpiContext::new(
-            ctx.accounts.token_program.to_account_info(),
-            cpi_accounts,
-        );
-        token::transfer(cpi_ctx, usdfg_amount)?;
+        // Check if transfer already happened (explicit transfer instruction before this contract call)
+        // This allows Phantom Wallet to show the transfer in preview
+        let escrow_balance = ctx.accounts.escrow_token_account.amount;
+        let creator_balance = ctx.accounts.creator_token_account.amount;
+        
+        // If escrow doesn't have enough tokens, do the transfer
+        // If escrow already has tokens (from explicit transfer instruction), skip transfer
+        if escrow_balance < usdfg_amount {
+            // Need to transfer - check creator has enough
+            require!(
+                creator_balance >= usdfg_amount,
+                ChallengeError::InsufficientFunds
+            );
+            
+            let cpi_accounts = Transfer {
+                from: ctx.accounts.creator_token_account.to_account_info(),
+                to: ctx.accounts.escrow_token_account.to_account_info(),
+                authority: ctx.accounts.creator.to_account_info(),
+            };
+            let cpi_ctx = CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                cpi_accounts,
+            );
+            token::transfer(cpi_ctx, usdfg_amount)?;
+        } else {
+            // Transfer already happened (explicit transfer instruction executed first)
+            // Just verify the amount matches
+            require!(
+                escrow_balance >= usdfg_amount,
+                ChallengeError::EntryFeeMismatch
+            );
+        }
 
         challenge.status = ChallengeStatus::CreatorFunded;
         challenge.joiner_funding_timer = Clock::get()?.unix_timestamp + 300; // 5 minutes for joiner to fund
