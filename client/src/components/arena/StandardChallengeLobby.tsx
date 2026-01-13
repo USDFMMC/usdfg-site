@@ -117,7 +117,9 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   };
   
   const status = getChallengeValue('status', 'pending_waiting_for_opponent');
-  const players = getChallengeValue('players', []);
+  // CRITICAL: Ensure players is always an array (getChallengeValue might return non-array)
+  const playersRaw = getChallengeValue('players', []);
+  const players = Array.isArray(playersRaw) ? playersRaw : [];
   const entryFee = getChallengeValue('entryFee', 0);
   const prizePool = getChallengeValue('prizePool', entryFee * 2);
   const game = getChallengeValue('game', 'USDFG Arena');
