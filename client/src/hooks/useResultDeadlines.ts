@@ -32,7 +32,6 @@ export function useResultDeadlines(challenges: ChallengeData[]) {
 
         // Check if deadline has passed (no time window restriction)
         if (timeSinceDeadline > 0) {
-          console.log('⏰ Checking result deadline for challenge:', challenge.id, 'Time since deadline:', Math.floor(timeSinceDeadline / 1000 / 60), 'minutes');
           try {
             await checkResultDeadline(challenge.id);
             checkedChallenges.current.add(challenge.id);

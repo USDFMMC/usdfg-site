@@ -62,6 +62,22 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     const storedPublicKey = localStorage.getItem('phantom_public_key');
     const walletDisconnected = localStorage.getItem('wallet_disconnected') === 'true';
     
+    // CRITICAL: On mobile, if wallet adapter says not connected, clear localStorage immediately
+    // This ensures users see "Connect Wallet" button instead of stale green wallet button
+    if (mobile && storedConnected && (!connected || !publicKey)) {
+      // On mobile, be very aggressive - if adapter says not connected, clear localStorage
+      // UNLESS there's a very recent connection attempt (within 2 seconds)
+      const connectTimestamp = sessionStorage.getItem('phantom_connect_timestamp');
+      const isVeryRecentConnection = connectTimestamp && (Date.now() - parseInt(connectTimestamp) < 2000);
+      
+      if (!isVeryRecentConnection && !walletDisconnected) {
+        console.log('🧹 Clearing stale mobile connection state - adapter says not connected');
+        localStorage.removeItem('phantom_connected');
+        localStorage.removeItem('phantom_public_key');
+        setMobileConnectionState({ connected: false, publicKey: null });
+      }
+    }
+    
     // If localStorage says connected but adapter says not connected, clear stale state
     if (storedConnected && (!connected || !publicKey) && !walletDisconnected) {
       // Check if this is a fresh page load (no recent connection activity)
@@ -71,7 +87,9 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       if (!isRecentConnection) {
         localStorage.removeItem('phantom_connected');
         localStorage.removeItem('phantom_public_key');
-        setMobileConnectionState({ connected: false, publicKey: null });
+        if (mobile) {
+          setMobileConnectionState({ connected: false, publicKey: null });
+        }
       }
     }
     
@@ -278,14 +296,19 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       : null);
   
   // Check connection from multiple sources (prop, hook, localStorage) - most reliable detection
+  // CRITICAL FIX: On mobile, be more strict - only show connected if wallet adapter confirms OR we have valid localStorage with no disconnect flag
   const actuallyConnected = Boolean(
     isConnected || // Parent prop
-    (connected && publicKey) || // Wallet adapter hook
-    (mobile && mobileConnectionState.connected && mobileConnectionState.publicKey) || // Mobile state
+    (connected && publicKey) || // Wallet adapter hook (most reliable)
+    // On mobile, only trust localStorage if wallet adapter also confirms OR if there's no disconnect flag
+    (mobile && mobileConnectionState.connected && mobileConnectionState.publicKey && 
+     (connected || localStorage.getItem('wallet_disconnected') !== 'true')) || // Mobile state with validation
     (mobile && typeof window !== 'undefined' && 
       localStorage.getItem('phantom_connected') === 'true' && 
       localStorage.getItem('phantom_public_key') && 
-      effectivePublicKey) // Mobile localStorage
+      localStorage.getItem('wallet_disconnected') !== 'true' && // CRITICAL: Don't show connected if explicitly disconnected
+      effectivePublicKey && 
+      (connected || publicKey)) // CRITICAL: Only trust localStorage if adapter also confirms
   );
 
   // Calculate mobile-specific connection state

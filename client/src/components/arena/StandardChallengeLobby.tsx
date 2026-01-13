@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { ChatBox } from "./ChatBox";
 import { VoiceChat } from "./VoiceChat";
 import { Camera, Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
@@ -110,16 +110,16 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const platform = activeChallenge.platform || activeChallenge.rawData?.platform || 'All Platforms';
   const challengeId = activeChallenge.id;
   
-  // Memoize props to prevent VoiceChat from remounting unnecessarily
-  const voiceChatChallengeId = useMemo(() => challengeId, [challengeId]);
-  const voiceChatCurrentWallet = useMemo(() => currentWallet || "", [currentWallet]);
+  // VoiceChat props (no memoization needed - React handles this)
+  const voiceChatChallengeId = challengeId;
+  const voiceChatCurrentWallet = currentWallet || "";
 
   // Check if user already submitted result (moved up for use in handleSubmit)
-  const results = activeChallenge.rawData?.results || activeChallenge.results || {};
+  const results = getChallengeValue('results', {});
   const userResult = currentWallet ? results[currentWallet.toLowerCase()] : null;
   const hasAlreadySubmitted = !!userResult;
 
-  const handleImageCapture = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setProofFile(file);
@@ -129,17 +129,17 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       };
       reader.readAsDataURL(file);
     }
-  }, []);
+  };
 
-  const removeImage = useCallback(() => {
+  const removeImage = () => {
     setProofImage(null);
     setProofFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  }, []);
+  };
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = async () => {
     if (selectedResult === null) return;
     
     // Prevent double submission - check if already submitted or currently loading
@@ -161,7 +161,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [selectedResult, proofFile, onSubmitResult, isLoading, hasAlreadySubmitted]);
+  };
 
   
   const getStatusDisplay = () => {
@@ -236,9 +236,9 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   
   // Check if user is a participant - must check players array AND creator/challenger/pendingJoiner fields
   // because players array is only populated when joiner funds, but they're participants before that
-  const creatorWallet = activeChallenge.creator || activeChallenge.rawData?.creator || '';
-  const challengerWallet = activeChallenge.rawData?.challenger || activeChallenge.challenger;
-  const pendingJoinerWallet = activeChallenge.rawData?.pendingJoiner || activeChallenge.pendingJoiner;
+  const creatorWallet = getChallengeValue('creator', '');
+  const challengerWallet = getChallengeValue('challenger', null);
+  const pendingJoinerWallet = getChallengeValue('pendingJoiner', null);
   
   const isCreator = currentWallet && creatorWallet.toLowerCase() === currentWallet.toLowerCase();
   const isChallenger = currentWallet && challengerWallet && challengerWallet.toLowerCase() === currentWallet.toLowerCase();
@@ -247,7 +247,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   
   // User is a participant if they're in players array, OR they're the creator, challenger, or pending joiner
   const isParticipant = isInPlayersArray || isCreator || isChallenger || isPendingJoiner;
-  const maxPlayers = activeChallenge.maxPlayers || activeChallenge.rawData?.maxPlayers || 2;
+  const maxPlayers = getChallengeValue('maxPlayers', 2);
   
   // Calculate actual participant count (including creator, challenger, pendingJoiner, and players array)
   const allParticipantsSet = new Set<string>();
@@ -259,7 +259,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const isFull = actualParticipantCount >= maxPlayers;
   
   // Check if creator can fund (status is creator_confirmation_required and deadline hasn't expired)
-  const creatorFundingDeadline = activeChallenge.rawData?.creatorFundingDeadline || activeChallenge.creatorFundingDeadline;
+  const creatorFundingDeadline = getChallengeValue('creatorFundingDeadline', null);
   const isDeadlineExpired = creatorFundingDeadline ? creatorFundingDeadline.toMillis() < Date.now() : false;
   
   // Get pending joiner info (needed for multiple checks below)
@@ -270,7 +270,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   
   // Check if joiner can fund (status is creator_funded, user is the challenger, and deadline hasn't expired)
   // CRITICAL: Use activeChallenge (liveChallenge) not challenge prop to get real-time updates
-  const joinerFundingDeadline = activeChallenge.rawData?.joinerFundingDeadline || activeChallenge.joinerFundingDeadline;
+  const joinerFundingDeadline = getChallengeValue('joinerFundingDeadline', null);
   const isJoinerDeadlineExpired = joinerFundingDeadline && joinerFundingDeadline.toMillis() < Date.now();
   const canJoinerFund = isChallenger && status === 'creator_funded' && !isJoinerDeadlineExpired && onJoinerFund;
   
@@ -299,7 +299,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const canSubmitResult = status === 'active' && players.length >= 2 && isParticipant && !hasAlreadySubmitted;
   
   // Check if user won and can claim prize
-  const winner = activeChallenge.rawData?.winner || activeChallenge.winner;
+  const winner = getChallengeValue('winner', null);
   const userWon = currentWallet && winner && winner.toLowerCase() === currentWallet.toLowerCase();
   const canClaimPrize = status === 'completed' && userWon && isParticipant;
   const prizeClaimed = activeChallenge.rawData?.prizeClaimed || activeChallenge.prizeClaimed;
