@@ -4894,10 +4894,46 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                       role="button"
                       tabIndex={0}
                       className={`relative text-left rounded-xl border overflow-hidden p-3 transition active:scale-[0.99] w-[176px] h-[176px] sm:w-[180px] sm:h-[180px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-400/50 ${edgeGlow}`}
-                      onClick={onSelect}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onSelect();
+                      }}
                       onTouchStart={(e) => {
+                        // Store touch start position to distinguish tap from scroll
+                        const touch = e.touches[0];
+                        if (touch) {
+                          (e.currentTarget as any).__touchStartX = touch.clientX;
+                          (e.currentTarget as any).__touchStartY = touch.clientY;
+                          (e.currentTarget as any).__touchStartTime = Date.now();
+                        }
                         // Prevent double-tap zoom on mobile
                         e.currentTarget.style.touchAction = 'manipulation';
+                      }}
+                      onTouchEnd={(e) => {
+                        // Check if this was a tap (not a scroll)
+                        const touch = e.changedTouches[0];
+                        const startX = (e.currentTarget as any).__touchStartX;
+                        const startY = (e.currentTarget as any).__touchStartY;
+                        const startTime = (e.currentTarget as any).__touchStartTime;
+                        
+                        if (touch && startX !== undefined && startY !== undefined && startTime) {
+                          const deltaX = Math.abs(touch.clientX - startX);
+                          const deltaY = Math.abs(touch.clientY - startY);
+                          const deltaTime = Date.now() - startTime;
+                          
+                          // If movement is small (< 10px) and quick (< 300ms), treat as tap
+                          if (deltaX < 10 && deltaY < 10 && deltaTime < 300) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onSelect();
+                          }
+                        }
+                        
+                        // Clean up
+                        delete (e.currentTarget as any).__touchStartX;
+                        delete (e.currentTarget as any).__touchStartY;
+                        delete (e.currentTarget as any).__touchStartTime;
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
@@ -4909,7 +4945,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                         touchAction: 'manipulation',
                         WebkitTapHighlightColor: 'transparent',
                         zIndex: 1,
-                        position: 'relative'
+                        position: 'relative',
+                        userSelect: 'none',
+                        WebkitUserSelect: 'none'
                       }}
                       aria-label={`Open ${gameName} challenge`}
                     >
@@ -5018,7 +5056,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           className="flex gap-3 overflow-x-auto pb-2 px-4 md:px-0" 
                           style={{ 
                             WebkitOverflowScrolling: 'touch',
-                            touchAction: 'pan-x',
+                            touchAction: 'pan-x pinch-zoom',
                             scrollbarWidth: 'none',
                             msOverflowStyle: 'none'
                           }}
@@ -5027,6 +5065,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                             <div 
                               key={challenge.id} 
                               className="flex-none"
+                              style={{
+                                touchAction: 'manipulation'
+                              }}
                             >
                               <DiscoveryCard 
                                 challenge={challenge}
