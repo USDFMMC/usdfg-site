@@ -100,14 +100,18 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   // Use live challenge data if available, fallback to prop
   const activeChallenge = liveChallenge || challenge;
 
-  const status = activeChallenge.status || activeChallenge.rawData?.status || 'pending_waiting_for_opponent';
+  // Helper to get value from challenge or rawData (simplifies redundant access patterns)
+  const getChallengeValue = <T,>(key: string, defaultValue: T): T => {
+    return (activeChallenge[key as keyof typeof activeChallenge] ?? activeChallenge.rawData?.[key as keyof typeof activeChallenge.rawData] ?? defaultValue) as T;
+  };
   
-  const players = activeChallenge.rawData?.players || activeChallenge.players || [];
-  const entryFee = activeChallenge.entryFee || activeChallenge.rawData?.entryFee || 0;
-  const prizePool = activeChallenge.prizePool || activeChallenge.rawData?.prizePool || (entryFee * 2);
-  const game = activeChallenge.game || activeChallenge.rawData?.game || 'USDFG Arena';
-  const mode = activeChallenge.mode || activeChallenge.rawData?.mode || 'Head-to-Head';
-  const platform = activeChallenge.platform || activeChallenge.rawData?.platform || 'All Platforms';
+  const status = getChallengeValue('status', 'pending_waiting_for_opponent');
+  const players = getChallengeValue('players', []);
+  const entryFee = getChallengeValue('entryFee', 0);
+  const prizePool = getChallengeValue('prizePool', entryFee * 2);
+  const game = getChallengeValue('game', 'USDFG Arena');
+  const mode = getChallengeValue('mode', 'Head-to-Head');
+  const platform = getChallengeValue('platform', 'All Platforms');
   const challengeId = activeChallenge.id;
   
   // VoiceChat props (no memoization needed - React handles this)
