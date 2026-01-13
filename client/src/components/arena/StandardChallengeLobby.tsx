@@ -706,7 +706,9 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
       {/* Creator Fund Button - Show if creator needs to fund */}
       {canCreatorFund && (
-        <div className="rounded-lg border border-amber-400/30 bg-amber-500/10 p-2.5">
+        <div className="rounded-lg border border-amber-400/30 bg-amber-500/10 p-2.5" style={{ display: 'block' }}>
+          {/* Debug: Force button to show */}
+          {console.log('🎯 RENDERING CREATOR FUND BUTTON - canCreatorFund is TRUE')}
           <div className="text-center">
             <div className="text-xs font-semibold text-amber-200 mb-1.5">
               ✨ Confirm and Fund Challenge ✨
