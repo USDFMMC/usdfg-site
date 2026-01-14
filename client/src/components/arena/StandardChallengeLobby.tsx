@@ -1108,22 +1108,19 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         </div>
       </div>
 
-      {/* Submit Result Section - Always visible when conditions are met */}
+      {/* Submit Result Section */}
       {canSubmitResult && !showSubmitForm && !hasAlreadySubmitted && (
-        <div className="w-full">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setShowSubmitForm(true);
-            }}
-            className="relative w-full rounded-md bg-amber-400/20 px-3 py-2 text-xs font-semibold text-amber-200 transition-all hover:bg-amber-400/30 hover:shadow-[0_0_8px_rgba(255,215,130,0.25)] border border-amber-400/40 cursor-pointer active:scale-[0.98]"
-            style={{ display: 'block', zIndex: 10 }}
-          >
-            🏆 Submit Result
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setShowSubmitForm(true);
+          }}
+          className="relative w-full rounded-md bg-amber-400/20 px-3 py-2 text-xs font-semibold text-amber-200 transition-all hover:bg-amber-400/30 hover:shadow-[0_0_8px_rgba(255,215,130,0.25)] border border-amber-400/40 cursor-pointer active:scale-[0.98]"
+        >
+          🏆 Submit Result
+        </button>
       )}
 
       {/* Show message if already submitted */}
