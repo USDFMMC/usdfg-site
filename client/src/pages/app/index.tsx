@@ -2725,17 +2725,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         return;
       }
       
-            // JOIN INTENT: Firestore only (NO SOLANA FEE!)
-            // Express intent in Firestore - this is sufficient for the creator to see and fund
-            // On-chain express intent will happen automatically when creator funds the challenge
+            // JOIN INTENT: Express in Firestore first, then on-chain
+            // Both are required - Firestore for UI, on-chain for contract state
             const needsFirestoreUpdate = status === 'pending_waiting_for_opponent' && !isAlreadyPendingJoiner;
             
             if (needsFirestoreUpdate) {
+              // Step 1: Express intent in Firestore (updates UI immediately)
               await expressJoinIntent(challenge.id, walletAddr);
               
               // CRITICAL: Immediately update selectedChallenge to trigger UI update
               // This ensures the "Fund Challenge" button appears instantly for the creator
-              // The onSnapshot listener will also update, but this ensures no delay
               const updatedChallenge = await fetchChallengeById(challenge.id);
               if (updatedChallenge) {
                 setSelectedChallenge({
@@ -2746,17 +2745,74 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 });
               }
               
-              // Firestore update completes instantly - real-time listener updates UI immediately
-              // Creator sees "Fund Challenge" button appear right away
-              alert('✅ Join intent expressed! Creator can now fund the challenge.');
+              // Step 2: Express intent on-chain (required for creator to fund)
+              // Check if PDA exists - if not, wait for creator to create it
+              let currentPDA = challengePDA;
+              if (!currentPDA) {
+                // No PDA yet - creator needs to create it first
+                // Refresh challenge to get updated PDA if creator just created it
+                const freshChallenge = await fetchChallengeById(challenge.id);
+                if (freshChallenge) {
+                  currentPDA = freshChallenge.rawData?.pda || freshChallenge.pda;
+                }
+              }
+              
+              if (currentPDA) {
+                try {
+                  // Express on-chain intent (small Solana fee required)
+                  const { expressJoinIntent: expressOnChain } = await import('@/lib/chain/contract');
+                  await expressOnChain(
+                    { signTransaction, publicKey },
+                    connection,
+                    currentPDA
+                  );
+                  
+                  alert('✅ Join intent expressed! Creator can now fund the challenge.');
+                } catch (onChainError: any) {
+                  const errorMsg = onChainError.message || onChainError.toString() || '';
+                  // If intent was already expressed on-chain, that's OK
+                  if (errorMsg.includes('already expressed') || errorMsg.includes('already') || 
+                      errorMsg.includes('duplicate') || errorMsg.includes('Constraint')) {
+                    alert('✅ Join intent expressed! Creator can now fund the challenge.');
+                  } else if (errorMsg.includes('User rejected') || errorMsg.includes('User cancelled') || 
+                             errorMsg.includes('rejected the request') || errorMsg.includes('cancelled')) {
+                    alert('⚠️ Transaction was cancelled. You can retry later, but creator cannot fund until you complete this step.');
+                    setShowDetailSheet(false);
+                    return;
+                  } else {
+                    // Other errors - still show success for Firestore update, but warn about on-chain
+                    console.error('On-chain express intent failed:', onChainError);
+                    alert('⚠️ Intent expressed in Firestore, but on-chain step failed. Creator may not be able to fund until this is resolved. Error: ' + errorMsg);
+                  }
+                }
+              } else {
+                // No PDA yet - creator needs to create it first
+                alert('✅ Intent expressed in Firestore! Waiting for creator to create challenge on-chain. Once they do, you\'ll need to complete the on-chain step.');
+              }
             } else {
-              // Already expressed intent - just confirm
-              alert('✅ You have already expressed intent to join this challenge. Waiting for creator to fund.');
+              // Already expressed intent - check if on-chain is needed
+              if (challengePDA) {
+                try {
+                  const { expressJoinIntent: expressOnChain } = await import('@/lib/chain/contract');
+                  await expressOnChain(
+                    { signTransaction, publicKey },
+                    connection,
+                    challengePDA
+                  );
+                  alert('✅ On-chain intent expressed! Creator can now fund the challenge.');
+                } catch (onChainError: any) {
+                  const errorMsg = onChainError.message || onChainError.toString() || '';
+                  if (errorMsg.includes('already expressed') || errorMsg.includes('already') || 
+                      errorMsg.includes('duplicate') || errorMsg.includes('Constraint')) {
+                    alert('✅ You have already expressed on-chain intent. Creator can now fund the challenge.');
+                  } else {
+                    alert('✅ You have already expressed intent in Firestore. On-chain step may be needed before creator can fund.');
+                  }
+                }
+              } else {
+                alert('✅ You have already expressed intent to join this challenge. Waiting for creator to create the challenge on-chain.');
+              }
             }
-            
-            // NO ON-CHAIN CALL FOR JOIN INTENT - saves users Solana fees!
-            // On-chain express intent will happen when creator funds, or can be done later if needed
-            // This makes joining free and instant!
             
             setShowDetailSheet(false);
       
