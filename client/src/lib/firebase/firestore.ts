@@ -1243,7 +1243,31 @@ export const joinerFund = async (challengeId: string, wallet: string) => {
     const maxPlayers = data.maxPlayers || (format === 'tournament' ? data.tournament?.maxPlayers || 8 : 2);
     
     // Now add challenger to players array and activate challenge
-    const newPlayers = data.players ? [...data.players, wallet] : [data.creator, wallet];
+    // CRITICAL: Ensure players array includes both creator and challenger
+    // If players array exists but is empty, or doesn't include creator, rebuild it
+    let newPlayers: string[];
+    if (data.players && Array.isArray(data.players) && data.players.length > 0) {
+      // Players array exists and has data - add challenger if not already included
+      if (!data.players.includes(wallet)) {
+        newPlayers = [...data.players, wallet];
+      } else {
+        newPlayers = data.players;
+      }
+    } else {
+      // Players array is empty or missing - create with both creator and challenger
+      newPlayers = [data.creator, wallet];
+    }
+    
+    // Ensure creator is always in the array (in case it was missing)
+    if (!newPlayers.includes(data.creator)) {
+      newPlayers = [data.creator, ...newPlayers];
+    }
+    
+    // Ensure challenger is in the array
+    if (!newPlayers.includes(wallet)) {
+      newPlayers = [...newPlayers, wallet];
+    }
+    
     const isFull = newPlayers.length >= maxPlayers;
 
     const updates: any = {
