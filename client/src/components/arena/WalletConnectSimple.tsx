@@ -37,7 +37,6 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const { publicKey, connected, connecting, connect, disconnect, mobile, connection } = useUSDFGWallet();
   const [balance, setBalance] = useState<number | null>(null);
   const [usdfgBalance, setUsdfgBalance] = useState<number | null>(null);
-  const [forceUpdate, setForceUpdate] = useState(0); // Force re-render when connecting state changes
   
   // CRITICAL: On mobile, check localStorage directly for Phantom connection
   // This ensures we detect connections even if parent component state is stale
