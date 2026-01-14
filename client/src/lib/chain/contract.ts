@@ -517,8 +517,7 @@ export async function creatorFund(
 
   // CRITICAL FIX: Add explicit token transfer instruction BEFORE contract instruction
   // This allows Phantom Wallet to show the USDFG transfer in the transaction preview
-  // The contract will also attempt to transfer via CPI, but we'll handle that in the contract
-  // by checking if transfer already happened (or we can modify contract to skip transfer)
+  // The contract will check if transfer already happened and skip it if it did
   const { createTransferInstruction } = await import('@solana/spl-token');
   const transferInstruction = createTransferInstruction(
     creatorTokenAccount,      // source: creator's USDFG token account
@@ -534,11 +533,10 @@ export async function creatorFund(
   });
   
   // Build transaction with transfer instruction FIRST (so Phantom shows it), then contract instruction
-  // NOTE: The contract will also try to transfer via CPI - we need to modify the contract
-  // to check if transfer already happened and skip it if it did
+  // The contract will check escrow balance and skip transfer if tokens are already there
   const transaction = new Transaction();
-  transaction.add(transferInstruction);  // Add transfer FIRST (Phantom shows this)
-  transaction.add(instruction);          // Add contract instruction SECOND (validates/transfers)
+  transaction.add(transferInstruction);  // Add transfer FIRST (Phantom shows this, executes first)
+  transaction.add(instruction);          // Add contract instruction SECOND (validates, skips transfer if already done)
   
   // Get blockhash with retry logic for rate limiting (429 errors)
   let blockhash: string;

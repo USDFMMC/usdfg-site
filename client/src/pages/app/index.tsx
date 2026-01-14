@@ -3065,7 +3065,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           ...updatedChallenge,
           rawData: updatedChallenge.rawData || updatedChallenge
         });
+        console.log('✅ Challenge data refreshed after creator funding:', updatedChallenge.id, updatedChallenge.status);
+      } else {
+        console.warn('⚠️ Could not fetch updated challenge after creator funding:', challenge.id);
       }
+      
+      // Also trigger a refresh of the challenges list to update UI
+      // This ensures the challenger sees the updated status in real-time
+      window.dispatchEvent(new Event('challengeUpdated'));
       
       // Refresh balance
       setTimeout(() => {
