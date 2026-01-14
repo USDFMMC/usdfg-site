@@ -64,66 +64,40 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   }, [challenge]);
   
   // Listen to real-time challenge updates to ensure button visibility is always accurate
-  // Set up listener immediately (no delay) for instant updates when someone expresses intent
-  // This is the PRIMARY source of truth - updates immediately when Firestore changes
   useEffect(() => {
-    if (!challenge?.id) {
-      return;
-    }
+    if (!challenge?.id) return;
     
     const challengeRef = doc(db, 'challenges', challenge.id);
     
-    // CRITICAL: Set up listener with includeMetadataChanges to catch ALL updates
-    // This ensures we get updates immediately, even metadata changes
-    // onSnapshot fires immediately when document changes, ensuring instant updates
-    // This listener is the PRIMARY source - it updates liveChallenge immediately
-    // regardless of when the parent component's selectedChallenge prop updates
     const unsubscribe = onSnapshot(
       challengeRef,
       async (snapshot) => {
         if (snapshot.exists()) {
           const updatedData = { id: snapshot.id, ...snapshot.data(), rawData: snapshot.data() };
-          const newStatus = getChallengeStatus(updatedData);
-          const newPendingJoiner = getChallengePendingJoiner(updatedData);
           
-          // FIX: If challenge is active but players array is empty, fix it
-          if (newStatus === 'active') {
+          // Auto-fix: If challenge is active but players array is empty, fix it
+          const status = getChallengeStatus(updatedData);
+          if (status === 'active') {
             const players = updatedData.players || updatedData.rawData?.players || [];
             const creator = updatedData.creator || updatedData.rawData?.creator;
             const challenger = updatedData.challenger || updatedData.rawData?.challenger;
             
-            // If players array is empty but we have creator and challenger, fix it
             if ((!players || players.length === 0) && creator && challenger) {
-              console.log('🔧 Fixing empty players array for active challenge:', {
-                creator: creator.slice(0, 8) + '...',
-                challenger: challenger.slice(0, 8) + '...'
-              });
-              
               try {
                 const { updateDoc } = await import('firebase/firestore');
-                await updateDoc(challengeRef, {
-                  players: [creator, challenger]
-                });
-                console.log('✅ Fixed players array for active challenge');
-              } catch (fixError) {
-                console.error('❌ Failed to fix players array:', fixError);
+                await updateDoc(challengeRef, { players: [creator, challenger] });
+              } catch (error) {
+                console.error('Failed to fix players array:', error);
               }
             }
           }
           
-          // CRITICAL: Always update liveChallenge immediately - no conditions
-          // This ensures "Fund Challenge" button appears instantly when someone expresses intent
-          // Priority: This listener > prop updates (for instant button visibility)
-          // Don't check for changes - always update to prevent any delay
           setLiveChallenge(updatedData);
-          
         } else {
-          // If document doesn't exist, fallback to prop
           setLiveChallenge(challenge);
         }
       },
       (error) => {
-        // Non-critical error - don't update on error, keep current state
         if (error.code !== 'permission-denied' && error.code !== 'unavailable') {
           console.error('Error listening to challenge updates:', error);
         }
@@ -135,42 +109,6 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   
   // Use live challenge data if available, fallback to prop
   const activeChallenge = liveChallenge || challenge;
-  
-  // FIX: Immediately check and fix empty players array for active challenges on mount
-  useEffect(() => {
-    if (!activeChallenge?.id) return;
-    
-    const status = getChallengeStatus(activeChallenge);
-    if (status === 'active') {
-      const players = getChallengeValue('players', []);
-      const creator = getChallengeValue('creator', '');
-      const challenger = getChallengeValue('challenger', '');
-      
-      // If players array is empty but we have creator and challenger, fix it immediately
-      if ((!players || players.length === 0) && creator && challenger) {
-        console.log('🔧 Immediately fixing empty players array on mount:', {
-          creator: creator.slice(0, 8) + '...',
-          challenger: challenger.slice(0, 8) + '...'
-        });
-        
-        const fixPlayersArray = async () => {
-          try {
-            const { doc, updateDoc } = await import('firebase/firestore');
-            const { db } = await import('@/lib/firebase/firestore');
-            const challengeRef = doc(db, 'challenges', activeChallenge.id);
-            await updateDoc(challengeRef, {
-              players: [creator, challenger]
-            });
-            console.log('✅ Fixed players array on mount');
-          } catch (fixError) {
-            console.error('❌ Failed to fix players array on mount:', fixError);
-          }
-        };
-        
-        fixPlayersArray();
-      }
-    }
-  }, [activeChallenge?.id, activeChallenge?.status]);
 
   // Helper to get value from challenge or rawData (simplifies redundant access patterns)
   const getChallengeValue = <T,>(key: string, defaultValue: T): T => {
