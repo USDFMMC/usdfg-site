@@ -2588,21 +2588,18 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
       
     try {
+      const currentStatus = challenge.status || challenge.rawData?.status;
       const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
-    const isAlreadyPendingJoiner = pendingJoiner && pendingJoiner.toLowerCase() === walletAddr.toLowerCase();
+      const isAlreadyPendingJoiner = pendingJoiner && pendingJoiner.toLowerCase() === walletAddr.toLowerCase();
     
       // If user is already a pending joiner, just try to express on-chain intent if needed
-      // (The main flow below will handle it, but we can shortcut here)
       if (isAlreadyPendingJoiner) {
-        // If deadline expired, tell user to wait for revert
         if (isDeadlineExpired) {
           alert('⚠️ Confirmation deadline expired. The challenge will automatically revert to open status soon. Please wait a moment and try joining again.');
           setShowDetailSheet(false);
           return;
         }
-
-        // Already expressed in Firestore - just need on-chain if PDA exists
-        // Fall through to main flow which will handle on-chain express intent
+        // Already expressed in Firestore - fall through to main flow
       }
       
       // If deadline expired and user is NOT the pending joiner, don't try to join
