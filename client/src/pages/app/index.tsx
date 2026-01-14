@@ -2713,7 +2713,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 }
               } else {
                 // No PDA yet - creator needs to create it first
-                alert('✅ Intent expressed in Firestore! Waiting for creator to create challenge on-chain. Once they do, you\'ll need to complete the on-chain step.');
+                alert('✅ Intent expressed in Firestore! Waiting for creator to create challenge on-chain.\n\nOnce they create it, click "Join Challenge" again to complete the on-chain step.');
               }
             } else {
               // Already expressed intent - check if on-chain is needed
