@@ -112,23 +112,23 @@ const VictoryModal: React.FC<VictoryModalProps> = ({
             onClick={onClose}
           />
 
-          {/* Modal - Match claim prize box sizing exactly for mobile */}
+          {/* Modal - Perfectly centered on all devices */}
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed left-1/2 top-1/2 z-[111] w-[calc(100vw-1rem)] max-w-sm -translate-x-1/2 -translate-y-1/2"
+            className="fixed inset-0 z-[111] flex items-center justify-center p-4"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxHeight: '90vh' }}
           >
-            <div className="relative overflow-hidden rounded-lg border border-amber-400/30 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black shadow-[0_0_40px_rgba(255,215,0,0.12)]">
-              {/* Gold glow effect around edges */}
-              <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-amber-500/10 via-transparent to-amber-500/10" />
-              <div className="absolute inset-0 rounded-lg bg-gradient-to-b from-amber-500/10 via-transparent to-amber-500/10" />
-              
-              {/* Content - Match claim prize box sizing exactly */}
-              <div className="relative p-2.5 text-center space-y-2">
+            <div className="w-full max-w-sm max-h-[90vh] overflow-y-auto">
+              <div className="relative overflow-hidden rounded-lg border border-amber-400/30 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black shadow-[0_0_40px_rgba(255,215,0,0.12)]">
+                {/* Gold glow effect around edges */}
+                <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-amber-500/10 via-transparent to-amber-500/10" />
+                <div className="absolute inset-0 rounded-lg bg-gradient-to-b from-amber-500/10 via-transparent to-amber-500/10" />
+                
+                {/* Content - Match claim prize box sizing exactly */}
+                <div className="relative p-2.5 text-center space-y-2">
                 {/* Trophy Icon - Match claim prize box (text-2xl emoji size) */}
                 <motion.div
                   initial={{ scale: 0 }}
@@ -199,6 +199,7 @@ const VictoryModal: React.FC<VictoryModalProps> = ({
                     Claim Reward
                   </Button>
                 </motion.div>
+                </div>
               </div>
             </div>
           </motion.div>
