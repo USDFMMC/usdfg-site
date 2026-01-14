@@ -315,6 +315,23 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   
   const canSubmitResult = status === 'active' && players.length >= 2 && isParticipant && !hasAlreadySubmitted;
   
+  // Debug: Log submit result button visibility (temporary)
+  if (status === 'active' && currentWallet) {
+    console.log('🔍 Submit Result Button Debug:', {
+      status,
+      playersLength: players.length,
+      isParticipant,
+      isCreator,
+      isChallenger,
+      isInPlayersArray,
+      hasAlreadySubmitted,
+      canSubmitResult,
+      showSubmitForm,
+      currentWallet: currentWallet.slice(0, 8) + '...',
+      players: players.map((p: string) => p?.slice(0, 8) + '...')
+    });
+  }
+  
   // Check if user won and can claim prize
   const winner = getChallengeValue('winner', null);
   const userWon = currentWallet && winner && winner.toLowerCase() === currentWallet.toLowerCase();
