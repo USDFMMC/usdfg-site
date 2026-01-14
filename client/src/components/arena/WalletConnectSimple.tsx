@@ -558,13 +558,18 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   if (connecting && !(connected && publicKey)) {
     // Check if connecting state is stuck (older than threshold)
     const connectTimestamp = getPhantomConnectTimestamp();
-    const stuckThreshold = mobile ? 3000 : 5000;
-    const isStuck = connectTimestamp && (Date.now() - connectTimestamp > stuckThreshold);
+    const stuckThreshold = mobile ? 2000 : 3000; // Very aggressive - 2 seconds on mobile
+    const isStuck = !connectTimestamp || (connectTimestamp && (Date.now() - connectTimestamp > stuckThreshold));
     
-    // If stuck, allow user to cancel and clear state, then retry connection
+    // CRITICAL: Always allow cancel/disconnect - don't disable button
+    // Users should be able to cancel connection at any time
     const handleCancelConnect = () => {
       console.log("🛑 User cancelled connection");
       clearPhantomConnectingState();
+      // Also try to disconnect if adapter is connected
+      if (connected) {
+        disconnect().catch(() => {});
+      }
       // Force component to re-render by updating state
       setForceUpdate(prev => prev + 1);
       // Also dispatch events to trigger other components
@@ -578,33 +583,27 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       <div className="flex flex-col space-y-2">
         {compact ? (
           <button
-            onClick={isStuck ? handleCancelConnect : undefined}
-            disabled={!isStuck}
-            className={`px-2.5 py-1.5 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-md text-xs text-center ${
-              isStuck ? 'cursor-pointer hover:bg-amber-600/30 active:opacity-70' : 'cursor-default'
-            } touch-manipulation`}
+            onClick={handleCancelConnect}
+            className="px-2.5 py-1.5 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-md text-xs text-center cursor-pointer hover:bg-amber-600/30 active:opacity-70 touch-manipulation"
             style={{ 
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent'
             }}
-            title={isStuck ? 'Tap to cancel and retry' : 'Connecting...'}
+            title="Tap to cancel connection"
           >
-            {isStuck ? 'Tap to Retry' : 'Connecting...'}
+            {isStuck ? 'Tap to Cancel' : 'Connecting...'}
           </button>
         ) : (
           <button
-            onClick={isStuck ? handleCancelConnect : undefined}
-            disabled={!isStuck}
-            className={`px-3 py-2 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-lg text-sm text-center ${
-              isStuck ? 'cursor-pointer hover:bg-amber-600/30 active:opacity-70' : 'cursor-default'
-            }`}
+            onClick={handleCancelConnect}
+            className="px-3 py-2 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-lg text-sm text-center cursor-pointer hover:bg-amber-600/30 active:opacity-70"
             style={{ 
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent'
             }}
-            title={isStuck ? 'Click to cancel connection' : 'Connecting...'}
+            title="Click to cancel connection"
           >
-            {isStuck ? 'Click to Cancel' : 'Connecting to Phantom...'}
+            {isStuck ? 'Click to Cancel' : 'Connecting...'}
           </button>
         )}
       </div>
