@@ -261,12 +261,13 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const challengerWallet = getChallengeValue('challenger', null);
   const pendingJoinerWallet = getChallengeValue('pendingJoiner', null);
   
-  const isCreator = currentWallet && creatorWallet.toLowerCase() === currentWallet.toLowerCase();
+  const isCreator = currentWallet && creatorWallet && creatorWallet.toLowerCase() === currentWallet.toLowerCase();
   const isChallenger = currentWallet && challengerWallet && challengerWallet.toLowerCase() === currentWallet.toLowerCase();
   const isPendingJoiner = currentWallet && pendingJoinerWallet && pendingJoinerWallet.toLowerCase() === currentWallet.toLowerCase();
-  const isInPlayersArray = currentWallet && players.some((p: string) => p?.toLowerCase() === currentWallet?.toLowerCase());
+  const isInPlayersArray = currentWallet && Array.isArray(players) && players.length > 0 && players.some((p: string) => p && p.toLowerCase() === currentWallet.toLowerCase());
   
   // User is a participant if they're in players array, OR they're the creator, challenger, or pending joiner
+  // CRITICAL: For active challenges, players array should have both players, but also check creator/challenger as fallback
   const isParticipant = isInPlayersArray || isCreator || isChallenger || isPendingJoiner;
   const maxPlayers = getChallengeValue('maxPlayers', 2);
   
