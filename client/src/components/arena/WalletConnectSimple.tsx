@@ -38,88 +38,50 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const [balance, setBalance] = useState<number | null>(null);
   const [usdfgBalance, setUsdfgBalance] = useState<number | null>(null);
   
-  // CRITICAL: On mobile, check localStorage directly for Phantom connection
-  // This ensures we detect connections even if parent component state is stale
-  // BUT: Validate on mount - if localStorage says connected but no valid connection, clear it
   const [mobileConnectionState, setMobileConnectionState] = useState(() => {
     if (!mobile || typeof window === 'undefined') return { connected: false, publicKey: null };
-    
-    // Use utility function to get connection state
     const storedState = getPhantomConnectionState();
-    
-    // If user explicitly disconnected or localStorage is stale, clear it
     if (localStorage.getItem('wallet_disconnected') === 'true' || (storedState.connected && !storedState.publicKey)) {
       clearPhantomConnectionState();
       return { connected: false, publicKey: null };
     }
-    
     return storedState;
   });
 
-  // Clean up stuck connection states on mount - be aggressive on Safari
+  // Clean up stuck connection states on mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    // CRITICAL FIX FOR MOBILE: If adapter says not connected, clear ALL localStorage state
-    // This prevents the green button from showing when wallet is not actually connected
     if (mobile && (!connected || !publicKey)) {
-      // On mobile, if adapter says not connected, clear localStorage immediately
-      // This ensures users always see "Connect Wallet" button, not stuck green button
       clearPhantomConnectionState();
       setMobileConnectionState({ connected: false, publicKey: null });
     }
     
-    // CRITICAL FIX: Validate localStorage connection state matches actual state
-    // Use utility function to validate and clean up stale state
     const isValid = validatePhantomConnectionState(connected, publicKey?.toString() || null, mobile ? 2000 : 10000);
-    
     if (!isValid && mobile) {
       setMobileConnectionState({ connected: false, publicKey: null });
     }
     
-    // Clear stuck connection states that are older than threshold (more aggressive on mobile)
     const connectTimestamp = getPhantomConnectTimestamp();
-    const stuckThreshold = mobile ? 10000 : 15000; // 10 seconds on mobile, 15 on desktop
-    if (connectTimestamp) {
-      const timeSinceConnect = Date.now() - connectTimestamp;
-      if (timeSinceConnect > stuckThreshold) {
-        console.log("🧹 Clearing stuck connecting state (older than threshold)");
-        clearPhantomConnectingState();
-      }
-    } else {
-      // No timestamp but marked as connecting - clear orphaned state immediately
-      if (isPhantomConnecting()) {
-        console.log("🧹 Clearing orphaned connecting state (no timestamp)");
-        clearPhantomConnectingState();
-      }
+    const stuckThreshold = mobile ? 10000 : 15000;
+    if (connectTimestamp && (Date.now() - connectTimestamp > stuckThreshold)) {
+      clearPhantomConnectingState();
+    } else if (isPhantomConnecting() && !connectTimestamp) {
+      clearPhantomConnectingState();
     }
     
-    // CRITICAL FIX FOR MOBILE: Also check if wallet adapter says not connecting but sessionStorage says connecting
-    // This prevents stuck "Connecting..." state when adapter has given up
     if (mobile && !connecting && isPhantomConnecting()) {
       const timestamp = getPhantomConnectTimestamp();
       if (timestamp && (Date.now() - timestamp > 5000)) {
-        // Adapter says not connecting but sessionStorage says connecting for >5 seconds - clear it
-        console.log("🧹 Clearing stuck mobile connecting state (adapter says not connecting)");
         clearPhantomConnectingState();
       }
     }
     
-    // If there's no active connection and no recent attempt, clear phantom_original_tab
-    // This allows normal browsing without the "new tab" warning
     const hasRecentTimestamp = connectTimestamp && (Date.now() - connectTimestamp < 5000);
     if (!isPhantomConnecting() && !hasRecentTimestamp) {
-      // Clear original tab marker if there's no active connection
-      // This prevents false positives on normal visits
-      if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('phantom_original_tab');
-        sessionStorage.removeItem('phantom_redirect_count');
-      }
+      sessionStorage.removeItem('phantom_original_tab');
+      sessionStorage.removeItem('phantom_redirect_count');
     }
-    
-    // Force a re-render after cleanup to ensure button state updates
-    // This is especially important on Safari where state might be stale
-    // REMOVED: setTimeout causing unnecessary re-renders - React will handle updates naturally
   }, [connected, publicKey, mobile]);
   
   // Mobile: Check stuck states and listen for localStorage changes
