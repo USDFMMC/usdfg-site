@@ -400,7 +400,12 @@ export async function creatorFund(
   challengePDA: string,
   entryFeeUsdfg: number
 ): Promise<string> {
-  console.log('💰 Creator funding challenge...');
+  console.log('💰 Creator funding challenge...', { entryFeeUsdfg, challengePDA });
+  
+  // CRITICAL: Validate entryFee is valid
+  if (!entryFeeUsdfg || entryFeeUsdfg <= 0) {
+    throw new Error(`Invalid entry fee: ${entryFeeUsdfg}. Entry fee must be greater than 0.`);
+  }
   
   if (!wallet || !wallet.publicKey) {
     throw new Error('Wallet not connected');
