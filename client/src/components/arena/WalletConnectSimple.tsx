@@ -120,13 +120,11 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     
     // Force a re-render after cleanup to ensure button state updates
     // This is especially important on Safari where state might be stale
-    setTimeout(() => {
-      window.dispatchEvent(new Event('storage'));
-      setForceUpdate(prev => prev + 1); // Force re-render
-    }, 100);
-  }, [connected, publicKey, mobile, forceUpdate]);
+    // REMOVED: setTimeout causing unnecessary re-renders - React will handle updates naturally
+  }, [connected, publicKey, mobile]);
   
   // Periodically check and clear stuck connecting states (especially on mobile)
+  // OPTIMIZED: Reduced frequency and removed forceUpdate to prevent re-render loops
   useEffect(() => {
     if (!mobile) return; // Only on mobile
     
@@ -136,21 +134,17 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       
       // If connecting state is stuck (older than 10 seconds), clear it
       if (isConnecting && timestamp && (Date.now() - timestamp > 10000)) {
-        console.log("🧹 Auto-clearing stuck mobile connecting state");
         clearPhantomConnectingState();
-        setForceUpdate(prev => prev + 1); // Force re-render
       }
       
       // If adapter says not connecting but sessionStorage says connecting, clear it
       if (isConnecting && !connecting && timestamp && (Date.now() - timestamp > 5000)) {
-        console.log("🧹 Auto-clearing stuck connecting state (adapter says not connecting)");
         clearPhantomConnectingState();
-        setForceUpdate(prev => prev + 1); // Force re-render
       }
-    }, 2000); // Check every 2 seconds
+    }, 5000); // OPTIMIZED: Check every 5 seconds instead of 2 (reduces CPU usage)
     
     return () => clearInterval(checkInterval);
-  }, [mobile, connecting, forceUpdate]);
+  }, [mobile, connecting]);
 
   // Listen for localStorage changes (when Phantom sets connection)
   // OPTIMIZED: Reduced polling frequency and added state change detection
@@ -212,8 +206,8 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('phantom_connected', handlePhantomConnected);
     
-    // OPTIMIZED: Reduced polling from 300ms to 2000ms (2 seconds) - still responsive but much less frequent
-    const interval = setInterval(checkConnection, 2000);
+    // OPTIMIZED: Reduced polling from 2 seconds to 5 seconds - still responsive but much less frequent
+    const interval = setInterval(checkConnection, 5000);
     
     return () => {
       window.removeEventListener('storage', handleStorageChange);

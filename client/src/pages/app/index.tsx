@@ -510,11 +510,11 @@ const ArenaHome: React.FC = () => {
     handleStorageSync();
     
     // Poll for sync data (since storage event doesn't fire in same tab)
-    // Check every 2 seconds - no need for aggressive polling
+    // OPTIMIZED: Check every 5 seconds instead of 2 (reduces CPU usage)
     const syncInterval = setInterval(() => {
       handleStorageSync();
       checkPhantomConnection(); // Also check connection state
-    }, 2000);
+    }, 5000);
     
     return () => {
       window.removeEventListener('phantomConnected', checkPhantomConnection);
