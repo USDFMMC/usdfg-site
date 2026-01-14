@@ -343,34 +343,35 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const hasWindowSolana = typeof window !== "undefined" && !!(window as any).solana;
   
   // CRITICAL: Check if Phantom connection is in progress, but only if it's recent (not stuck)
+  // CRITICAL FIX: Only show connecting if wallet adapter ALSO says connecting
+  // This prevents stuck "Connecting..." button when adapter has given up
   let isPhantomConnectingFlag = false;
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && !(connected && publicKey)) {
+    // Only check connecting state if NOT already connected
     const connectingFlag = isPhantomConnecting();
     const connectTimestamp = getPhantomConnectTimestamp();
     
-    const stuckThreshold = mobile ? 10000 : 15000; // 10 seconds on mobile, 15 on desktop
+    const stuckThreshold = mobile ? 3000 : 5000; // 3 seconds on mobile, 5 on desktop (very aggressive)
     
     if (connectingFlag && connectTimestamp) {
       const timeSinceConnect = Date.now() - connectTimestamp;
       if (timeSinceConnect > stuckThreshold) {
-        console.log(`🧹 Clearing stuck connection state (older than ${stuckThreshold/1000} seconds)`);
+        // Stuck - clear it immediately
         clearPhantomConnectingState();
         isPhantomConnectingFlag = false;
       } else {
-        // Only show connecting if adapter also says connecting (prevents stuck state)
-        isPhantomConnectingFlag = connecting || connectingFlag;
+        // CRITICAL: Only show connecting if adapter ALSO says connecting
+        // If adapter says not connecting, don't show connecting state
+        isPhantomConnectingFlag = connecting && connectingFlag;
       }
     } else if (connectingFlag && !connectTimestamp) {
-      console.log("🧹 Clearing orphaned connection state immediately");
+      // No timestamp - clear orphaned state immediately
       clearPhantomConnectingState();
       isPhantomConnectingFlag = false;
     } else if (connectingFlag && !connecting) {
-      // SessionStorage says connecting but adapter says not - clear if stuck
-      if (connectTimestamp && (Date.now() - connectTimestamp > 5000)) {
-        console.log("🧹 Clearing stuck connecting state (adapter says not connecting)");
-        clearPhantomConnectingState();
-        isPhantomConnectingFlag = false;
-      }
+      // SessionStorage says connecting but adapter says not - clear immediately
+      clearPhantomConnectingState();
+      isPhantomConnectingFlag = false;
     }
   }
   
@@ -398,63 +399,23 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   // Handle wallet connection
   // CRITICAL: On mobile, be VERY permissive - allow connection attempts
   const handleConnect = () => {
-    // Prevent multiple simultaneous connection attempts
+    // CRITICAL: Only prevent if adapter is actively connecting (not just stale flag)
     if (connecting) {
       console.warn("⚠️ Connection already in progress - ignoring click");
       return;
     }
     
+    // CRITICAL: If already connected, don't try to connect again
+    if (connected && publicKey) {
+      console.log("✅ Already connected - ignoring click");
+      return;
+    }
+    
     console.log("🔘 Connect button clicked", { mobile, actuallyConnected, connecting, isPhantomConnecting });
     
-    // On mobile, be very permissive - only block if definitely connected
-    if (mobile) {
-      // Check if actually connected (check localStorage directly)
-      const phantomState = getPhantomConnectionState();
-      
-      if (phantomState.connected) {
-        console.log("✅ Already connected on mobile - ignoring click");
-        return;
-      }
-      
-      // Clear any stale connection states before proceeding
-      const connectTimestamp = getPhantomConnectTimestamp();
-      if (connectTimestamp) {
-        const timeSinceConnect = Date.now() - connectTimestamp;
-        // If older than 2 seconds, clear it (very aggressive on mobile)
-        if (timeSinceConnect > 2000) {
-          console.log("🧹 Clearing stale connection state on mobile (older than 2 seconds)");
-          clearPhantomConnectingState();
-        }
-      } else {
-        // No timestamp - clear any orphaned state
-        if (isPhantomConnecting()) {
-          clearPhantomConnectingState();
-        }
-      }
-      
-      // Allow connection to proceed on mobile (don't block)
-    } else {
-      // Desktop: Use normal checks
-      const actuallyConnected = connected || isConnected;
-      if (actuallyConnected || connecting) {
-        console.warn("⚠️ Already connected or connecting - ignoring click");
-        return;
-      }
-      
-      // Clear stuck states on desktop too
-      if (isPhantomConnecting()) {
-        const connectTimestamp = getPhantomConnectTimestamp();
-        if (connectTimestamp) {
-          const timeSinceConnect = Date.now() - connectTimestamp;
-          if (timeSinceConnect > 5000) {
-            console.warn("⚠️ Clearing stuck connection state (older than 5 seconds)");
-            clearPhantomConnectingState();
-          }
-        } else {
-          clearPhantomConnectingState();
-        }
-      }
-    }
+    // CRITICAL: Always clear stale connecting states before proceeding
+    // This ensures clean connection attempt
+    clearPhantomConnectingState();
 
     (async () => {
       // CRITICAL FIX: Clear ALL stale state before connecting
