@@ -236,6 +236,10 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     const effectivePublicKey = publicKey; // ONLY trust adapter - localStorage can be stale
     
     if (actuallyConnected && effectivePublicKey) {
+      // CRITICAL: Clear connecting state immediately when connection succeeds
+      // This prevents stuck "Connecting..." button on mobile
+      clearPhantomConnectingState();
+      
       // Clear disconnect flag when user successfully connects
       localStorage.removeItem('wallet_disconnected');
       
