@@ -464,6 +464,11 @@ export async function creatorFund(
   // Convert USDFG to lamports
   const entryFeeLamports = Math.floor(entryFeeUsdfg * Math.pow(10, 9));
   
+  // CRITICAL: Validate lamports conversion
+  if (entryFeeLamports <= 0) {
+    throw new Error(`Invalid entry fee conversion: ${entryFeeUsdfg} USDFG = ${entryFeeLamports} lamports. Entry fee must be greater than 0.`);
+  }
+  
   // CRITICAL: Log the USDFG amount being transferred
   console.log('💰💰💰 CREATOR FUNDING WITH USDFG:', {
     entryFeeUsdfg,
@@ -524,6 +529,12 @@ export async function creatorFund(
   // This allows Phantom Wallet to show the USDFG transfer in the transaction preview
   // The contract will check if transfer already happened and skip it if it did
   const { createTransferInstruction } = await import('@solana/spl-token');
+  
+  // CRITICAL: Validate lamports before creating transfer instruction
+  if (entryFeeLamports <= 0) {
+    throw new Error(`Cannot create transfer instruction: entryFeeLamports is ${entryFeeLamports}. Entry fee must be greater than 0.`);
+  }
+  
   const transferInstruction = createTransferInstruction(
     creatorTokenAccount,      // source: creator's USDFG token account
     escrowTokenAccountPDA,   // destination: escrow USDFG token account  
@@ -531,10 +542,13 @@ export async function creatorFund(
     entryFeeLamports          // amount: entry fee in lamports
   );
   
-  console.log('💸 Adding explicit USDFG transfer instruction for Phantom preview:', {
+  console.log('💸💸💸 Adding explicit USDFG transfer instruction for Phantom preview:', {
     from: creatorTokenAccount.toString(),
     to: escrowTokenAccountPDA.toString(),
-    amount: `${entryFeeUsdfg} USDFG (${entryFeeLamports} lamports)`
+    amount: `${entryFeeUsdfg} USDFG (${entryFeeLamports} lamports)`,
+    instructionProgramId: transferInstruction.programId.toString(),
+    instructionKeys: transferInstruction.keys.length,
+    dataLength: transferInstruction.data.length
   });
   
   // Build transaction with transfer instruction FIRST (so Phantom shows it), then contract instruction

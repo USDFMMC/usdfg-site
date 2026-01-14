@@ -2913,6 +2913,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
       const entryFee = freshChallenge.entryFee || challenge.entryFee || challenge.rawData?.entryFee || 0;
       
+      // CRITICAL: Validate entryFee before proceeding
+      if (!entryFee || entryFee <= 0) {
+        throw new Error(`Invalid entry fee: ${entryFee}. Cannot fund challenge with zero or negative entry fee.`);
+      }
+      
       // Check if PDA exists
       let challengePDA = freshChallenge.pda || challenge.rawData?.pda || challenge.pda;
       
