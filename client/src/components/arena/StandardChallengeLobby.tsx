@@ -135,6 +135,42 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   
   // Use live challenge data if available, fallback to prop
   const activeChallenge = liveChallenge || challenge;
+  
+  // FIX: Immediately check and fix empty players array for active challenges on mount
+  useEffect(() => {
+    if (!activeChallenge?.id) return;
+    
+    const status = getChallengeStatus(activeChallenge);
+    if (status === 'active') {
+      const players = getChallengeValue('players', []);
+      const creator = getChallengeValue('creator', '');
+      const challenger = getChallengeValue('challenger', '');
+      
+      // If players array is empty but we have creator and challenger, fix it immediately
+      if ((!players || players.length === 0) && creator && challenger) {
+        console.log('🔧 Immediately fixing empty players array on mount:', {
+          creator: creator.slice(0, 8) + '...',
+          challenger: challenger.slice(0, 8) + '...'
+        });
+        
+        const fixPlayersArray = async () => {
+          try {
+            const { doc, updateDoc } = await import('firebase/firestore');
+            const { db } = await import('@/lib/firebase/firestore');
+            const challengeRef = doc(db, 'challenges', activeChallenge.id);
+            await updateDoc(challengeRef, {
+              players: [creator, challenger]
+            });
+            console.log('✅ Fixed players array on mount');
+          } catch (fixError) {
+            console.error('❌ Failed to fix players array on mount:', fixError);
+          }
+        };
+        
+        fixPlayersArray();
+      }
+    }
+  }, [activeChallenge?.id, activeChallenge?.status]);
 
   // Helper to get value from challenge or rawData (simplifies redundant access patterns)
   const getChallengeValue = <T,>(key: string, defaultValue: T): T => {
