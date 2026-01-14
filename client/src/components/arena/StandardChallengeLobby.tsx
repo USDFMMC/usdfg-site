@@ -1126,7 +1126,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       </div>
 
       {/* Submit Result Section */}
-      {canSubmitResult && !showSubmitForm && !hasAlreadySubmitted && (
+      {canSubmitResult && !showSubmitForm && (
         <button
           type="button"
           onClick={(e) => {
