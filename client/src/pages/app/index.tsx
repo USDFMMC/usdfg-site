@@ -2598,29 +2598,92 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
     const isAlreadyPendingJoiner = pendingJoiner && pendingJoiner.toLowerCase() === walletAddr.toLowerCase();
     
-      // If user is already a pending joiner, confirm and return (no fee needed!)
+      // If user is already a pending joiner, check if they need to express on-chain intent
       if (isAlreadyPendingJoiner) {
         // If deadline expired, tell user to wait for revert
         if (isDeadlineExpired) {
           alert('⚠️ Confirmation deadline expired. The challenge will automatically revert to open status soon. Please wait a moment and try joining again.');
           setShowDetailSheet(false);
-      return;
-    }
+          return;
+        }
 
-        // User already expressed intent in Firestore - no on-chain call needed (saves fees!)
-        // On-chain will sync when creator funds
-        alert('✅ You have already expressed intent to join this challenge. Waiting for creator to fund.');
-        setShowDetailSheet(false);
-        
-        // Open minimized nav bar lobby first (auto-minimizes on mobile)
-        setSelectedChallenge({
-          id: challenge.id,
-          title: challenge.title || extractGameFromTitle(challenge.title || '') || "Challenge",
-          ...challenge,
-          rawData: challenge.rawData || challenge
-        });
-        setShowStandardLobby(true);
-        return;
+        // If PDA exists, challenger needs to express on-chain intent before creator can fund
+        if (challengePDA) {
+          try {
+            // Try to express on-chain intent (this is free - no payment required)
+            const { expressJoinIntent: expressOnChain } = await import('@/lib/chain/contract');
+            await expressOnChain(
+              { signTransaction, publicKey },
+              connection,
+              challengePDA
+            );
+            
+            alert('✅ On-chain join intent expressed! Creator can now fund the challenge.');
+            setShowDetailSheet(false);
+            
+            // Open minimized nav bar lobby
+            setSelectedChallenge({
+              id: challenge.id,
+              title: challenge.title || extractGameFromTitle(challenge.title || '') || "Challenge",
+              ...challenge,
+              rawData: challenge.rawData || challenge
+            });
+            setShowStandardLobby(true);
+            
+            // Refresh challenge data to update UI
+            const updatedChallenge = await fetchChallengeById(challenge.id);
+            if (updatedChallenge) {
+              setSelectedChallenge({
+                id: updatedChallenge.id,
+                title: updatedChallenge.title || extractGameFromTitle(updatedChallenge.title || '') || "Challenge",
+                ...updatedChallenge,
+                rawData: updatedChallenge.rawData || updatedChallenge
+              });
+            }
+            return;
+          } catch (onChainError: any) {
+            const errorMsg = onChainError.message || onChainError.toString() || '';
+            // If intent was already expressed on-chain, that's OK
+            if (errorMsg.includes('already expressed') || errorMsg.includes('already') || 
+                errorMsg.includes('duplicate') || errorMsg.includes('Constraint')) {
+              alert('✅ You have already expressed on-chain intent. Creator can now fund the challenge.');
+              setShowDetailSheet(false);
+              
+              // Open minimized nav bar lobby
+              setSelectedChallenge({
+                id: challenge.id,
+                title: challenge.title || extractGameFromTitle(challenge.title || '') || "Challenge",
+                ...challenge,
+                rawData: challenge.rawData || challenge
+              });
+              setShowStandardLobby(true);
+              return;
+            }
+            // If user rejected transaction, don't show error - they can retry
+            if (errorMsg.includes('User rejected') || errorMsg.includes('User cancelled') || 
+                errorMsg.includes('rejected the request') || errorMsg.includes('cancelled')) {
+              alert('⚠️ Transaction was cancelled. Please try again when ready.');
+              return;
+            }
+            // Other errors - show message and let them retry
+            throw new Error(`Failed to express on-chain intent: ${errorMsg}`);
+          }
+        } else {
+          // No PDA yet - creator needs to create it first
+          // User already expressed intent in Firestore - waiting for creator to create PDA
+          alert('✅ You have already expressed intent to join this challenge. Waiting for creator to create the challenge on-chain.');
+          setShowDetailSheet(false);
+          
+          // Open minimized nav bar lobby first (auto-minimizes on mobile)
+          setSelectedChallenge({
+            id: challenge.id,
+            title: challenge.title || extractGameFromTitle(challenge.title || '') || "Challenge",
+            ...challenge,
+            rawData: challenge.rawData || challenge
+          });
+          setShowStandardLobby(true);
+          return;
+        }
       }
       
       // If deadline expired and user is NOT the pending joiner, don't try to join
