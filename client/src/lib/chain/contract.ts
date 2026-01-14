@@ -589,13 +589,27 @@ export async function creatorFund(
   transaction.feePayer = creator;
 
   // CRITICAL: Log transaction details before signing
-  console.log('📝 Transaction details:', {
+  console.log('📝 Transaction details BEFORE signing:', {
     instructions: transaction.instructions.length,
-    firstInstruction: transaction.instructions[0]?.programId.toString(),
-    secondInstruction: transaction.instructions[1]?.programId.toString(),
+    firstInstructionProgramId: transaction.instructions[0]?.programId.toString(),
+    firstInstructionKeys: transaction.instructions[0]?.keys.length,
+    firstInstructionDataLength: transaction.instructions[0]?.data.length,
+    secondInstructionProgramId: transaction.instructions[1]?.programId.toString(),
+    secondInstructionKeys: transaction.instructions[1]?.keys.length,
     entryFeeUSDFG: entryFeeUsdfg,
-    entryFeeLamports: entryFeeLamports
+    entryFeeLamports: entryFeeLamports,
+    hasTransferInstruction: transaction.instructions[0]?.programId.toString() === TOKEN_PROGRAM_ID.toString(),
+    hasContractInstruction: transaction.instructions[1]?.programId.toString() === PROGRAM_ID.toString()
   });
+  
+  // CRITICAL: Verify transfer instruction is first
+  if (transaction.instructions[0]?.programId.toString() !== TOKEN_PROGRAM_ID.toString()) {
+    console.error('❌ ERROR: Transfer instruction is not first!', {
+      firstInstructionProgramId: transaction.instructions[0]?.programId.toString(),
+      expectedProgramId: TOKEN_PROGRAM_ID.toString()
+    });
+    throw new Error('Transaction construction error: Transfer instruction must be first');
+  }
   
   const signedTransaction = await wallet.signTransaction(transaction);
   const signature = await connection.sendRawTransaction(signedTransaction.serialize());
