@@ -507,12 +507,9 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         
         // Clear timeout and connecting state on success
         clearTimeout(timeoutId);
-        if (!mobile) {
-          // Desktop: Clear connecting state
-          sessionStorage.removeItem('phantom_connecting');
-          sessionStorage.removeItem('phantom_connect_timestamp');
-        }
-        // Mobile: phantomMobileConnect() handles its own state
+        // CRITICAL: Always clear connecting state on success (both mobile and desktop)
+        // This prevents stuck "Connecting..." button
+        clearPhantomConnectingState();
       } catch (error: any) {
         // Clear timeout on error
         clearTimeout(timeoutId);
