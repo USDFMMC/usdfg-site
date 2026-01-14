@@ -569,11 +569,43 @@ export async function creatorFund(
   transaction.recentBlockhash = blockhash!;
   transaction.feePayer = creator;
 
+  // CRITICAL: Log transaction details before signing
+  console.log('📝 Transaction details:', {
+    instructions: transaction.instructions.length,
+    firstInstruction: transaction.instructions[0]?.programId.toString(),
+    secondInstruction: transaction.instructions[1]?.programId.toString(),
+    entryFeeUSDFG: entryFeeUsdfg,
+    entryFeeLamports: entryFeeLamports
+  });
+  
   const signedTransaction = await wallet.signTransaction(transaction);
   const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+  
+  console.log('⏳ Confirming transaction...', signature);
   await connection.confirmTransaction(signature);
   
-  console.log('✅ Creator funded successfully!');
+  // CRITICAL: Verify the transfer actually happened by checking escrow balance
+  try {
+    const { getAccount } = await import('@solana/spl-token');
+    const escrowAccount = await getAccount(connection, escrowTokenAccountPDA);
+    const escrowBalance = Number(escrowAccount.amount) / Math.pow(10, 9);
+    console.log('✅ Creator funded successfully!', {
+      signature,
+      escrowBalance: `${escrowBalance} USDFG`,
+      expectedAmount: `${entryFeeUsdfg} USDFG`,
+      transferSuccessful: escrowBalance >= entryFeeUsdfg
+    });
+    
+    if (escrowBalance < entryFeeUsdfg) {
+      console.error('❌ WARNING: Escrow balance is less than expected!', {
+        escrowBalance,
+        expected: entryFeeUsdfg
+      });
+    }
+  } catch (error) {
+    console.warn('⚠️ Could not verify escrow balance:', error);
+  }
+  
   return signature;
 }
 
