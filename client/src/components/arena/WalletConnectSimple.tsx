@@ -122,8 +122,35 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     // This is especially important on Safari where state might be stale
     setTimeout(() => {
       window.dispatchEvent(new Event('storage'));
+      setForceUpdate(prev => prev + 1); // Force re-render
     }, 100);
-  }, [connected, publicKey, mobile]);
+  }, [connected, publicKey, mobile, forceUpdate]);
+  
+  // Periodically check and clear stuck connecting states (especially on mobile)
+  useEffect(() => {
+    if (!mobile) return; // Only on mobile
+    
+    const checkInterval = setInterval(() => {
+      const isConnecting = isPhantomConnecting();
+      const timestamp = getPhantomConnectTimestamp();
+      
+      // If connecting state is stuck (older than 10 seconds), clear it
+      if (isConnecting && timestamp && (Date.now() - timestamp > 10000)) {
+        console.log("🧹 Auto-clearing stuck mobile connecting state");
+        clearPhantomConnectingState();
+        setForceUpdate(prev => prev + 1); // Force re-render
+      }
+      
+      // If adapter says not connecting but sessionStorage says connecting, clear it
+      if (isConnecting && !connecting && timestamp && (Date.now() - timestamp > 5000)) {
+        console.log("🧹 Auto-clearing stuck connecting state (adapter says not connecting)");
+        clearPhantomConnectingState();
+        setForceUpdate(prev => prev + 1); // Force re-render
+      }
+    }, 2000); // Check every 2 seconds
+    
+    return () => clearInterval(checkInterval);
+  }, [mobile, connecting, forceUpdate]);
 
   // Listen for localStorage changes (when Phantom sets connection)
   // OPTIMIZED: Reduced polling frequency and added state change detection
@@ -564,12 +591,14 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   };
 
   // If connecting, show connecting state with cancel option
-  if (connecting || isPhantomConnectingFlag) {
-    // Check if connecting state is stuck (older than 10 seconds)
+  // CRITICAL: Only show connecting if NOT already connected (prevents stuck state)
+  if ((connecting || isPhantomConnectingFlag) && !(connected && publicKey)) {
+    // Check if connecting state is stuck (older than threshold)
     const connectTimestamp = getPhantomConnectTimestamp();
-    const isStuck = connectTimestamp && (Date.now() - connectTimestamp > 10000);
+    const stuckThreshold = mobile ? 5000 : 10000;
+    const isStuck = connectTimestamp && (Date.now() - connectTimestamp > stuckThreshold);
     
-    // If stuck, allow user to cancel
+    // If stuck, allow user to cancel and clear state
     const handleCancelConnect = () => {
       console.log("🛑 User cancelled connection");
       clearPhantomConnectingState();
