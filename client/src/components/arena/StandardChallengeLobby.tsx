@@ -80,11 +80,36 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     // regardless of when the parent component's selectedChallenge prop updates
     const unsubscribe = onSnapshot(
       challengeRef,
-      (snapshot) => {
+      async (snapshot) => {
         if (snapshot.exists()) {
           const updatedData = { id: snapshot.id, ...snapshot.data(), rawData: snapshot.data() };
           const newStatus = getChallengeStatus(updatedData);
           const newPendingJoiner = getChallengePendingJoiner(updatedData);
+          
+          // FIX: If challenge is active but players array is empty, fix it
+          if (newStatus === 'active') {
+            const players = updatedData.players || updatedData.rawData?.players || [];
+            const creator = updatedData.creator || updatedData.rawData?.creator;
+            const challenger = updatedData.challenger || updatedData.rawData?.challenger;
+            
+            // If players array is empty but we have creator and challenger, fix it
+            if ((!players || players.length === 0) && creator && challenger) {
+              console.log('🔧 Fixing empty players array for active challenge:', {
+                creator: creator.slice(0, 8) + '...',
+                challenger: challenger.slice(0, 8) + '...'
+              });
+              
+              try {
+                const { updateDoc } = await import('firebase/firestore');
+                await updateDoc(challengeRef, {
+                  players: [creator, challenger]
+                });
+                console.log('✅ Fixed players array for active challenge');
+              } catch (fixError) {
+                console.error('❌ Failed to fix players array:', fixError);
+              }
+            }
+          }
           
           // CRITICAL: Always update liveChallenge immediately - no conditions
           // This ensures "Fund Challenge" button appears instantly when someone expresses intent
