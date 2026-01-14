@@ -132,9 +132,13 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const voiceChatCurrentWallet = currentWallet || "";
 
   // Check if user already submitted result (moved up for use in handleSubmit)
+  // Use useMemo to prevent recalculation on every render unless results or wallet actually change
   const results = getChallengeValue('results', {});
-  const userResult = currentWallet ? results[currentWallet.toLowerCase()] : null;
-  const hasAlreadySubmitted = !!userResult;
+  const hasAlreadySubmitted = useMemo(() => {
+    if (!currentWallet || !results || typeof results !== 'object') return false;
+    const userResult = results[currentWallet.toLowerCase()];
+    return !!userResult;
+  }, [currentWallet, results]);
 
   const handleImageCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
