@@ -564,9 +564,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       if (connected) {
         disconnect().catch(() => {});
       }
-      // Force component to re-render by updating state
-      setForceUpdate(prev => prev + 1);
-      // Also dispatch events to trigger other components
+      // Dispatch events to trigger other components (React will re-render naturally)
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('storage'));
         window.dispatchEvent(new Event('walletStateChanged'));
