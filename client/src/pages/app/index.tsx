@@ -4899,7 +4899,20 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                       role="button"
                       tabIndex={0}
                       className={`relative text-left rounded-xl border overflow-hidden p-3 transition active:scale-[0.99] w-[176px] h-[176px] sm:w-[180px] sm:h-[180px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-400/50 ${edgeGlow}`}
-                      onClick={onSelect}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onSelect();
+                      }}
+                      onTouchStart={(e) => {
+                        // Ensure touch events work on mobile
+                        e.stopPropagation();
+                      }}
+                      onTouchEnd={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onSelect();
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' || e.key === ' ') {
                           e.preventDefault();
@@ -4908,7 +4921,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                       }}
                       style={{
                         touchAction: 'manipulation',
-                        WebkitTapHighlightColor: 'transparent'
+                        WebkitTapHighlightColor: 'transparent',
+                        WebkitUserSelect: 'none',
+                        userSelect: 'none'
                       }}
                       aria-label={`Open ${gameName} challenge`}
                     >
