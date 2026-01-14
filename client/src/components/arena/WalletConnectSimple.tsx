@@ -122,90 +122,49 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     // REMOVED: setTimeout causing unnecessary re-renders - React will handle updates naturally
   }, [connected, publicKey, mobile]);
   
-  // Periodically check and clear stuck connecting states (especially on mobile)
-  // OPTIMIZED: Reduced frequency and removed forceUpdate to prevent re-render loops
-  useEffect(() => {
-    if (!mobile) return; // Only on mobile
-    
-    const checkInterval = setInterval(() => {
-      const isConnecting = isPhantomConnecting();
-      const timestamp = getPhantomConnectTimestamp();
-      
-      // If connecting state is stuck (older than 10 seconds), clear it
-      if (isConnecting && timestamp && (Date.now() - timestamp > 10000)) {
-        clearPhantomConnectingState();
-      }
-      
-      // If adapter says not connecting but sessionStorage says connecting, clear it
-      if (isConnecting && !connecting && timestamp && (Date.now() - timestamp > 5000)) {
-        clearPhantomConnectingState();
-      }
-    }, 5000); // OPTIMIZED: Check every 5 seconds instead of 2 (reduces CPU usage)
-    
-    return () => clearInterval(checkInterval);
-  }, [mobile, connecting]);
-
-  // Listen for localStorage changes (when Phantom sets connection)
-  // OPTIMIZED: Reduced polling frequency and added state change detection
+  // Mobile: Check stuck states and listen for localStorage changes
   useEffect(() => {
     if (!mobile || typeof window === 'undefined') return;
     
-    let lastState: { connected: boolean; publicKey: string | null } = { 
-      connected: false, 
-      publicKey: null 
-    };
+    let lastState: { connected: boolean; publicKey: string | null } = { connected: false, publicKey: null };
     
     const checkConnection = () => {
       const phantomState = getPhantomConnectionState();
-      const isPhantomConnected = phantomState.connected;
-      const storedPublicKey = phantomState.publicKey;
+      const isConnecting = isPhantomConnecting();
+      const timestamp = getPhantomConnectTimestamp();
       
-      // Only update state if it actually changed (prevents unnecessary re-renders)
-      if (lastState.connected === isPhantomConnected && lastState.publicKey === storedPublicKey) {
-        return; // No change, skip update
+      // Clear stuck connecting states
+      if (isConnecting && timestamp && (Date.now() - timestamp > 10000)) {
+        clearPhantomConnectingState();
       }
-      
-      // Update last state
-      lastState = {
-        connected: isPhantomConnected,
-        publicKey: storedPublicKey
-      };
-      
-      // If connected, clear any connecting flags
-      if (isPhantomConnected && storedPublicKey) {
+      if (isConnecting && !connecting && timestamp && (Date.now() - timestamp > 5000)) {
         clearPhantomConnectingState();
       }
       
-      setMobileConnectionState({
-        connected: isPhantomConnected,
-        publicKey: storedPublicKey
-      });
-      
-      // Force parent component re-render by calling onConnect if newly connected
-      if (isPhantomConnected && storedPublicKey && !lastState.connected) {
-        onConnect();
+      // Check connection state
+      if (lastState.connected === phantomState.connected && lastState.publicKey === phantomState.publicKey) {
+        return;
       }
+      
+      lastState = { connected: phantomState.connected, publicKey: phantomState.publicKey };
+      
+      if (phantomState.connected && phantomState.publicKey) {
+        clearPhantomConnectingState();
+        if (!lastState.connected) onConnect();
+      }
+      
+      setMobileConnectionState({ connected: phantomState.connected, publicKey: phantomState.publicKey });
     };
     
-    // Check immediately
     checkConnection();
     
-    // Listen for storage events (from other tabs/windows)
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'phantom_connected' || e.key === 'phantom_public_key') {
-        checkConnection();
-      }
+      if (e.key === 'phantom_connected' || e.key === 'phantom_public_key') checkConnection();
     };
-    
-    // Listen for custom phantom_connected event
-    const handlePhantomConnected = () => {
-      checkConnection();
-    };
+    const handlePhantomConnected = () => checkConnection();
     
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('phantom_connected', handlePhantomConnected);
-    
-    // OPTIMIZED: Reduced polling from 2 seconds to 5 seconds - still responsive but much less frequent
     const interval = setInterval(checkConnection, 5000);
     
     return () => {
@@ -213,7 +172,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       window.removeEventListener('phantom_connected', handlePhantomConnected);
       clearInterval(interval);
     };
-  }, [mobile, onConnect]);
+  }, [mobile, connecting, onConnect]);
 
   // Handle connection state changes
   useEffect(() => {

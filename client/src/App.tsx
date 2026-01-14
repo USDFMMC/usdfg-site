@@ -124,32 +124,9 @@ function App() {
     const urlParams = new URLSearchParams(window.location.search);
     const allParams = Object.fromEntries(urlParams.entries());
     
-    // Detect silent rejection - even in new tabs (connectTimestamp persists in localStorage)
-    // Check if we have a recent connection attempt but no params
-    if (connectTimestamp && !hasSearchParams) {
-      if (timeSinceConnect && timeSinceConnect < 10000) { // Within 10 seconds of connect attempt
-        console.error("❌❌❌ PHANTOM SILENT REJECTION DETECTED ❌❌❌");
-        console.error("❌ Phantom opened but returned immediately without ANY params");
-        console.error("❌ Time since connect:", timeSinceConnect, "ms");
-        console.error("❌ Current URL:", window.location.href);
-        console.error("❌ Is new tab:", !sessionStorage.getItem('phantom_original_tab'));
-        console.error("❌ This indicates Phantom silently rejected the connection");
-        console.error("❌ Possible causes:");
-        console.error("   1. Phantom can't fetch manifest.json from its app context");
-        console.error("   2. Manifest.json validation failed in Phantom");
-        console.error("   3. app_url doesn't match manifest.json url exactly");
-        console.error("   4. Phantom cache has old/stale manifest data");
-        console.error("   5. Universal link association broken (opening new tab instead of same tab)");
-        console.error("   6. Phantom version doesn't support this format");
-        console.error("❌ CRITICAL: Phantom opened a NEW tab - universal link not working");
-        console.error("❌ This suggests iOS universal link association is broken");
-        console.error("❌ ACTION REQUIRED:");
-        console.error("   1. Clear Phantom cache: Settings → Connected Apps → Remove USDFG");
-        console.error("   2. Clear Safari cache: Settings → Safari → Advanced → Website Data → usdfg.pro");
-        console.error("   3. Restart Phantom app completely");
-        console.error("   4. Try connecting again");
-        console.error("   5. If still fails, try using Phantom's in-app browser instead");
-      }
+    // Detect silent rejection
+    if (connectTimestamp && !hasSearchParams && timeSinceConnect && timeSinceConnect < 10000) {
+      console.error("❌ Phantom silent rejection detected - no params returned");
     }
     
     // Check if we were trying to connect (detect if Phantom closed without returning)

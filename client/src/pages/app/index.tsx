@@ -2575,7 +2575,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       }
     }
     
-    // Quick status validation - don't block on fresh fetches (real-time listener will update)
+    // Quick status validation
     if (status !== 'pending_waiting_for_opponent' && status !== 'creator_confirmation_required') {
       if (status === 'creator_funded' && isChallenger) {
         alert('The creator has funded. Please use the "Fund Challenge" button to fund your entry.');
@@ -2584,17 +2584,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       } else {
         alert(`Challenge is not waiting for opponent. Current status: ${status}`);
       }
-        return;
-      }
+      return;
+    }
       
     try {
-    const walletAddr = publicKey.toString();
-      
-      // Get challenge data once (avoid redundant checks)
-    const challengePDA = challenge.rawData?.pda || challenge.pda;
-      const currentStatus = challenge.status || challenge.rawData?.status;
-    const pendingJoiner = challenge.rawData?.pendingJoiner || challenge.pendingJoiner;
-      const creatorFundingDeadline = challenge.rawData?.creatorFundingDeadline || challenge.creatorFundingDeadline;
       const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
     const isAlreadyPendingJoiner = pendingJoiner && pendingJoiner.toLowerCase() === walletAddr.toLowerCase();
     
