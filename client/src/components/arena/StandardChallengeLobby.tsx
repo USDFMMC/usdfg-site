@@ -379,7 +379,10 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   // Creator can cancel/delete if deadline expired or status is pending (no one joined yet)
   const canCreatorCancel = isCreator && (isDeadlineExpired || status === 'pending_waiting_for_opponent') && onCancelChallenge;
   
-  const canSubmitResult = status === 'active' && players.length >= 2 && isParticipant && !hasAlreadySubmitted;
+  // FIX: Check players array length OR creator/challenger presence for submit button
+  // This ensures button shows even if players array is temporarily empty (being fixed)
+  const hasEnoughPlayers = players.length >= 2 || (creatorWallet && challengerWallet);
+  const canSubmitResult = status === 'active' && hasEnoughPlayers && isParticipant && !hasAlreadySubmitted;
   
   // Debug: Log submit result button visibility (temporary)
   if (status === 'active' && currentWallet) {
