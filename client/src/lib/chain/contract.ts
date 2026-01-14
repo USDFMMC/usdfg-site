@@ -627,13 +627,19 @@ export async function creatorFund(
     hasContractInstruction: transaction.instructions[1]?.programId.toString() === PROGRAM_ID.toString()
   });
   
-  // CRITICAL: Verify transfer instruction is first
-  if (transaction.instructions[0]?.programId.toString() !== TOKEN_PROGRAM_ID.toString()) {
-    console.error('❌ ERROR: Transfer instruction is not first!', {
-      firstInstructionProgramId: transaction.instructions[0]?.programId.toString(),
-      expectedProgramId: TOKEN_PROGRAM_ID.toString()
-    });
-    throw new Error('Transaction construction error: Transfer instruction must be first');
+  // CRITICAL: Verify transfer instruction is first (only if it was added)
+  // If escrow account doesn't exist, we skip the transfer instruction and let contract handle it
+  if (escrowAccountExists) {
+    if (transaction.instructions[0]?.programId.toString() !== TOKEN_PROGRAM_ID.toString()) {
+      console.error('❌ ERROR: Transfer instruction is not first!', {
+        firstInstructionProgramId: transaction.instructions[0]?.programId.toString(),
+        expectedProgramId: TOKEN_PROGRAM_ID.toString()
+      });
+      throw new Error('Transaction construction error: Transfer instruction must be first');
+    }
+    console.log('✅ Verified: Transfer instruction is first');
+  } else {
+    console.log('✅ Verified: Contract instruction only (escrow will be created by contract)');
   }
   
   const signedTransaction = await wallet.signTransaction(transaction);
