@@ -444,7 +444,6 @@ const ArenaHome: React.FC = () => {
       const storedPublicKey = localStorage.getItem('phantom_public_key');
       
       if (isPhantomConnected && storedPublicKey) {
-        console.log('📱 Found stored Phantom connection - public key:', storedPublicKey);
         // Clear connecting flag since we're now connected
         sessionStorage.removeItem('phantom_connecting');
         // Update state to trigger re-render
@@ -4881,10 +4880,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                   }
                 }
                 const imagePath = getGameImage(gameName);
-                // Debug logging for mobile issues - helps identify what image is being used
-                if (gameName.toLowerCase().includes('nba') || gameName.toLowerCase().includes('2k')) {
-                  console.log(`🏀 NBA Game Image Debug - Game: "${gameName}", Image: "${imagePath}", Challenge ID: ${challenge.id}, Title: "${challenge.title}"`);
-                }
                 const isOwner = isChallengeOwner(challenge);
                 
                 const status = challenge.status;
