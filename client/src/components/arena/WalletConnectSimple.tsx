@@ -592,14 +592,15 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   };
 
   // If connecting, show connecting state with cancel option
-  // CRITICAL: Only show connecting if NOT already connected (prevents stuck state)
-  if ((connecting || isPhantomConnectingFlag) && !(connected && publicKey)) {
+  // CRITICAL: Only show connecting if wallet adapter ALSO says connecting (prevents stuck state)
+  // If adapter says not connecting, show normal Connect Wallet button instead
+  if (connecting && !(connected && publicKey)) {
     // Check if connecting state is stuck (older than threshold)
     const connectTimestamp = getPhantomConnectTimestamp();
-    const stuckThreshold = mobile ? 5000 : 10000;
+    const stuckThreshold = mobile ? 3000 : 5000;
     const isStuck = connectTimestamp && (Date.now() - connectTimestamp > stuckThreshold);
     
-    // If stuck, allow user to cancel and clear state
+    // If stuck, allow user to cancel and clear state, then retry connection
     const handleCancelConnect = () => {
       console.log("🛑 User cancelled connection");
       clearPhantomConnectingState();
@@ -625,9 +626,9 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent'
             }}
-            title={isStuck ? 'Tap to cancel connection' : 'Connecting...'}
+            title={isStuck ? 'Tap to cancel and retry' : 'Connecting...'}
           >
-            {isStuck ? 'Tap to Cancel' : 'Connecting...'}
+            {isStuck ? 'Tap to Retry' : 'Connecting...'}
           </button>
         ) : (
           <button
