@@ -8,8 +8,6 @@
  * Nonce must be 24 bytes, NOT 16 bytes
  */
 
-console.log('🔍 DEEPLINK MODULE LOADED - phantom-deeplink.ts imported');
-
 import nacl from "tweetnacl";
 import { PublicKey } from '@solana/web3.js';
 import { isPhantomConnecting, setPhantomConnecting } from "../utils/wallet-state";
