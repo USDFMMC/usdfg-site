@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, Suspense } from 'react';
 import { X, ChevronUp } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { getPlayerStats } from '@/lib/firebase/firestore';
 
 interface PlayerInfo {
@@ -83,17 +84,16 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
     }
   }, [isMinimized, isMobile, safePlayers]);
 
-  // Reset to expanded (full lobby) when panel opens
-  // Users can manually minimize to nav bar if they want to scroll the site
+  // Auto-minimize on mobile when panel opens (shows pill immediately)
   useEffect(() => {
-    if (isOpen) {
-      // Always start in expanded (full lobby) state when panel opens
-      setIsMinimized(false);
-    } else {
-      // Reset when panel closes so next time it opens full
+    if (isOpen && isMobile) {
+      // On mobile, show minimized pill immediately when panel opens
+      setIsMinimized(true);
+    } else if (!isOpen) {
+      // Reset when panel closes
       setIsMinimized(false);
     }
-  }, [isOpen]);
+  }, [isOpen, isMobile]);
 
   const handleExpand = () => {
     setIsMinimized(false);
@@ -105,104 +105,121 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
 
   if (!isOpen) return null;
 
-  // Minimized view (mobile only) - shows at top like X's minimized player
-  // Show when minimized on mobile (will display once players data loads)
+  // Get player names for display
+  const getPlayerDisplayName = (player: PlayerInfo) => {
+    const stats = playerData[player.wallet.toLowerCase()] || {};
+    return stats.displayName || player.displayName || player.wallet.slice(0, 4);
+  };
+
+  const getStatusText = () => {
+    if (safePlayers.length >= 2) {
+      const p1Name = getPlayerDisplayName(safePlayers[0]);
+      const p2Name = getPlayerDisplayName(safePlayers[1]);
+      return `${p1Name} vs ${p2Name}`;
+    } else if (safePlayers.length === 1) {
+      const p1Name = getPlayerDisplayName(safePlayers[0]);
+      return `${p1Name} • Waiting for opponent`;
+    }
+    return 'Waiting for opponent';
+  };
+
+  // Minimized view (mobile only) - new purple pill design
   if (isOpen && isMobile && isMinimized) {
     return (
-      <>
-        {/* Minimized bar at top - like X's minimized player */}
-        {/* Tap anywhere on the bar to expand */}
-        <div
-          className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-blue-600/95 to-purple-600/95 backdrop-blur-md border-b border-blue-400/30 shadow-lg md:hidden touch-manipulation active:opacity-90"
-          onClick={handleExpand}
-          style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+      <AnimatePresence initial={false} mode="wait">
+        <motion.div
+          key="expanded"
+          initial={{ opacity: 0, y: 16, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 16, scale: 0.98 }}
+          transition={{ duration: 0.25, ease: "easeOut" }}
+          className="fixed top-0 left-0 right-0 z-50 px-4 pt-2 pb-2 md:hidden"
         >
-          <div className="flex items-center gap-3 px-4 py-3">
-            {/* Player avatars - show creator, and joiner if available */}
-            <div className="flex -space-x-2">
-              {safePlayers.slice(0, 2).map((player, idx) => {
-                const stats = playerData[player.wallet.toLowerCase()] || {};
-                const displayName = stats.displayName || player.displayName || `${player.wallet.slice(0, 4)}...${player.wallet.slice(-4)}`;
-                const profileImage = stats.profileImage || player.profileImage;
-                return (
-                  <div
-                    key={player.wallet}
-                    className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400/20 to-purple-400/20 border-2 border-white/30 flex items-center justify-center overflow-hidden"
-                    style={{ zIndex: 2 - idx }}
-                  >
-                    {profileImage ? (
-                      <img 
-                        src={profileImage} 
-                        alt={displayName} 
-                        className="w-full h-full object-cover" 
-                      />
-                    ) : (
-                      <span className="text-white font-semibold text-sm">
-                        {displayName.charAt(0).toUpperCase()}
-                      </span>
-                    )}
+          <div
+            className="relative w-full h-[72px] px-6 flex items-center justify-between rounded-full
+              bg-gradient-to-r from-pink-500 via-purple-600 to-blue-500
+              shadow-[0_0_22px_rgba(122,92,255,.6),0_0_44px_rgba(77,163,255,.35)]"
+            onClick={handleExpand}
+            style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+          >
+            {/* LEFT: avatars + text */}
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="flex items-center -space-x-2">
+                {safePlayers.slice(0, 2).map((player, idx) => {
+                  const stats = playerData[player.wallet.toLowerCase()] || {};
+                  const displayName = stats.displayName || player.displayName || player.wallet.slice(0, 4);
+                  const profileImage = stats.profileImage || player.profileImage;
+                  return (
+                    <div
+                      key={player.wallet}
+                      className="w-10 h-10 rounded-full bg-white/15 ring-2 ring-white/15 flex items-center justify-center overflow-hidden"
+                      style={{ zIndex: 2 - idx }}
+                    >
+                      {profileImage ? (
+                        <img 
+                          src={profileImage} 
+                          alt={displayName} 
+                          className="w-full h-full object-cover" 
+                        />
+                      ) : (
+                        <span className="font-bold text-white text-sm">
+                          {displayName.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+                {/* Show placeholder for second player if only 1 player */}
+                {safePlayers.length === 1 && (
+                  <div className="w-10 h-10 rounded-full bg-white/10 ring-2 ring-white/10 flex items-center justify-center">
+                    <span className="text-white/70 text-sm">+</span>
                   </div>
-                );
-              })}
-              {/* Show placeholder for second player if only 1 player */}
-              {safePlayers.length === 1 && (
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400/20 to-purple-400/20 border-2 border-white/30 border-dashed flex items-center justify-center">
-                  <span className="text-white/50 text-xs">+</span>
-                </div>
-              )}
-            </div>
-
-            {/* Game info */}
-            <div className="flex-1 min-w-0">
-              <div className="text-white font-semibold text-sm truncate">
-                {gameName || 'Challenge'}
+                )}
               </div>
-              <div className="text-blue-100 text-xs truncate">
-                {safePlayers.length >= 2 
-                  ? (() => {
-                      const p1Stats = playerData[safePlayers[0]?.wallet.toLowerCase()] || {};
-                      const p2Stats = playerData[safePlayers[1]?.wallet.toLowerCase()] || {};
-                      const p1Name = p1Stats.displayName || safePlayers[0]?.displayName || safePlayers[0]?.wallet.slice(0, 6);
-                      const p2Name = p2Stats.displayName || safePlayers[1]?.displayName || safePlayers[1]?.wallet.slice(0, 6);
-                      return `${p1Name} vs ${p2Name}`;
-                    })()
-                  : safePlayers.length === 1
-                  ? (() => {
-                      const p1Stats = playerData[safePlayers[0]?.wallet.toLowerCase()] || {};
-                      const p1Name = p1Stats.displayName || safePlayers[0]?.displayName || safePlayers[0]?.wallet.slice(0, 6);
-                      return `${p1Name} • Waiting for opponent`;
-                    })()
-                  : 'No players yet'
-                }
+
+              <div className="flex flex-col leading-tight text-white min-w-0">
+                <span className="text-[16px] font-bold truncate">{gameName || 'Challenge'}</span>
+                <span className="text-[13px] opacity-85 truncate">{getStatusText()}</span>
               </div>
             </div>
 
-            {/* Expand button - tap to expand */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleExpand();
-              }}
-              className="p-2 rounded-lg bg-white/10 hover:bg-white/20 active:bg-white/30 transition-colors touch-manipulation"
-              aria-label="Expand lobby"
-            >
-              <ChevronUp className="w-5 h-5 text-white" />
-            </button>
+            {/* RIGHT: signal bars + controls */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-end gap-1">
+                {[0, 0.15, 0.3].map((delay, i) => (
+                  <motion.span
+                    key={i}
+                    className="w-[3px] bg-white/90 rounded"
+                    initial={false}
+                    animate={{ height: [8, 18, 8], opacity: [0.55, 1, 0.55] }}
+                    transition={{
+                      duration: 1.15,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                      delay
+                    }}
+                    style={{ height: 8 }}
+                  />
+                ))}
+              </div>
 
-            {/* Close button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-              }}
-              className="p-2 rounded-lg bg-white/10 hover:bg-white/20 active:bg-white/30 transition-colors touch-manipulation"
-              aria-label="Close lobby"
-            >
-              <X className="w-5 h-5 text-white" />
-            </button>
+              {/* Close button */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                }}
+                className="w-10 h-10 rounded-2xl bg-black/20 hover:bg-black/35 text-white/95 flex items-center justify-center transition"
+                aria-label="Close live pill"
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
           </div>
-        </div>
-      </>
+        </motion.div>
+      </AnimatePresence>
     );
   }
 
