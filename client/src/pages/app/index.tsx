@@ -46,6 +46,7 @@ import ElegantModal from "@/components/ui/ElegantModal";
 import CreateChallengeForm from "@/components/arena/CreateChallengeForm";
 import ElegantNavbar from "@/components/layout/ElegantNavbar";
 import LiveChallengesGrid from "@/components/arena/LiveChallengesGrid";
+import PurplePillPreview from "@/components/preview/PurplePillPreview";
 // Lazy load heavy modals for better performance on all devices
 const SubmitResultRoom = lazy(() => import("@/components/arena/SubmitResultRoom").then(module => ({ default: module.SubmitResultRoom })));
 const PlayerProfileModal = lazy(() => import("@/components/arena/PlayerProfileModal"));
