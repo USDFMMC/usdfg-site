@@ -132,6 +132,11 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
 
   // Minimized view (mobile only) - new purple pill design
   // When clicked, expands to full lobby (same behavior as original)
+  // Debug: Log state to verify conditions
+  if (process.env.NODE_ENV === 'development') {
+    console.log('RightSidePanel state:', { isOpen, isMobile, isMinimized, showPill: isOpen && isMobile && isMinimized });
+  }
+  
   if (isOpen && isMobile && isMinimized) {
     return (
       <motion.div
