@@ -543,8 +543,8 @@ export async function creatorFund(
   });
 
   // ALWAYS add USDFG transfer instruction so Phantom shows it
-  // The contract will create the escrow account via init_if_needed if it doesn't exist
-  // We add transfer first so Phantom shows it, but it will execute after contract creates account
+  // Order: Contract first (creates escrow via init_if_needed), then transfer
+  // Contract will check escrow balance and skip CPI transfer if explicit transfer already happened
   const transaction = new Transaction();
   const { createTransferInstruction } = await import('@solana/spl-token');
   
@@ -553,8 +553,7 @@ export async function creatorFund(
     throw new Error(`Invalid entry fee: ${entryFeeLamports} lamports. Entry fee must be greater than 0.`);
   }
   
-  // ALWAYS add transfer instruction - contract will create escrow account first via init_if_needed
-  // Note: Transfer will execute AFTER contract instruction, so escrow will exist
+  // Create transfer instruction
   const transferInstruction = createTransferInstruction(
     creatorTokenAccount,      // source: creator's USDFG token account
     escrowTokenAccountPDA,   // destination: escrow USDFG token account  
@@ -565,13 +564,14 @@ export async function creatorFund(
   console.log('💸 Adding USDFG transfer instruction (Phantom will show this):', {
     from: creatorTokenAccount.toString(),
     to: escrowTokenAccountPDA.toString(),
-    amount: `${entryFeeUsdfg} USDFG (${entryFeeLamports} lamports)`,
-    escrowExists: escrowAccountExists
+    amount: `${entryFeeUsdfg} USDFG (${entryFeeLamports} lamports)`
   });
   
   // Add contract instruction FIRST (creates escrow account if needed via init_if_needed)
+  // Contract will check escrow balance and skip CPI transfer if balance is already sufficient
   transaction.add(instruction);
-  // Add transfer instruction SECOND (will execute after escrow is created)
+  // Add transfer instruction SECOND (executes after escrow is created)
+  // Contract will see the balance after this transfer and skip its own CPI transfer
   transaction.add(transferInstruction);
   
   // Get blockhash with retry logic for rate limiting (429 errors)
