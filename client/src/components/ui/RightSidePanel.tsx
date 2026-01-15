@@ -40,6 +40,8 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
   const [isMinimized, setIsMinimized] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [playerData, setPlayerData] = useState<Record<string, { displayName?: string; profileImage?: string }>>({});
+  const [dragY, setDragY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Ensure players is always an array
   const safePlayers = Array.isArray(players) ? players : [];
@@ -220,14 +222,38 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
         style={{ opacity: isOpen ? 1 : 0 }}
       />
       
-      {/* Right Side Panel - slides up from bottom right like X Spaces */}
-      <div
+      {/* Right Side Panel - slides up from bottom right like X Spaces, swipe down to close */}
+      <motion.div
         ref={panelRef}
         className={`fixed right-0 bottom-0 z-50 w-full max-w-md bg-gradient-to-br from-gray-900/98 via-gray-900/98 to-black/98 backdrop-blur-md border-t border-l border-amber-400/20 shadow-[0_-4px_40px_rgba(0,0,0,0.8)] rounded-t-2xl ${className}`}
         style={{
-          transform: isOpen ? 'translateY(0)' : 'translateY(100%)',
-          transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           maxHeight: '90vh',
+        }}
+        drag="y"
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={0.2}
+        onDrag={(event, info) => {
+          // Only allow dragging down (positive Y)
+          if (info.offset.y > 0) {
+            setDragY(info.offset.y);
+            setIsDragging(true);
+          }
+        }}
+        onDragEnd={(event, info) => {
+          setIsDragging(false);
+          // If dragged down more than 100px, minimize back to pill (not close)
+          if (info.offset.y > 100) {
+            setIsMinimized(true);
+          }
+          setDragY(0);
+        }}
+        animate={{
+          y: isOpen ? (isDragging ? dragY : 0) : '100%',
+        }}
+        transition={{
+          type: 'spring',
+          damping: 30,
+          stiffness: 300,
         }}
         onClick={(e) => e.stopPropagation()}
       >
