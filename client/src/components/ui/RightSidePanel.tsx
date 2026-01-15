@@ -100,6 +100,11 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
     if (onExpand) onExpand();
   };
 
+  const handlePillClick = () => {
+    // When pill is clicked, expand to full lobby (same as original behavior)
+    handleExpand();
+  };
+
   // Don't prevent body scroll - allow browsing while lobby is open (X Spaces style)
   // Removed body scroll lock so users can browse the main page
 
