@@ -542,45 +542,49 @@ export async function creatorFund(
     console.log(`  ${idx}: ${key.pubkey.toString()} (${accountNames[idx]}, signer: ${key.isSigner}, writable: ${key.isWritable})`);
   });
 
-  // CRITICAL FIX: Add explicit token transfer instruction ONLY if escrow account exists
-  // If escrow account doesn't exist, let the contract create it and handle the transfer
-  // This prevents "InvalidAccountData" errors when trying to transfer to non-existent account
+  // ALWAYS add USDFG transfer instruction so Phantom shows it
+  // If escrow account doesn't exist, create it first, then transfer
   const transaction = new Transaction();
+  const { createTransferInstruction, createAssociatedTokenAccountInstruction } = await import('@solana/spl-token');
   
-  if (escrowAccountExists) {
-    // Escrow account exists - add explicit transfer instruction for Phantom preview
-    const { createTransferInstruction } = await import('@solana/spl-token');
-    
-    // CRITICAL: Validate lamports before creating transfer instruction
-    if (entryFeeLamports <= 0) {
-      throw new Error(`Cannot create transfer instruction: entryFeeLamports is ${entryFeeLamports}. Entry fee must be greater than 0.`);
-    }
-    
-    const transferInstruction = createTransferInstruction(
-      creatorTokenAccount,      // source: creator's USDFG token account
-      escrowTokenAccountPDA,   // destination: escrow USDFG token account  
-      creator,                  // authority: creator (signs the transfer)
-      entryFeeLamports          // amount: entry fee in lamports
+  // If escrow account doesn't exist, create it first
+  if (!escrowAccountExists) {
+    console.log('📝 Creating escrow token account before transfer...');
+    // The escrow account is a PDA, so we need to use the escrow authority as the payer
+    // But actually, the contract will create it via init_if_needed
+    // So we'll add the contract instruction first, then the transfer
+    // Actually, we can't do that because the transfer needs the account to exist
+    // So we need to create it manually first
+    const createEscrowInstruction = createAssociatedTokenAccountInstruction(
+      creator,                  // payer
+      escrowTokenAccountPDA,   // ata (PDA)
+      escrowAuthorityPDA,      // owner (escrow authority PDA)
+      USDFG_MINT               // mint
     );
-    
-    console.log('💸💸💸 Adding explicit USDFG transfer instruction for Phantom preview:', {
-      from: creatorTokenAccount.toString(),
-      to: escrowTokenAccountPDA.toString(),
-      amount: `${entryFeeUsdfg} USDFG (${entryFeeLamports} lamports)`,
-      instructionProgramId: transferInstruction.programId.toString(),
-      instructionKeys: transferInstruction.keys.length,
-      dataLength: transferInstruction.data.length
-    });
-    
-    transaction.add(transferInstruction);  // Add transfer FIRST (Phantom shows this, executes first)
-  } else {
-    // Escrow account doesn't exist - contract will create it and do the transfer
-    // Note: Phantom may not show USDFG in preview, but transfer will still happen via contract CPI
-    console.log('⚠️ Escrow account does not exist - contract will create it and handle USDFG transfer');
-    console.log('⚠️ Phantom may only show Solana fee in preview, but USDFG transfer will still execute');
+    transaction.add(createEscrowInstruction);
+    console.log('✅ Added escrow token account creation instruction');
   }
   
-  transaction.add(instruction);  // Add contract instruction (creates escrow if needed, does transfer)
+  // ALWAYS add the transfer instruction so Phantom shows USDFG transfer
+  if (entryFeeLamports <= 0) {
+    throw new Error(`Invalid entry fee: ${entryFeeLamports} lamports. Entry fee must be greater than 0.`);
+  }
+  
+  const transferInstruction = createTransferInstruction(
+    creatorTokenAccount,      // source: creator's USDFG token account
+    escrowTokenAccountPDA,   // destination: escrow USDFG token account  
+    creator,                  // authority: creator (signs the transfer)
+    entryFeeLamports          // amount: entry fee in lamports
+  );
+  
+  console.log('💸 Adding USDFG transfer instruction (Phantom will show this):', {
+    from: creatorTokenAccount.toString(),
+    to: escrowTokenAccountPDA.toString(),
+    amount: `${entryFeeUsdfg} USDFG (${entryFeeLamports} lamports)`
+  });
+  
+  transaction.add(transferInstruction);  // Add transfer (Phantom shows this)
+  transaction.add(instruction);  // Add contract instruction (validates and updates state)
   
   // Get blockhash with retry logic for rate limiting (429 errors)
   let blockhash: string;
