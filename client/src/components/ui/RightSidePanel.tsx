@@ -130,21 +130,21 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
     return 'Waiting for opponent';
   };
 
-  // Minimized view (mobile only) - new purple pill design
+  // Minimized view - new purple pill design (visible on both mobile and desktop for viewing)
   // When clicked, expands to full lobby (same behavior as original)
   // Debug: Log state to verify conditions
   if (process.env.NODE_ENV === 'development') {
-    console.log('RightSidePanel state:', { isOpen, isMobile, isMinimized, showPill: isOpen && isMobile && isMinimized });
+    console.log('RightSidePanel state:', { isOpen, isMobile, isMinimized, showPill: isOpen && isMinimized });
   }
   
-  if (isOpen && isMobile && isMinimized) {
+  if (isOpen && isMinimized) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 16, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 16, scale: 0.98 }}
         transition={{ duration: 0.25, ease: "easeOut" }}
-        className="fixed top-0 left-0 right-0 z-50 px-4 pt-2 pb-2 md:hidden"
+        className="fixed top-0 left-0 right-0 z-50 px-4 pt-2 pb-2"
       >
         <div
           className="relative w-full h-[72px] px-6 flex items-center justify-between rounded-full
