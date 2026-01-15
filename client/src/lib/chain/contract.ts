@@ -542,33 +542,35 @@ export async function creatorFund(
     console.log(`  ${idx}: ${key.pubkey.toString()} (${accountNames[idx]}, signer: ${key.isSigner}, writable: ${key.isWritable})`);
   });
 
-  // CRITICAL: Contract expects transfer to happen BEFORE contract instruction
-  // Contract checks escrow balance at START - if balance >= amount, it skips CPI transfer
-  // So we MUST add transfer instruction FIRST, then contract instruction SECOND
-  // But escrow account must exist first - contract's init_if_needed handles this
-  // However, init_if_needed runs BEFORE contract function body, so:
-  // 1. Contract instruction runs → init_if_needed creates escrow (balance = 0)
-  // 2. Contract function checks balance (0) → does CPI transfer ❌ WRONG ORDER!
+  // SMART CONTRACT ANALYSIS:
+  // - Contract comment says: "Check if transfer already happened (explicit transfer instruction before this contract call)"
+  // - Contract checks escrow balance at START of function (line 126)
+  // - If balance < amount, contract does CPI transfer (line 131)
+  // - If balance >= amount, contract skips CPI transfer (line 148)
   //
-  // SOLUTION: We need escrow to exist BEFORE transfer, but contract creates it
-  // So we add contract instruction FIRST (creates escrow), then transfer SECOND
-  // But contract will see balance = 0 and do CPI transfer, then our transfer executes → DOUBLE!
+  // PROBLEM: Escrow uses init_if_needed (line 613), which runs BEFORE function body
+  // - If we add contract FIRST: init_if_needed creates escrow (balance=0) → function checks (0) → does CPI → our transfer executes → DOUBLE!
+  // - If we add transfer FIRST: transfer fails if escrow doesn't exist
   //
-  // ACTUAL SOLUTION: Only add transfer if escrow exists, otherwise let contract handle it
-  // But then Phantom won't show USDFG transfer...
+  // SOLUTION: Create escrow account manually FIRST (if needed), then transfer, then contract
+  // But escrow is a PDA token account - we need to use Anchor's init_if_needed mechanism
+  // Actually, we can't create it manually because it's a PDA with specific seeds
   //
-  // BEST SOLUTION: Add transfer FIRST, contract SECOND, but create escrow manually if needed
+  // BEST SOLUTION: Let contract handle everything - it will create escrow and do CPI transfer
+  // But then Phantom won't show USDFG transfer in preview
+  //
+  // COMPROMISE: Only add explicit transfer if escrow exists (for Phantom preview)
+  // If escrow doesn't exist, let contract create it and do CPI transfer (no preview, but works)
   const transaction = new Transaction();
-  const { createTransferInstruction, getAssociatedTokenAddressSync } = await import('@solana/spl-token');
+  const { createTransferInstruction } = await import('@solana/spl-token');
   
   // Validate lamports
   if (entryFeeLamports <= 0) {
     throw new Error(`Invalid entry fee: ${entryFeeLamports} lamports. Entry fee must be greater than 0.`);
   }
   
-  // If escrow doesn't exist, we can't transfer to it
-  // Contract will create it via init_if_needed and do CPI transfer
-  // So we only add explicit transfer if escrow exists
+  // Only add explicit transfer if escrow exists (for Phantom preview)
+  // If escrow doesn't exist, contract will create it via init_if_needed and do CPI transfer
   if (escrowAccountExists) {
     const transferInstruction = createTransferInstruction(
       creatorTokenAccount,
@@ -577,22 +579,22 @@ export async function creatorFund(
       entryFeeLamports
     );
     
-    console.log('💸 Adding USDFG transfer instruction FIRST (Phantom will show this):', {
+    console.log('💸 Adding USDFG transfer instruction (Phantom will show this):', {
       from: creatorTokenAccount.toString(),
       to: escrowTokenAccountPDA.toString(),
       amount: `${entryFeeUsdfg} USDFG (${entryFeeLamports} lamports)`
     });
     
-    // Transfer FIRST (contract expects this)
+    // Add transfer FIRST (contract expects this per comment on line 124)
     transaction.add(transferInstruction);
   } else {
-    console.log('⚠️ Escrow account does not exist - contract will create it and handle USDFG transfer via CPI');
-    console.log('⚠️ Phantom may only show SOL fee, but USDFG transfer will execute via contract');
+    console.log('⚠️ Escrow account does not exist - contract will create it via init_if_needed and handle USDFG transfer via CPI');
+    console.log('⚠️ Phantom may only show SOL fee in preview, but USDFG transfer will execute correctly');
   }
   
-  // Contract instruction SECOND (validates and updates state)
-  // If escrow doesn't exist, contract creates it via init_if_needed and does CPI transfer
+  // Contract instruction (creates escrow if needed, validates, updates state)
   // If escrow exists and we added transfer, contract will see balance >= amount and skip CPI transfer
+  // If escrow doesn't exist, contract creates it and does CPI transfer
   transaction.add(instruction);
   
   // Get blockhash with retry logic for rate limiting (429 errors)
