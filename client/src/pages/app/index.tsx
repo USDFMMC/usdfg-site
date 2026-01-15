@@ -4659,6 +4659,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           </div>
         </ElegantNavbar>
 
+        {/* TEMPORARY PREVIEW: Purple Pill Design - Remove after viewing */}
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[60] w-full max-w-2xl px-4 pointer-events-none">
+          <PurplePillPreview />
+        </div>
+
         {/* Elegant Notification */}
         <ElegantNotification
           isOpen={notification.isOpen}
