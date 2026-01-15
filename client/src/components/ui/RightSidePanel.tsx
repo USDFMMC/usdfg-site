@@ -292,7 +292,7 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
             {children}
           </div>
         </div>
-      </div>
+      </motion.div>
     </>
   );
 };
