@@ -187,7 +187,7 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
             </div>
           </div>
 
-          {/* RIGHT: signal bars + controls */}
+          {/* RIGHT: signal bars */}
           <div className="flex items-center gap-3">
             <div className="flex items-end gap-1">
               {[0, 0.15, 0.3].map((delay, i) => (
@@ -206,20 +206,6 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
                 />
               ))}
             </div>
-
-            {/* Close button */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose();
-              }}
-              className="w-10 h-10 rounded-2xl bg-black/20 hover:bg-black/35 text-white/95 flex items-center justify-center transition"
-              aria-label="Close live pill"
-              title="Close"
-            >
-              ✕
-            </button>
           </div>
         </div>
       </motion.div>
@@ -234,13 +220,14 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
         style={{ opacity: isOpen ? 1 : 0 }}
       />
       
-      {/* Right Side Panel */}
+      {/* Right Side Panel - slides up from bottom right like X Spaces */}
       <div
         ref={panelRef}
-        className={`fixed right-0 top-0 bottom-0 z-50 w-full max-w-md bg-gradient-to-br from-gray-900/98 via-gray-900/98 to-black/98 backdrop-blur-md border-l border-amber-400/20 shadow-[-4px_0_40px_rgba(0,0,0,0.8)] ${className}`}
+        className={`fixed right-0 bottom-0 z-50 w-full max-w-md bg-gradient-to-br from-gray-900/98 via-gray-900/98 to-black/98 backdrop-blur-md border-t border-l border-amber-400/20 shadow-[0_-4px_40px_rgba(0,0,0,0.8)] rounded-t-2xl ${className}`}
         style={{
-          transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
+          transform: isOpen ? 'translateY(0)' : 'translateY(100%)',
           transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          maxHeight: '90vh',
         }}
         onClick={(e) => e.stopPropagation()}
       >
