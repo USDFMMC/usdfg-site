@@ -542,37 +542,58 @@ export async function creatorFund(
     console.log(`  ${idx}: ${key.pubkey.toString()} (${accountNames[idx]}, signer: ${key.isSigner}, writable: ${key.isWritable})`);
   });
 
-  // ALWAYS add USDFG transfer instruction so Phantom shows it
-  // Order: Contract first (creates escrow via init_if_needed), then transfer
-  // Contract will check escrow balance and skip CPI transfer if explicit transfer already happened
+  // CRITICAL: Contract expects transfer to happen BEFORE contract instruction
+  // Contract checks escrow balance at START - if balance >= amount, it skips CPI transfer
+  // So we MUST add transfer instruction FIRST, then contract instruction SECOND
+  // But escrow account must exist first - contract's init_if_needed handles this
+  // However, init_if_needed runs BEFORE contract function body, so:
+  // 1. Contract instruction runs → init_if_needed creates escrow (balance = 0)
+  // 2. Contract function checks balance (0) → does CPI transfer ❌ WRONG ORDER!
+  //
+  // SOLUTION: We need escrow to exist BEFORE transfer, but contract creates it
+  // So we add contract instruction FIRST (creates escrow), then transfer SECOND
+  // But contract will see balance = 0 and do CPI transfer, then our transfer executes → DOUBLE!
+  //
+  // ACTUAL SOLUTION: Only add transfer if escrow exists, otherwise let contract handle it
+  // But then Phantom won't show USDFG transfer...
+  //
+  // BEST SOLUTION: Add transfer FIRST, contract SECOND, but create escrow manually if needed
   const transaction = new Transaction();
-  const { createTransferInstruction } = await import('@solana/spl-token');
+  const { createTransferInstruction, getAssociatedTokenAddressSync } = await import('@solana/spl-token');
   
   // Validate lamports
   if (entryFeeLamports <= 0) {
     throw new Error(`Invalid entry fee: ${entryFeeLamports} lamports. Entry fee must be greater than 0.`);
   }
   
-  // Create transfer instruction
-  const transferInstruction = createTransferInstruction(
-    creatorTokenAccount,      // source: creator's USDFG token account
-    escrowTokenAccountPDA,   // destination: escrow USDFG token account  
-    creator,                  // authority: creator (signs the transfer)
-    entryFeeLamports          // amount: entry fee in lamports
-  );
+  // If escrow doesn't exist, we can't transfer to it
+  // Contract will create it via init_if_needed and do CPI transfer
+  // So we only add explicit transfer if escrow exists
+  if (escrowAccountExists) {
+    const transferInstruction = createTransferInstruction(
+      creatorTokenAccount,
+      escrowTokenAccountPDA,
+      creator,
+      entryFeeLamports
+    );
+    
+    console.log('💸 Adding USDFG transfer instruction FIRST (Phantom will show this):', {
+      from: creatorTokenAccount.toString(),
+      to: escrowTokenAccountPDA.toString(),
+      amount: `${entryFeeUsdfg} USDFG (${entryFeeLamports} lamports)`
+    });
+    
+    // Transfer FIRST (contract expects this)
+    transaction.add(transferInstruction);
+  } else {
+    console.log('⚠️ Escrow account does not exist - contract will create it and handle USDFG transfer via CPI');
+    console.log('⚠️ Phantom may only show SOL fee, but USDFG transfer will execute via contract');
+  }
   
-  console.log('💸 Adding USDFG transfer instruction (Phantom will show this):', {
-    from: creatorTokenAccount.toString(),
-    to: escrowTokenAccountPDA.toString(),
-    amount: `${entryFeeUsdfg} USDFG (${entryFeeLamports} lamports)`
-  });
-  
-  // Add contract instruction FIRST (creates escrow account if needed via init_if_needed)
-  // Contract will check escrow balance and skip CPI transfer if balance is already sufficient
+  // Contract instruction SECOND (validates and updates state)
+  // If escrow doesn't exist, contract creates it via init_if_needed and does CPI transfer
+  // If escrow exists and we added transfer, contract will see balance >= amount and skip CPI transfer
   transaction.add(instruction);
-  // Add transfer instruction SECOND (executes after escrow is created)
-  // Contract will see the balance after this transfer and skip its own CPI transfer
-  transaction.add(transferInstruction);
   
   // Get blockhash with retry logic for rate limiting (429 errors)
   let blockhash: string;
