@@ -222,7 +222,7 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
         style={{ opacity: isOpen ? 1 : 0 }}
       />
       
-      {/* Right Side Panel - slides up from bottom right like X Spaces, swipe down to close */}
+      {/* Right Side Panel - slides up from bottom right like X Spaces, swipe down to minimize to pill */}
       <motion.div
         ref={panelRef}
         className={`fixed right-0 bottom-0 z-50 w-full max-w-md bg-gradient-to-br from-gray-900/98 via-gray-900/98 to-black/98 backdrop-blur-md border-t border-l border-amber-400/20 shadow-[0_-4px_40px_rgba(0,0,0,0.8)] rounded-t-2xl ${className}`}
