@@ -543,33 +543,18 @@ export async function creatorFund(
   });
 
   // ALWAYS add USDFG transfer instruction so Phantom shows it
-  // If escrow account doesn't exist, create it first, then transfer
+  // The contract will create the escrow account via init_if_needed if it doesn't exist
+  // We add transfer first so Phantom shows it, but it will execute after contract creates account
   const transaction = new Transaction();
-  const { createTransferInstruction, createAssociatedTokenAccountInstruction } = await import('@solana/spl-token');
+  const { createTransferInstruction } = await import('@solana/spl-token');
   
-  // If escrow account doesn't exist, create it first
-  if (!escrowAccountExists) {
-    console.log('📝 Creating escrow token account before transfer...');
-    // The escrow account is a PDA, so we need to use the escrow authority as the payer
-    // But actually, the contract will create it via init_if_needed
-    // So we'll add the contract instruction first, then the transfer
-    // Actually, we can't do that because the transfer needs the account to exist
-    // So we need to create it manually first
-    const createEscrowInstruction = createAssociatedTokenAccountInstruction(
-      creator,                  // payer
-      escrowTokenAccountPDA,   // ata (PDA)
-      escrowAuthorityPDA,      // owner (escrow authority PDA)
-      USDFG_MINT               // mint
-    );
-    transaction.add(createEscrowInstruction);
-    console.log('✅ Added escrow token account creation instruction');
-  }
-  
-  // ALWAYS add the transfer instruction so Phantom shows USDFG transfer
+  // Validate lamports
   if (entryFeeLamports <= 0) {
     throw new Error(`Invalid entry fee: ${entryFeeLamports} lamports. Entry fee must be greater than 0.`);
   }
   
+  // ALWAYS add transfer instruction - contract will create escrow account first via init_if_needed
+  // Note: Transfer will execute AFTER contract instruction, so escrow will exist
   const transferInstruction = createTransferInstruction(
     creatorTokenAccount,      // source: creator's USDFG token account
     escrowTokenAccountPDA,   // destination: escrow USDFG token account  
@@ -580,11 +565,14 @@ export async function creatorFund(
   console.log('💸 Adding USDFG transfer instruction (Phantom will show this):', {
     from: creatorTokenAccount.toString(),
     to: escrowTokenAccountPDA.toString(),
-    amount: `${entryFeeUsdfg} USDFG (${entryFeeLamports} lamports)`
+    amount: `${entryFeeUsdfg} USDFG (${entryFeeLamports} lamports)`,
+    escrowExists: escrowAccountExists
   });
   
-  transaction.add(transferInstruction);  // Add transfer (Phantom shows this)
-  transaction.add(instruction);  // Add contract instruction (validates and updates state)
+  // Add contract instruction FIRST (creates escrow account if needed via init_if_needed)
+  transaction.add(instruction);
+  // Add transfer instruction SECOND (will execute after escrow is created)
+  transaction.add(transferInstruction);
   
   // Get blockhash with retry logic for rate limiting (429 errors)
   let blockhash: string;
@@ -631,15 +619,22 @@ export async function creatorFund(
     hasContractInstruction: transaction.instructions[1]?.programId.toString() === PROGRAM_ID.toString()
   });
   
-  // Verify transfer instruction is first (always added now)
-  if (transaction.instructions[0]?.programId.toString() !== TOKEN_PROGRAM_ID.toString()) {
-    console.error('❌ ERROR: Transfer instruction is not first!', {
+  // Verify instruction order: contract first (creates escrow), then transfer
+  if (transaction.instructions[0]?.programId.toString() !== PROGRAM_ID.toString()) {
+    console.error('❌ ERROR: Contract instruction is not first!', {
       firstInstructionProgramId: transaction.instructions[0]?.programId.toString(),
+      expectedProgramId: PROGRAM_ID.toString()
+    });
+    throw new Error('Transaction construction error: Contract instruction must be first to create escrow account');
+  }
+  if (transaction.instructions[1]?.programId.toString() !== TOKEN_PROGRAM_ID.toString()) {
+    console.error('❌ ERROR: Transfer instruction is not second!', {
+      secondInstructionProgramId: transaction.instructions[1]?.programId.toString(),
       expectedProgramId: TOKEN_PROGRAM_ID.toString()
     });
-    throw new Error('Transaction construction error: Transfer instruction must be first');
+    throw new Error('Transaction construction error: Transfer instruction must be second');
   }
-  console.log('✅ Verified: Transfer instruction is first');
+  console.log('✅ Verified: Contract instruction first (creates escrow), transfer second');
   
   const signedTransaction = await wallet.signTransaction(transaction);
   const signature = await connection.sendRawTransaction(signedTransaction.serialize());
