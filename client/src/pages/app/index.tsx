@@ -2583,11 +2583,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       } else if (status === 'creator_funded') {
         alert('This challenge is already funded by the creator. Waiting for the challenger to fund their entry.');
       } else {
-        alert(`Challenge is not waiting for opponent. Current status: ${status}`);
+      alert(`Challenge is not waiting for opponent. Current status: ${status}`);
       }
       return;
     }
-      
+
     try {
       const currentStatus = challenge.status || challenge.rawData?.status;
       const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
@@ -2660,8 +2660,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                   ...updatedChallenge,
                   rawData: updatedChallenge.rawData || updatedChallenge
                 });
-              }
-              
+      }
+      
               // Step 2: Express intent on-chain (required for creator to fund)
               // Check if PDA exists - if not, wait for creator to create it
               let currentPDA = challengePDA;
@@ -2679,14 +2679,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                   // Express on-chain intent (small Solana fee required)
                   const { expressJoinIntent: expressOnChain } = await import('@/lib/chain/contract');
                   await expressOnChain(
-                    { signTransaction, publicKey },
-                    connection,
+              { signTransaction, publicKey },
+              connection,
                     currentPDA
-                  );
+            );
                   
                   alert('✅ Join intent expressed! Creator can now fund the challenge.');
-                } catch (onChainError: any) {
-                  const errorMsg = onChainError.message || onChainError.toString() || '';
+          } catch (onChainError: any) {
+            const errorMsg = onChainError.message || onChainError.toString() || '';
                   // If intent was already expressed on-chain, that's OK
                   if (errorMsg.includes('already expressed') || errorMsg.includes('already') || 
                       errorMsg.includes('duplicate') || errorMsg.includes('Constraint')) {
@@ -2701,37 +2701,37 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     console.error('On-chain express intent failed:', onChainError);
                     alert('⚠️ Intent expressed in Firestore, but on-chain step failed. Creator may not be able to fund until this is resolved. Error: ' + errorMsg);
                   }
-                }
-              } else {
+          }
+        } else {
                 // No PDA yet - creator needs to create it first
                 alert('✅ Intent expressed in Firestore! Waiting for creator to create challenge on-chain.\n\nOnce they create it, click "Join Challenge" again to complete the on-chain step.');
-              }
+      }
             } else {
               // Already expressed intent - check if on-chain is needed
-              if (challengePDA) {
-                try {
+      if (challengePDA) {
+        try {
                   const { expressJoinIntent: expressOnChain } = await import('@/lib/chain/contract');
                   await expressOnChain(
-                    { signTransaction, publicKey },
-                    connection,
-                    challengePDA
-                  );
+            { signTransaction, publicKey },
+            connection,
+            challengePDA
+          );
                   alert('✅ On-chain intent expressed! Creator can now fund the challenge.');
-                } catch (onChainError: any) {
-                  const errorMsg = onChainError.message || onChainError.toString() || '';
+        } catch (onChainError: any) {
+          const errorMsg = onChainError.message || onChainError.toString() || '';
                   if (errorMsg.includes('already expressed') || errorMsg.includes('already') || 
                       errorMsg.includes('duplicate') || errorMsg.includes('Constraint')) {
                     alert('✅ You have already expressed on-chain intent. Creator can now fund the challenge.');
-                  } else {
+            } else {
                     alert('✅ You have already expressed intent in Firestore. On-chain step may be needed before creator can fund.');
-                  }
-                }
-              } else {
-                alert('✅ You have already expressed intent to join this challenge. Waiting for creator to create the challenge on-chain.');
-              }
             }
-            
-            setShowDetailSheet(false);
+        }
+      } else {
+                alert('✅ You have already expressed intent to join this challenge. Waiting for creator to create the challenge on-chain.');
+        }
+      }
+      
+      setShowDetailSheet(false);
       
       // Open minimized nav bar lobby first (auto-minimizes on mobile)
       // This shows the nav bar at the top, user can expand to see full lobby
@@ -4658,11 +4658,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             />
           </div>
         </ElegantNavbar>
-
-        {/* TEMPORARY: Purple Pill Preview - Remove after viewing */}
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl px-4">
-          <PurplePillPreview />
-        </div>
 
         {/* Elegant Notification */}
         <ElegantNotification

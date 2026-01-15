@@ -340,7 +340,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       // Update mobile connection state to ensure button shows correct state
       if (mobile) {
         setMobileConnectionState({ connected: false, publicKey: null });
-      }
+        }
       
       // CRITICAL: On mobile, DON'T set connecting state here
       // Let phantomMobileConnect() set it when it actually navigates
@@ -361,7 +361,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
             // On mobile, just clear silently - user can try again
             console.log("✅ Connection timeout cleared - user can try again");
           } else {
-            alert("Connection timed out. Please try again. If Phantom didn't open, make sure it's installed from https://phantom.app");
+          alert("Connection timed out. Please try again. If Phantom didn't open, make sure it's installed from https://phantom.app");
           }
         }
       }, timeoutMs);
@@ -436,12 +436,12 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       
       // Now call disconnect (may fail, but state is already cleared)
       try {
-        await disconnect();
+      await disconnect();
       } catch (disconnectError) {
         console.warn('Disconnect call failed, but state already cleared:', disconnectError);
         // State is already cleared, continue
       }
-      
+  
       // Trigger disconnect event
       window.dispatchEvent(new Event('walletDisconnected'));
       

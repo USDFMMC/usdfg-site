@@ -127,7 +127,7 @@ function App() {
     // Detect silent rejection
     if (connectTimestamp && !hasSearchParams && timeSinceConnect && timeSinceConnect < 10000) {
       console.error("❌ Phantom silent rejection detected - no params returned");
-    }
+      }
     
     // Check if we were trying to connect (detect if Phantom closed without returning)
     const hasPendingNonce = sessionStorage.getItem('phantom_dapp_nonce');

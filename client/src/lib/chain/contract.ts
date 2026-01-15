@@ -295,10 +295,10 @@ export async function expressJoinIntent(
   const signedTransaction = await wallet.signTransaction(transaction);
   
   try {
-    const signature = await connection.sendRawTransaction(signedTransaction.serialize());
-    await connection.confirmTransaction(signature);
+  const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+  await connection.confirmTransaction(signature);
     console.log('✅ Join intent expressed successfully! Signature:', signature);
-    return signature;
+  return signature;
   } catch (error: any) {
     // Check if the error is because the challenger already expressed intent
     const errorMsg = error.message || error.toString() || '';
@@ -532,7 +532,7 @@ export async function creatorFund(
     ],
     data: instructionData,
   });
-  
+
   console.log('✅ Using canonical account order matching local Rust struct');
   console.log('⚠️  NOTE: Contract must be redeployed to match this order');
   
@@ -658,7 +658,7 @@ export async function creatorFund(
     throw new Error('Transaction construction error: Transfer instruction must be second');
   }
   console.log('✅ Verified: Contract instruction first (creates escrow), transfer second');
-  
+
   const signedTransaction = await wallet.signTransaction(transaction);
   const signature = await connection.sendRawTransaction(signedTransaction.serialize());
   

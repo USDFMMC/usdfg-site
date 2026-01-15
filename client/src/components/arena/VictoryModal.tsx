@@ -123,10 +123,10 @@ const VictoryModal: React.FC<VictoryModalProps> = ({
           >
             <div className="w-full max-w-sm max-h-[90vh] overflow-y-auto">
               <div className="relative overflow-hidden rounded-lg border border-amber-400/30 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black shadow-[0_0_40px_rgba(255,215,0,0.12)]">
-                {/* Gold glow effect around edges */}
+              {/* Gold glow effect around edges */}
                 <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-amber-500/10 via-transparent to-amber-500/10" />
                 <div className="absolute inset-0 rounded-lg bg-gradient-to-b from-amber-500/10 via-transparent to-amber-500/10" />
-                
+              
                 {/* Content - Match claim prize box sizing exactly */}
                 <div className="relative p-2.5 text-center space-y-2">
                 {/* Trophy Icon - Match claim prize box (text-2xl emoji size) */}
@@ -177,11 +177,11 @@ const VictoryModal: React.FC<VictoryModalProps> = ({
                   {autoWon ? (
                     <p className="text-xs text-emerald-100/80">
                       Your opponent submitted a loss. Trust review recorded automatically.
-                    </p>
+                      </p>
                   ) : (
                     <p className="text-xs text-emerald-100/80">
-                      You won the match! Trust review recorded.
-                    </p>
+                        You won the match! Trust review recorded.
+                      </p>
                   )}
                 </motion.div>
 

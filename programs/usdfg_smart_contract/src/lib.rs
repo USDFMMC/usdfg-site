@@ -135,16 +135,16 @@ pub mod usdfg_smart_contract {
                 ChallengeError::InsufficientFunds
             );
             
-            let cpi_accounts = Transfer {
-                from: ctx.accounts.creator_token_account.to_account_info(),
-                to: ctx.accounts.escrow_token_account.to_account_info(),
-                authority: ctx.accounts.creator.to_account_info(),
-            };
-            let cpi_ctx = CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
-                cpi_accounts,
-            );
-            token::transfer(cpi_ctx, usdfg_amount)?;
+        let cpi_accounts = Transfer {
+            from: ctx.accounts.creator_token_account.to_account_info(),
+            to: ctx.accounts.escrow_token_account.to_account_info(),
+            authority: ctx.accounts.creator.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            cpi_accounts,
+        );
+        token::transfer(cpi_ctx, usdfg_amount)?;
         } else {
             // Transfer already happened (explicit transfer instruction executed first)
             // Just verify the amount matches

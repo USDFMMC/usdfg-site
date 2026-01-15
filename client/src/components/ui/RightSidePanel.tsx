@@ -38,7 +38,6 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [isPillExpanded, setIsPillExpanded] = useState(true); // Expanded/collapsed state within the pill
   const [isMobile, setIsMobile] = useState(false);
   const [playerData, setPlayerData] = useState<Record<string, { displayName?: string; profileImage?: string }>>({});
 
@@ -101,10 +100,6 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
     if (onExpand) onExpand();
   };
 
-  const handlePillToggle = () => {
-    setIsPillExpanded(!isPillExpanded);
-  };
-
   // Don't prevent body scroll - allow browsing while lobby is open (X Spaces style)
   // Removed body scroll lock so users can browse the main page
 
@@ -128,124 +123,101 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
     return 'Waiting for opponent';
   };
 
-  // Minimized view (mobile only) - new purple pill design with expanded/collapsed states
+  // Minimized view (mobile only) - new purple pill design
+  // When clicked, expands to full lobby (same behavior as original)
   if (isOpen && isMobile && isMinimized) {
     return (
-      <AnimatePresence initial={false} mode="wait">
-        {isPillExpanded ? (
-          <motion.div
-            key="expanded"
-            initial={{ opacity: 0, y: 16, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 16, scale: 0.98 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-            className="fixed top-0 left-0 right-0 z-50 px-4 pt-2 pb-2 md:hidden"
-          >
-            <div
-              className="relative w-full h-[72px] px-6 flex items-center justify-between rounded-full
-                bg-gradient-to-r from-pink-500 via-purple-600 to-blue-500
-                shadow-[0_0_22px_rgba(122,92,255,.6),0_0_44px_rgba(77,163,255,.35)]"
-              onClick={handlePillToggle}
-              style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
-            >
-              {/* LEFT: avatars + text */}
-              <div className="flex items-center gap-4 min-w-0">
-                <div className="flex items-center -space-x-2">
-                  {safePlayers.slice(0, 2).map((player, idx) => {
-                    const stats = playerData[player.wallet.toLowerCase()] || {};
-                    const displayName = stats.displayName || player.displayName || player.wallet.slice(0, 4);
-                    const profileImage = stats.profileImage || player.profileImage;
-                    return (
-                      <div
-                        key={player.wallet}
-                        className="w-10 h-10 rounded-full bg-white/15 ring-2 ring-white/15 flex items-center justify-center overflow-hidden"
-                        style={{ zIndex: 2 - idx }}
-                      >
-                        {profileImage ? (
-                          <img 
-                            src={profileImage} 
-                            alt={displayName} 
-                            className="w-full h-full object-cover" 
-                          />
-                        ) : (
-                          <span className="font-bold text-white text-sm">
-                            {displayName.charAt(0).toUpperCase()}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                  {/* Show placeholder for second player if only 1 player */}
-                  {safePlayers.length === 1 && (
-                    <div className="w-10 h-10 rounded-full bg-white/10 ring-2 ring-white/10 flex items-center justify-center">
-                      <span className="text-white/70 text-sm">+</span>
-                    </div>
-                  )}
+      <motion.div
+        initial={{ opacity: 0, y: 16, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 16, scale: 0.98 }}
+        transition={{ duration: 0.25, ease: "easeOut" }}
+        className="fixed top-0 left-0 right-0 z-50 px-4 pt-2 pb-2 md:hidden"
+      >
+        <div
+          className="relative w-full h-[72px] px-6 flex items-center justify-between rounded-full
+            bg-gradient-to-r from-pink-500 via-purple-600 to-blue-500
+            shadow-[0_0_22px_rgba(122,92,255,.6),0_0_44px_rgba(77,163,255,.35)]"
+          onClick={handlePillClick}
+          style={{ cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}
+        >
+          {/* LEFT: avatars + text */}
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="flex items-center -space-x-2">
+              {safePlayers.slice(0, 2).map((player, idx) => {
+                const stats = playerData[player.wallet.toLowerCase()] || {};
+                const displayName = stats.displayName || player.displayName || player.wallet.slice(0, 4);
+                const profileImage = stats.profileImage || player.profileImage;
+                return (
+                  <div
+                    key={player.wallet}
+                    className="w-10 h-10 rounded-full bg-white/15 ring-2 ring-white/15 flex items-center justify-center overflow-hidden"
+                    style={{ zIndex: 2 - idx }}
+                  >
+                    {profileImage ? (
+                      <img 
+                        src={profileImage} 
+                        alt={displayName} 
+                        className="w-full h-full object-cover" 
+                      />
+                    ) : (
+                      <span className="font-bold text-white text-sm">
+                        {displayName.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+              {/* Show placeholder for second player if only 1 player */}
+              {safePlayers.length === 1 && (
+                <div className="w-10 h-10 rounded-full bg-white/10 ring-2 ring-white/10 flex items-center justify-center">
+                  <span className="text-white/70 text-sm">+</span>
                 </div>
-
-                <div className="flex flex-col leading-tight text-white min-w-0">
-                  <span className="text-[16px] font-bold truncate">{gameName || 'Challenge'}</span>
-                  <span className="text-[13px] opacity-85 truncate">{getStatusText()}</span>
-                </div>
-              </div>
-
-              {/* RIGHT: signal bars + controls */}
-              <div className="flex items-center gap-3">
-                <div className="flex items-end gap-1">
-                  {[0, 0.15, 0.3].map((delay, i) => (
-                    <motion.span
-                      key={i}
-                      className="w-[3px] bg-white/90 rounded"
-                      initial={false}
-                      animate={{ height: [8, 18, 8], opacity: [0.55, 1, 0.55] }}
-                      transition={{
-                        duration: 1.15,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                        delay
-                      }}
-                      style={{ height: 8 }}
-                    />
-                  ))}
-                </div>
-
-                {/* Close button */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onClose();
-                  }}
-                  className="w-10 h-10 rounded-2xl bg-black/20 hover:bg-black/35 text-white/95 flex items-center justify-center transition"
-                  aria-label="Close live pill"
-                  title="Close"
-                >
-                  ✕
-                </button>
-              </div>
+              )}
             </div>
-          </motion.div>
-        ) : (
-          <motion.button
-            key="collapsed"
-            type="button"
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.96 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            onClick={handlePillToggle}
-            className="fixed top-0 left-0 right-0 z-50 mx-4 mt-2 flex items-center gap-3 px-5 h-[56px] rounded-full
-              bg-gradient-to-r from-pink-500 via-purple-600 to-blue-500
-              text-white shadow-[0_0_18px_rgba(122,92,255,.6)] md:hidden"
-            aria-label="Expand live pill"
-            title="Expand"
-          >
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-            <span className="font-semibold">Live Challenge</span>
-            <span className="text-xs opacity-80">Tap to expand</span>
-          </motion.button>
-        )}
-      </AnimatePresence>
+
+            <div className="flex flex-col leading-tight text-white min-w-0">
+              <span className="text-[16px] font-bold truncate">{gameName || 'Challenge'}</span>
+              <span className="text-[13px] opacity-85 truncate">{getStatusText()}</span>
+            </div>
+          </div>
+
+          {/* RIGHT: signal bars + controls */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-end gap-1">
+              {[0, 0.15, 0.3].map((delay, i) => (
+                <motion.span
+                  key={i}
+                  className="w-[3px] bg-white/90 rounded"
+                  initial={false}
+                  animate={{ height: [8, 18, 8], opacity: [0.55, 1, 0.55] }}
+                  transition={{
+                    duration: 1.15,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                    delay
+                  }}
+                  style={{ height: 8 }}
+                />
+              ))}
+            </div>
+
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              className="w-10 h-10 rounded-2xl bg-black/20 hover:bg-black/35 text-white/95 flex items-center justify-center transition"
+              aria-label="Close live pill"
+              title="Close"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      </motion.div>
     );
   }
 
