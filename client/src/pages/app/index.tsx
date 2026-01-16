@@ -46,7 +46,6 @@ import ElegantModal from "@/components/ui/ElegantModal";
 import CreateChallengeForm from "@/components/arena/CreateChallengeForm";
 import ElegantNavbar from "@/components/layout/ElegantNavbar";
 import LiveChallengesGrid from "@/components/arena/LiveChallengesGrid";
-import PurplePillPreview from "@/components/preview/PurplePillPreview";
 // Lazy load heavy modals for better performance on all devices
 const SubmitResultRoom = lazy(() => import("@/components/arena/SubmitResultRoom").then(module => ({ default: module.SubmitResultRoom })));
 const PlayerProfileModal = lazy(() => import("@/components/arena/PlayerProfileModal"));
@@ -4658,11 +4657,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             />
           </div>
         </ElegantNavbar>
-
-        {/* TEMPORARY PREVIEW: Purple Pill - Remove after viewing */}
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[60] w-full max-w-2xl px-4">
-          <PurplePillPreview />
-        </div>
 
         {/* Elegant Notification */}
         <ElegantNotification
