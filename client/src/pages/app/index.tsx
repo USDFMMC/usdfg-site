@@ -808,6 +808,9 @@ const ArenaHome: React.FC = () => {
   const [usdfgPrice, setUsdfgPrice] = useState<number>(0.15); // Mock price: $0.15 per USDFG
   const [userUsdfgBalance, setUserUsdfgBalance] = useState<number | null>(null);
   const [isCreatingChallenge, setIsCreatingChallenge] = useState<boolean>(false);
+  // CRITICAL: Button disabling states - set immediately on click to prevent double-submission
+  const [isCreatorFunding, setIsCreatorFunding] = useState<string | null>(null);
+  const [isJoinerFunding, setIsJoinerFunding] = useState<string | null>(null);
   const [topPlayers, setTopPlayers] = useState<PlayerStats[]>([]);
   const [showPlayerProfile, setShowPlayerProfile] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerStats | null>(null);
@@ -2184,10 +2187,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         return;
       }
 
-      // Proceeding with challenge creation
-      const { createChallenge } = await import("@/lib/chain/contract");
-      const { Connection } = await import("@solana/web3.js");
-      const { getRpcEndpoint } = await import("@/lib/chain/rpc");
+      // CRITICAL: Challenge creation is now Firestore-only - no on-chain calls
+      // PDA will be created later when creator funds (in handleDirectCreatorFund)
       
       // Determine max players based on mode
       const getMaxPlayersForMode = (mode: string) => {
@@ -2224,23 +2225,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const entryFee = challengeData.entryFee || 0;
       const isFounderChallenge = isAdmin && (entryFee === 0 || entryFee < 0.000000001);
       
-      let challengeId: string;
-      
-      let challengePDA: string | null = null;
-      
-      if (isFounderChallenge) {
-        // Founder Challenge - skip on-chain creation, just create in Firestore
-        // Generate a fake PDA for Founder Challenges (won't be used on-chain)
-        // We'll just use a Firestore-generated ID
-        challengeId = 'founder_' + Date.now().toString();
-        challengePDA = null; // No PDA for Founder Challenges
-      } else {
-        // Regular challenge - create in Firestore first, PDA will be created later when creator funds
-        // This avoids requiring Solana fees during challenge creation
-        challengeId = null; // Firestore will generate the ID
-        challengePDA = null; // PDA will be created later when creator funds or when joiner expresses intent
-        console.log('📝 Challenge will be created in Firestore first. PDA will be created later when creator funds.');
-      }
+      // CRITICAL: No PDA creation here - PDA will be created when creator funds
+      // This ensures no SOL is spent until real money movement happens
+      const challengePDA = null; // PDA will be created later in creatorFund
+      console.log('📝 Challenge created in Firestore only. PDA will be created when creator funds.');
       
       // Calculate prize pool
       // For Founder Challenges: admin sets prize pool manually (no platform fee)
@@ -2299,7 +2287,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         format: challengeData.format || (challengeData.tournament ? 'tournament' : 'standard'),
         tournament: challengeData.format === 'tournament' ? challengeData.tournament : undefined,
         // Prize claim fields
-        pda: isFounderChallenge ? null : challengePDA || undefined, // PDA created immediately for regular challenges (null for Founder Challenges)
+        pda: isFounderChallenge ? null : undefined, // PDA will be created when creator funds (null for Founder Challenges)
         prizePool: prizePool, // Prize pool (for Founder Challenges, admin sets this)
         // Store only the title which contains game info - saves storage costs
         title: challengeTitle, // Generated title with game info
@@ -2319,7 +2307,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Debug: Firestore challenge data
       console.log("🔥 Adding challenge to Firestore...");
       console.log("🔥 Firestore Challenge Data:", firestoreChallengeData);
-      console.log("🔥 Challenge PDA being stored:", challengePDA || 'null/undefined (Founder Challenge or PDA creation failed)');
+      console.log("🔥 Challenge PDA: Will be created when creator funds (no PDA at creation time)");
       
       // Validate required fields before sending
       if (!firestoreChallengeData.creator) {
@@ -2338,12 +2326,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Close the modal after successful creation
       setShowCreateModal(false);
       
-      // Refresh USDFG balance after successful challenge creation (entry fee was deducted)
-      setTimeout(() => {
-        refreshUSDFGBalance().catch(() => {
-          // Silently handle errors
-        });
-      }, 2000); // Wait 2 seconds for transaction to confirm
+      // No balance refresh needed - no USDFG was moved (challenge creation is free)
       
     } catch (error) {
       console.error("❌ Failed to create challenge:", error);
@@ -2526,21 +2509,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
   // Handle joiner express intent from ChallengeDetailSheet
   const handleDirectJoinerExpressIntent = async (challenge: any) => {
-    if (!publicKey || !connection) {
+    // CRITICAL: Joining is now Firestore-only - no wallet connection or on-chain calls required
+    const walletAddr = publicKey?.toString() || null;
+    if (!walletAddr) {
       alert('Please connect your wallet first');
       return;
     }
 
-    const { signTransaction } = wallet;
-    if (!signTransaction) {
-      alert('Wallet does not support transaction signing');
-      return;
-    }
-
-    const walletAddr = publicKey.toString();
-    const currentWallet = publicKey.toString().toLowerCase();
+    const currentWallet = walletAddr.toLowerCase();
     const status = getChallengeStatus(challenge);
-    const challengePDA = getChallengePDA(challenge);
     const pendingJoiner = getChallengePendingJoiner(challenge);
     const challenger = getChallengeChallenger(challenge);
     const creatorWallet = getChallengeCreator(challenge);
@@ -2562,16 +2539,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       return;
     }
 
-    // Optimized: Combine status checks and reduce redundant fetches
-    // If creator and deadline expired, revert first (expressJoinIntent will handle this too, but do it here for speed)
+    // If creator and deadline expired, revert first
     if (isCreator && status === 'creator_confirmation_required' && isDeadlineExpired) {
       try {
         await revertCreatorTimeout(challenge.id);
-        // No delay needed - Firestore updates are fast, real-time listener will pick it up
         console.log('✅ Challenge reverted, creator can now join');
       } catch (revertError) {
         console.error('Failed to revert challenge:', revertError);
-        // Continue anyway - expressJoinIntent will handle it
       }
     }
     
@@ -2582,7 +2556,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       } else if (status === 'creator_funded') {
         alert('This challenge is already funded by the creator. Waiting for the challenger to fund their entry.');
       } else {
-      alert(`Challenge is not waiting for opponent. Current status: ${status}`);
+        alert(`Challenge is not waiting for opponent. Current status: ${status}`);
       }
       return;
     }
@@ -2592,14 +2566,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
       const isAlreadyPendingJoiner = pendingJoiner && pendingJoiner.toLowerCase() === walletAddr.toLowerCase();
     
-      // If user is already a pending joiner, just try to express on-chain intent if needed
+      // If user is already a pending joiner, nothing to do
       if (isAlreadyPendingJoiner) {
         if (isDeadlineExpired) {
           alert('⚠️ Confirmation deadline expired. The challenge will automatically revert to open status soon. Please wait a moment and try joining again.');
           setShowDetailSheet(false);
           return;
         }
-        // Already expressed in Firestore - fall through to main flow
+        alert('✅ You have already expressed intent to join this challenge. Waiting for creator to fund.');
+        setShowDetailSheet(false);
+        return;
       }
       
       // If deadline expired and user is NOT the pending joiner, don't try to join
@@ -2618,122 +2594,25 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         }
       }
       
-      // Check if Founder Challenge
-      const creatorWallet = getChallengeCreator(challenge);
-      const entryFee = getChallengeEntryFee(challenge);
-      const isAdmin = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
-      const isFounderChallenge = isAdmin && (entryFee === 0 || entryFee < 0.000000001);
+      // CRITICAL: Express intent in Firestore ONLY - no on-chain calls
+      // This is now a UI-only action - no wallet popup, no SOL fee
+      await expressJoinIntent(challenge.id, walletAddr);
       
-      if (isFounderChallenge) {
-        // Founder Challenge - express intent in Firestore only
-        await expressJoinIntent(challenge.id, walletAddr, true);
-        alert('✅ Join intent expressed! Waiting for creator to confirm.');
-        setShowDetailSheet(false);
-        
-        // Open minimized nav bar lobby first (auto-minimizes on mobile)
+      // Immediately update selectedChallenge to trigger UI update
+      const updatedChallenge = await fetchChallengeById(challenge.id);
+      if (updatedChallenge) {
         setSelectedChallenge({
-          id: challenge.id,
-          title: challenge.title || extractGameFromTitle(challenge.title || '') || "Challenge",
-          ...challenge,
-          rawData: challenge.rawData || challenge
+          id: updatedChallenge.id,
+          title: updatedChallenge.title || extractGameFromTitle(updatedChallenge.title || '') || "Challenge",
+          ...updatedChallenge,
+          rawData: updatedChallenge.rawData || updatedChallenge
         });
-        setShowStandardLobby(true);
-        return;
       }
       
-            // JOIN INTENT: Express in Firestore first, then on-chain
-            // Both are required - Firestore for UI, on-chain for contract state
-            const needsFirestoreUpdate = status === 'pending_waiting_for_opponent' && !isAlreadyPendingJoiner;
-            
-            if (needsFirestoreUpdate) {
-              // Step 1: Express intent in Firestore (updates UI immediately)
-              await expressJoinIntent(challenge.id, walletAddr);
-              
-              // CRITICAL: Immediately update selectedChallenge to trigger UI update
-              // This ensures the "Fund Challenge" button appears instantly for the creator
-              const updatedChallenge = await fetchChallengeById(challenge.id);
-              if (updatedChallenge) {
-                setSelectedChallenge({
-                  id: updatedChallenge.id,
-                  title: updatedChallenge.title || extractGameFromTitle(updatedChallenge.title || '') || "Challenge",
-                  ...updatedChallenge,
-                  rawData: updatedChallenge.rawData || updatedChallenge
-                });
-      }
-      
-              // Step 2: Express intent on-chain (required for creator to fund)
-              // Check if PDA exists - if not, wait for creator to create it
-              let currentPDA = challengePDA;
-              if (!currentPDA) {
-                // No PDA yet - creator needs to create it first
-                // Refresh challenge to get updated PDA if creator just created it
-                const freshChallenge = await fetchChallengeById(challenge.id);
-                if (freshChallenge) {
-                  currentPDA = freshChallenge.rawData?.pda || freshChallenge.pda;
-                }
-              }
-              
-              if (currentPDA) {
-                try {
-                  // Express on-chain intent (small Solana fee required)
-                  const { expressJoinIntent: expressOnChain } = await import('@/lib/chain/contract');
-                  await expressOnChain(
-              { signTransaction, publicKey },
-              connection,
-                    currentPDA
-            );
-                  
-                  alert('✅ Join intent expressed! Creator can now fund the challenge.');
-          } catch (onChainError: any) {
-            const errorMsg = onChainError.message || onChainError.toString() || '';
-                  // If intent was already expressed on-chain, that's OK
-                  if (errorMsg.includes('already expressed') || errorMsg.includes('already') || 
-                      errorMsg.includes('duplicate') || errorMsg.includes('Constraint')) {
-                    alert('✅ Join intent expressed! Creator can now fund the challenge.');
-                  } else if (errorMsg.includes('User rejected') || errorMsg.includes('User cancelled') || 
-                             errorMsg.includes('rejected the request') || errorMsg.includes('cancelled')) {
-                    alert('⚠️ Transaction was cancelled. You can retry later, but creator cannot fund until you complete this step.');
-                    setShowDetailSheet(false);
-                    return;
-                  } else {
-                    // Other errors - still show success for Firestore update, but warn about on-chain
-                    console.error('On-chain express intent failed:', onChainError);
-                    alert('⚠️ Intent expressed in Firestore, but on-chain step failed. Creator may not be able to fund until this is resolved. Error: ' + errorMsg);
-                  }
-          }
-        } else {
-                // No PDA yet - creator needs to create it first
-                alert('✅ Intent expressed in Firestore! Waiting for creator to create challenge on-chain.\n\nOnce they create it, click "Join Challenge" again to complete the on-chain step.');
-      }
-            } else {
-              // Already expressed intent - check if on-chain is needed
-      if (challengePDA) {
-        try {
-                  const { expressJoinIntent: expressOnChain } = await import('@/lib/chain/contract');
-                  await expressOnChain(
-            { signTransaction, publicKey },
-            connection,
-            challengePDA
-          );
-                  alert('✅ On-chain intent expressed! Creator can now fund the challenge.');
-        } catch (onChainError: any) {
-          const errorMsg = onChainError.message || onChainError.toString() || '';
-                  if (errorMsg.includes('already expressed') || errorMsg.includes('already') || 
-                      errorMsg.includes('duplicate') || errorMsg.includes('Constraint')) {
-                    alert('✅ You have already expressed on-chain intent. Creator can now fund the challenge.');
-            } else {
-                    alert('✅ You have already expressed intent in Firestore. On-chain step may be needed before creator can fund.');
-            }
-        }
-      } else {
-                alert('✅ You have already expressed intent to join this challenge. Waiting for creator to create the challenge on-chain.');
-        }
-      }
-      
+      alert('✅ Join intent expressed! Creator can now fund the challenge.');
       setShowDetailSheet(false);
       
       // Open minimized nav bar lobby first (auto-minimizes on mobile)
-      // This shows the nav bar at the top, user can expand to see full lobby
       setSelectedChallenge({
         id: challenge.id,
         title: challenge.title || extractGameFromTitle(challenge.title || '') || "Challenge",
@@ -2744,20 +2623,17 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     } catch (err: any) {
       console.error("❌ Express join intent failed:", err);
       const errorMessage = err.message || err.toString() || 'Failed to express join intent. Please try again.';
-      
-      // If user rejected transaction, don't show error - they can retry
-      if (errorMessage.includes('User rejected') || errorMessage.includes('User cancelled') || 
-          errorMessage.includes('rejected the request') || errorMessage.includes('cancelled')) {
-        // Error already handled in inner catch - don't show again
-        return;
-      }
-      
       alert('Failed to express join intent: ' + errorMessage);
     }
   };
 
   // Handle joiner funding from ChallengeDetailSheet
   const handleDirectJoinerFund = async (challenge: any) => {
+    // CRITICAL: Disable button immediately on click to prevent double-submission
+    if (isJoinerFunding === challenge.id) {
+      return; // Already processing
+    }
+    
     if (!publicKey || !connection) {
       alert('Please connect your wallet first');
       return;
@@ -2784,10 +2660,24 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       return;
     }
 
+    // CRITICAL: Idempotency guard - prevent double funding
+    const freshChallenge = await fetchChallengeById(challenge.id);
+    if (!freshChallenge) {
+      throw new Error('Challenge not found. It may have been cancelled or expired.');
+    }
+
+    if (freshChallenge.status === 'active' || freshChallenge.status === 'completed') {
+      alert('✅ Challenge already funded. Status: ' + freshChallenge.status);
+      return;
+    }
+
+    // CRITICAL: Set funding state IMMEDIATELY before any async operations
+    setIsJoinerFunding(challenge.id);
+
     try {
       const walletAddr = publicKey.toString();
-      const challengePDA = getChallengePDA(challenge);
-      const entryFee = getChallengeEntryFee(challenge);
+      const challengePDA = getChallengePDA(freshChallenge) || getChallengePDA(challenge);
+      const entryFee = getChallengeEntryFee(freshChallenge) || getChallengeEntryFee(challenge);
       
       if (!challengePDA) {
         throw new Error('Challenge has no on-chain PDA.');
@@ -2848,6 +2738,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     } catch (err: any) {
       console.error("❌ Joiner funding failed:", err);
       alert('Failed to fund challenge: ' + (err.message || 'Unknown error'));
+    } finally {
+      // CRITICAL: Always clear funding state, even on error
+      setIsJoinerFunding(null);
     }
   };
 
@@ -2902,6 +2795,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
   // Handle direct creator funding from ChallengeDetailSheet
   const handleDirectCreatorFund = async (challenge: any) => {
+    // CRITICAL: Disable button immediately on click to prevent double-submission
+    if (isCreatorFunding === challenge.id) {
+      return; // Already processing
+    }
+    
     if (!publicKey || !connection) {
       alert('Please connect your wallet first');
       return;
@@ -2928,13 +2826,21 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       return;
     }
 
-    try {
-      // Fetch fresh challenge data to check deadline
-      const freshChallenge = await fetchChallengeById(challenge.id);
-      if (!freshChallenge) {
-        throw new Error('Challenge not found. It may have been cancelled or expired.');
-      }
+    // CRITICAL: Idempotency guard - prevent double funding
+    const freshChallenge = await fetchChallengeById(challenge.id);
+    if (!freshChallenge) {
+      throw new Error('Challenge not found. It may have been cancelled or expired.');
+    }
 
+    if (freshChallenge.status === 'creator_funded' || freshChallenge.status === 'active') {
+      alert('✅ Challenge already funded. Status: ' + freshChallenge.status);
+      return;
+    }
+
+    // CRITICAL: Set funding state IMMEDIATELY before any async operations
+    setIsCreatorFunding(challenge.id);
+
+    try {
       const freshStatus = freshChallenge.status;
       if (freshStatus !== 'creator_confirmation_required') {
         throw new Error(`Challenge status changed. Current status: ${freshStatus}`);
@@ -2946,6 +2852,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         throw new Error('⚠️ Confirmation deadline expired. The challenge has been reverted to waiting for opponent.');
       }
 
+      // Validate pending joiner exists
+      const pendingJoiner = freshChallenge.pendingJoiner || challenge.rawData?.pendingJoiner;
+      if (!pendingJoiner) {
+        throw new Error('No challenger has expressed intent yet. Please wait for an opponent to join.');
+      }
+
       const entryFee = freshChallenge.entryFee || challenge.entryFee || challenge.rawData?.entryFee || 0;
       
       // CRITICAL: Validate entryFee before proceeding
@@ -2953,118 +2865,60 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         throw new Error(`Invalid entry fee: ${entryFee}. Cannot fund challenge with zero or negative entry fee.`);
       }
       
-      // Check if PDA exists
+      // CRITICAL: Create PDA if it doesn't exist, then immediately fund
+      // This is the ONLY place PDA creation happens - ensures no SOL is spent until funding
       let challengePDA = freshChallenge.pda || challenge.rawData?.pda || challenge.pda;
       
       if (!challengePDA) {
-        // PDA doesn't exist yet - check if there's a pending joiner
-        const pendingJoiner = freshChallenge.pendingJoiner || challenge.rawData?.pendingJoiner;
-        
-        if (pendingJoiner) {
-          // There's a joiner waiting - we need to:
-          // 1. Create the PDA first (can't fund until joiner expresses intent on-chain)
-          // 2. Have the joiner express intent on-chain
-          // 3. Then creator can fund
-          const { createChallenge } = await import('@/lib/chain/contract');
-          try {
-            challengePDA = await createChallenge(
-              { signTransaction, publicKey },
-              connection,
-              entryFee
-            );
-          } catch (createError: any) {
-            console.error('❌ Error creating challenge PDA:', createError);
-            const errorMsg = createError.message || createError.toString() || '';
-            if (errorMsg.includes('InvalidProgramId') || errorMsg.includes('3008')) {
-              throw new Error('⚠️ Program ID mismatch. Please refresh the page and try again. If the issue persists, the contract may need to be redeployed.');
-            }
-            throw createError;
-          }
-          
-          // Update Firestore with PDA
-          const { updateDoc, doc } = await import('firebase/firestore');
-          const { db } = await import('@/lib/firebase/config');
-          await updateDoc(doc(db, 'challenges', challenge.id), {
-            pda: challengePDA
-          });
-          
-          // Successfully created PDA - challenger needs to express intent on-chain
-          // They can do this by clicking "Join Challenge" again or the "Express Intent On-Chain" button
-          const joinerShort = pendingJoiner.slice(0, 8) + '...';
-          alert(`✅ Challenge PDA created on-chain!\n\n` +
-            `The challenger (${joinerShort}) needs to complete their on-chain join intent.\n\n` +
-            `They can do this by clicking "Join Challenge" again in the lobby, or using the "⚡ Express Intent On-Chain" button.\n\n` +
-            `Once they complete this step, you'll be able to fund the challenge.`);
-          setShowDetailSheet(false);
-          return;
-        } else {
-          // No joiner yet - just create the PDA (can't fund without a joiner)
-          const { createChallenge } = await import('@/lib/chain/contract');
-          try {
-            challengePDA = await createChallenge(
-              { signTransaction, publicKey },
-              connection,
-              entryFee
-            );
-          } catch (createError: any) {
-            console.error('❌ Error creating challenge PDA:', createError);
-            const errorMsg = createError.message || createError.toString() || '';
-            if (errorMsg.includes('InvalidProgramId') || errorMsg.includes('3008')) {
-              throw new Error('⚠️ Program ID mismatch. Please refresh the page and try again. If the issue persists, the contract may need to be redeployed.');
-            }
-            throw createError;
-          }
-          
-          // Update Firestore with PDA
-          const { updateDoc, doc } = await import('firebase/firestore');
-          const { db } = await import('@/lib/firebase/config');
-          await updateDoc(doc(db, 'challenges', challenge.id), {
-            pda: challengePDA
-          });
-          
-          // Can't fund yet - need to wait for a joiner
-          alert('✅ Challenge PDA created on-chain. Waiting for an opponent to join before you can fund.');
-          setShowDetailSheet(false);
-          return;
-        }
-      } else {
-        // PDA exists - check if on-chain state needs to be synced
-        // If Firestore says creator_confirmation_required but on-chain is still PendingWaitingForOpponent,
-        // the joiner needs to express intent on-chain first
-        // CRITICAL: Log entry fee before calling on-chain function
-        console.log('🚀 CREATOR FUNDING - Entry Fee:', {
-          entryFee,
-          entryFeeUSDFG: `${entryFee} USDFG`,
-          challengePDA,
-          challengeId: challenge.id
-        });
-        
+        // PDA doesn't exist - create it now (this is the first on-chain call)
+        console.log('📝 Creating challenge PDA on-chain...');
+        const { createChallenge } = await import('@/lib/chain/contract');
         try {
-          await creatorFundOnChain(
+          challengePDA = await createChallenge(
             { signTransaction, publicKey },
             connection,
-            challengePDA,
             entryFee
           );
-        } catch (fundError: any) {
-          const errorMsg = fundError.message || fundError.toString() || '';
-          // Check if error is because challenge is not in CreatorConfirmationRequired state
-          if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770') || errorMsg.includes('6000') || errorMsg.includes('Challenge is not open')) {
-            const pendingJoiner = freshChallenge.pendingJoiner || challenge.rawData?.pendingJoiner;
-            if (pendingJoiner) {
-              // Challenger expressed intent in Firestore but not on-chain
-              // The challenger needs to click "Join Challenge" again or use the "Express Intent On-Chain" button
-              const joinerShort = pendingJoiner.slice(0, 8) + '...';
-              throw new Error(`⚠️ Challenger needs to complete on-chain join intent.\n\n` +
-                `The challenger (${joinerShort}) has expressed intent in Firestore, but needs to complete the on-chain step.\n\n` +
-                `They can click "Join Challenge" again in the lobby, or use the "⚡ Express Intent On-Chain" button.\n\n` +
-                `Once they complete this step, you'll be able to fund the challenge.`);
-            } else {
-              throw new Error('⚠️ Challenge state mismatch. No challenger has expressed intent. Please wait for an opponent to join.');
-            }
+          
+          // Update Firestore with PDA
+          const { updateDoc, doc } = await import('firebase/firestore');
+          const { db } = await import('@/lib/firebase/config');
+          await updateDoc(doc(db, 'challenges', challenge.id), {
+            pda: challengePDA
+          });
+          console.log('✅ Challenge PDA created:', challengePDA);
+        } catch (createError: any) {
+          console.error('❌ Error creating challenge PDA:', createError);
+          const errorMsg = createError.message || createError.toString() || '';
+          if (errorMsg.includes('InvalidProgramId') || errorMsg.includes('3008')) {
+            throw new Error('⚠️ Program ID mismatch. Please refresh the page and try again. If the issue persists, the contract may need to be redeployed.');
           }
-          throw fundError; // Re-throw if it's a different error
+          throw createError;
         }
+      }
+      
+      // Now fund the challenge (PDA exists at this point)
+      console.log('🚀 CREATOR FUNDING - Entry Fee:', {
+        entryFee,
+        entryFeeUSDFG: `${entryFee} USDFG`,
+        challengePDA,
+        challengeId: challenge.id
+      });
+      
+      try {
+        await creatorFundOnChain(
+          { signTransaction, publicKey },
+          connection,
+          challengePDA,
+          entryFee
+        );
+      } catch (fundError: any) {
+        const errorMsg = fundError.message || fundError.toString() || '';
+        // Check if error is because challenge is not in CreatorConfirmationRequired state
+        if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770') || errorMsg.includes('6000') || errorMsg.includes('Challenge is not open')) {
+          throw new Error('⚠️ Challenge state mismatch on-chain. The challenger may need to express intent. Please refresh and try again.');
+        }
+        throw fundError; // Re-throw if it's a different error
       }
       
       // Update Firestore - wrap in try-catch to handle errors gracefully
@@ -3138,6 +2992,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       } else {
         alert('Failed to fund challenge: ' + errorMessage);
       }
+    } finally {
+      // CRITICAL: Always clear funding state, even on error
+      setIsCreatorFunding(null);
     }
   };
 
@@ -3428,59 +3285,62 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
   // Handle reward claiming
   const handleClaimPrize = async (challenge: any) => {
+    // CRITICAL: Disable button immediately on click to prevent double-submission
+    if (claimingPrize === challenge.id) {
+      return; // Already processing
+    }
+    
     if (!publicKey || !connection) {
       console.error("❌ Wallet not connected");
       alert("Please connect your wallet first");
       return;
     }
 
-    // Prevent double-clicks
-    if (claimingPrize === challenge.id) {
-      return;
-    }
-
-    // Check if user has reviewed this challenge before allowing claim
-    try {
-      const hasReviewed = await hasUserReviewedChallenge(publicKey.toBase58(), challenge.id);
-      
-      if (!hasReviewed) {
-        // User hasn't reviewed yet - show review modal first
-        console.log('🎯 User tried to claim prize but hasn\'t reviewed yet - showing review modal');
-        
-        // Get players array - handle both rawData and challenge.players formats
-        const playersArray = challenge.rawData?.players || (Array.isArray(challenge.players) ? challenge.players : []);
-        const currentWallet = publicKey.toString().toLowerCase();
-        const opponentWallet = Array.isArray(playersArray) ? playersArray.find((p: string) => p?.toLowerCase() !== currentWallet) : null;
-        const opponentName = opponentWallet ? `${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}` : 'Opponent';
-        
-        // Set up pending match result as if they won (which they did)
-        setPendingMatchResult({
-          didWin: true,
-          proofFile: null,
-          challengeId: challenge.id,
-          opponentWallet: opponentWallet || undefined,
-          autoWon: true,
-          needsClaim: true // Flag to indicate they need to claim after review
-        });
-        
-        setSelectedChallenge(challenge);
-        
-        // Show trust review modal (must review before claiming)
-        setTrustReviewOpponent(opponentName);
-        setShowTrustReview(true);
-        
-        // Show message explaining they need to review first
-        alert("📝 Please review your opponent before claiming your reward. This helps maintain USDFG integrity.");
-        return;
-      }
-    } catch (error) {
-      console.error('Error checking if user reviewed challenge:', error);
-      // Continue with claim if check fails (allow claim but log warning)
-    }
-
+    // CRITICAL: Set claiming state IMMEDIATELY before any async operations
+    // This prevents double-clicks even if early returns happen
     setClaimingPrize(challenge.id);
 
     try {
+      // Check if user has reviewed this challenge before allowing claim
+      try {
+        const hasReviewed = await hasUserReviewedChallenge(publicKey.toBase58(), challenge.id);
+        
+        if (!hasReviewed) {
+          // User hasn't reviewed yet - show review modal first
+          console.log('🎯 User tried to claim prize but hasn\'t reviewed yet - showing review modal');
+          
+          // Get players array - handle both rawData and challenge.players formats
+          const playersArray = challenge.rawData?.players || (Array.isArray(challenge.players) ? challenge.players : []);
+          const currentWallet = publicKey.toString().toLowerCase();
+          const opponentWallet = Array.isArray(playersArray) ? playersArray.find((p: string) => p?.toLowerCase() !== currentWallet) : null;
+          const opponentName = opponentWallet ? `${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}` : 'Opponent';
+          
+          // Set up pending match result as if they won (which they did)
+          setPendingMatchResult({
+            didWin: true,
+            proofFile: null,
+            challengeId: challenge.id,
+            opponentWallet: opponentWallet || undefined,
+            autoWon: true,
+            needsClaim: true // Flag to indicate they need to claim after review
+          });
+          
+          setSelectedChallenge(challenge);
+          
+          // Show trust review modal (must review before claiming)
+          setTrustReviewOpponent(opponentName);
+          setShowTrustReview(true);
+          
+          // Show message explaining they need to review first
+          alert("📝 Please review your opponent before claiming your reward. This helps maintain USDFG integrity.");
+          // Clear claiming state since we're showing modal (user will claim after review)
+          setClaimingPrize(null);
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking if user reviewed challenge:', error);
+        // Continue with claim if check fails (allow claim but log warning)
+      }
       // Pre-check: Verify challenge is actually claimable on-chain
       if (challenge.pda) {
         try {
@@ -6078,6 +5938,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     }}
                     isSubmitting={false}
                     isClaiming={claimingPrize === selectedChallenge.id}
+                    isCreatorFunding={isCreatorFunding === selectedChallenge.id}
+                    isJoinerFunding={isJoinerFunding === selectedChallenge.id}
                   />
                 </RightSidePanel>
               )}

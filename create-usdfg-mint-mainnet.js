@@ -1,0 +1,617 @@
+#!/usr/bin/env node
+
+/**
+ * Create USDFG Token Mint on MAINNET
+ * 
+ * ⚠️  CRITICAL: This script creates a token on MAINNET with REAL SOL.
+ * ⚠️  Review all details carefully before proceeding.
+ * 
+ * Uses:
+ * - Vanity keypair (UFGa...) as the mint address
+ * - HA wallet (HATb...) as mint authority and freeze authority
+ * - Adds token metadata with image
+ * - Revokes mint and freeze authorities after setup
+ */
+
+import { Connection, Keypair, PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
+import { 
+  createMint, 
+  getOrCreateAssociatedTokenAccount,
+  mintTo,
+  setAuthority,
+  AuthorityType,
+  getMint,
+  TOKEN_PROGRAM_ID,
+  createInitializeMintInstruction,
+  getMinimumBalanceForRentExemptMint,
+  MINT_SIZE
+} from '@solana/spl-token';
+import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
+import { createSignerFromKeypair, signerIdentity } from '@metaplex-foundation/umi';
+import { 
+  createMetadataAccountV3,
+  updateV1,
+  findMetadataPda,
+  mplTokenMetadata
+} from '@metaplex-foundation/mpl-token-metadata';
+import { fromWeb3JsKeypair, fromWeb3JsPublicKey } from '@metaplex-foundation/umi-web3js-adapters';
+import fs from 'fs';
+import bs58 from 'bs58';
+import readline from 'readline';
+
+// Configuration
+const MINT_KEYPAIR_PATH = './wallets/UFGaQZsTKsoT6B24nKASB4jrJCxEEdo9HKfhajszrfT.json';
+const AUTHORITY_KEYPAIR_PATH = './wallets/authority.json';
+const HA_PUBLIC_KEY = 'HATbEKpksdhRE7RPGgAnk7fM9sXK2LwxGQHwGbtCpvFp';
+const HA_PRIVATE_KEY_BASE58 = '59xNhH1xrfncjqx4KaSCcaxNwf7A89kzGTxzm8xQZAn6bVC82M1ntZ2hbogx3ywy6c1xcwMTcma5RDZqis4gzR1Y';
+const TOKEN_IMAGE_PATH = '/Users/usdfg/Downloads/usdfgtoken.png';
+
+// Token parameters
+const TOKEN_NAME = 'USDFGAMING';
+const TOKEN_SYMBOL = 'USDFG';
+const TOKEN_DECIMALS = 9;
+const TOTAL_SUPPLY = 21_000_000; // 21 million tokens
+
+// MAINNET CONFIGURATION
+const RPC_URL = process.env.MAINNET_RPC_URL || 'https://api.mainnet-beta.solana.com';
+const NETWORK = 'mainnet-beta';
+
+/**
+ * Prompt user for confirmation
+ */
+function askQuestion(query) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise(resolve => rl.question(query, ans => {
+    rl.close();
+    resolve(ans);
+  }));
+}
+
+/**
+ * Upload image to IPFS using NFT.Storage (optional, falls back to website URL)
+ */
+async function uploadImageToIPFS(imagePath) {
+  console.log('\n📤 Preparing image URI...');
+  
+  try {
+    // Check if file exists
+    if (!fs.existsSync(imagePath)) {
+      throw new Error(`Image file not found: ${imagePath}`);
+    }
+
+    // For mainnet, use the hosted URL (already verified on devnet)
+    const imageUri = `https://usdfg.pro/assets/usdfg-token.png`;
+    console.log(`✅ Image URI: ${imageUri}`);
+    return imageUri;
+  } catch (error) {
+    console.error('❌ Error preparing image URI:', error.message);
+    // Fallback to website URL
+    const imageUri = `https://usdfg.pro/assets/usdfg-token.png`;
+    console.log(`   Using fallback URL: ${imageUri}`);
+    return imageUri;
+  }
+}
+
+/**
+ * Prepare metadata JSON URI
+ */
+async function prepareMetadataJSON(imageUri) {
+  console.log('\n📤 Preparing metadata JSON URI...');
+  
+  try {
+    // For mainnet, use the hosted URL (already verified on devnet)
+    const metadataUri = `https://usdfg.pro/api/token-metadata.json`;
+    console.log(`✅ Metadata URI: ${metadataUri}`);
+    return metadataUri;
+  } catch (error) {
+    console.error('❌ Error preparing metadata URI:', error.message);
+    // Fallback to website URL
+    const metadataUri = `https://usdfg.pro/api/token-metadata.json`;
+    console.log(`   Using fallback URL: ${metadataUri}`);
+    return metadataUri;
+  }
+}
+
+/**
+ * Create token metadata account on-chain using Metaplex
+ */
+async function createTokenMetadataOnChain(connection, mint, authorityKeypair, imageUri) {
+  console.log('\n📝 Creating token metadata account on-chain...');
+  
+  try {
+    // Prepare metadata JSON URI
+    const metadataUri = await prepareMetadataJSON(imageUri);
+    
+    // Create UMI instance
+    const umi = createUmi(connection.rpcEndpoint);
+    umi.use(mplTokenMetadata());
+    
+    // Convert keypairs to UMI format
+    const umiAuthorityKeypair = fromWeb3JsKeypair(authorityKeypair);
+    const umiAuthoritySigner = createSignerFromKeypair(umi, umiAuthorityKeypair);
+    umi.use(signerIdentity(umiAuthoritySigner));
+    
+    const mintPublicKey = fromWeb3JsPublicKey(mint);
+    
+    // Find metadata PDA
+    const metadataPda = findMetadataPda(umi, { mint: mintPublicKey });
+    console.log(`   Metadata PDA: ${metadataPda.toString()}`);
+    
+    // Check if metadata account already exists and has data
+    const existingMetadata = await umi.rpc.getAccount(metadataPda);
+    
+    let builder;
+    let isUpdate = false;
+    
+    // Ensure URI is short enough (Metaplex has a ~200 char limit for URI field)
+    if (metadataUri.length > 200) {
+      throw new Error(`Metadata URI too long (${metadataUri.length} chars). Must be under 200 characters.`);
+    }
+    
+    if (existingMetadata.exists && existingMetadata.data && existingMetadata.data.length > 0) {
+      // Update existing metadata account
+      console.log('   ⚠️  Metadata account exists. Updating with new URI...');
+      isUpdate = true;
+      
+      // Use updateArgs to properly structure the data
+      const { updateArgs } = await import('@metaplex-foundation/mpl-token-metadata');
+      const updateData = updateArgs({
+        name: TOKEN_NAME,
+        symbol: TOKEN_SYMBOL,
+        uri: metadataUri,
+        sellerFeeBasisPoints: 0,
+      });
+      
+      builder = updateV1(umi, {
+        metadata: metadataPda,
+        updateAuthority: umiAuthoritySigner,
+        newUpdateAuthority: umiAuthoritySigner.publicKey, // Keep same authority
+        data: updateData,
+      });
+    } else {
+      // Create new metadata account
+      console.log('   Creating metadata account transaction...');
+      
+      builder = createMetadataAccountV3(umi, {
+        metadata: metadataPda,
+        mint: mintPublicKey,
+        mintAuthority: umiAuthoritySigner,
+        updateAuthority: umiAuthoritySigner.publicKey, // HA wallet keeps update authority
+        name: TOKEN_NAME,
+        symbol: TOKEN_SYMBOL,
+        uri: metadataUri, // URI to metadata JSON (must be < 200 chars)
+        sellerFeeBasisPoints: 0,
+        isMutable: true, // Allow metadata updates
+      });
+    }
+    
+    try {
+      const result = await builder.sendAndConfirm(umi);
+      // The result from sendAndConfirm should have a signature property
+      let signature = 'unknown';
+      if (result) {
+        if (result.signature) {
+          if (result.signature instanceof Uint8Array) {
+            signature = bs58.encode(result.signature);
+          } else {
+            signature = result.signature.toString();
+          }
+        } else if (result.response?.signature) {
+          if (result.response.signature instanceof Uint8Array) {
+            signature = bs58.encode(result.response.signature);
+          } else {
+            signature = result.response.signature.toString();
+          }
+        } else if (typeof result === 'string') {
+          signature = result;
+        } else {
+          const resultStr = JSON.stringify(result);
+          const sigMatch = resultStr.match(/"signature":"([^"]+)"/);
+          if (sigMatch) {
+            signature = sigMatch[1];
+          }
+        }
+      }
+      
+      if (isUpdate) {
+        console.log(`✅ Metadata account updated`);
+      } else {
+        console.log(`✅ Metadata account created`);
+      }
+      console.log(`   Transaction: ${signature}`);
+      
+      // Verify metadata account exists
+      const metadataAccount = await umi.rpc.getAccount(metadataPda);
+      if (!metadataAccount.exists) {
+        throw new Error('Metadata account was not created');
+      }
+      
+      console.log(`✅ Metadata account verified on-chain`);
+      
+      return {
+        metadataAccount: metadataPda.toString(),
+        metadataUri: metadataUri,
+        imageUri: imageUri,
+        updateAuthority: authorityKeypair.publicKey.toString(),
+        transaction: signature
+      };
+    } catch (error) {
+      console.error('❌ Error creating metadata account:', error.message);
+      throw error;
+    }
+  } catch (error) {
+    console.error('❌ Error in createTokenMetadataOnChain:', error.message);
+    throw error;
+  }
+}
+
+async function main() {
+  console.log('🚀 Creating USDFG Token Mint on MAINNET');
+  console.log('==========================================\n');
+  console.log('⚠️  ⚠️  ⚠️  MAINNET DEPLOYMENT ⚠️  ⚠️  ⚠️');
+  console.log('This will use REAL SOL and create a REAL token.\n');
+  
+  // Safety check: Confirm mainnet
+  if (!RPC_URL.includes('mainnet')) {
+    throw new Error('❌ SAFETY: This script is configured for MAINNET ONLY. RPC_URL must include "mainnet".');
+  }
+  
+  console.log(`🌐 Network: ${NETWORK}`);
+  console.log(`🔗 RPC URL: ${RPC_URL}\n`);
+  
+  // Final confirmation prompt
+  console.log('📋 DEPLOYMENT DETAILS:');
+  console.log(`   Mint Address: UFGaQZsTKsoT6B24nKASB4jrJCxEEdo9HKfhajszrfT`);
+  console.log(`   Mint Authority: ${HA_PUBLIC_KEY} (HA wallet)`);
+  console.log(`   Freeze Authority: ${HA_PUBLIC_KEY} (HA wallet, will be revoked)`);
+  console.log(`   Name: ${TOKEN_NAME}`);
+  console.log(`   Symbol: ${TOKEN_SYMBOL}`);
+  console.log(`   Decimals: ${TOKEN_DECIMALS}`);
+  console.log(`   Total Supply: ${TOTAL_SUPPLY.toLocaleString()} ${TOKEN_SYMBOL}`);
+  console.log(`   Network: ${NETWORK} (REAL SOL)\n`);
+  
+  const confirm1 = await askQuestion('⚠️  Type "DEPLOY TO MAINNET" to confirm: ');
+  if (confirm1 !== 'DEPLOY TO MAINNET') {
+    console.log('❌ Deployment cancelled.');
+    process.exit(0);
+  }
+  
+  const confirm2 = await askQuestion('⚠️  Type the mint address (UFGa...) to confirm: ');
+  if (confirm2 !== 'UFGaQZsTKsoT6B24nKASB4jrJCxEEdo9HKfhajszrfT') {
+    console.log('❌ Mint address mismatch. Deployment cancelled.');
+    process.exit(0);
+  }
+  
+  console.log('\n⏸️  Final 10 second countdown...');
+  for (let i = 10; i > 0; i--) {
+    process.stdout.write(`\r   ${i}... `);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  console.log('\n\n🚀 Proceeding with deployment...\n');
+  
+  try {
+    // Load keypairs
+    console.log('📁 Loading keypairs...');
+    
+    // Load mint keypair (vanity address)
+    if (!fs.existsSync(MINT_KEYPAIR_PATH)) {
+      throw new Error(`Mint keypair not found: ${MINT_KEYPAIR_PATH}`);
+    }
+    const mintKeypairData = JSON.parse(fs.readFileSync(MINT_KEYPAIR_PATH, 'utf8'));
+    const mintKeypair = Keypair.fromSecretKey(Uint8Array.from(mintKeypairData));
+    console.log(`✅ Mint keypair loaded: ${mintKeypair.publicKey.toString()}`);
+    
+    // Verify mint address matches
+    if (mintKeypair.publicKey.toString() !== 'UFGaQZsTKsoT6B24nKASB4jrJCxEEdo9HKfhajszrfT') {
+      throw new Error(`Mint address mismatch! Expected UFGaQZsTKsoT6B24nKASB4jrJCxEEdo9HKfhajszrfT, got ${mintKeypair.publicKey.toString()}`);
+    }
+    
+    // Create authority keypair from base58 if it doesn't exist
+    if (!fs.existsSync(AUTHORITY_KEYPAIR_PATH)) {
+      console.log('📝 Creating temporary authority.json...');
+      const privateKeyBytes = bs58.decode(HA_PRIVATE_KEY_BASE58);
+      const authorityKeypair = Keypair.fromSecretKey(privateKeyBytes);
+      
+      // Verify public key matches
+      if (authorityKeypair.publicKey.toString() !== HA_PUBLIC_KEY) {
+        throw new Error(`Public key mismatch! Expected ${HA_PUBLIC_KEY}, got ${authorityKeypair.publicKey.toString()}`);
+      }
+      
+      // Save as JSON array (temporary only)
+      fs.writeFileSync(AUTHORITY_KEYPAIR_PATH, JSON.stringify(Array.from(authorityKeypair.secretKey)));
+      console.log(`✅ Authority keypair created (temporary): ${authorityKeypair.publicKey.toString()}`);
+    }
+    
+    // Load authority keypair
+    const authorityKeypairData = JSON.parse(fs.readFileSync(AUTHORITY_KEYPAIR_PATH, 'utf8'));
+    const authorityKeypair = Keypair.fromSecretKey(Uint8Array.from(authorityKeypairData));
+    
+    // Verify authority public key
+    if (authorityKeypair.publicKey.toString() !== HA_PUBLIC_KEY) {
+      throw new Error(`Authority public key mismatch! Expected ${HA_PUBLIC_KEY}, got ${authorityKeypair.publicKey.toString()}`);
+    }
+    console.log(`✅ Authority keypair loaded: ${authorityKeypair.publicKey.toString()}`);
+    
+    // Connect to network
+    console.log(`\n🌐 Connecting to ${NETWORK}...`);
+    const connection = new Connection(RPC_URL, 'confirmed');
+    
+    // Check balances
+    let mintBalance = await connection.getBalance(mintKeypair.publicKey);
+    let authorityBalance = await connection.getBalance(authorityKeypair.publicKey);
+    
+    console.log(`\n💰 Wallet Balances:`);
+    console.log(`   Mint wallet (${mintKeypair.publicKey.toString()}): ${mintBalance / 1e9} SOL`);
+    console.log(`   Authority wallet (${authorityKeypair.publicKey.toString()}): ${authorityBalance / 1e9} SOL`);
+    
+    // Check if account exists and close it if it's a system account
+    const existingAccount = await connection.getAccountInfo(mintKeypair.publicKey);
+    if (existingAccount && existingAccount.owner.equals(SystemProgram.programId)) {
+      console.log('\n⚠️  System account exists at mint address. Closing it completely...');
+      console.log(`   Current balance: ${mintBalance} lamports`);
+      
+      // Transfer ALL lamports (including rent-exempt) to authority
+      const closeTx = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: mintKeypair.publicKey,
+          toPubkey: authorityKeypair.publicKey,
+          lamports: mintBalance, // Transfer ALL lamports
+        })
+      );
+      
+      const { blockhash } = await connection.getLatestBlockhash();
+      closeTx.recentBlockhash = blockhash;
+      closeTx.feePayer = authorityKeypair.publicKey;
+      closeTx.sign(mintKeypair, authorityKeypair);
+      
+      const closeSig = await connection.sendRawTransaction(closeTx.serialize());
+      await connection.confirmTransaction(closeSig);
+      console.log('✅ Account closing transaction sent:', closeSig);
+      
+      // Wait for account to be fully closed
+      console.log('⏳ Waiting for account to be fully closed...');
+      let accountStillExists = true;
+      let attempts = 0;
+      while (accountStillExists && attempts < 10) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        const checkAccount = await connection.getAccountInfo(mintKeypair.publicKey);
+        accountStillExists = !!checkAccount;
+        attempts++;
+        if (accountStillExists) {
+          console.log(`   Attempt ${attempts}: Account still exists, waiting...`);
+        }
+      }
+      
+      if (accountStillExists) {
+        throw new Error('Account was not fully closed after 10 attempts. Cannot proceed.');
+      }
+      
+      console.log('✅ Account fully closed and deleted');
+      mintBalance = 0;
+    }
+    
+    // Ensure authority has enough SOL for mint creation
+    // Mint creation requires ~0.001 SOL for rent
+    if (authorityBalance < 0.1 * 1e9) {
+      throw new Error(`Insufficient SOL in authority wallet. Need at least 0.1 SOL. Current: ${authorityBalance / 1e9} SOL`);
+    }
+    
+    // Check if mint already exists
+    let mint = mintKeypair.publicKey;
+    const existingAccountCheck = await connection.getAccountInfo(mintKeypair.publicKey);
+    
+    if (existingAccountCheck) {
+      // Account exists - check if it's already a mint
+      if (existingAccountCheck.owner.equals(TOKEN_PROGRAM_ID)) {
+        try {
+          const existingMint = await getMint(connection, mintKeypair.publicKey);
+          console.log('⚠️  Mint already exists at this address');
+          console.log(`   Decimals: ${existingMint.decimals}`);
+          console.log(`   Supply: ${existingMint.supply.toString()}`);
+          console.log(`   Mint Authority: ${existingMint.mintAuthority?.toString() || 'None (revoked)'}`);
+          console.log(`   Freeze Authority: ${existingMint.freezeAuthority?.toString() || 'None (revoked)'}`);
+          
+          const continueDeploy = await askQuestion('\n⚠️  Mint already exists. Continue with metadata update? (yes/no): ');
+          if (continueDeploy.toLowerCase() !== 'yes') {
+            console.log('❌ Deployment cancelled.');
+            process.exit(0);
+          }
+        } catch (error) {
+          throw new Error('Account exists and is owned by Token Program but is not a valid mint. Cannot proceed.');
+        }
+      } else {
+        throw new Error(`Account exists at mint address but is not a token mint. Cannot proceed.`);
+      }
+    } else {
+      // Account doesn't exist - create mint manually with authority as payer
+      console.log('🏭 Creating new token mint (authority pays for account creation)...');
+      
+      // Calculate rent for mint account
+      const rentExemptBalance = await getMinimumBalanceForRentExemptMint(connection);
+      console.log(`   Rent-exempt balance: ${rentExemptBalance} lamports`);
+      
+      // Create transaction with:
+      // 1. Create account instruction (authority pays)
+      // 2. Initialize mint instruction
+      const mintTransaction = new Transaction();
+      
+      // Create account instruction - authority pays, creates account owned by Token Program
+      mintTransaction.add(
+        SystemProgram.createAccount({
+          fromPubkey: authorityKeypair.publicKey, // Authority pays
+          newAccountPubkey: mintKeypair.publicKey, // Mint address
+          space: MINT_SIZE,
+          lamports: rentExemptBalance,
+          programId: TOKEN_PROGRAM_ID, // Account owned by Token Program
+        })
+      );
+      
+      // Initialize mint instruction
+      mintTransaction.add(
+        createInitializeMintInstruction(
+          mintKeypair.publicKey, // Mint address
+          TOKEN_DECIMALS, // Decimals
+          authorityKeypair.publicKey, // Mint authority
+          authorityKeypair.publicKey, // Freeze authority
+          TOKEN_PROGRAM_ID
+        )
+      );
+      
+      // Sign with both keypairs
+      const { blockhash } = await connection.getLatestBlockhash();
+      mintTransaction.recentBlockhash = blockhash;
+      mintTransaction.feePayer = authorityKeypair.publicKey;
+      mintTransaction.sign(mintKeypair, authorityKeypair);
+      
+      // Send transaction
+      const mintSig = await connection.sendRawTransaction(mintTransaction.serialize());
+      await connection.confirmTransaction(mintSig);
+      console.log(`✅ Token mint created: ${mintKeypair.publicKey.toString()}`);
+      console.log(`   Transaction: ${mintSig}`);
+      
+      mint = mintKeypair.publicKey;
+    }
+    
+    // Verify mint address matches
+    if (mint.toString() !== mintKeypair.publicKey.toString()) {
+      throw new Error(`Mint address mismatch! Expected ${mintKeypair.publicKey.toString()}, got ${mint.toString()}`);
+    }
+    
+    // Create token account for authority
+    console.log('\n💼 Creating token account for authority...');
+    const authorityTokenAccount = await getOrCreateAssociatedTokenAccount(
+      connection,
+      authorityKeypair, // Payer
+      mint, // Mint
+      authorityKeypair.publicKey // Owner
+    );
+    console.log(`✅ Token account created: ${authorityTokenAccount.address.toString()}`);
+    
+    // Mint total supply to authority
+    console.log(`\n💰 Minting ${TOTAL_SUPPLY.toLocaleString()} ${TOKEN_SYMBOL} to authority...`);
+    const totalSupplyLamports = TOTAL_SUPPLY * Math.pow(10, TOKEN_DECIMALS);
+    const mintTx = await mintTo(
+      connection,
+      authorityKeypair, // Payer
+      mint, // Mint
+      authorityTokenAccount.address, // Destination
+      authorityKeypair, // Mint authority
+      totalSupplyLamports // Amount
+    );
+    console.log(`✅ Mint transaction: ${mintTx}`);
+    
+    // Upload image to IPFS and create metadata on-chain
+    const imageUri = await uploadImageToIPFS(TOKEN_IMAGE_PATH);
+    const metadataResult = await createTokenMetadataOnChain(connection, mint, authorityKeypair, imageUri);
+    
+    // Check current mint state
+    const mintInfo = await getMint(connection, mint);
+    console.log('\n📊 Current Mint State:');
+    console.log(`   Mint Authority: ${mintInfo.mintAuthority?.toString() || 'None (already revoked)'}`);
+    console.log(`   Freeze Authority: ${mintInfo.freezeAuthority?.toString() || 'None (already revoked)'}`);
+    
+    // Revoke mint authority (make supply fixed) - only if it exists
+    if (mintInfo.mintAuthority && mintInfo.mintAuthority.equals(authorityKeypair.publicKey)) {
+      console.log('\n🔒 Revoking mint authority (making supply fixed)...');
+      try {
+        await setAuthority(
+          connection,
+          authorityKeypair, // Payer
+          mint, // Mint
+          null, // New authority (null = revoke)
+          AuthorityType.MintTokens, // Authority type
+          authorityKeypair // Current authority
+        );
+        console.log('✅ Mint authority revoked - supply is now fixed');
+      } catch (error) {
+        console.error('⚠️  Error revoking mint authority:', error.message);
+        throw error; // Don't continue if revocation fails on mainnet
+      }
+    } else if (!mintInfo.mintAuthority) {
+      console.log('\n✅ Mint authority already revoked');
+    } else {
+      console.log(`\n⚠️  Mint authority is ${mintInfo.mintAuthority.toString()}, not HA wallet. Skipping revocation.`);
+    }
+    
+    // Revoke freeze authority - only if it exists
+    if (mintInfo.freezeAuthority && mintInfo.freezeAuthority.equals(authorityKeypair.publicKey)) {
+      console.log('\n🔒 Revoking freeze authority...');
+      try {
+        await setAuthority(
+          connection,
+          authorityKeypair, // Payer
+          mint, // Mint
+          null, // New authority (null = revoke)
+          AuthorityType.FreezeAccount, // Authority type
+          authorityKeypair // Current authority
+        );
+        console.log('✅ Freeze authority revoked - token cannot be frozen');
+      } catch (error) {
+        console.error('⚠️  Error revoking freeze authority:', error.message);
+        throw error; // Don't continue if revocation fails on mainnet
+      }
+    } else if (!mintInfo.freezeAuthority) {
+      console.log('\n✅ Freeze authority already revoked');
+    } else {
+      console.log(`\n⚠️  Freeze authority is ${mintInfo.freezeAuthority.toString()}, not HA wallet. Skipping revocation.`);
+    }
+    
+    // Get final mint state for summary
+    const finalMintInfo = await getMint(connection, mint);
+    
+    // Clean up: Delete authority.json
+    console.log('\n🧹 Cleaning up temporary files...');
+    if (fs.existsSync(AUTHORITY_KEYPAIR_PATH)) {
+      fs.unlinkSync(AUTHORITY_KEYPAIR_PATH);
+      console.log('✅ Deleted temporary authority.json');
+    }
+    
+    // Final summary
+    console.log('\n' + '='.repeat(60));
+    console.log('✅ USDFG TOKEN MINT CREATED SUCCESSFULLY ON MAINNET');
+    console.log('='.repeat(60));
+    console.log(`\n📋 Token Details:`);
+    console.log(`   Mint Address: ${mint.toString()}`);
+    console.log(`   Total Supply: ${TOTAL_SUPPLY.toLocaleString()} ${TOKEN_SYMBOL}`);
+    console.log(`   Decimals: ${TOKEN_DECIMALS}`);
+    console.log(`   Mint Authority: ${finalMintInfo.mintAuthority?.toString() || 'REVOKED (fixed supply)'}`);
+    console.log(`   Freeze Authority: ${finalMintInfo.freezeAuthority?.toString() || 'REVOKED (cannot freeze)'}`);
+    console.log(`   Current Supply: ${finalMintInfo.supply.toString()}`);
+    console.log(`\n📝 Metadata Account Details:`);
+    console.log(`   Metadata Account: ${metadataResult.metadataAccount}`);
+    console.log(`   Metadata URI: ${metadataResult.metadataUri}`);
+    console.log(`   Name: ${TOKEN_NAME}`);
+    console.log(`   Symbol: ${TOKEN_SYMBOL}`);
+    console.log(`   Image URI: ${metadataResult.imageUri}`);
+    console.log(`   Metadata Update Authority: ${metadataResult.updateAuthority} (HA...)`);
+    console.log(`   Transaction: ${metadataResult.transaction}`);
+    console.log(`\n🔗 Explorer Links:`);
+    console.log(`   Mint Address: https://explorer.solana.com/address/${mint.toString()}`);
+    console.log(`   Metadata Account: https://explorer.solana.com/address/${metadataResult.metadataAccount}`);
+    console.log(`   Metadata JSON: ${metadataResult.metadataUri}`);
+    console.log(`   Image (verify rendering): ${metadataResult.imageUri}`);
+    console.log(`\n⚠️  NEXT STEPS:`);
+    console.log(`   1. Update client/src/lib/chain/config.ts:`);
+    console.log(`      Change USDFG_MINT to: ${mint.toString()}`);
+    console.log(`   2. Update the network comment in config.ts to "mainnet-beta"`);
+    console.log(`   3. Test the token in your application`);
+    console.log(`   4. Deploy your smart contract to mainnet (if not already done)`);
+    console.log('\n');
+    
+  } catch (error) {
+    // Clean up on error
+    if (fs.existsSync(AUTHORITY_KEYPAIR_PATH)) {
+      fs.unlinkSync(AUTHORITY_KEYPAIR_PATH);
+    }
+    throw error;
+  }
+}
+
+main().catch(error => {
+  console.error('\n❌ Error:', error.message);
+  process.exit(1);
+});

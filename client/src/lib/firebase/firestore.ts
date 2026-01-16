@@ -3804,6 +3804,12 @@ export async function claimChallengePrize(
     
     const data = snap.data() as ChallengeData;
     
+    // CRITICAL: Idempotency guard - prevent double claiming
+    if (data.payoutTriggered || data.prizeClaimedAt) {
+      console.log('✅ Prize already claimed - idempotent check passed');
+      return; // Already claimed, return success
+    }
+    
     // Validate challenge is ready for claim
     if (data.status !== 'completed') {
       throw new Error('❌ Challenge is not completed');

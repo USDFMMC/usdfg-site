@@ -29,6 +29,8 @@ interface StandardChallengeLobbyProps {
   onClose: () => void;
   isSubmitting?: boolean;
   isClaiming?: boolean;
+  isCreatorFunding?: boolean;
+  isJoinerFunding?: boolean;
 }
 
 const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
@@ -43,6 +45,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   onClose,
   isSubmitting = false,
   isClaiming = false,
+  isCreatorFunding = false,
+  isJoinerFunding = false,
 }) => {
   const [showSubmitForm, setShowSubmitForm] = useState(false);
   const [selectedResult, setSelectedResult] = useState<boolean | null>(null);
@@ -741,101 +745,52 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                   alert('Error: Funding handler not available. Please refresh the page.');
                 }
               }}
-              className="w-full rounded-md bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white px-3 py-2 text-xs font-semibold transition-all shadow-[0_0_10px_rgba(245,158,11,0.4)] hover:shadow-[0_0_15px_rgba(245,158,11,0.6)] border border-amber-400/30"
+              disabled={isCreatorFunding}
+              className={`w-full rounded-md bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white px-3 py-2 text-xs font-semibold transition-all shadow-[0_0_10px_rgba(245,158,11,0.4)] hover:shadow-[0_0_15px_rgba(245,158,11,0.6)] border border-amber-400/30 ${
+                isCreatorFunding ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             >
-              Fund Challenge ({entryFee} USDFG + Network Fee)
+              {isCreatorFunding ? 'Funding...' : `Fund Challenge (${entryFee} USDFG + Network Fee)`}
             </button>
           </div>
         </div>
       )}
 
-      {/* Waiting message for joiner - check if PDA exists to determine next step */}
-      {!isCreator && status === 'creator_confirmation_required' && isAlreadyPendingJoiner && (() => {
-        const challengePDA = getChallengeValue('pda', null);
-        const needsOnChainIntent = challengePDA; // If PDA exists, challenger needs to express on-chain intent
-        
-        if (needsOnChainIntent) {
-          // PDA exists - challenger needs to complete on-chain step
-          return (
-            <div className="rounded-lg border border-amber-400/30 bg-amber-500/10 p-2.5">
-              <div className="text-center">
-                <div className="text-xs font-semibold text-amber-200 mb-1.5">
-                  ⚡ Action Required: Complete On-Chain Join Intent
-                </div>
-                <div className="text-[10px] text-amber-100/80 mb-2">
-                  You've expressed intent in Firestore, but need to complete the on-chain step before the creator can fund.
-                </div>
-                {onJoinChallenge && (
-                  <button
-                    onClick={() => onJoinChallenge(activeChallenge)}
-                    className="w-full mt-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 py-2 text-white font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(251,146,60,0.35)] text-xs"
-                  >
-                    ⚡ Click to Complete On-Chain Join Intent
-                  </button>
-                )}
-                {creatorFundingDeadline && (
-                  <div className="text-[10px] text-amber-300/70 mt-2">
-                    Creator deadline: {(() => {
-                      const now = Date.now();
-                      const deadlineMs = creatorFundingDeadline.toMillis();
-                      const diffMs = deadlineMs - now;
-                      const diffMinutes = Math.floor(diffMs / 1000 / 60);
-                      const diffHours = Math.floor(diffMinutes / 60);
-                      
-                      if (diffMs <= 0) {
-                        return 'Expired';
-                      } else if (diffHours > 0) {
-                        return `${diffHours}h ${diffMinutes % 60}m remaining`;
-                      } else {
-                        return `${diffMinutes}m remaining`;
-                      }
-                    })()}
-                  </div>
+      {/* Waiting message for joiner - Firestore-only, no on-chain steps */}
+      {!isCreator && status === 'creator_confirmation_required' && isAlreadyPendingJoiner && (
+        <div className="rounded-lg border border-blue-400/30 bg-blue-500/10 p-2.5">
+          <div className="text-center">
+            <div className="text-xs font-semibold text-blue-200 mb-1.5">
+              ⏳ Waiting for Creator to Fund
+            </div>
+            <div className="text-[10px] text-blue-100/80 mb-2">
+              You've expressed intent to join. Waiting for the creator to fund the challenge.
+            </div>
+            {creatorFundingDeadline && (
+              <div className="text-[10px] text-blue-300/70 mb-2">
+                Creator deadline: {(() => {
+                  const now = Date.now();
+                  const deadlineMs = creatorFundingDeadline.toMillis();
+                  const diffMs = deadlineMs - now;
+                  const diffMinutes = Math.floor(diffMs / 1000 / 60);
+                  const diffHours = Math.floor(diffMinutes / 60);
+                  
+                  if (diffMs <= 0) {
+                    return 'Expired';
+                  } else if (diffHours > 0) {
+                    return `${diffHours}h ${diffMinutes % 60}m remaining`;
+                  } else {
+                    return `${diffMinutes}m remaining`;
+                  }
+                })()}
+                {isDeadlineExpired && (
+                  <span className="ml-2 text-red-300">(Expired - challenge will revert soon)</span>
                 )}
               </div>
-            </div>
-          );
-        } else {
-          // No PDA yet - waiting for creator to create it
-          return (
-            <div className="rounded-lg border border-blue-400/30 bg-blue-500/10 p-2.5">
-              <div className="text-center">
-                <div className="text-xs font-semibold text-blue-200 mb-1.5">
-                  ⏳ Waiting for Creator to Create Challenge On-Chain
-                </div>
-                <div className="text-[10px] text-blue-100/80 mb-2">
-                  You've expressed intent to join. The creator needs to create the challenge on-chain first.
-                </div>
-                {creatorFundingDeadline && (
-                  <div className="text-[10px] text-blue-300/70 mb-2">
-                    Creator deadline: {(() => {
-                      const now = Date.now();
-                      const deadlineMs = creatorFundingDeadline.toMillis();
-                      const diffMs = deadlineMs - now;
-                      const diffMinutes = Math.floor(diffMs / 1000 / 60);
-                      const diffHours = Math.floor(diffMinutes / 60);
-                      
-                      if (diffMs <= 0) {
-                        return 'Expired';
-                      } else if (diffHours > 0) {
-                        return `${diffHours}h ${diffMinutes % 60}m remaining`;
-                      } else {
-                        return `${diffMinutes}m remaining`;
-                      }
-                    })()}
-                    {isDeadlineExpired && (
-                      <span className="ml-2 text-red-300">(Expired - challenge will revert soon)</span>
-                    )}
-                  </div>
-                )}
-                <div className="text-[10px] text-blue-100/60">
-                  Once the creator creates the challenge on-chain, you'll need to complete the on-chain join step.
-                </div>
-              </div>
-            </div>
-          );
-        }
-      })()}
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Debug info for creator when status is creator_confirmation_required but button not showing */}
       {isCreator && status === 'creator_confirmation_required' && !canCreatorFund && !isDeadlineExpired && (
@@ -956,9 +911,12 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                   }
                 }
               }}
-              className="w-full rounded-md bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-3 py-2 text-xs font-semibold transition-all shadow-[0_0_10px_rgba(34,197,94,0.4)] hover:shadow-[0_0_15px_rgba(34,197,94,0.6)] border border-green-400/30"
+              disabled={isJoinerFunding}
+              className={`w-full rounded-md bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-3 py-2 text-xs font-semibold transition-all shadow-[0_0_10px_rgba(34,197,94,0.4)] hover:shadow-[0_0_15px_rgba(34,197,94,0.6)] border border-green-400/30 ${
+                isJoinerFunding ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             >
-              Fund Challenge ({entryFee} USDFG + Network Fee)
+              {isJoinerFunding ? 'Funding...' : `Fund Challenge (${entryFee} USDFG + Network Fee)`}
             </button>
           </div>
         </div>

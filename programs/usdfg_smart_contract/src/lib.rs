@@ -37,6 +37,10 @@ pub mod usdfg_smart_contract {
 
         let challenge = &mut ctx.accounts.challenge;
 
+
+
+        
+
         // NO PAYMENT - Just create metadata
         // Initialize challenge
         challenge.creator = ctx.accounts.creator.key();
