@@ -130,7 +130,8 @@
     "vite-plugin-pwa": "^1.2.0"
   },
   "optionalDependencies": {
-    "bufferutil": "^4.0.8"
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "bufferutil": "4.1.0"
   },
   "overrides": {
     "rollup": "4.52.3",
