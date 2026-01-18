@@ -198,20 +198,16 @@ export function useUSDFGWallet() {
     // On mobile, connection state is already cleared above
   }
 
-  // On mobile, check for stored connection from deep link return
-  const phantomState = mobile ? getPhantomConnectionState() : null;
-  const mobileConnected = mobile && phantomState?.connected || false;
-  const mobilePublicKey = mobile && phantomState?.publicKey || null;
-
+  // CRITICAL FIX: Always use wallet.publicKey from adapter, not localStorage
+  // UI must be driven solely by wallet.publicKey for proper reactivity
+  // localStorage can be stale - only use wallet adapter as source of truth
   return {
     connect,
     disconnect,
-    connected: mobile ? mobileConnected : wallet.connected,
-    publicKey: mobile 
-      ? (mobilePublicKey ? new PublicKey(mobilePublicKey) : null)
-      : (wallet.publicKey as PublicKey | null),
+    connected: wallet.connected,
+    publicKey: wallet.publicKey as PublicKey | null, // Always use adapter's publicKey
     mobile,
-    connecting: mobile ? false : wallet.connecting,
+    connecting: wallet.connecting,
     connection,
   };
 }
