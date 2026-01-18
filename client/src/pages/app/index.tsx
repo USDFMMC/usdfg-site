@@ -2427,23 +2427,48 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const shareText = `🎮 Join my USDFG Arena challenge!\n\n"${challenge.title}"\n💰 ${challenge.entryFee} USDFG Entry • 🏆 ${challenge.prizePool} USDFG Reward\n🎯 ${extractGameFromTitle(challenge.title)} • ${getGameCategory(extractGameFromTitle(challenge.title))}\n\nJoin now: ${shareUrl}`;
       
       // Try to use Web Share API if available (mobile)
-      if (navigator.share) {
-        await navigator.share({
-          title: `USDFG Arena Challenge: ${challenge.title}`,
-          text: shareText,
-          url: shareUrl
-        });
-      } else {
-        // Fallback: copy to clipboard
-        await navigator.clipboard.writeText(shareText);
-        alert('Challenge link copied to clipboard! Share it with your friends!');
+      // CRITICAL FIX: Check both navigator.share existence AND that it's a function
+      if (typeof navigator !== 'undefined' && navigator.share && typeof navigator.share === 'function') {
+        try {
+          await navigator.share({
+            title: `USDFG Arena Challenge: ${challenge.title}`,
+            text: shareText,
+            url: shareUrl
+          });
+          // If share succeeds, return early (user shared successfully)
+          return;
+        } catch (shareError: any) {
+          // User cancellation is not an error - just return silently
+          if (shareError.name === 'AbortError' || shareError.message?.includes('cancel')) {
+            return; // User cancelled share dialog - this is fine
+          }
+          // If share fails for other reasons, fall through to clipboard
+          console.warn('Share failed, falling back to clipboard:', shareError);
+        }
       }
-    } catch (error) {
+      
+      // Fallback: copy to clipboard
+      try {
+        // Check if clipboard API is available
+        if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          await navigator.clipboard.writeText(shareText);
+          alert('Challenge link copied to clipboard! Share it with your friends!');
+        } else {
+          // Last resort: show share text in prompt (works everywhere)
+          throw new Error('Clipboard not available');
+        }
+      } catch (clipboardError: any) {
+        // Clipboard failed - show share text in alert as final fallback
+        const shareUrl = `${window.location.origin}/?challenge=${challenge.id}`;
+        const shareText = `🎮 Join my USDFG Arena challenge!\n\n"${challenge.title}"\n💰 ${challenge.entryFee} USDFG Entry • 🏆 ${challenge.prizePool} USDFG Reward\n🎯 ${extractGameFromTitle(challenge.title)} • ${getGameCategory(extractGameFromTitle(challenge.title))}\n\nJoin now: ${shareUrl}`;
+        alert(`Share this challenge:\n\n${shareText}\n\n(Copy the link above)`);
+      }
+    } catch (error: any) {
       console.error('Error sharing challenge:', error);
-      // Fallback: show share text in alert
+      // Final fallback: show share text in alert
       const shareUrl = `${window.location.origin}/?challenge=${challenge.id}`;
       const shareText = `🎮 Join my USDFG Arena challenge!\n\n"${challenge.title}"\n💰 ${challenge.entryFee} USDFG Entry • 🏆 ${challenge.prizePool} USDFG Reward\n🎯 ${extractGameFromTitle(challenge.title)} • ${getGameCategory(extractGameFromTitle(challenge.title))}\n\nJoin now: ${shareUrl}`;
-      alert(`Share this challenge:\n\n${shareText}`);
+      alert(`Share this challenge:\n\n${shareText}\n\n(Copy the link above)`);
     }
   };
   
@@ -5026,9 +5051,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                             type="button"
                                           onClick={(e) => {
                                             e.stopPropagation();
+                                            e.preventDefault();
                               handleShareChallenge(challenge);
                             }}
-                            className="p-1.5 rounded-lg bg-black/60 hover:bg-black/80 backdrop-blur-sm border border-white/20 hover:border-amber-400/40 transition-all"
+                            onTouchEnd={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              handleShareChallenge(challenge);
+                            }}
+                            className="p-1.5 rounded-lg bg-black/60 hover:bg-black/80 backdrop-blur-sm border border-white/20 hover:border-amber-400/40 transition-all touch-manipulation"
+                            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                             title="Share challenge"
                             aria-label="Share challenge"
                           >
