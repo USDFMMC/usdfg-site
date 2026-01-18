@@ -4,13 +4,7 @@
   command = "npm install && npm run build"
 
 # Redirects for React Router
-# /app/* routes go to index.html for React Router to handle
-[[redirects]]
-  from = "/app/*"
-  to = "/index.html"
-  status = 200
-
-# Root and other routes also go to index.html (React Router handles routing)
+# All routes go to index.html (React Router handles routing)
 [[redirects]]
   from = "/*"
   to = "/index.html"
