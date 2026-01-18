@@ -168,7 +168,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       return (
         <div className="flex items-center gap-2">
           {(usdfgBalance !== null || balance !== null) && (
-            <div className="text-right hidden xs:block">
+            <div className="text-right">
               {usdfgBalance !== null && (
                 <div className="text-[10px] text-cyan-400 font-semibold leading-tight">
                   {usdfgBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} USDFG
@@ -197,7 +197,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     
     return (
       <div className="flex items-center gap-3">
-        <div className="text-right hidden lg:block">
+        <div className="text-right">
           <div className="text-cyan-400 font-semibold text-xs leading-tight">
             {usdfgBalance !== null ? `${usdfgBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} USDFG` : "Loading..."}
           </div>
