@@ -37,6 +37,8 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const { publicKey, connected, connecting, connect, disconnect, mobile, connection } = useUSDFGWallet();
   const [balance, setBalance] = useState<number | null>(null);
   const [usdfgBalance, setUsdfgBalance] = useState<number | null>(null);
+  // Force re-render trigger for mobile connection state
+  const [, forceUpdate] = useState(0);
   
   const [mobileConnectionState, setMobileConnectionState] = useState(() => {
     if (!mobile || typeof window === 'undefined') return { connected: false, publicKey: null };
@@ -108,8 +110,11 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       if (connected && publicKey) {
         clearPhantomConnectingState();
         // Update mobile connection state immediately when adapter confirms connection
-        setMobileConnectionState({ connected: true, publicKey: publicKey.toString() });
-        console.log('✅ Mobile checkConnection: Wallet connected - updated state immediately');
+        const newState = { connected: true, publicKey: publicKey.toString() };
+        setMobileConnectionState(newState);
+        console.log('✅ Mobile checkConnection: Wallet connected - updated state immediately', newState);
+        // Force re-render
+        forceUpdate(prev => prev + 1);
         // Force parent to update
         if (!lastState.connected) {
           onConnect();
@@ -141,10 +146,15 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       
       if (phantomState.connected && phantomState.publicKey) {
         clearPhantomConnectingState();
+        const newState = { connected: phantomState.connected, publicKey: phantomState.publicKey };
+        setMobileConnectionState(newState);
+        // Force re-render when connection state changes
+        forceUpdate(prev => prev + 1);
+        console.log('✅ Mobile: Connection state updated from localStorage', newState);
         if (!lastState.connected) onConnect();
+      } else {
+        setMobileConnectionState({ connected: phantomState.connected, publicKey: phantomState.publicKey });
       }
-      
-      setMobileConnectionState({ connected: phantomState.connected, publicKey: phantomState.publicKey });
     };
     
     checkConnection();
@@ -175,8 +185,14 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         clearPhantomConnectingState();
         console.log('✅ Wallet connected - immediately cleared connecting state');
       }
+      // CRITICAL FIX FOR MOBILE: Update mobileConnectionState immediately when adapter confirms
+      // This ensures the button updates right away
+      if (mobile) {
+        setMobileConnectionState({ connected: true, publicKey: publicKey.toString() });
+        console.log('✅ Mobile: Updated mobileConnectionState immediately on adapter connection');
+      }
     }
-  }, [connected, publicKey]);
+  }, [connected, publicKey, mobile]);
 
   // Handle connection state changes
   useEffect(() => {
@@ -580,18 +596,19 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
 
   // Show connected state if connected - using same button design but green
   // CRITICAL FIX FOR MOBILE: Check multiple sources for connection state
-  // On mobile, prioritize adapter state but also check localStorage and parent prop
-  // MOBILE FIX: Show green button if adapter OR mobileConnectionState says connected
+  // On mobile, be more lenient - if ANY source says connected, show green button
+  // MOBILE FIX: Show green button if adapter OR mobileConnectionState OR parent prop says connected
   const shouldShowGreenButton = mobile 
     ? (
-        // Mobile: Check adapter first (most reliable), then fallback to mobileConnectionState
+        // Mobile: Check ALL sources - if any say connected, show green button
+        // This fixes the issue where button stays "Connect Wallet" after successful connection
         (connected === true && publicKey !== null && publicKey !== undefined) ||
-        (mobileConnectionState.connected && mobileConnectionState.publicKey && publicKey !== null) ||
-        (isConnected && publicKey !== null)
+        (mobileConnectionState.connected && mobileConnectionState.publicKey) ||
+        (isConnected && (publicKey !== null || mobileConnectionState.publicKey !== null))
       )
     : (isMobileActuallyConnected && effectivePublicKey);
   
-  // Get the effective public key for mobile (use adapter first, then fallback)
+  // Get the effective public key for mobile (use adapter first, then fallback to mobileConnectionState)
   const effectivePublicKeyForMobile = mobile
     ? (publicKey || (mobileConnectionState.publicKey ? (() => {
         try {
@@ -605,9 +622,42 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   if (shouldShowGreenButton) {
     // Use the appropriate public key based on platform
     const keyToUse = mobile ? effectivePublicKeyForMobile : effectivePublicKey;
-    if (!keyToUse) return null; // Safety check
     
-    const shortAddress = `${keyToUse.toString().slice(0, 4)}...${keyToUse.toString().slice(-4)}`;
+    // CRITICAL FIX: On mobile, if we don't have a key from adapter, use mobileConnectionState
+    // This ensures we can show the connected button even if adapter hasn't updated yet
+    const finalKeyToUse = mobile && !keyToUse && mobileConnectionState.publicKey
+      ? (() => {
+          try {
+            return new PublicKey(mobileConnectionState.publicKey);
+          } catch {
+            return null;
+          }
+        })()
+      : keyToUse;
+    
+    if (!finalKeyToUse) {
+      // On mobile, if we're connected but don't have a key yet, still show something
+      if (mobile && (connected || mobileConnectionState.connected || isConnected)) {
+        // Show connected state with placeholder until key loads
+        return (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleDisconnect}
+              className="px-3 py-1 bg-gradient-to-r from-green-500/20 to-emerald-600/20 text-green-300 font-light tracking-wide rounded-md hover:from-green-500/30 hover:to-emerald-600/30 transition-all border border-green-500/50 shadow-sm shadow-green-500/10 text-xs backdrop-blur-sm touch-manipulation"
+              style={{ 
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent'
+              }}
+            >
+              Connected
+            </button>
+          </div>
+        );
+      }
+      return null; // Safety check
+    }
+    
+    const shortAddress = `${finalKeyToUse.toString().slice(0, 4)}...${finalKeyToUse.toString().slice(-4)}`;
     
     // Compact mode for mobile - same design, green colors, horizontal layout
     if (compact) {
