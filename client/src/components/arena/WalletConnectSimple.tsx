@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useReducer } from "react";
+import React, { useState, useEffect } from "react";
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddress } from '@solana/spl-token';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { USDFG_MINT } from '@/lib/chain/config';
 import { logWalletEvent } from '@/utils/wallet-log';
 import { useUSDFGWallet } from '@/lib/wallet/useUSDFGWallet';
-import { clearPhantomConnectingState } from '@/lib/utils/wallet-state';
 
 interface WalletConnectSimpleProps {
   isConnected: boolean;
@@ -23,46 +22,6 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const { publicKey, connecting, connect, disconnect, connection } = useUSDFGWallet();
   const [balance, setBalance] = useState<number | null>(null);
   const [usdfgBalance, setUsdfgBalance] = useState<number | null>(null);
-  
-  // Force re-render counter for mobile visibility/focus events
-  // This ensures the component re-renders when mobile wallet returns via deep-link
-  const [, forceUpdate] = useReducer(x => x + 1, 0);
-  
-  // Listen for visibility/focus events to force re-render on mobile deep-link return
-  // Mobile wallet deep-link return doesn't trigger React re-render, so we need to force it
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    const onResume = () => {
-      // Force re-render to re-read wallet.publicKey
-      // This fixes mobile wallet button not updating after deep-link return
-      console.log('🔄 Visibility/focus event - forcing re-render to check wallet.publicKey');
-      forceUpdate();
-    };
-    
-    document.addEventListener("visibilitychange", onResume);
-    window.addEventListener("focus", onResume);
-    
-    // Also listen for wallet-related storage events
-    const onStorageChange = (e: StorageEvent) => {
-      if (e.key === 'phantom_public_key' || e.key === 'phantom_connected') {
-        console.log('🔄 Storage event - forcing re-render to check wallet.publicKey');
-        forceUpdate();
-      }
-    };
-    window.addEventListener("storage", onStorageChange);
-    
-    return () => {
-      document.removeEventListener("visibilitychange", onResume);
-      window.removeEventListener("focus", onResume);
-      window.removeEventListener("storage", onStorageChange);
-    };
-  }, []);
-
-  // Debug: Log publicKey changes to diagnose why button isn't updating
-  useEffect(() => {
-    console.log('🔍 Wallet button - publicKey:', publicKey?.toString() || 'null', '| connecting:', connecting);
-  }, [publicKey, connecting]);
 
   // Fetch balances when publicKey exists
   useEffect(() => {
@@ -129,12 +88,6 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     }
   }, [publicKey, onDisconnect]);
 
-  // Clear connecting state when publicKey appears
-  useEffect(() => {
-    if (publicKey) {
-      clearPhantomConnectingState();
-    }
-  }, [publicKey]);
 
   const handleConnect = () => {
     if (connecting) {
@@ -152,9 +105,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         logWalletEvent('selecting', { adapter: 'Phantom' });
         await connect();
         logWalletEvent('connect_called', { adapter: 'Phantom' });
-        clearPhantomConnectingState();
       } catch (error: any) {
-        clearPhantomConnectingState();
         logWalletEvent('error', { 
           message: error.message || 'Connection failed',
           error: String(error)
@@ -177,21 +128,11 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const handleDisconnect = async () => {
     try {
       logWalletEvent('disconnecting', {});
-      clearPhantomConnectingState();
-      if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('last_logged_wallet');
-      }
-      
       await disconnect();
-      window.dispatchEvent(new Event('walletDisconnected'));
       onDisconnect();
       logWalletEvent('disconnected', {});
     } catch (error) {
       console.error('Disconnect error:', error);
-      clearPhantomConnectingState();
-      if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('last_logged_wallet');
-      }
       onDisconnect();
     }
   };
@@ -202,25 +143,15 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       <div className="flex flex-col space-y-2">
         {compact ? (
           <button
-            onClick={() => { clearPhantomConnectingState(); }}
-            className="px-2.5 py-1.5 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-md text-xs text-center cursor-pointer hover:bg-amber-600/30 active:opacity-70 touch-manipulation"
-            style={{ 
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
-            }}
-            title="Tap to cancel connection"
+            className="px-2.5 py-1.5 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-md text-xs text-center cursor-pointer hover:bg-amber-600/30"
+            disabled
           >
             Connecting...
           </button>
         ) : (
           <button
-            onClick={() => { clearPhantomConnectingState(); }}
-            className="px-3 py-2 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-lg text-sm text-center cursor-pointer hover:bg-amber-600/30 active:opacity-70"
-            style={{ 
-              touchAction: 'manipulation',
-              WebkitTapHighlightColor: 'transparent'
-            }}
-            title="Click to cancel connection"
+            className="px-3 py-2 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-lg text-sm text-center cursor-pointer hover:bg-amber-600/30"
+            disabled
           >
             Connecting...
           </button>
