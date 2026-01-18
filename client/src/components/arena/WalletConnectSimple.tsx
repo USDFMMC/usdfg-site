@@ -96,17 +96,26 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   }, [connected, publicKey, mobile, connecting]);
   
   // Mobile: Check stuck states and listen for localStorage changes
+  // CRITICAL: This effect must run frequently to catch connection state changes immediately
   useEffect(() => {
     if (!mobile || typeof window === 'undefined') return;
     
     let lastState: { connected: boolean; publicKey: string | null } = { connected: false, publicKey: null };
     
     const checkConnection = () => {
-      // CRITICAL FIX: If wallet adapter says connected, clear connecting state immediately
-      // This fixes the issue where button shows "Connecting" even after successful connection
+      // CRITICAL FIX: If wallet adapter says connected, update state immediately
+      // This fixes the issue where button shows "Connect Wallet" even after successful connection
       if (connected && publicKey) {
         clearPhantomConnectingState();
-        console.log('✅ Mobile checkConnection: Wallet connected - cleared connecting state');
+        // Update mobile connection state immediately when adapter confirms connection
+        setMobileConnectionState({ connected: true, publicKey: publicKey.toString() });
+        console.log('✅ Mobile checkConnection: Wallet connected - updated state immediately');
+        // Force parent to update
+        if (!lastState.connected) {
+          onConnect();
+        }
+        lastState = { connected: true, publicKey: publicKey.toString() };
+        return; // Exit early - adapter is source of truth
       }
       
       const phantomState = getPhantomConnectionState();
@@ -123,7 +132,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         console.log('🧹 Mobile: Cleared stale connecting state (adapter says not connecting)');
       }
       
-      // Check connection state
+      // Check connection state from localStorage (fallback)
       if (lastState.connected === phantomState.connected && lastState.publicKey === phantomState.publicKey) {
         return;
       }
@@ -147,7 +156,8 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('phantom_connected', handlePhantomConnected);
-    const interval = setInterval(checkConnection, 5000);
+    // More frequent checks on mobile to catch connection immediately
+    const interval = setInterval(checkConnection, 1000); // Check every second on mobile
     
     return () => {
       window.removeEventListener('storage', handleStorageChange);
@@ -569,17 +579,35 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   }
 
   // Show connected state if connected - using same button design but green
-  // CRITICAL FIX FOR MOBILE: Only show green button if adapter explicitly confirms connection
-  // On mobile, if adapter says not connected, ALWAYS show Connect Wallet button (never green button)
-  // Do NOT trust localStorage alone - it can show stale/wrong wallet addresses
-  // MOBILE FIX: On mobile, ONLY show green button if adapter explicitly says connected AND has publicKey
-  // If mobile and adapter says not connected, skip green button and show Connect Wallet button
+  // CRITICAL FIX FOR MOBILE: Check multiple sources for connection state
+  // On mobile, prioritize adapter state but also check localStorage and parent prop
+  // MOBILE FIX: Show green button if adapter OR mobileConnectionState says connected
   const shouldShowGreenButton = mobile 
-    ? (connected === true && publicKey !== null && publicKey !== undefined && effectivePublicKey !== null)
+    ? (
+        // Mobile: Check adapter first (most reliable), then fallback to mobileConnectionState
+        (connected === true && publicKey !== null && publicKey !== undefined) ||
+        (mobileConnectionState.connected && mobileConnectionState.publicKey && publicKey !== null) ||
+        (isConnected && publicKey !== null)
+      )
     : (isMobileActuallyConnected && effectivePublicKey);
   
+  // Get the effective public key for mobile (use adapter first, then fallback)
+  const effectivePublicKeyForMobile = mobile
+    ? (publicKey || (mobileConnectionState.publicKey ? (() => {
+        try {
+          return new PublicKey(mobileConnectionState.publicKey);
+        } catch {
+          return null;
+        }
+      })() : null))
+    : effectivePublicKey;
+  
   if (shouldShowGreenButton) {
-    const shortAddress = `${effectivePublicKey.toString().slice(0, 4)}...${effectivePublicKey.toString().slice(-4)}`;
+    // Use the appropriate public key based on platform
+    const keyToUse = mobile ? effectivePublicKeyForMobile : effectivePublicKey;
+    if (!keyToUse) return null; // Safety check
+    
+    const shortAddress = `${keyToUse.toString().slice(0, 4)}...${keyToUse.toString().slice(-4)}`;
     
     // Compact mode for mobile - same design, green colors, horizontal layout
     if (compact) {
