@@ -1,5 +1,1 @@
-# React Router: All routes go to index.html (React Router handles routing)
-/*                /index.html   200
-
-# Catch-all for all other routes (homepage, privacy, terms, etc.)
-/*                    /index.html   200 
+/* /index.html 200

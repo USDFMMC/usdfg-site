@@ -3,13 +3,6 @@
   publish = "dist"
   command = "npm install && npm run build"
 
-# Redirects for React Router
-# All routes go to index.html (React Router handles routing)
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-
 [[headers]]
   for = "/*"
   [headers.values]
