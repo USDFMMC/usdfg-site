@@ -104,6 +104,7 @@
     "@metaplex-foundation/umi": "^1.4.1",
     "@metaplex-foundation/umi-bundle-defaults": "^1.4.1",
     "@metaplex-foundation/umi-web3js-adapters": "^1.4.1",
+    "@react-native-async-storage/async-storage": "1.24.0",
     "@replit/vite-plugin-runtime-error-modal": "^0.0.3",
     "@tailwindcss/typography": "^0.5.15",
     "@types/connect-pg-simple": "^7.0.3",
@@ -117,6 +118,7 @@
     "@types/ws": "^8.5.13",
     "@vitejs/plugin-react": "^5.0.4",
     "autoprefixer": "^10.4.20",
+    "bufferutil": "4.1.0",
     "drizzle-kit": "^0.18.1",
     "esbuild": "0.24.0",
     "nft.storage": "^7.2.0",
@@ -127,9 +129,7 @@
     "tsx": "^4.19.4",
     "typescript": "5.6.3",
     "vite": "^7.1.7",
-    "vite-plugin-pwa": "^1.2.0",
-    "bufferutil": "4.1.0",
-    "@react-native-async-storage/async-storage": "2.2.0"
+    "vite-plugin-pwa": "^1.2.0"
   },
   "overrides": {
     "rollup": "4.52.3",
