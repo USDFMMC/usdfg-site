@@ -1,25 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddress } from '@solana/spl-token';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { USDFG_MINT } from '@/lib/chain/config';
 import { logWalletEvent } from '@/utils/wallet-log';
 import { useUSDFGWallet } from '@/lib/wallet/useUSDFGWallet';
-import { isMobileSafari } from '@/lib/utils/isMobileSafari';
-import { 
-  getPhantomConnectionState, 
-  setPhantomConnectionState, 
-  clearPhantomConnectionState,
-  isPhantomConnecting,
-  setPhantomConnecting,
-  getPhantomConnectTimestamp,
-  isRecentPhantomConnection,
-  clearPhantomConnectingState,
-  validatePhantomConnectionState
-} from '@/lib/utils/wallet-state';
-
-// NOTE: openPhantomMobile() function removed - connection logic now consolidated in useUSDFGWallet.connect()
-// This prevents conflicts between multiple connection paths
+import { clearPhantomConnectingState } from '@/lib/utils/wallet-state';
 
 interface WalletConnectSimpleProps {
   isConnected: boolean;
@@ -34,448 +20,111 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   onDisconnect,
   compact = false
 }) => {
-  const { publicKey, connected, connecting, connect, disconnect, mobile, connection } = useUSDFGWallet();
+  const { publicKey, connecting, connect, disconnect, connection } = useUSDFGWallet();
   const [balance, setBalance] = useState<number | null>(null);
   const [usdfgBalance, setUsdfgBalance] = useState<number | null>(null);
-  // Force re-render trigger for mobile connection state
-  const [, forceUpdate] = useState(0);
-  
-  const [mobileConnectionState, setMobileConnectionState] = useState(() => {
-    if (!mobile || typeof window === 'undefined') return { connected: false, publicKey: null };
-    const storedState = getPhantomConnectionState();
-    if (localStorage.getItem('wallet_disconnected') === 'true' || (storedState.connected && !storedState.publicKey)) {
-      clearPhantomConnectionState();
-      return { connected: false, publicKey: null };
-    }
-    return storedState;
-  });
 
-  // Clean up stuck connection states on mount
+  // Fetch balances when publicKey exists
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    // CRITICAL FIX FOR MOBILE: If wallet is already connected, clear any connecting state immediately
-    // This fixes the issue where button shows "Connecting" even after successful connection
-    if (connected && publicKey) {
-      clearPhantomConnectingState();
-      console.log('✅ Wallet connected - cleared connecting state');
+    if (!publicKey || !connection) {
+      setBalance(null);
+      setUsdfgBalance(null);
+      return;
     }
-    
-    if (mobile && (!connected || !publicKey)) {
-      clearPhantomConnectionState();
-      setMobileConnectionState({ connected: false, publicKey: null });
-    }
-    
-    const isValid = validatePhantomConnectionState(connected, publicKey?.toString() || null, mobile ? 2000 : 10000);
-    if (!isValid && mobile) {
-      setMobileConnectionState({ connected: false, publicKey: null });
-    }
-    
-    const connectTimestamp = getPhantomConnectTimestamp();
-    const stuckThreshold = mobile ? 3000 : 5000; // More aggressive on mobile - 3 seconds
-    if (connectTimestamp && (Date.now() - connectTimestamp > stuckThreshold)) {
-      clearPhantomConnectingState();
-      console.log('🧹 Cleared stuck connecting state (threshold exceeded)');
-    } else if (isPhantomConnecting() && !connectTimestamp) {
-      clearPhantomConnectingState();
-      console.log('🧹 Cleared orphaned connecting state (no timestamp)');
-    }
-    
-    // CRITICAL: On mobile, if adapter says not connecting but sessionStorage says connecting, clear it
-    if (mobile && !connecting && isPhantomConnecting()) {
-      const timestamp = getPhantomConnectTimestamp();
-      if (!timestamp || (timestamp && (Date.now() - timestamp > 2000))) {
-        clearPhantomConnectingState();
-        console.log('🧹 Cleared stale connecting state on mobile');
-      }
-    }
-    
-    const hasRecentTimestamp = connectTimestamp && (Date.now() - connectTimestamp < 5000);
-    if (!isPhantomConnecting() && !hasRecentTimestamp) {
-      sessionStorage.removeItem('phantom_original_tab');
-      sessionStorage.removeItem('phantom_redirect_count');
-    }
-  }, [connected, publicKey, mobile, connecting]);
-  
-  // Mobile: Check stuck states and listen for localStorage changes
-  // CRITICAL: This effect must run frequently to catch connection state changes immediately
-  useEffect(() => {
-    if (!mobile || typeof window === 'undefined') return;
-    
-    let lastState: { connected: boolean; publicKey: string | null } = { connected: false, publicKey: null };
-    
-    const checkConnection = () => {
-      // CRITICAL FIX: If wallet adapter says connected, update state immediately
-      // This fixes the issue where button shows "Connect Wallet" even after successful connection
-      if (connected && publicKey) {
-        clearPhantomConnectingState();
-        // Update mobile connection state immediately when adapter confirms connection
-        const newState = { connected: true, publicKey: publicKey.toString() };
-        setMobileConnectionState(newState);
-        console.log('✅ Mobile checkConnection: Wallet connected - updated state immediately', newState);
-        // Force re-render
-        forceUpdate(prev => prev + 1);
-        // Force parent to update
-        if (!lastState.connected) {
-          onConnect();
-        }
-        lastState = { connected: true, publicKey: publicKey.toString() };
-        return; // Exit early - adapter is source of truth
-      }
-      
-      const phantomState = getPhantomConnectionState();
-      const isConnecting = isPhantomConnecting();
-      const timestamp = getPhantomConnectTimestamp();
-      
-      // Clear stuck connecting states (more aggressive on mobile)
-      if (isConnecting && timestamp && (Date.now() - timestamp > 3000)) {
-        clearPhantomConnectingState();
-        console.log('🧹 Mobile: Cleared stuck connecting state');
-      }
-      if (isConnecting && !connecting && timestamp && (Date.now() - timestamp > 2000)) {
-        clearPhantomConnectingState();
-        console.log('🧹 Mobile: Cleared stale connecting state (adapter says not connecting)');
-      }
-      
-      // Check connection state from localStorage (fallback)
-      if (lastState.connected === phantomState.connected && lastState.publicKey === phantomState.publicKey) {
-        return;
-      }
-      
-      lastState = { connected: phantomState.connected, publicKey: phantomState.publicKey };
-      
-      if (phantomState.connected && phantomState.publicKey) {
-        clearPhantomConnectingState();
-        const newState = { connected: phantomState.connected, publicKey: phantomState.publicKey };
-        setMobileConnectionState(newState);
-        // Force re-render when connection state changes
-        forceUpdate(prev => prev + 1);
-        console.log('✅ Mobile: Connection state updated from localStorage', newState);
-        if (!lastState.connected) onConnect();
-      } else {
-        setMobileConnectionState({ connected: phantomState.connected, publicKey: phantomState.publicKey });
-      }
-    };
-    
-    checkConnection();
-    
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'phantom_connected' || e.key === 'phantom_public_key') checkConnection();
-    };
-    const handlePhantomConnected = () => checkConnection();
-    
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('phantom_connected', handlePhantomConnected);
-    // More frequent checks on mobile to catch connection immediately
-    const interval = setInterval(checkConnection, 1000); // Check every second on mobile
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('phantom_connected', handlePhantomConnected);
-      clearInterval(interval);
-    };
-  }, [mobile, connecting, onConnect, connected, publicKey]);
 
-  // CRITICAL: Clear connecting state immediately when wallet connects
-  // This must run BEFORE the connection state handler to prevent race conditions
-  useEffect(() => {
-    if (connected && publicKey) {
-      // Immediately clear any connecting state - wallet is now connected
-      if (isPhantomConnecting()) {
-        clearPhantomConnectingState();
-        console.log('✅ Wallet connected - immediately cleared connecting state');
-      }
-      // CRITICAL FIX FOR MOBILE: Update mobileConnectionState immediately when adapter confirms
-      // This ensures the button updates right away
-      if (mobile) {
-        setMobileConnectionState({ connected: true, publicKey: publicKey.toString() });
-        console.log('✅ Mobile: Updated mobileConnectionState immediately on adapter connection');
-      }
-    }
-  }, [connected, publicKey, mobile]);
-
-  // Handle connection state changes
-  useEffect(() => {
-    // On mobile, check BOTH the prop (from parent) AND localStorage directly
-    // On desktop, use adapter connection or prop
-    const actuallyConnected = mobile 
-      ? (isConnected || connected || mobileConnectionState.connected) // Mobile: check prop, hook, and localStorage
-      : (isConnected || (connected && publicKey)); // Desktop uses adapter or prop
-    
-    // Get the effective public key (from hook, localStorage, or prop)
-    // CRITICAL: ONLY use wallet adapter's publicKey - do NOT trust localStorage
-    // This prevents showing random/stale wallet addresses like "8MJW...k5Tx" when not connected
-    const effectivePublicKey = publicKey; // ONLY trust adapter - localStorage can be stale
-    
-    if (actuallyConnected && effectivePublicKey) {
-      // CRITICAL: Clear connecting state immediately when connection succeeds
-      // This prevents stuck "Connecting..." button on mobile
-      clearPhantomConnectingState();
-      
-      // Clear disconnect flag when user successfully connects
-      localStorage.removeItem('wallet_disconnected');
-      
-      // Only log and call onConnect if this is a new connection (check last logged wallet)
-      const lastLoggedWallet = sessionStorage.getItem('last_logged_wallet');
-      const currentWalletString = effectivePublicKey.toString();
-      
-      if (lastLoggedWallet !== currentWalletString) {
-        logWalletEvent('connected', { wallet: currentWalletString });
-        sessionStorage.setItem('last_logged_wallet', currentWalletString);
-        onConnect();
-      }
-      
-      // Fetch SOL balance (non-blocking, fail gracefully)
-      const fetchSOLBalance = async (): Promise<void> => {
-        try {
-          const balanceLamports = await Promise.race([
-            connection.getBalance(effectivePublicKey, 'confirmed'),
-            new Promise<never>((_, reject) => 
-              setTimeout(() => reject(new Error('Timeout')), 5000)
-            )
-          ]);
-          const balance = balanceLamports / LAMPORTS_PER_SOL;
-          setBalance(balance);
-        } catch (err: any) {
-          setBalance(null);
-        }
-      };
-      
-      fetchSOLBalance().catch(() => {
+    // Fetch SOL balance
+    const fetchSOLBalance = async (): Promise<void> => {
+      try {
+        const balanceLamports = await Promise.race([
+          connection.getBalance(publicKey, 'confirmed'),
+          new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout')), 5000)
+          )
+        ]);
+        const balance = balanceLamports / LAMPORTS_PER_SOL;
+        setBalance(balance);
+      } catch (err: any) {
         setBalance(null);
-      });
+      }
+    };
 
-      // Fetch USDFG balance (non-blocking, fail gracefully)
-      const fetchUSDFGBalance = async (): Promise<void> => {
-        try {
-          const tokenAccount = await getAssociatedTokenAddress(USDFG_MINT, effectivePublicKey);
-          const tokenBalance = await Promise.race([
-            connection.getTokenAccountBalance(tokenAccount, 'confirmed'),
-            new Promise<never>((_, reject) => 
-              setTimeout(() => reject(new Error('Timeout')), 5000)
-            )
-          ]);
-          const usdfg = tokenBalance.value.uiAmount || 0;
-          setUsdfgBalance(usdfg);
-        } catch (err: any) {
-          setUsdfgBalance(0);
-        }
-      };
-      
-      fetchUSDFGBalance().catch(() => {
+    // Fetch USDFG balance
+    const fetchUSDFGBalance = async (): Promise<void> => {
+      try {
+        const tokenAccount = await getAssociatedTokenAddress(USDFG_MINT, publicKey);
+        const tokenBalance = await Promise.race([
+          connection.getTokenAccountBalance(tokenAccount, 'confirmed'),
+          new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout')), 5000)
+          )
+        ]);
+        const usdfg = tokenBalance.value.uiAmount || 0;
+        setUsdfgBalance(usdfg);
+      } catch (err: any) {
         setUsdfgBalance(0);
-        });
-    } else if (!actuallyConnected) {
-      // Wallet adapter says disconnected - clear everything including stale localStorage
+      }
+    };
+
+    fetchSOLBalance().catch(() => setBalance(null));
+    fetchUSDFGBalance().catch(() => setUsdfgBalance(0));
+
+    // Log connection event
+    const currentWalletString = publicKey.toString();
+    const lastLoggedWallet = sessionStorage.getItem('last_logged_wallet');
+    if (lastLoggedWallet !== currentWalletString) {
+      logWalletEvent('connected', { wallet: currentWalletString });
+      sessionStorage.setItem('last_logged_wallet', currentWalletString);
+      onConnect();
+    }
+  }, [publicKey, connection, onConnect]);
+
+  // Handle disconnect cleanup
+  useEffect(() => {
+    if (!publicKey) {
       const lastLoggedWallet = sessionStorage.getItem('last_logged_wallet');
       if (lastLoggedWallet) {
         sessionStorage.removeItem('last_logged_wallet');
-        // CRITICAL: Clear stale localStorage to prevent showing wrong wallet address
-        clearPhantomConnectionState();
-        // Clear mobile connection state
-        if (mobile) {
-          setMobileConnectionState({ connected: false, publicKey: null });
-        }
         onDisconnect();
       }
-      setBalance(null);
-      setUsdfgBalance(null);
     }
-  }, [connected, publicKey, onConnect, onDisconnect, connection, mobile]);
+  }, [publicKey, onDisconnect]);
 
-  // Calculate derived values (needed before conditional returns)
-  // CRITICAL: ONLY use wallet adapter's publicKey - do NOT trust localStorage
-  // This prevents showing random/stale wallet addresses
-  const effectivePublicKey = publicKey; // ONLY trust adapter
-  
-  // Check connection from multiple sources (prop, hook, localStorage) - most reliable detection
-  // CRITICAL FIX: On mobile, ONLY trust wallet adapter - if adapter says not connected, show Connect button
-  // This prevents showing green "connected" button when user can't actually login
-  const actuallyConnected = Boolean(
-    // ONLY trust wallet adapter hook - this is the source of truth
-    // On mobile, if adapter says not connected, we're NOT connected (even if localStorage says otherwise)
-    (connected && publicKey) ||
-    // Parent prop ONLY if adapter also confirms (double-check)
-    (isConnected && connected && publicKey)
-    // DO NOT trust localStorage on mobile - it can be stale and show wrong wallet
-    // CRITICAL: On mobile, if adapter says not connected, we MUST show Connect button
-  );
-  
-  // CRITICAL FIX FOR MOBILE: If adapter says not connected, NEVER show green button
-  // This ensures users can always login on mobile, even if localStorage has stale data
-  // On mobile, ONLY show green button if adapter explicitly confirms connection (connected && publicKey)
-  // If adapter says not connected, ALWAYS show Connect Wallet button
-  // MOBILE: Completely ignore localStorage - ONLY trust wallet adapter
-  const isMobileActuallyConnected = mobile 
-    ? (connected === true && publicKey !== null && publicKey !== undefined) // On mobile: ONLY trust adapter, ignore localStorage completely
-    : actuallyConnected; // Desktop: use normal logic
-
-  // Calculate mobile-specific connection state
-  const isMobile = isMobileSafari();
-  const hasWindowSolana = typeof window !== "undefined" && !!(window as any).solana;
-  
-  // CRITICAL: Check if Phantom connection is in progress, but only if it's recent (not stuck)
-  // CRITICAL FIX: Only show connecting if wallet adapter ALSO says connecting
-  // This prevents stuck "Connecting..." button when adapter has given up
-  let isPhantomConnectingFlag = false;
-  
-  // CRITICAL FIX FOR MOBILE: If wallet is connected, NEVER show connecting state
-  // This fixes the issue where button shows "Connecting" even after successful connection
-  if (connected && publicKey) {
-    // Wallet is connected - force connecting flag to false and clear any stale state
-    isPhantomConnectingFlag = false;
-    if (typeof window !== "undefined" && isPhantomConnecting()) {
+  // Clear connecting state when publicKey appears
+  useEffect(() => {
+    if (publicKey) {
       clearPhantomConnectingState();
-      console.log('✅ Wallet connected - cleared stale connecting state in flag calculation');
     }
-  } else if (typeof window !== "undefined") {
-    // Only check connecting state if NOT already connected
-    const connectingFlag = isPhantomConnecting();
-    const connectTimestamp = getPhantomConnectTimestamp();
-    
-    const stuckThreshold = mobile ? 2000 : 3000; // Very aggressive - 2 seconds on mobile
-    
-    if (connectingFlag && connectTimestamp) {
-      const timeSinceConnect = Date.now() - connectTimestamp;
-      if (timeSinceConnect > stuckThreshold) {
-        // Stuck - clear it immediately
-        clearPhantomConnectingState();
-        isPhantomConnectingFlag = false;
-        console.log('🧹 Cleared stuck connecting state');
-      } else {
-        // CRITICAL: Only show connecting if adapter ALSO says connecting
-        // If adapter says not connecting, don't show connecting state
-        isPhantomConnectingFlag = connecting && connectingFlag;
-      }
-    } else if (connectingFlag && !connectTimestamp) {
-      // No timestamp - clear orphaned state immediately
-      clearPhantomConnectingState();
-      isPhantomConnectingFlag = false;
-      console.log('🧹 Cleared orphaned connecting state (no timestamp)');
-    } else if (connectingFlag && !connecting) {
-      // SessionStorage says connecting but adapter says not - clear immediately
-      clearPhantomConnectingState();
-      isPhantomConnectingFlag = false;
-      console.log('🧹 Cleared stale connecting state (adapter says not connecting)');
-    }
-  }
-  
-  // Calculate button disabled state
-  // CRITICAL: Only disable if actually connecting or already connected
-  // On mobile, be more permissive - allow connection attempts even if there's stale state
-  let isButtonDisabled = false;
-  if (mobile) {
-    // Only disable if very recently connecting (within 2 seconds) to prevent double-clicks
-    if (isPhantomConnectingFlag) {
-      const connectTimestamp = getPhantomConnectTimestamp();
-      if (connectTimestamp) {
-        const timeSinceConnect = Date.now() - connectTimestamp;
-        isButtonDisabled = timeSinceConnect < 2000; // Disable only if very recent (within 2s)
-      }
-    }
-    // Don't disable if actuallyConnected - let the connected state UI handle it
-    // This ensures button is always clickable when not connected
-  } else {
-    isButtonDisabled = connecting || isPhantomConnectingFlag;
-  }
+  }, [publicKey]);
 
-  // Removed button state logging useEffect - was causing unnecessary re-renders on mobile
-
-  // Handle wallet connection
-  // CRITICAL: On mobile, be VERY permissive - allow connection attempts
   const handleConnect = () => {
-    // CRITICAL: Only prevent if adapter is actively connecting (not just stale flag)
     if (connecting) {
       console.warn("⚠️ Connection already in progress - ignoring click");
       return;
     }
     
-    // CRITICAL: If already connected, don't try to connect again
-    if (connected && publicKey) {
+    if (publicKey) {
       console.log("✅ Already connected - ignoring click");
       return;
     }
-    
-    console.log("🔘 Connect button clicked", { mobile, actuallyConnected, connecting, isPhantomConnecting });
-    
-    // CRITICAL: Always clear stale connecting states before proceeding
-    // This ensures clean connection attempt
-    clearPhantomConnectingState();
 
     (async () => {
-      // CRITICAL FIX: Clear ALL stale state before connecting
-      // This ensures clean connection state, especially on mobile after disconnect
-      localStorage.removeItem('wallet_disconnected');
-      // Don't clear phantom_connected/phantom_public_key here - let Phantom set them
-      
-      // Update mobile connection state to ensure button shows correct state
-      if (mobile) {
-        setMobileConnectionState({ connected: false, publicKey: null });
-        }
-      
-      // CRITICAL: On mobile, DON'T set connecting state here
-      // Let phantomMobileConnect() set it when it actually navigates
-      // This prevents the guard from blocking the first call
-      if (!mobile) {
-        // Desktop: Set connecting state with timestamp
-        setPhantomConnecting(true);
-      }
-      
-      // Set a timeout to clear stuck states (10 seconds on mobile, 15 seconds on desktop)
-      // Shorter timeout on mobile to prevent users from getting stuck
-      const timeoutMs = mobile ? 10000 : 15000;
-      const timeoutId = setTimeout(() => {
-        if (isPhantomConnecting()) {
-          console.warn("⚠️ Connection timeout - clearing stuck state");
-          clearPhantomConnectingState();
-          if (mobile) {
-            // On mobile, just clear silently - user can try again
-            console.log("✅ Connection timeout cleared - user can try again");
-          } else {
-          alert("Connection timed out. Please try again. If Phantom didn't open, make sure it's installed from https://phantom.app");
-          }
-        }
-      }, timeoutMs);
-      
       try {
         logWalletEvent('selecting', { adapter: 'Phantom' });
-        
-        // Wrap in try-catch to prevent React hook order issues
-        try {
-          await connect();
-        } catch (connectError: any) {
-          // Log the error but re-throw it to be handled by outer catch
-          console.error('❌ Connection error in handleConnect:', connectError);
-          throw connectError;
-        }
-        
+        await connect();
         logWalletEvent('connect_called', { adapter: 'Phantom' });
-        
-        // Clear timeout and connecting state on success
-        clearTimeout(timeoutId);
-        // CRITICAL: Always clear connecting state on success (both mobile and desktop)
-        // This prevents stuck "Connecting..." button
         clearPhantomConnectingState();
       } catch (error: any) {
-        // Clear timeout on error
-        clearTimeout(timeoutId);
-        
+        clearPhantomConnectingState();
         logWalletEvent('error', { 
           message: error.message || 'Connection failed',
           error: String(error)
         });
-        console.error('Connection error:', error);
-        
-        // Clear connecting state on error
-        sessionStorage.removeItem('phantom_connecting');
-        sessionStorage.removeItem('phantom_connect_timestamp');
         
         if (error.message?.includes('User rejected') || error.message?.includes('User cancelled')) {
           console.log('User cancelled wallet connection');
         } else {
-          // Show user-friendly error message
           const errorMessage = error.message || 'Unknown error';
-          if (errorMessage.includes('not found') || errorMessage.includes('not detected') || errorMessage.includes('not available')) {
+          if (errorMessage.includes('not found') || errorMessage.includes('not detected')) {
             alert(`Phantom wallet not found. Please install Phantom from https://phantom.app and try again.`);
           } else {
             alert(`Connection failed: ${errorMessage}`);
@@ -485,89 +134,35 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     })();
   };
 
-  // Handle disconnect
   const handleDisconnect = async () => {
     try {
       logWalletEvent('disconnecting', {});
-      
-      // CRITICAL FIX: Clear state BEFORE calling disconnect to ensure immediate UI update
-      // This prevents the "stuck connected" state on mobile
-      clearPhantomConnectionState();
       clearPhantomConnectingState();
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('wallet_connected');
-        localStorage.removeItem('wallet_address');
         sessionStorage.removeItem('last_logged_wallet');
       }
       
-      // Update mobile connection state immediately (BEFORE disconnect call)
-      if (mobile) {
-        setMobileConnectionState({ connected: false, publicKey: null });
-      }
-      
-      // Now call disconnect (may fail, but state is already cleared)
-      try {
       await disconnect();
-      } catch (disconnectError) {
-        console.warn('Disconnect call failed, but state already cleared:', disconnectError);
-        // State is already cleared, continue
-      }
-  
-      // Trigger disconnect event
       window.dispatchEvent(new Event('walletDisconnected'));
-      
-      // Call parent's onDisconnect callback to update parent state
       onDisconnect();
-      
       logWalletEvent('disconnected', {});
     } catch (error) {
       console.error('Disconnect error:', error);
-      // Clear state even on error - ensure clean state
-      clearPhantomConnectionState();
       clearPhantomConnectingState();
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('wallet_connected');
-        localStorage.removeItem('wallet_address');
         sessionStorage.removeItem('last_logged_wallet');
-      }
-      if (mobile) {
-        setMobileConnectionState({ connected: false, publicKey: null });
       }
       onDisconnect();
     }
   };
 
-  // If connecting, show connecting state with cancel option
-  // CRITICAL: Only show connecting if wallet adapter ALSO says connecting (prevents stuck state)
-  // CRITICAL FIX: Also check isPhantomConnectingFlag to ensure we're actually connecting
-  // If adapter says not connecting OR wallet is already connected, show normal button instead
-  if ((connecting || isPhantomConnectingFlag) && !(connected && publicKey)) {
-    // Check if connecting state is stuck (older than threshold)
-    const connectTimestamp = getPhantomConnectTimestamp();
-    const stuckThreshold = mobile ? 2000 : 3000; // Very aggressive - 2 seconds on mobile
-    const isStuck = !connectTimestamp || (connectTimestamp && (Date.now() - connectTimestamp > stuckThreshold));
-    
-    // CRITICAL: Always allow cancel/disconnect - don't disable button
-    // Users should be able to cancel connection at any time
-    const handleCancelConnect = () => {
-      console.log("🛑 User cancelled connection");
-      clearPhantomConnectingState();
-      // Also try to disconnect if adapter is connected
-      if (connected) {
-        disconnect().catch(() => {});
-      }
-      // Dispatch events to trigger other components (React will re-render naturally)
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new Event('storage'));
-        window.dispatchEvent(new Event('walletStateChanged'));
-      }
-    };
-    
+  // Show connecting state (only when connecting AND publicKey is null)
+  if (connecting && !publicKey) {
     return (
       <div className="flex flex-col space-y-2">
         {compact ? (
           <button
-            onClick={handleCancelConnect}
+            onClick={() => { clearPhantomConnectingState(); }}
             className="px-2.5 py-1.5 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-md text-xs text-center cursor-pointer hover:bg-amber-600/30 active:opacity-70 touch-manipulation"
             style={{ 
               touchAction: 'manipulation',
@@ -575,11 +170,11 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
             }}
             title="Tap to cancel connection"
           >
-            {isStuck ? 'Tap to Cancel' : 'Connecting...'}
+            Connecting...
           </button>
         ) : (
           <button
-            onClick={handleCancelConnect}
+            onClick={() => { clearPhantomConnectingState(); }}
             className="px-3 py-2 bg-amber-600/20 text-amber-300 border border-amber-500/30 rounded-lg text-sm text-center cursor-pointer hover:bg-amber-600/30 active:opacity-70"
             style={{ 
               touchAction: 'manipulation',
@@ -587,86 +182,23 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
             }}
             title="Click to cancel connection"
           >
-            {isStuck ? 'Click to Cancel' : 'Connecting...'}
+            Connecting...
           </button>
         )}
       </div>
     );
   }
 
-  // Show connected state if connected - using same button design but green
-  // CRITICAL FIX FOR MOBILE: Check multiple sources for connection state
-  // On mobile, be more lenient - if ANY source says connected, show green button
-  // MOBILE FIX: Show green button if adapter OR mobileConnectionState OR parent prop says connected
-  const shouldShowGreenButton = mobile 
-    ? (
-        // Mobile: Check ALL sources - if any say connected, show green button
-        // This fixes the issue where button stays "Connect Wallet" after successful connection
-        (connected === true && publicKey !== null && publicKey !== undefined) ||
-        (mobileConnectionState.connected && mobileConnectionState.publicKey) ||
-        (isConnected && (publicKey !== null || mobileConnectionState.publicKey !== null))
-      )
-    : (isMobileActuallyConnected && effectivePublicKey);
-  
-  // Get the effective public key for mobile (use adapter first, then fallback to mobileConnectionState)
-  const effectivePublicKeyForMobile = mobile
-    ? (publicKey || (mobileConnectionState.publicKey ? (() => {
-        try {
-          return new PublicKey(mobileConnectionState.publicKey);
-        } catch {
-          return null;
-        }
-      })() : null))
-    : effectivePublicKey;
-  
-  if (shouldShowGreenButton) {
-    // Use the appropriate public key based on platform
-    const keyToUse = mobile ? effectivePublicKeyForMobile : effectivePublicKey;
+  // Show connected state if publicKey exists
+  if (publicKey) {
+    const shortAddress = `${publicKey.toString().slice(0, 4)}...${publicKey.toString().slice(-4)}`;
     
-    // CRITICAL FIX: On mobile, if we don't have a key from adapter, use mobileConnectionState
-    // This ensures we can show the connected button even if adapter hasn't updated yet
-    const finalKeyToUse = mobile && !keyToUse && mobileConnectionState.publicKey
-      ? (() => {
-          try {
-            return new PublicKey(mobileConnectionState.publicKey);
-          } catch {
-            return null;
-          }
-        })()
-      : keyToUse;
-    
-    if (!finalKeyToUse) {
-      // On mobile, if we're connected but don't have a key yet, still show something
-      if (mobile && (connected || mobileConnectionState.connected || isConnected)) {
-        // Show connected state with placeholder until key loads
-        return (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleDisconnect}
-              className="px-3 py-1 bg-gradient-to-r from-green-500/20 to-emerald-600/20 text-green-300 font-light tracking-wide rounded-md hover:from-green-500/30 hover:to-emerald-600/30 transition-all border border-green-500/50 shadow-sm shadow-green-500/10 text-xs backdrop-blur-sm touch-manipulation"
-              style={{ 
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent'
-              }}
-            >
-              Connected
-            </button>
-          </div>
-        );
-      }
-      return null; // Safety check
-    }
-    
-    const shortAddress = `${finalKeyToUse.toString().slice(0, 4)}...${finalKeyToUse.toString().slice(-4)}`;
-    
-    // Compact mode for mobile - same design, green colors, horizontal layout
     if (compact) {
-        return (
+      return (
         <div className="flex items-center gap-2">
-          {/* Balances - compact inline */}
           {(usdfgBalance !== null || balance !== null) && (
             <div className="text-right hidden xs:block">
-            {usdfgBalance !== null && (
+              {usdfgBalance !== null && (
                 <div className="text-[10px] text-cyan-400 font-semibold leading-tight">
                   {usdfgBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} USDFG
                 </div>
@@ -676,10 +208,10 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
                   {balance.toFixed(2)} SOL
                 </div>
               )}
-              </div>
-            )}
+            </div>
+          )}
           <button
-              onClick={handleDisconnect}
+            onClick={handleDisconnect}
             className="px-2.5 py-1.5 bg-gradient-to-r from-green-500/20 to-emerald-600/20 text-green-300 font-light tracking-wide rounded-md hover:from-green-500/30 hover:to-emerald-600/30 transition-all border border-green-500/50 shadow-sm shadow-green-500/10 text-xs backdrop-blur-sm touch-manipulation whitespace-nowrap"
             style={{ 
               touchAction: 'manipulation',
@@ -688,23 +220,20 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           >
             {shortAddress}
           </button>
-          </div>
-        );
+        </div>
+      );
     }
     
-    // Full mode for desktop - same design, green colors, with balances
     return (
       <div className="flex items-center gap-3">
-        {/* Balances - compact display */}
         <div className="text-right hidden lg:block">
           <div className="text-cyan-400 font-semibold text-xs leading-tight">
             {usdfgBalance !== null ? `${usdfgBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} USDFG` : "Loading..."}
           </div>
           <div className="text-gray-400 text-[10px] leading-tight">
-                {balance !== null ? `${balance.toFixed(4)} SOL` : "Loading..."}
+            {balance !== null ? `${balance.toFixed(4)} SOL` : "Loading..."}
           </div>
         </div>
-        {/* Wallet address button */}
         <button
           onClick={handleDisconnect}
           className="px-4 py-1.5 bg-gradient-to-r from-green-500/20 to-emerald-600/20 text-green-300 font-light tracking-wide rounded-md hover:from-green-500/30 hover:to-emerald-600/30 transition-all border border-green-500/50 shadow-sm shadow-green-500/10 text-sm backdrop-blur-sm"
@@ -719,42 +248,37 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     );
   }
 
-  // Disconnected state - original amber design
-  // CRITICAL: Always show "Connect Wallet" button when not connected (ensures users can always connect)
-  // CRITICAL FIX: Only show "Connecting..." if we're actually connecting AND not already connected
-  // This prevents showing "Connecting..." when wallet is already connected but adapter state is stale
-  const shouldShowConnecting = (connecting || isPhantomConnectingFlag) && !(connected && publicKey);
-  
+  // Disconnected state - show Connect Wallet button
   return (
     <div className="flex flex-col space-y-2">
       {compact ? (
-          <button
+        <button
           onClick={handleConnect}
-          disabled={isButtonDisabled}
-            className="px-3 py-1 bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-300 font-light tracking-wide rounded-md hover:from-amber-500/30 hover:to-amber-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-amber-500/50 shadow-sm shadow-amber-500/10 text-xs backdrop-blur-sm touch-manipulation"
+          disabled={connecting}
+          className="px-3 py-1 bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-300 font-light tracking-wide rounded-md hover:from-amber-500/30 hover:to-amber-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-amber-500/50 shadow-sm shadow-amber-500/10 text-xs backdrop-blur-sm touch-manipulation"
           style={{ 
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent',
             position: 'relative',
             zIndex: 10
           }}
-          >
-          {shouldShowConnecting ? "Connecting..." : "Connect Wallet"}
-          </button>
-        ) : (
-          <button
+        >
+          Connect Wallet
+        </button>
+      ) : (
+        <button
           onClick={handleConnect}
-          disabled={isButtonDisabled}
-                className="px-4 py-1.5 bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-300 font-light tracking-wide rounded-md hover:from-amber-500/30 hover:to-amber-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-amber-500/50 shadow-sm shadow-amber-500/10 text-sm backdrop-blur-sm"
+          disabled={connecting}
+          className="px-4 py-1.5 bg-gradient-to-r from-amber-500/20 to-amber-600/20 text-amber-300 font-light tracking-wide rounded-md hover:from-amber-500/30 hover:to-amber-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-amber-500/50 shadow-sm shadow-amber-500/10 text-sm backdrop-blur-sm"
           style={{ 
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent',
             position: 'relative',
             zIndex: 10
           }}
-              >
-          {shouldShowConnecting ? "Connecting..." : "Connect Wallet"}
-              </button>
+        >
+          Connect Wallet
+        </button>
       )}
     </div>
   );
