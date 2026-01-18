@@ -36,17 +36,33 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     const onResume = () => {
       // Force re-render to re-read wallet.publicKey
       // This fixes mobile wallet button not updating after deep-link return
+      console.log('🔄 Visibility/focus event - forcing re-render to check wallet.publicKey');
       forceUpdate();
     };
     
     document.addEventListener("visibilitychange", onResume);
     window.addEventListener("focus", onResume);
     
+    // Also listen for wallet-related storage events
+    const onStorageChange = (e: StorageEvent) => {
+      if (e.key === 'phantom_public_key' || e.key === 'phantom_connected') {
+        console.log('🔄 Storage event - forcing re-render to check wallet.publicKey');
+        forceUpdate();
+      }
+    };
+    window.addEventListener("storage", onStorageChange);
+    
     return () => {
       document.removeEventListener("visibilitychange", onResume);
       window.removeEventListener("focus", onResume);
+      window.removeEventListener("storage", onStorageChange);
     };
   }, []);
+
+  // Debug: Log publicKey changes to diagnose why button isn't updating
+  useEffect(() => {
+    console.log('🔍 Wallet button - publicKey:', publicKey?.toString() || 'null', '| connecting:', connecting);
+  }, [publicKey, connecting]);
 
   // Fetch balances when publicKey exists
   useEffect(() => {
