@@ -52,6 +52,7 @@ const ElegantModal: React.FC<ElegantModalProps> = ({
           shadow-[0_0_40px_rgba(0,0,0,0.6)] shadow-amber-400/8
           ${className}
         `}
+        style={className.includes('tournament-modal') ? { maxWidth: '1400px', width: '95vw' } : undefined}
       >
         {/* Header */}
         {title && (
@@ -87,7 +88,7 @@ const ElegantModal: React.FC<ElegantModalProps> = ({
         )}
         
         {/* Content */}
-        <div className="p-3 overflow-y-auto max-h-[calc(90vh-80px)]">
+        <div className={`p-3 overflow-y-auto max-h-[calc(90vh-80px)] ${className.includes('tournament-modal') ? 'overflow-x-auto' : ''}`}>
           {children}
         </div>
       </div>

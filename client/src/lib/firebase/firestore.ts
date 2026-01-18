@@ -306,7 +306,16 @@ export const submitTournamentMatchResult = async (
       throw new Error('Player is not a participant in this match');
     }
 
-    // Record player's submission
+    // CRITICAL: Check if match is already completed - prevent duplicate processing
+    if (match.status === 'completed') {
+      console.log('⚠️ Match already completed - skipping duplicate submission');
+      return; // Idempotent: already processed
+    }
+
+    // Check if player has already submitted their result
+    const existingResult = isPlayer1 ? match.player1Result : match.player2Result;
+    
+    // Record player's submission (even if already submitted, to ensure we have latest data)
     const result: 'win' | 'loss' = didWin ? 'win' : 'loss';
     if (isPlayer1) {
       match.player1Result = result;
@@ -316,7 +325,36 @@ export const submitTournamentMatchResult = async (
 
     // Check if both players have submitted
     const bothSubmitted = match.player1Result !== undefined && match.player2Result !== undefined;
-
+    
+    console.log('🔍 Submission check:', {
+      matchId,
+      isPlayer1,
+      existingResult,
+      player1Result: match.player1Result,
+      player2Result: match.player2Result,
+      bothSubmitted,
+      matchStatus: match.status
+    });
+    
+    // CRITICAL: If match is already completed, return early (idempotent)
+    if (match.status === 'completed') {
+      console.log('⚠️ Match already completed - skipping duplicate submission');
+      return;
+    }
+    
+    // If player already submitted but match not completed, check if we should process
+    if (existingResult !== undefined && !bothSubmitted) {
+      // Only this player submitted, nothing to do
+      console.log('⚠️ Player already submitted result - waiting for opponent');
+      const updates: any = {
+        'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
+        updatedAt: serverTimestamp(),
+      };
+      await updateDoc(challengeRef, updates);
+      return;
+    }
+    
+    // If both players have submitted, we MUST process completion (even if duplicate call)
     if (!bothSubmitted) {
       // Only one player has submitted - just save the result and wait
       const updates: any = {
@@ -324,9 +362,22 @@ export const submitTournamentMatchResult = async (
         updatedAt: serverTimestamp(),
       };
       await updateDoc(challengeRef, updates);
-      console.log('✅ Match result submitted, waiting for opponent...');
+      console.log('✅ Match result submitted, waiting for opponent...', {
+        player1Result: match.player1Result,
+        player2Result: match.player2Result
+      });
       return;
     }
+    
+    // CRITICAL: Both players have submitted - MUST process completion
+    console.log('✅ Both players submitted! Processing match completion...', {
+      player1: match.player1,
+      player2: match.player2,
+      player1Result: match.player1Result,
+      player2Result: match.player2Result,
+      matchStatus: match.status,
+      isFinal: currentRoundIndex === bracket.length - 1
+    });
 
     // Both players have submitted - check if results match
     const player1Won = match.player1Result === 'win';
@@ -366,6 +417,17 @@ export const submitTournamentMatchResult = async (
     // Check if this is the final round
     if (currentRoundIndex === bracket.length - 1) {
       // This is the final - tournament is complete
+      // CRITICAL: Double-check tournament isn't already completed (race condition guard)
+      const finalSnap = await getDoc(challengeRef);
+      if (finalSnap.exists()) {
+        const finalData = finalSnap.data() as ChallengeData;
+        const finalTournament = finalData.tournament;
+        if (finalTournament?.stage === 'completed' || finalData.status === 'completed') {
+          console.log('⚠️ Tournament already completed - skipping duplicate completion');
+          return; // Idempotent: already completed
+        }
+      }
+      
       const updates: any = {
         'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
         'tournament.champion': winnerWallet,
@@ -430,6 +492,135 @@ export const submitTournamentMatchResult = async (
     console.log('✅ Both players submitted - winner advanced to next round:', winnerWallet);
   } catch (error) {
     console.error('❌ Error submitting tournament match result:', error);
+    throw error;
+  }
+};
+
+/**
+ * Join a tournament by adding a player to the tournament and filling the next available bracket slot
+ */
+export const joinTournament = async (
+  challengeId: string,
+  playerWallet: string
+): Promise<void> => {
+  try {
+    const challengeRef = doc(db, 'challenges', challengeId);
+    const snap = await getDoc(challengeRef);
+    
+    if (!snap.exists()) {
+      throw new Error('Challenge not found');
+    }
+
+    const data = snap.data() as ChallengeData;
+    
+    // Verify it's a tournament
+    const format = data.format || (data.tournament ? 'tournament' : 'standard');
+    if (format !== 'tournament') {
+      throw new Error('This is not a tournament challenge');
+    }
+
+    const tournament = data.tournament;
+    if (!tournament) {
+      throw new Error('Tournament data not found');
+    }
+
+    // Check if tournament is in waiting_for_players stage
+    if (tournament.stage !== 'waiting_for_players') {
+      throw new Error(`Tournament is not accepting new players. Current stage: ${tournament.stage}`);
+    }
+
+    // Get current players
+    const currentPlayers = Array.isArray(data.players) ? data.players : [];
+    const maxPlayers = tournament.maxPlayers || currentPlayers.length;
+
+    // Check if player is already in tournament
+    const isAlreadyPlayer = currentPlayers.some(
+      (p: string) => p && p.toLowerCase() === playerWallet.toLowerCase()
+    );
+    if (isAlreadyPlayer) {
+      throw new Error('You are already in this tournament');
+    }
+
+    // Check if tournament is full
+    if (currentPlayers.length >= maxPlayers) {
+      throw new Error('Tournament is full');
+    }
+
+    // Check if creator is trying to join their own tournament
+    const isCreator = data.creator.toLowerCase() === playerWallet.toLowerCase();
+    if (isCreator) {
+      throw new Error('Cannot join your own tournament');
+    }
+
+    // Add player to players array
+    const updatedPlayers = [...currentPlayers, playerWallet];
+
+    // Find next empty slot in bracket and fill it
+    const bracket = deepCloneBracket(tournament.bracket);
+    const firstRound = bracket[0];
+    if (!firstRound) {
+      throw new Error('Tournament bracket not found');
+    }
+
+    let slotFilled = false;
+    for (const match of firstRound.matches) {
+      if (!match.player1) {
+        match.player1 = playerWallet;
+        slotFilled = true;
+        break;
+      } else if (!match.player2) {
+        match.player2 = playerWallet;
+        slotFilled = true;
+        break;
+      }
+    }
+
+    if (!slotFilled) {
+      throw new Error('No available slots in tournament bracket');
+    }
+
+    // Update match status if both players are now set
+    firstRound.matches.forEach(match => {
+      const hasBoth = Boolean(match.player1 && match.player2);
+      if (hasBoth && match.status === 'waiting') {
+        match.status = 'ready';
+      }
+    });
+
+    // Check if tournament is now full
+    const isFull = updatedPlayers.length >= maxPlayers;
+    const newStage: TournamentStage = isFull ? 'round_in_progress' : 'waiting_for_players';
+
+    // If tournament is full, activate first round matches
+    let finalBracket = bracket;
+    if (isFull) {
+      finalBracket = activateRoundMatches(bracket, 1);
+    }
+
+    // Update tournament state
+    const updatedTournament: TournamentState = {
+      ...tournament,
+      bracket: sanitizeTournamentState({ ...tournament, bracket: finalBracket }).bracket,
+      stage: newStage,
+    };
+
+    // Update challenge document
+    const updates: any = {
+      players: updatedPlayers,
+      'tournament.bracket': updatedTournament.bracket,
+      'tournament.stage': updatedTournament.stage,
+      updatedAt: serverTimestamp(),
+    };
+
+    // If tournament is full, update status to active
+    if (isFull) {
+      updates.status = 'active';
+    }
+
+    await updateDoc(challengeRef, updates);
+    console.log(`✅ Player ${playerWallet.slice(0, 8)}... joined tournament. ${updatedPlayers.length}/${maxPlayers} players`);
+  } catch (error) {
+    console.error('❌ Error joining tournament:', error);
     throw error;
   }
 };

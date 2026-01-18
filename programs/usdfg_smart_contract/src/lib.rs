@@ -102,13 +102,17 @@ pub mod usdfg_smart_contract {
         Ok(())
     }
 
-    /// Creator funds escrow after joiner expressed intent
+    /// Creator funds escrow - allows funding as long as challenge is unfunded
     /// Moves challenge to CreatorFunded state
+    /// No challenger required - challenger validation happens at joiner funding
     pub fn creator_fund(ctx: Context<CreatorFund>, usdfg_amount: u64) -> Result<()> {
         let challenge = &mut ctx.accounts.challenge;
 
+        // Allow funding if challenge is waiting for opponent OR if creator confirmation is required
+        // This allows creator to fund even if no one has expressed intent on-chain
         require!(
-            challenge.status == ChallengeStatus::CreatorConfirmationRequired,
+            challenge.status == ChallengeStatus::PendingWaitingForOpponent 
+                || challenge.status == ChallengeStatus::CreatorConfirmationRequired,
             ChallengeError::NotOpen
         );
         require!(
@@ -119,10 +123,14 @@ pub mod usdfg_smart_contract {
             usdfg_amount == challenge.entry_fee,
             ChallengeError::EntryFeeMismatch
         );
-        require!(
-            Clock::get()?.unix_timestamp < challenge.confirmation_timer,
-            ChallengeError::ConfirmationExpired
-        );
+        // Only check confirmation_timer if status is CreatorConfirmationRequired
+        // (timer is only set when express_join_intent was called)
+        if challenge.status == ChallengeStatus::CreatorConfirmationRequired {
+            require!(
+                Clock::get()?.unix_timestamp < challenge.confirmation_timer,
+                ChallengeError::ConfirmationExpired
+            );
+        }
 
         // Transfer creator's tokens to escrow
         // Check if transfer already happened (explicit transfer instruction before this contract call)
@@ -173,6 +181,7 @@ pub mod usdfg_smart_contract {
     }
 
     /// Joiner funds escrow after creator funded
+    /// Sets challenger if not already set (allows Firestore-only join intent)
     /// Moves challenge to Active state
     pub fn joiner_fund(ctx: Context<JoinerFund>, usdfg_amount: u64) -> Result<()> {
         let challenge = &mut ctx.accounts.challenge;
@@ -181,10 +190,25 @@ pub mod usdfg_smart_contract {
             challenge.status == ChallengeStatus::CreatorFunded,
             ChallengeError::NotInProgress
         );
+        
+        // Validate challenger is not the creator
         require!(
-            ctx.accounts.challenger.key() == challenge.challenger.unwrap(),
-            ChallengeError::Unauthorized
+            ctx.accounts.challenger.key() != challenge.creator,
+            ChallengeError::SelfChallenge
         );
+        
+        // Set challenger if not already set (allows Firestore-only join intent)
+        // If challenger is already set, validate it matches
+        if let Some(existing_challenger) = challenge.challenger {
+            require!(
+                ctx.accounts.challenger.key() == existing_challenger,
+                ChallengeError::Unauthorized
+            );
+        } else {
+            // Set challenger on-chain when they fund
+            challenge.challenger = Some(ctx.accounts.challenger.key());
+        }
+        
         require!(
             usdfg_amount == challenge.entry_fee,
             ChallengeError::EntryFeeMismatch
@@ -914,4 +938,3 @@ pub struct DisputeRefunded {
     pub challenger_claimed_win: bool,
     pub timestamp: i64,
 }
-

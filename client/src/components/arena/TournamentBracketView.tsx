@@ -10,6 +10,10 @@ interface TournamentBracketViewProps {
   currentWallet?: string | null;
   challengeId: string;
   onOpenSubmitResult?: (matchId: string, opponentWallet: string) => void;
+  onJoinTournament?: (challengeId: string) => Promise<void>;
+  onClaimPrize?: (challenge: any) => Promise<void>;
+  challenge?: any; // Full challenge object for claim prize logic
+  isClaiming?: boolean; // Whether claim is in progress
 }
 
 const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
@@ -18,6 +22,10 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   currentWallet,
   challengeId,
   onOpenSubmitResult,
+  onJoinTournament,
+  onClaimPrize,
+  challenge,
+  isClaiming = false,
 }) => {
 
   if (!tournament || !tournament.bracket?.length) {
@@ -91,6 +99,11 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   const isCompleted = stage === 'completed';
   const champion = tournament.champion;
   const isChampion = currentWallet && champion && currentWallet.toLowerCase() === champion.toLowerCase();
+  
+  // Check if prize can be claimed
+  const canClaim = challenge?.canClaim || challenge?.rawData?.canClaim;
+  const prizeClaimed = challenge?.prizeClaimed || challenge?.rawData?.prizeClaimed || challenge?.rawData?.prizeClaimedAt || challenge?.payoutTriggered;
+  const canClaimPrize = isChampion && isCompleted && canClaim && !prizeClaimed;
 
   return (
     <div className="space-y-4">
@@ -108,9 +121,37 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
               <div className="text-sm font-semibold text-emerald-200 mb-1">
                 🎉 You Won!
               </div>
-              <div className="text-xs text-emerald-100/80">
-                Return to the challenge list to claim your prize!
-              </div>
+              {canClaimPrize && onClaimPrize ? (
+                <div className="space-y-2">
+                  <div className="text-xs text-emerald-100/80 mb-2">
+                    Claim your prize to receive the tournament reward!
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (challenge && onClaimPrize) {
+                        try {
+                          await onClaimPrize(challenge);
+                        } catch (error: any) {
+                          console.error('Error claiming prize:', error);
+                          alert(error.message || 'Failed to claim prize');
+                        }
+                      }
+                    }}
+                    disabled={isClaiming}
+                    className="w-full rounded-lg bg-emerald-500/20 px-4 py-2 text-sm font-semibold text-emerald-200 transition-all hover:bg-emerald-500/30 hover:shadow-[0_0_12px_rgba(16,185,129,0.3)] border border-emerald-400/40 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isClaiming ? 'Claiming...' : '🏆 Claim Prize'}
+                  </button>
+                </div>
+              ) : prizeClaimed ? (
+                <div className="text-xs text-emerald-100/80">
+                  ✅ Prize claimed! Check your wallet for the USDFG reward.
+                </div>
+              ) : (
+                <div className="text-xs text-emerald-100/80">
+                  Prize claiming will be available soon...
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -127,6 +168,20 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
           <p className="mt-1 text-xs text-blue-100/80">
             The tournament will start automatically when all {maxPlayers} players join. Share the challenge link to invite others!
           </p>
+          {onJoinTournament && currentWallet && currentPlayers < maxPlayers && !players.some(p => p && p.toLowerCase() === currentWallet.toLowerCase()) && (
+            <button
+              onClick={async () => {
+                try {
+                  await onJoinTournament(challengeId);
+                } catch (error: any) {
+                  alert(error.message || 'Failed to join tournament');
+                }
+              }}
+              className="mt-3 w-full rounded-lg bg-blue-500/20 px-4 py-2 text-sm font-semibold text-blue-200 transition-all hover:bg-blue-500/30 hover:shadow-[0_0_12px_rgba(59,130,246,0.3)] border border-blue-400/40"
+            >
+              Join Tournament
+            </button>
+          )}
         </div>
       )}
 
@@ -149,19 +204,37 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
               : "Chat with your opponent and start the match. Submit results once you finish—winner advances automatically."}
           </p>
           {onOpenSubmitResult ? (
-            <button
-              onClick={() => {
-                console.log('🎯 Submit button clicked:', {
-                  matchId: playerMatch.match.id,
-                  opponentWallet,
-                  roundNumber: playerMatch.round.roundNumber
-                });
-                onOpenSubmitResult(playerMatch.match.id, opponentWallet);
-              }}
-              className="mt-3 w-full rounded-lg bg-amber-400/20 px-4 py-2 text-sm font-semibold text-amber-200 transition-all hover:bg-amber-400/30 hover:shadow-[0_0_12px_rgba(255,215,130,0.3)] border border-amber-400/40"
-            >
-              {playerMatch.round.roundNumber === bracket.length ? '🏆 Submit Final Result' : 'Submit Result'}
-            </button>
+            (() => {
+              // Check if player already submitted
+              const isPlayer1 = playerMatch.match.player1?.toLowerCase() === currentWallet?.toLowerCase();
+              const isPlayer2 = playerMatch.match.player2?.toLowerCase() === currentWallet?.toLowerCase();
+              const existingResult = isPlayer1 ? playerMatch.match.player1Result : (isPlayer2 ? playerMatch.match.player2Result : undefined);
+              const alreadySubmitted = existingResult !== undefined;
+              
+              if (alreadySubmitted) {
+                return (
+                  <div className="mt-3 w-full rounded-lg bg-blue-500/20 px-4 py-2 text-sm font-semibold text-blue-200 border border-blue-400/40 text-center">
+                    ✅ Result submitted. Waiting for opponent...
+                  </div>
+                );
+              }
+              
+              return (
+                <button
+                  onClick={() => {
+                    console.log('🎯 Submit button clicked:', {
+                      matchId: playerMatch.match.id,
+                      opponentWallet,
+                      roundNumber: playerMatch.round.roundNumber
+                    });
+                    onOpenSubmitResult(playerMatch.match.id, opponentWallet);
+                  }}
+                  className="mt-3 w-full rounded-lg bg-amber-400/20 px-4 py-2 text-sm font-semibold text-amber-200 transition-all hover:bg-amber-400/30 hover:shadow-[0_0_12px_rgba(255,215,130,0.3)] border border-amber-400/40"
+                >
+                  {playerMatch.round.roundNumber === bracket.length ? '🏆 Submit Final Result' : 'Submit Result'}
+                </button>
+              );
+            })()
           ) : (
             <div className="mt-3 text-xs text-red-400">⚠️ Submit handler not available</div>
           )}
@@ -169,11 +242,12 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
       )}
 
       <div className="flex flex-col gap-4 lg:flex-row">
-        <div className="flex-1 overflow-x-auto">
+        <div className="flex-1 overflow-x-auto min-w-0">
           <div
             className="grid gap-4"
             style={{
-              gridTemplateColumns: `repeat(${bracket.length}, minmax(200px, 1fr))`,
+              gridTemplateColumns: `repeat(${bracket.length}, minmax(250px, 1fr))`,
+              minWidth: `${bracket.length * 250}px`,
             }}
           >
         {bracket.map((round) => (

@@ -52,6 +52,13 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
+    // CRITICAL FIX FOR MOBILE: If wallet is already connected, clear any connecting state immediately
+    // This fixes the issue where button shows "Connecting" even after successful connection
+    if (connected && publicKey) {
+      clearPhantomConnectingState();
+      console.log('✅ Wallet connected - cleared connecting state');
+    }
+    
     if (mobile && (!connected || !publicKey)) {
       clearPhantomConnectionState();
       setMobileConnectionState({ connected: false, publicKey: null });
@@ -63,17 +70,21 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     }
     
     const connectTimestamp = getPhantomConnectTimestamp();
-    const stuckThreshold = mobile ? 10000 : 15000;
+    const stuckThreshold = mobile ? 3000 : 5000; // More aggressive on mobile - 3 seconds
     if (connectTimestamp && (Date.now() - connectTimestamp > stuckThreshold)) {
       clearPhantomConnectingState();
+      console.log('🧹 Cleared stuck connecting state (threshold exceeded)');
     } else if (isPhantomConnecting() && !connectTimestamp) {
       clearPhantomConnectingState();
+      console.log('🧹 Cleared orphaned connecting state (no timestamp)');
     }
     
+    // CRITICAL: On mobile, if adapter says not connecting but sessionStorage says connecting, clear it
     if (mobile && !connecting && isPhantomConnecting()) {
       const timestamp = getPhantomConnectTimestamp();
-      if (timestamp && (Date.now() - timestamp > 5000)) {
+      if (!timestamp || (timestamp && (Date.now() - timestamp > 2000))) {
         clearPhantomConnectingState();
+        console.log('🧹 Cleared stale connecting state on mobile');
       }
     }
     
@@ -82,7 +93,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       sessionStorage.removeItem('phantom_original_tab');
       sessionStorage.removeItem('phantom_redirect_count');
     }
-  }, [connected, publicKey, mobile]);
+  }, [connected, publicKey, mobile, connecting]);
   
   // Mobile: Check stuck states and listen for localStorage changes
   useEffect(() => {
@@ -91,16 +102,25 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     let lastState: { connected: boolean; publicKey: string | null } = { connected: false, publicKey: null };
     
     const checkConnection = () => {
+      // CRITICAL FIX: If wallet adapter says connected, clear connecting state immediately
+      // This fixes the issue where button shows "Connecting" even after successful connection
+      if (connected && publicKey) {
+        clearPhantomConnectingState();
+        console.log('✅ Mobile checkConnection: Wallet connected - cleared connecting state');
+      }
+      
       const phantomState = getPhantomConnectionState();
       const isConnecting = isPhantomConnecting();
       const timestamp = getPhantomConnectTimestamp();
       
-      // Clear stuck connecting states
-      if (isConnecting && timestamp && (Date.now() - timestamp > 10000)) {
+      // Clear stuck connecting states (more aggressive on mobile)
+      if (isConnecting && timestamp && (Date.now() - timestamp > 3000)) {
         clearPhantomConnectingState();
+        console.log('🧹 Mobile: Cleared stuck connecting state');
       }
-      if (isConnecting && !connecting && timestamp && (Date.now() - timestamp > 5000)) {
+      if (isConnecting && !connecting && timestamp && (Date.now() - timestamp > 2000)) {
         clearPhantomConnectingState();
+        console.log('🧹 Mobile: Cleared stale connecting state (adapter says not connecting)');
       }
       
       // Check connection state
@@ -134,7 +154,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       window.removeEventListener('phantom_connected', handlePhantomConnected);
       clearInterval(interval);
     };
-  }, [mobile, connecting, onConnect]);
+  }, [mobile, connecting, onConnect, connected, publicKey]);
 
   // Handle connection state changes
   useEffect(() => {
@@ -260,12 +280,22 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   // CRITICAL FIX: Only show connecting if wallet adapter ALSO says connecting
   // This prevents stuck "Connecting..." button when adapter has given up
   let isPhantomConnectingFlag = false;
-  if (typeof window !== "undefined" && !(connected && publicKey)) {
+  
+  // CRITICAL FIX FOR MOBILE: If wallet is connected, NEVER show connecting state
+  // This fixes the issue where button shows "Connecting" even after successful connection
+  if (connected && publicKey) {
+    isPhantomConnectingFlag = false;
+    // Also clear any stale connecting state immediately
+    if (typeof window !== "undefined" && isPhantomConnecting()) {
+      clearPhantomConnectingState();
+      console.log('✅ Wallet connected - cleared stale connecting state');
+    }
+  } else if (typeof window !== "undefined") {
     // Only check connecting state if NOT already connected
     const connectingFlag = isPhantomConnecting();
     const connectTimestamp = getPhantomConnectTimestamp();
     
-    const stuckThreshold = mobile ? 3000 : 5000; // 3 seconds on mobile, 5 on desktop (very aggressive)
+    const stuckThreshold = mobile ? 2000 : 3000; // Very aggressive - 2 seconds on mobile
     
     if (connectingFlag && connectTimestamp) {
       const timeSinceConnect = Date.now() - connectTimestamp;
@@ -273,6 +303,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         // Stuck - clear it immediately
         clearPhantomConnectingState();
         isPhantomConnectingFlag = false;
+        console.log('🧹 Cleared stuck connecting state');
       } else {
         // CRITICAL: Only show connecting if adapter ALSO says connecting
         // If adapter says not connecting, don't show connecting state
@@ -282,10 +313,12 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       // No timestamp - clear orphaned state immediately
       clearPhantomConnectingState();
       isPhantomConnectingFlag = false;
+      console.log('🧹 Cleared orphaned connecting state (no timestamp)');
     } else if (connectingFlag && !connecting) {
       // SessionStorage says connecting but adapter says not - clear immediately
       clearPhantomConnectingState();
       isPhantomConnectingFlag = false;
+      console.log('🧹 Cleared stale connecting state (adapter says not connecting)');
     }
   }
   
@@ -468,8 +501,9 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
 
   // If connecting, show connecting state with cancel option
   // CRITICAL: Only show connecting if wallet adapter ALSO says connecting (prevents stuck state)
-  // If adapter says not connecting, show normal Connect Wallet button instead
-  if (connecting && !(connected && publicKey)) {
+  // CRITICAL FIX: Also check isPhantomConnectingFlag to ensure we're actually connecting
+  // If adapter says not connecting OR wallet is already connected, show normal button instead
+  if ((connecting || isPhantomConnectingFlag) && !(connected && publicKey)) {
     // Check if connecting state is stuck (older than threshold)
     const connectTimestamp = getPhantomConnectTimestamp();
     const stuckThreshold = mobile ? 2000 : 3000; // Very aggressive - 2 seconds on mobile
@@ -611,7 +645,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
             zIndex: 10
           }}
           >
-          {connecting || isPhantomConnecting ? "Connecting..." : "Connect Wallet"}
+          {connecting || isPhantomConnectingFlag ? "Connecting..." : "Connect Wallet"}
           </button>
         ) : (
           <button
@@ -625,7 +659,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
             zIndex: 10
           }}
               >
-          {connecting || isPhantomConnecting ? "Connecting..." : "Connect Wallet"}
+          {connecting || isPhantomConnectingFlag ? "Connecting..." : "Connect Wallet"}
               </button>
       )}
     </div>

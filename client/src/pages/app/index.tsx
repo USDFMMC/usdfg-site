@@ -13,7 +13,7 @@ import RightSidePanel from "@/components/ui/RightSidePanel";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
-import { ChallengeData, expressJoinIntent, creatorFund, joinerFund, revertCreatorTimeout, revertJoinerTimeout, expirePendingChallenge, cleanupExpiredChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage, uploadTeamImage, updateTeamImage, upsertChallengeNotification, listenToChallengeNotifications, ChallengeNotification, fetchChallengeById, submitTournamentMatchResult, deleteChallenge } from "@/lib/firebase/firestore";
+import { ChallengeData, expressJoinIntent, creatorFund, joinerFund, revertCreatorTimeout, revertJoinerTimeout, expirePendingChallenge, cleanupExpiredChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage, uploadTeamImage, updateTeamImage, upsertChallengeNotification, listenToChallengeNotifications, ChallengeNotification, fetchChallengeById, submitTournamentMatchResult, deleteChallenge, joinTournament } from "@/lib/firebase/firestore";
 import { Timestamp } from "firebase/firestore";
 import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
@@ -49,7 +49,7 @@ import LiveChallengesGrid from "@/components/arena/LiveChallengesGrid";
 // Lazy load heavy modals for better performance on all devices
 const SubmitResultRoom = lazy(() => import("@/components/arena/SubmitResultRoom").then(module => ({ default: module.SubmitResultRoom })));
 const PlayerProfileModal = lazy(() => import("@/components/arena/PlayerProfileModal"));
-const TrustReviewModal = lazy(() => import("@/components/arena/TrustReviewModal"));
+import TrustReviewModal from "@/components/arena/TrustReviewModal";
 const TeamManagementModal = lazy(() => import("@/components/arena/TeamManagementModal"));
 import VictoryModal from "@/components/arena/VictoryModal";
 
@@ -2761,29 +2761,43 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
 
     const status = getChallengeStatus(challenge);
-    const isDeadlineExpired = isCreatorFundingDeadlineExpired(challenge);
+    const format = challenge.rawData?.format || (challenge.rawData?.tournament ? 'tournament' : 'standard');
+    const isTournament = format === 'tournament';
+    const tournament = challenge.rawData?.tournament;
     
-    // Only allow cancel if deadline expired or challenge is still pending (no one joined)
-    if (status !== 'pending_waiting_for_opponent' && status !== 'creator_confirmation_required') {
-      if (status === 'creator_confirmation_required' && !isDeadlineExpired) {
-        alert('Cannot cancel challenge while waiting for your confirmation. Either fund the challenge or wait for the deadline to expire.');
-      } else {
-        alert(`Cannot cancel challenge in ${status} state. Only pending challenges can be cancelled.`);
+    // For tournaments, allow deletion if stage is waiting_for_players
+    if (isTournament) {
+      if (tournament?.stage !== 'waiting_for_players') {
+        alert(`Cannot cancel tournament in ${tournament?.stage || 'unknown'} stage. Only tournaments waiting for players can be cancelled.`);
+        return;
       }
-      return;
-    }
+    } else {
+      // For standard challenges, use existing logic
+      const isDeadlineExpired = isCreatorFundingDeadlineExpired(challenge);
+      
+      // Only allow cancel if deadline expired or challenge is still pending (no one joined)
+      if (status !== 'pending_waiting_for_opponent' && status !== 'creator_confirmation_required') {
+        if (status === 'creator_confirmation_required' && !isDeadlineExpired) {
+          alert('Cannot cancel challenge while waiting for your confirmation. Either fund the challenge or wait for the deadline to expire.');
+        } else {
+          alert(`Cannot cancel challenge in ${status} state. Only pending challenges can be cancelled.`);
+        }
+        return;
+      }
 
-    try {
       // First, revert if deadline expired and status hasn't updated yet
       if (status === 'creator_confirmation_required' && isDeadlineExpired) {
         await revertCreatorTimeout(challenge.id);
       }
-      
+    }
+
+    try {
       // Delete the challenge
       await deleteChallenge(challenge.id);
       
       // Close the lobby
       setShowStandardLobby(false);
+      setShowTournamentLobby(false);
       setSelectedChallenge(null);
       
       alert('✅ Challenge cancelled and deleted successfully.');
@@ -2914,11 +2928,50 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         );
       } catch (fundError: any) {
         const errorMsg = fundError.message || fundError.toString() || '';
-        // Check if error is because challenge is not in CreatorConfirmationRequired state
-        if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770') || errorMsg.includes('6000') || errorMsg.includes('Challenge is not open')) {
-          throw new Error('⚠️ Challenge state mismatch on-chain. The challenger may need to express intent. Please refresh and try again.');
+        console.error('❌ Creator funding on-chain error:', {
+          error: fundError,
+          message: errorMsg,
+          logs: fundError.logs || [],
+          code: fundError.code
+        });
+        
+        // Handle "already processed" error - transaction may have succeeded
+        if (errorMsg.includes('already been processed') || errorMsg.includes('already processed')) {
+          console.log('⚠️ Transaction already processed - checking if challenge was funded...');
+          
+          // Check if challenge was actually funded by checking escrow balance
+          try {
+            const { getAccount } = await import('@solana/spl-token');
+            const [escrowTokenAccountPDA] = PublicKey.findProgramAddressSync(
+              [Buffer.from('escrow_wallet'), new PublicKey(challengePDA).toBuffer(), USDFG_MINT.toBuffer()],
+              PROGRAM_ID
+            );
+            const escrowAccount = await getAccount(connection, escrowTokenAccountPDA);
+            const escrowBalance = Number(escrowAccount.amount) / Math.pow(10, 9);
+            
+            if (escrowBalance >= entryFee) {
+              console.log('✅ Challenge was already funded successfully!', {
+                escrowBalance: `${escrowBalance} USDFG`,
+                expected: `${entryFee} USDFG`
+              });
+              // Funding succeeded, continue to Firestore update
+              // Don't throw error - just continue (break out of catch block)
+            } else {
+              throw new Error('Transaction was already processed, but challenge may not be funded. Please refresh and check the challenge status.');
+            }
+          } catch (checkError: any) {
+            // If we can't verify, show a helpful message
+            if (checkError.message?.includes('may not be funded')) {
+              throw checkError;
+            }
+            console.warn('⚠️ Could not verify funding status, but transaction may have succeeded:', checkError);
+            // Continue anyway - transaction may have succeeded (don't throw, let it proceed to Firestore update)
+          }
+        } else if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770') || errorMsg.includes('6000') || errorMsg.includes('Challenge is not open')) {
+          throw new Error('⚠️ Challenge state mismatch on-chain. The contract may need to be redeployed to support funding without on-chain challenger intent. Please contact support or try again after contract update.');
+        } else {
+          throw fundError; // Re-throw if it's a different error
         }
-        throw fundError; // Re-throw if it's a different error
       }
       
       // Update Firestore - wrap in try-catch to handle errors gracefully
@@ -2999,10 +3052,51 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   };
 
   // Handle opening submit result modal for tournament matches
-  const handleOpenTournamentSubmitResult = (matchId: string, opponentWallet: string) => {
-    setTournamentMatchData({ matchId, opponentWallet });
-    setShowTournamentLobby(false); // Close tournament lobby to show submit result modal
-    setShowSubmitResultModal(true);
+  const handleOpenTournamentSubmitResult = async (matchId: string, opponentWallet: string) => {
+    // CRITICAL: Check if match is already completed before opening submit modal
+    if (!selectedChallenge || !publicKey) return;
+    
+    try {
+      const currentChallenge = await fetchChallengeById(selectedChallenge.id);
+      const currentTournament = currentChallenge?.tournament;
+      const currentBracket = currentTournament?.bracket;
+      
+      // Find the match in the current bracket
+      if (currentBracket) {
+        for (const round of currentBracket) {
+          for (const match of round.matches) {
+            if (match.id === matchId) {
+              if (match.status === 'completed') {
+                console.log('⚠️ Match already completed - preventing submit modal from opening');
+                alert("This match is already completed. The tournament may have finished.");
+                return;
+              }
+              // Check if player already submitted
+              const currentWalletLower = publicKey.toString().toLowerCase();
+              const isPlayer1 = match.player1?.toLowerCase() === currentWalletLower;
+              const isPlayer2 = match.player2?.toLowerCase() === currentWalletLower;
+              const existingResult = isPlayer1 ? match.player1Result : (isPlayer2 ? match.player2Result : undefined);
+              if (existingResult !== undefined) {
+                console.log('⚠️ Player already submitted - preventing submit modal from opening');
+                alert("You have already submitted your result for this match. Waiting for opponent...");
+                return;
+              }
+              break;
+            }
+          }
+        }
+      }
+      
+      setTournamentMatchData({ matchId, opponentWallet });
+      setShowTournamentLobby(false); // Close tournament lobby to show submit result modal
+      setShowSubmitResultModal(true);
+    } catch (error) {
+      console.error('Error checking match status:', error);
+      // Still allow modal to open if check fails
+      setTournamentMatchData({ matchId, opponentWallet });
+      setShowTournamentLobby(false);
+      setShowSubmitResultModal(true);
+    }
   };
 
   // Handle result submission - now stores result and shows trust review
@@ -3021,24 +3115,75 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       if (isTournament && tournamentMatchData) {
         const walletAddress = publicKey.toBase58();
         
-        // Submit result (both win and loss are handled the same way)
-        await submitTournamentMatchResult(
-          selectedChallenge.id,
-          tournamentMatchData.matchId,
-          walletAddress,
-          didWin
-        );
+        // CRITICAL: Check if match is already completed before submitting
+        const currentChallenge = await fetchChallengeById(selectedChallenge.id);
+        const currentTournament = currentChallenge?.tournament;
+        const currentBracket = currentTournament?.bracket;
         
-        // Close submit result modal and reopen tournament lobby
-        setShowSubmitResultModal(false);
-        setTournamentMatchData(null);
-        setShowTournamentLobby(true);
+        // Find the match in the current bracket
+        let matchAlreadyCompleted = false;
+        if (currentBracket) {
+          for (const round of currentBracket) {
+            for (const match of round.matches) {
+              if (match.id === tournamentMatchData.matchId) {
+                if (match.status === 'completed') {
+                  matchAlreadyCompleted = true;
+                  console.log('⚠️ Match already completed - preventing duplicate submission');
+                }
+                break;
+              }
+            }
+            if (matchAlreadyCompleted) break;
+          }
+        }
         
-        // Show success message
-        const message = didWin 
-          ? "🏆 Result submitted! Waiting for opponent to submit their result..."
-          : "😔 Result submitted. Waiting for opponent to submit their result...";
-        alert(message);
+        if (matchAlreadyCompleted) {
+          // Match already completed - just close modal and show message
+          setShowSubmitResultModal(false);
+          setTournamentMatchData(null);
+          setShowTournamentLobby(true);
+          alert("✅ Match result was already submitted. Tournament may be completed.");
+          return;
+        }
+        
+        try {
+          // Submit result (both win and loss are handled the same way)
+          await submitTournamentMatchResult(
+            selectedChallenge.id,
+            tournamentMatchData.matchId,
+            walletAddress,
+            didWin
+          );
+          
+          // Close submit result modal and reopen tournament lobby
+          setShowSubmitResultModal(false);
+          setTournamentMatchData(null);
+          setShowTournamentLobby(true);
+          
+          // Check if tournament is completed by fetching fresh challenge data
+          const freshChallenge = await fetchChallengeById(selectedChallenge.id);
+          const tournament = freshChallenge?.tournament;
+          const isCompleted = tournament?.stage === 'completed' || freshChallenge?.status === 'completed';
+          
+          // Show success message
+          const message = isCompleted
+            ? "🏆 Tournament completed! Check the bracket to see the champion."
+            : (didWin 
+              ? "🏆 Result submitted! Waiting for opponent to submit their result..."
+              : "😔 Result submitted. Waiting for opponent to submit their result...");
+          alert(message);
+        } catch (error: any) {
+          // If error is about already submitted/completed, just close modal
+          if (error.message?.includes('already') || error.message?.includes('completed') || error.message?.includes('duplicate')) {
+            console.log('⚠️ Submission prevented - match already processed');
+            setShowSubmitResultModal(false);
+            setTournamentMatchData(null);
+            setShowTournamentLobby(true);
+            alert("✅ Match result was already processed.");
+          } else {
+            throw error; // Re-throw other errors
+          }
+        }
         return;
       }
       
@@ -5846,6 +5991,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     setSelectedChallenge(null);
                   }}
                   title={`${selectedChallenge.title || "Tournament"} Bracket`}
+                  className="tournament-modal"
                 >
                   <TournamentBracketView
                     tournament={selectedChallenge.rawData?.tournament}
@@ -5853,6 +5999,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     currentWallet={publicKey?.toString() || null}
                     challengeId={selectedChallenge.id}
                     onOpenSubmitResult={handleOpenTournamentSubmitResult}
+                    onJoinTournament={async (challengeId: string) => {
+                      if (!publicKey) {
+                        alert('Please connect your wallet first');
+                        return;
+                      }
+                      await joinTournament(challengeId, publicKey.toString());
+                    }}
+                    onClaimPrize={handleClaimPrize}
+                    challenge={selectedChallenge}
+                    isClaiming={claimingPrize === selectedChallenge.id}
                   />
                 </ElegantModal>
               );
@@ -6121,7 +6277,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
 
       {/* Trust Review Modal */}
-      <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div></div>}>
       <TrustReviewModal
         isOpen={showTrustReview}
         opponentName={trustReviewOpponent}
@@ -6132,7 +6287,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         }}
         onSubmit={handleTrustReviewSubmit}
       />
-      </Suspense>
 
       {/* Trophy Modal */}
       {showTrophyModal && selectedTrophy && (
@@ -6268,6 +6422,32 @@ const CreateChallengeModal: React.FC<{
     const mode = formData.mode || '';
     return mode.toLowerCase().includes('tournament');
   }, [formData.mode]);
+
+  // Clear connecting state when wallet connects or disconnects
+  useEffect(() => {
+    if (isConnected) {
+      setConnecting(false);
+      // Clear any stale connecting flags
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('phantom_connecting');
+      }
+    }
+  }, [isConnected]);
+
+  // Also clear connecting state if it gets stuck (timeout after 15 seconds)
+  useEffect(() => {
+    if (connecting) {
+      const timeout = setTimeout(() => {
+        console.warn('⚠️ Connection timeout - clearing stuck connecting state');
+        setConnecting(false);
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('phantom_connecting');
+        }
+      }, 15000);
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [connecting]);
 
   // Available games for selection
   const availableGames = [
@@ -6649,10 +6829,35 @@ const CreateChallengeModal: React.FC<{
     setTimeout(() => applyPreset(), 100);
   }, [formData.game, formData.mode, applyPreset]);
 
-  const handleConnect = () => {
-    // Close the modal and let the user connect via the main wallet button
-    onClose();
-    // The user should connect their wallet using the main "Connect Wallet" button first
+  const handleConnect = async () => {
+    // Don't close modal - let user see connection progress
+    setConnecting(true);
+    
+    try {
+      // Call the parent's onConnect handler which will trigger wallet connection
+      await onConnect();
+      
+      // Note: The useEffect above will clear connecting state when isConnected becomes true
+      // But also set a fallback timeout in case the connection state doesn't update immediately
+      setTimeout(() => {
+        if (isConnected) {
+          setConnecting(false);
+        }
+      }, 2000);
+    } catch (error: any) {
+      console.error('Connection error:', error);
+      setConnecting(false);
+      
+      // Clear any stale connecting flags
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('phantom_connecting');
+      }
+      
+      // Show user-friendly error if not a user cancellation
+      if (!error?.message?.includes('User rejected') && !error?.message?.includes('User cancelled')) {
+        alert(`Connection failed: ${error?.message || 'Unknown error'}`);
+      }
+    }
   };
 
   return (
