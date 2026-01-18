@@ -4,14 +4,21 @@ import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { VitePWA } from "vite-plugin-pwa";
 
-export default defineConfig({
-  plugins: [
-    react({
-      // Optimize React refresh for better HMR
-      fastRefresh: true,
-    }),
-    runtimeErrorOverlay(),
-    VitePWA({
+export default defineConfig(async () => {
+  // Conditionally import cartographer plugin only when needed
+  const cartographerPlugin = 
+    process.env.NODE_ENV !== "production" && process.env.REPL_ID !== undefined
+      ? (await import("@replit/vite-plugin-cartographer")).cartographer()
+      : null;
+
+  return {
+    plugins: [
+      react({
+        // Optimize React refresh for better HMR
+        fastRefresh: true,
+      }),
+      runtimeErrorOverlay(),
+      VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'robots.txt', 'sitemap.xml'],
       manifest: {
@@ -100,15 +107,8 @@ export default defineConfig({
         enabled: false // Disable in dev to avoid conflicts
       }
     }),
-    ...(process.env.NODE_ENV !== "production" &&
-    process.env.REPL_ID !== undefined
-      ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer(),
-          ),
-        ]
-      : []),
-  ],
+      ...(cartographerPlugin ? [cartographerPlugin] : []),
+    ],
   define: {
     global: 'globalThis',
   },
@@ -205,4 +205,5 @@ export default defineConfig({
       "X-XSS-Protection": "1; mode=block",
     },
   },
+  };
 });
