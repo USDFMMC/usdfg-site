@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useReducer } from "react";
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddress } from '@solana/spl-token';
 import { useConnection } from '@solana/wallet-adapter-react';
@@ -23,6 +23,30 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const { publicKey, connecting, connect, disconnect, connection } = useUSDFGWallet();
   const [balance, setBalance] = useState<number | null>(null);
   const [usdfgBalance, setUsdfgBalance] = useState<number | null>(null);
+  
+  // Force re-render counter for mobile visibility/focus events
+  // This ensures the component re-renders when mobile wallet returns via deep-link
+  const [, forceUpdate] = useReducer(x => x + 1, 0);
+  
+  // Listen for visibility/focus events to force re-render on mobile deep-link return
+  // Mobile wallet deep-link return doesn't trigger React re-render, so we need to force it
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const onResume = () => {
+      // Force re-render to re-read wallet.publicKey
+      // This fixes mobile wallet button not updating after deep-link return
+      forceUpdate();
+    };
+    
+    document.addEventListener("visibilitychange", onResume);
+    window.addEventListener("focus", onResume);
+    
+    return () => {
+      document.removeEventListener("visibilitychange", onResume);
+      window.removeEventListener("focus", onResume);
+    };
+  }, []);
 
   // Fetch balances when publicKey exists
   useEffect(() => {
