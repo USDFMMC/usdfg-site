@@ -87,6 +87,50 @@ export function isPendingJoiner(challenge: any, wallet: string): boolean {
 }
 
 /**
+ * Resolve user role deterministically
+ * Returns one of: 'creator' | 'pending_joiner' | 'challenger' | 'player' | 'spectator'
+ * Priority order ensures deterministic resolution:
+ * 1. Creator (highest priority - creator can never be challenger/joiner)
+ * 2. Pending joiner (before challenger is set)
+ * 3. Challenger (after pending joiner becomes challenger)
+ * 4. Player (in players array but not creator/challenger)
+ * 5. Spectator (default - not a participant)
+ */
+export function resolveUserRole(challenge: any, publicKey: string | null | undefined): 'creator' | 'pending_joiner' | 'challenger' | 'player' | 'spectator' {
+  if (!publicKey || !challenge) return 'spectator';
+  
+  const wallet = publicKey.toLowerCase();
+  const creator = getChallengeCreator(challenge)?.toLowerCase();
+  const challenger = getChallengeChallenger(challenge)?.toLowerCase();
+  const pendingJoiner = getChallengePendingJoiner(challenge)?.toLowerCase();
+  const players = challenge?.players || challenge?.rawData?.players || [];
+  const playersArray = Array.isArray(players) ? players : [];
+  
+  // Priority 1: Creator (highest priority - creator can never see join button)
+  if (creator && creator === wallet) {
+    return 'creator';
+  }
+  
+  // Priority 2: Pending joiner (before challenger is confirmed)
+  if (pendingJoiner && pendingJoiner === wallet) {
+    return 'pending_joiner';
+  }
+  
+  // Priority 3: Challenger (after pending joiner becomes challenger)
+  if (challenger && challenger === wallet) {
+    return 'challenger';
+  }
+  
+  // Priority 4: Player (in players array but not creator/challenger)
+  if (playersArray.some((p: string) => p?.toLowerCase() === wallet)) {
+    return 'player';
+  }
+  
+  // Priority 5: Spectator (default)
+  return 'spectator';
+}
+
+/**
  * Get creator funding deadline
  */
 export function getCreatorFundingDeadline(challenge: any): Timestamp | null {
