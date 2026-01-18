@@ -33,19 +33,19 @@ export default defineConfig(async () => {
         start_url: '/app',
         icons: [
           {
-            src: '/assets/usdfg-token.png',
+            src: '/assets/usdfgtoken.png',
             sizes: '144x144',
             type: 'image/png',
             purpose: 'any maskable'
           },
           {
-            src: '/assets/usdfg-token.png',
+            src: '/assets/usdfgtoken.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any'
           },
           {
-            src: '/assets/usdfg-token.png',
+            src: '/assets/usdfgtoken.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any'

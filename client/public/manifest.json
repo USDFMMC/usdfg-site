@@ -12,19 +12,19 @@
   "categories": ["games", "entertainment", "finance"],
   "icons": [
     {
-      "src": "/assets/usdfg-token.png",
+      "src": "/assets/usdfgtoken.png",
       "sizes": "144x144",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/assets/usdfg-token.png",
+      "src": "/assets/usdfgtoken.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/assets/usdfg-token.png",
+      "src": "/assets/usdfgtoken.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
@@ -47,7 +47,7 @@
       "url": "/app/challenge/new",
       "icons": [
         {
-          "src": "/assets/usdfg-token.png",
+          "src": "/assets/usdfgtoken.png",
           "sizes": "144x144"
         }
       ]
@@ -59,7 +59,7 @@
       "url": "/app?tab=leaderboard",
       "icons": [
         {
-          "src": "/assets/usdfg-token.png",
+          "src": "/assets/usdfgtoken.png",
           "sizes": "144x144"
         }
       ]
