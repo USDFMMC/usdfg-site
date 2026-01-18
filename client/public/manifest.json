@@ -30,15 +30,7 @@
       "purpose": "any"
     }
   ],
-  "screenshots": [
-    {
-      "src": "/assets/usdfg-og-banner.png",
-      "sizes": "1200x630",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "USDFG Arena Gaming Platform"
-    }
-  ],
+  "screenshots": [],
   "shortcuts": [
     {
       "name": "Create Challenge",
