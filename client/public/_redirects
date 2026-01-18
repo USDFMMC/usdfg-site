@@ -1,0 +1,9 @@
+# Netlify redirects for SPA routing
+# All routes should serve index.html for client-side routing
+
+# App routes - serve index.html (SPA routing)
+/app/*    /index.html   200
+/app      /index.html   200
+
+# Root and other routes - serve index.html for client-side routing
+/*        /index.html   200

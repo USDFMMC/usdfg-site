@@ -938,3 +938,4 @@ pub struct DisputeRefunded {
     pub challenger_claimed_win: bool,
     pub timestamp: i64,
 }
+

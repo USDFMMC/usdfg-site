@@ -1,29 +1,8 @@
-# CRITICAL: Phantom manifest.json must be served with application/json Content-Type
-# This MUST be at the top to ensure it takes precedence
-# Also need CORS headers so Phantom can fetch the manifest from its app
-/phantom/manifest.json
-  Content-Type: application/json; charset=utf-8
-  Cache-Control: no-cache
-  Access-Control-Allow-Origin: *
-  Access-Control-Allow-Methods: GET, OPTIONS
-  Access-Control-Allow-Headers: Content-Type
+# Cloudflare Pages headers (if using Cloudflare)
+# Note: Cloudflare Pages uses Functions for routing, not _redirects
 
-# Token metadata JSON - needs CORS for wallets
-/api/token-metadata.json
-  Content-Type: application/json; charset=utf-8
-  Cache-Control: public, max-age=3600
-  Access-Control-Allow-Origin: *
-  Access-Control-Allow-Methods: GET, OPTIONS
-  Access-Control-Allow-Headers: Content-Type
+# For Cloudflare Pages, routing is handled via:
+# 1. Functions/_middleware.ts (for routing)
+# 2. Or _routes.json (for static routing)
 
-/*
-  Content-Security-Policy: default-src 'self'; img-src 'self' https: data:; connect-src 'self' https://api.devnet.solana.com https://api.mainnet-beta.solana.com https://api.testnet.solana.com wss://api.devnet.solana.com wss://api.mainnet-beta.solana.com wss://api.testnet.solana.com https://firestore.googleapis.com https://firebase.googleapis.com https://firebaseinstallations.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://esm.sh; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://esm.sh; script-src-elem 'self' 'unsafe-inline' https://esm.sh; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;
-  X-Frame-Options: DENY
-  X-Content-Type-Options: nosniff
-  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
-  Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: camera=(), microphone=(), geolocation=()
-  X-XSS-Protection: 1; mode=block
-
-/assets/*
-  Cache-Control: public, max-age=31536000, immutable
+# Headers are set in netlify.toml or via Cloudflare Workers

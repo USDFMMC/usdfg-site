@@ -156,6 +156,18 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     };
   }, [mobile, connecting, onConnect, connected, publicKey]);
 
+  // CRITICAL: Clear connecting state immediately when wallet connects
+  // This must run BEFORE the connection state handler to prevent race conditions
+  useEffect(() => {
+    if (connected && publicKey) {
+      // Immediately clear any connecting state - wallet is now connected
+      if (isPhantomConnecting()) {
+        clearPhantomConnectingState();
+        console.log('✅ Wallet connected - immediately cleared connecting state');
+      }
+    }
+  }, [connected, publicKey]);
+
   // Handle connection state changes
   useEffect(() => {
     // On mobile, check BOTH the prop (from parent) AND localStorage directly
@@ -284,11 +296,11 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   // CRITICAL FIX FOR MOBILE: If wallet is connected, NEVER show connecting state
   // This fixes the issue where button shows "Connecting" even after successful connection
   if (connected && publicKey) {
+    // Wallet is connected - force connecting flag to false and clear any stale state
     isPhantomConnectingFlag = false;
-    // Also clear any stale connecting state immediately
     if (typeof window !== "undefined" && isPhantomConnecting()) {
       clearPhantomConnectingState();
-      console.log('✅ Wallet connected - cleared stale connecting state');
+      console.log('✅ Wallet connected - cleared stale connecting state in flag calculation');
     }
   } else if (typeof window !== "undefined") {
     // Only check connecting state if NOT already connected
@@ -631,6 +643,10 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
 
   // Disconnected state - original amber design
   // CRITICAL: Always show "Connect Wallet" button when not connected (ensures users can always connect)
+  // CRITICAL FIX: Only show "Connecting..." if we're actually connecting AND not already connected
+  // This prevents showing "Connecting..." when wallet is already connected but adapter state is stale
+  const shouldShowConnecting = (connecting || isPhantomConnectingFlag) && !(connected && publicKey);
+  
   return (
     <div className="flex flex-col space-y-2">
       {compact ? (
@@ -645,7 +661,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
             zIndex: 10
           }}
           >
-          {connecting || isPhantomConnectingFlag ? "Connecting..." : "Connect Wallet"}
+          {shouldShowConnecting ? "Connecting..." : "Connect Wallet"}
           </button>
         ) : (
           <button
@@ -659,7 +675,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
             zIndex: 10
           }}
               >
-          {connecting || isPhantomConnectingFlag ? "Connecting..." : "Connect Wallet"}
+          {shouldShowConnecting ? "Connecting..." : "Connect Wallet"}
               </button>
       )}
     </div>
