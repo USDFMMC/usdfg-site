@@ -4138,7 +4138,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               onError={(e) => {
                 const target = e.currentTarget as HTMLImageElement;
                 console.error(`❌ Failed to load detail sheet image: ${imagePath} for game: ${gameName}`);
-                target.src = '/assets/usdfg-logo-transparent.png';
+                target.src = '/assets/usdfgtoken.png';
               }}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-neutral-900 via-black/60 to-black/20" />
@@ -5019,7 +5019,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                         if (process.env.NODE_ENV === 'development') {
                         console.error(`❌ Failed to load image: ${imagePath} for game: ${gameName}, challenge: ${challenge.id}`);
                         }
-                        target.src = '/assets/usdfg-logo-transparent.png';
+                        target.src = '/assets/usdfgtoken.png';
                       }}
                       onLoad={() => {
                         // Remove excessive logging - images are cached by browser anyway
@@ -5038,6 +5038,19 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                         <div className="min-w-0 flex-1">
                           <div className="text-[15px] font-semibold truncate">{gameName}</div>
                           <div className="text-xs text-white/70 truncate">{challenge.mode || 'Head-to-Head'}</div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[10px] text-white/60">👥</span>
+                            <span className="text-[10px] font-semibold text-white/80">
+                              {(() => {
+                                const playersCount = Array.isArray(challenge.players) ? challenge.players.length : (typeof challenge.players === 'number' ? challenge.players : 0);
+                                const maxPlayers = challenge.capacity || challenge.maxPlayers || 2;
+                                return `${playersCount}/${maxPlayers}`;
+                              })()}
+                            </span>
+                            <span className="text-[9px] text-white/40">•</span>
+                            <span className="text-[10px] text-white/60">👁️</span>
+                            <span className="text-[10px] font-semibold text-purple-300/80">Watch</span>
+                          </div>
                         </div>
                         <div className="flex flex-col items-end gap-1.5">
                           <StatusPill 
