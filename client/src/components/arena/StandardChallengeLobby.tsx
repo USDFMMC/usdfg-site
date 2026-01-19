@@ -36,6 +36,113 @@ interface StandardChallengeLobbyProps {
 
 const MAX_SPECTATORS = 69;
 
+// Creator Mute Controls Components
+const MuteAllSpectatorsButton: React.FC<{ challengeId: string; spectators: string[] }> = ({ challengeId, spectators }) => {
+  const [isMuting, setIsMuting] = useState(false);
+  
+  const handleMuteAll = async () => {
+    if (isMuting) return;
+    setIsMuting(true);
+    
+    try {
+      // Mute all spectators by creating mute documents
+      const mutePromises = spectators.map((wallet) => {
+        const muteRef = doc(db, 'challenge_lobbies', challengeId, 'voice_controls', wallet);
+        return setDoc(muteRef, {
+          muted: true,
+          mutedBy: 'creator',
+          mutedAt: serverTimestamp(),
+        });
+      });
+      
+      await Promise.all(mutePromises);
+    } catch (error: any) {
+      console.error('Failed to mute all spectators:', error);
+      alert('Failed to mute all spectators. Please try again.');
+    } finally {
+      setIsMuting(false);
+    }
+  };
+  
+  return (
+    <button
+      type="button"
+      onClick={handleMuteAll}
+      disabled={isMuting || spectators.length === 0}
+      className="w-full px-2 py-1.5 rounded-md bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 text-purple-200 text-[10px] font-semibold transition-all disabled:opacity-50"
+    >
+      {isMuting ? 'Muting...' : `🔇 Mute All Spectators (${spectators.length})`}
+    </button>
+  );
+};
+
+const MuteParticipantButton: React.FC<{ challengeId: string; wallet: string; displayName: string }> = ({ challengeId, wallet, displayName }) => {
+  const [isMuted, setIsMuted] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
+  
+  // Check current mute status
+  useEffect(() => {
+    if (!challengeId || !wallet) return;
+    
+    const muteRef = doc(db, 'challenge_lobbies', challengeId, 'voice_controls', wallet);
+    
+    const unsubscribe = onSnapshot(
+      muteRef,
+      (snapshot) => {
+        setIsMuted(snapshot.exists() && snapshot.data()?.muted === true);
+      },
+      (error) => {
+        if (error.code !== 'permission-denied' && error.code !== 'unavailable') {
+          console.error('Error checking mute status:', error);
+        }
+      }
+    );
+    
+    return () => unsubscribe();
+  }, [challengeId, wallet]);
+  
+  const handleToggleMute = async () => {
+    if (isToggling) return;
+    setIsToggling(true);
+    
+    try {
+      const muteRef = doc(db, 'challenge_lobbies', challengeId, 'voice_controls', wallet);
+      
+      if (isMuted) {
+        // Unmute by deleting the document
+        await deleteDoc(muteRef);
+      } else {
+        // Mute by creating the document
+        await setDoc(muteRef, {
+          muted: true,
+          mutedBy: 'creator',
+          mutedAt: serverTimestamp(),
+        });
+      }
+    } catch (error: any) {
+      console.error('Failed to toggle mute:', error);
+      alert('Failed to toggle mute. Please try again.');
+    } finally {
+      setIsToggling(false);
+    }
+  };
+  
+  return (
+    <button
+      type="button"
+      onClick={handleToggleMute}
+      disabled={isToggling}
+      className={`w-full px-2 py-1.5 rounded-md border text-[10px] font-semibold transition-all flex items-center justify-between disabled:opacity-50 ${
+        isMuted 
+          ? 'bg-red-500/20 hover:bg-red-500/30 border-red-500/30 text-red-200' 
+          : 'bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/30 text-amber-200'
+      }`}
+    >
+      <span>{isMuted ? '🔊 Unmute' : '🔇 Mute'} {displayName}</span>
+    </button>
+  );
+};
+
 const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   challenge,
   currentWallet,
@@ -124,6 +231,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   };
   
   const status = getChallengeValue('status', 'pending_waiting_for_opponent') as string;
+  const isActiveMatch = status === 'active';
   // CRITICAL: Ensure players is always an array (getChallengeValue might return non-array)
   const playersRaw = getChallengeValue('players', []) as any;
   const players: string[] = Array.isArray(playersRaw) ? playersRaw.filter((p: any): p is string => typeof p === 'string' && !!p) : [];
@@ -1484,10 +1592,71 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         
         {/* Voice Room - Second (below Match Chat) */}
         <div className="rounded-lg border border-white/10 bg-black/40 p-2 backdrop-blur-sm">
-          <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-300/80">
-            Voice Room
+          <div className="mb-1.5 flex items-center justify-between">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-gray-300/80">
+              Voice Room
+            </div>
+            {isActiveMatch && isCreator && (
+              <div className="text-[9px] text-amber-300/70">
+                Creator Controls Active
+              </div>
+            )}
           </div>
-          <VoiceChat challengeId={voiceChatChallengeId} currentWallet={voiceChatCurrentWallet} />
+          
+          {/* Warning for spectators during active matches */}
+          {isActiveMatch && userRole === 'spectator' && (
+            <div className="mb-2 p-2 rounded-lg border border-purple-500/30 bg-purple-900/20">
+              <div className="text-[10px] font-semibold text-purple-300 mb-0.5">
+                🔇 Listen Only Mode
+              </div>
+              <div className="text-[9px] text-purple-200/70">
+                Voice chat is disabled for spectators during active challenges. Spectators cannot influence match outcomes.
+              </div>
+            </div>
+          )}
+          
+          <VoiceChat 
+            challengeId={voiceChatChallengeId} 
+            currentWallet={voiceChatCurrentWallet}
+            challengeStatus={status}
+            isSpectator={userRole === 'spectator'}
+            isCreator={userRole === 'creator'}
+            participants={participants}
+            spectators={spectators}
+          />
+          
+          {/* Creator Mute Controls - Only show during active matches */}
+          {isActiveMatch && isCreator && (
+            <div className="mt-2 pt-2 border-t border-white/5">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-300/80 mb-1.5">
+                Creator Controls
+              </div>
+              <div className="space-y-1.5">
+                {/* Mute All Spectators Button */}
+                {spectators.length > 0 && (
+                  <MuteAllSpectatorsButton 
+                    challengeId={challengeId}
+                    spectators={spectators}
+                  />
+                )}
+                
+                {/* Mute Individual Participants */}
+                {participants.filter((p: string) => p?.toLowerCase() !== creatorWallet?.toLowerCase()).map((wallet: string) => {
+                  const data = playerData[wallet.toLowerCase()] || {};
+                  const displayName = data.displayName || `${wallet.slice(0, 4)}...${wallet.slice(-4)}`;
+                  
+                  return (
+                    <MuteParticipantButton
+                      key={wallet}
+                      challengeId={challengeId}
+                      wallet={wallet}
+                      displayName={displayName}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

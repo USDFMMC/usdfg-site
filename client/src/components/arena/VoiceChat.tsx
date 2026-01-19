@@ -6,15 +6,61 @@ import { db } from "../../lib/firebase/config";
 interface VoiceChatProps {
   challengeId: string;
   currentWallet: string;
+  challengeStatus?: string; // 'pending_waiting_for_opponent' | 'creator_funded' | 'active' | 'completed'
+  isSpectator?: boolean; // True if user is a spectator (not a participant)
+  isCreator?: boolean; // True if user is the challenge creator
+  participants?: string[]; // List of participant wallets
+  spectators?: string[]; // List of spectator wallets
 }
 
-const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWallet }) => {
+const VoiceChatComponent: React.FC<VoiceChatProps> = ({ 
+  challengeId, 
+  currentWallet,
+  challengeStatus = 'pending_waiting_for_opponent',
+  isSpectator = false,
+  isCreator = false,
+  participants = [],
+  spectators = []
+}) => {
   // Remove mount logging - excessive logging removed
   const [muted, setMuted] = useState(false);
   const [connected, setConnected] = useState(false);
   const [peerConnected, setPeerConnected] = useState(false);
   const [status, setStatus] = useState<string>("Initializing...");
   const [voiceDisabled, setVoiceDisabled] = useState(false);
+  const [mutedByCreator, setMutedByCreator] = useState(false);
+  
+  // Determine if voice is allowed based on status and role
+  const isActiveMatch = challengeStatus === 'active';
+  const allowVoice = !isActiveMatch || !isSpectator; // Spectators can't speak during active matches
+  const isListenOnly = isSpectator && isActiveMatch; // Spectators are listen-only during active matches
+  
+  // Listen to creator mute controls from Firestore
+  useEffect(() => {
+    if (!challengeId || !currentWallet) return;
+    
+    const muteRef = doc(db, 'challenge_lobbies', challengeId, 'voice_controls', currentWallet);
+    
+    const unsubscribe = onSnapshot(
+      muteRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          setMutedByCreator(data.muted === true);
+        } else {
+          setMutedByCreator(false);
+        }
+      },
+      (error) => {
+        // Ignore permission errors
+        if (error.code !== 'permission-denied' && error.code !== 'unavailable') {
+          console.error('Error listening to mute status:', error);
+        }
+      }
+    );
+    
+    return () => unsubscribe();
+  }, [challengeId, currentWallet]);
   
   const localStream = useRef<MediaStream | null>(null);
   const peerConnection = useRef<RTCPeerConnection | null>(null);
@@ -38,7 +84,12 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWall
       return;
     }
     
-    if (voiceDisabled || !memoizedChallengeId || memoizedChallengeId.trim() === '') {
+    // CRITICAL: Spectators cannot use voice during active matches
+    if (isListenOnly || voiceDisabled || !memoizedChallengeId || memoizedChallengeId.trim() === '') {
+      if (isListenOnly) {
+        setStatus("Voice disabled for spectators during active matches");
+        setConnected(false);
+      }
       return;
     }
     
@@ -64,7 +115,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWall
         initInProgressRef.current = false;
       }
     };
-  }, [memoizedChallengeId, voiceDisabled]); // Only depend on memoized challengeId and voiceDisabled
+  }, [memoizedChallengeId, voiceDisabled, isListenOnly]); // Include isListenOnly to disable when match becomes active
 
   // Preserve audio connection when page visibility changes (backgrounding on mobile)
   useEffect(() => {
@@ -359,7 +410,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWall
   };
 
   const toggleMute = () => {
-    if (!localStream.current) return;
+    if (!localStream.current || isListenOnly || mutedByCreator) return;
     
     const newMutedState = !muted;
     localStream.current.getAudioTracks().forEach((track) => {
@@ -367,6 +418,16 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWall
     });
     setMuted(newMutedState);
   };
+  
+  // Force mute if spectator during active match or muted by creator
+  useEffect(() => {
+    if (localStream.current && (isListenOnly || mutedByCreator)) {
+      localStream.current.getAudioTracks().forEach((track) => {
+        track.enabled = false; // Mute the track
+      });
+      setMuted(true);
+    }
+  }, [isListenOnly, mutedByCreator]);
 
   const cleanup = async () => {
     // Unsubscribe from Firestore signals listener first
@@ -411,24 +472,22 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWall
     setStatus("");
   };
 
-  // If voice is disabled, show minimal UI
-  if (voiceDisabled) {
+  // If voice is disabled or spectator during active match, show restricted UI
+  if (voiceDisabled || isListenOnly) {
     return (
-      <div className="p-3 rounded-lg border border-gray-700 bg-gray-800/50">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-gray-500" />
-            <span className="text-gray-400 text-sm">Voice chat disabled (using text only)</span>
+      <div className="p-3 rounded-lg border border-purple-700/50 bg-purple-900/20">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-purple-500" />
+          <div className="flex-1">
+            <span className="text-purple-300 text-sm font-semibold">
+              {isListenOnly ? '🔇 Listen Only - Spectators cannot speak during active matches' : 'Voice chat disabled'}
+            </span>
+            {isListenOnly && (
+              <p className="text-[10px] text-purple-200/70 mt-0.5">
+                Spectators cannot influence match outcomes. Voice chat is available in pre-match lobby only.
+              </p>
+            )}
           </div>
-          <button
-            onClick={() => {
-              setVoiceDisabled(false);
-              setStatus("Initializing...");
-            }}
-            className="px-3 py-1 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-xs transition-colors"
-          >
-            Enable Voice
-          </button>
         </div>
       </div>
     );
@@ -484,12 +543,13 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWall
         {/* Mute Button */}
         <button
           onClick={toggleMute}
-          disabled={!connected}
+          disabled={!connected || mutedByCreator}
           className={`px-3 py-2 rounded-lg text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 ${
-            muted ? 'bg-red-600 hover:bg-red-700 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 'bg-green-600 hover:bg-green-700 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
+            muted || mutedByCreator ? 'bg-red-600 hover:bg-red-700 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 'bg-green-600 hover:bg-green-700 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
           }`}
+          title={mutedByCreator ? 'Muted by challenge creator' : muted ? 'Unmute' : 'Mute'}
         >
-          {muted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          {muted || mutedByCreator ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
         </button>
       </div>
     </div>
@@ -498,8 +558,11 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({ challengeId, currentWall
 
 // Memoize component to prevent unnecessary re-renders
 export const VoiceChat = React.memo(VoiceChatComponent, (prevProps, nextProps) => {
-  // Only re-render if challengeId or currentWallet actually changed
+  // Re-render if challengeId, currentWallet, status, or role changed
   return prevProps.challengeId === nextProps.challengeId && 
-         prevProps.currentWallet === nextProps.currentWallet;
+         prevProps.currentWallet === nextProps.currentWallet &&
+         prevProps.challengeStatus === nextProps.challengeStatus &&
+         prevProps.isSpectator === nextProps.isSpectator &&
+         prevProps.isCreator === nextProps.isCreator;
 });
 
