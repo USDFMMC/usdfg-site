@@ -5145,6 +5145,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                             players={challenge.players || 0} 
                             capacity={challenge.capacity || 2} 
                           />
+                          {/* Expiration Timer - Show for active/live challenges (compact, top-right) */}
+                          {isLive && expirationTimestamp && (
+                            <div className="rounded-md bg-red-500/15 border border-red-400/30 px-1.5 py-0.5">
+                              <CountdownTimer 
+                                deadline={expirationTimestamp} 
+                                expiredMessage="Expired"
+                                className="text-[9px] font-semibold text-red-300"
+                              />
+                            </div>
+                          )}
                           {/* Share button - positioned below status */}
                                         <button
                             type="button"
@@ -5180,17 +5190,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           <div className="font-semibold">{challenge.prizePool} USDFG</div>
                             </div>
                           </div>
-                          
-                      {/* Expiration Timer - Show for active/live challenges */}
-                      {isLive && expirationTimestamp && (
-                        <div className="mt-1.5 rounded-lg bg-red-500/10 border border-red-400/30 px-2 py-1 flex items-center justify-center gap-1">
-                          <CountdownTimer 
-                            deadline={expirationTimestamp} 
-                            expiredMessage="Expired"
-                            className="text-[10px] font-semibold text-red-300"
-                          />
-                        </div>
-                      )}
 
                       <div className="flex items-center justify-between gap-2 text-[12px] text-white/80">
                         <div className="min-w-0 truncate">
