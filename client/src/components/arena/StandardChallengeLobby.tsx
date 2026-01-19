@@ -59,6 +59,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [playerData, setPlayerData] = useState<Record<string, { displayName?: string; profileImage?: string }>>({});
   const [spectatorCount, setSpectatorCount] = useState<number>(0);
+  const [spectators, setSpectators] = useState<string[]>([]);
   
   // Real-time challenge data - ensures button visibility updates immediately
   const [liveChallenge, setLiveChallenge] = useState<any>(challenge);
@@ -85,9 +86,9 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           // Auto-fix: If challenge is active but players array is empty, fix it
           const status = getChallengeStatus(updatedData);
           if (status === 'active') {
-            const players = updatedData.players || updatedData.rawData?.players || [];
-            const creator = updatedData.creator || updatedData.rawData?.creator;
-            const challenger = updatedData.challenger || updatedData.rawData?.challenger;
+            const players = (updatedData as any).players || (updatedData as any).rawData?.players || [];
+            const creator = (updatedData as any).creator || (updatedData as any).rawData?.creator;
+            const challenger = (updatedData as any).challenger || (updatedData as any).rawData?.challenger;
             
             if ((!players || players.length === 0) && creator && challenger) {
               try {
@@ -125,7 +126,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const status = getChallengeValue('status', 'pending_waiting_for_opponent') as string;
   // CRITICAL: Ensure players is always an array (getChallengeValue might return non-array)
   const playersRaw = getChallengeValue('players', []);
-  const players = Array.isArray(playersRaw) ? playersRaw : [];
+  const players: string[] = Array.isArray(playersRaw) ? playersRaw.filter((p): p is string => typeof p === 'string') : [];
   const entryFee = getChallengeValue('entryFee', 0);
   const prizePool = getChallengeValue('prizePool', entryFee * 2);
   const game = getChallengeValue('game', 'USDFG Arena');
@@ -147,7 +148,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
   // Check if user already submitted result (moved up for use in handleSubmit)
   // Use useMemo to prevent recalculation on every render unless results or wallet actually change
-  const results = getChallengeValue('results', {});
+  const results = getChallengeValue('results', {}) as Record<string, any>;
   const hasAlreadySubmitted = useMemo(() => {
     if (!currentWallet || !results || typeof results !== 'object') return false;
     const userResult = results[currentWallet.toLowerCase()];
@@ -368,8 +369,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     }
     
     // Claim prize: participant + completed + won + not claimed
-    const winner = getChallengeValue('winner', null);
-    const userWon = currentWallet && winner && winner.toLowerCase() === currentWallet.toLowerCase();
+    const winner = getChallengeValue<string | null>('winner', null) as string | null;
+    const userWon = currentWallet && winner && typeof winner === 'string' && winner.toLowerCase() === currentWallet.toLowerCase();
     const prizeClaimed = activeChallenge.rawData?.prizeClaimed || activeChallenge.prizeClaimed;
     if (isParticipant && status === 'completed' && userWon && !prizeClaimed) {
       state.showClaim = true;
@@ -390,12 +391,12 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const prizeClaimed = activeChallenge.rawData?.prizeClaimed || activeChallenge.prizeClaimed;
   
   // Winner check (for display)
-  const winner = getChallengeValue('winner', null);
-  const userWon = currentWallet && winner && winner.toLowerCase() === currentWallet.toLowerCase();
+  const winner = getChallengeValue<string | null>('winner', null) as string | null;
+  const userWon = currentWallet && winner && typeof winner === 'string' && winner.toLowerCase() === currentWallet.toLowerCase();
   
   // Get opponent wallet for display
-  const opponentWallet = players.length >= 2 && currentWallet 
-    ? players.find((p: string) => p?.toLowerCase() !== currentWallet?.toLowerCase())
+  const opponentWallet: string | null = players.length >= 2 && currentWallet 
+    ? (players.find((p: string) => p?.toLowerCase() !== currentWallet?.toLowerCase()) as string | undefined) || null
     : null;
 
   // Fetch player display names and profile images
@@ -403,7 +404,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     const fetchPlayerData = async () => {
       const data: Record<string, { displayName?: string; profileImage?: string }> = {};
       for (const wallet of players) {
-        if (wallet) {
+        if (wallet && typeof wallet === 'string') {
           try {
             const stats = await getPlayerStats(wallet);
             if (stats) {
@@ -450,7 +451,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     
     // Only track as spectator if not a participant
     if (!isParticipant) {
-      // Single stats document for this challenge lobby (cost-effective!)
+      // Track individual spectator in a subcollection
+      const spectatorRef = doc(db, 'challenge_lobbies', challengeId, 'spectators', currentWallet);
       const statsRef = doc(db, 'challenge_lobbies', challengeId, 'stats', 'count');
       let isMounted = true;
       let hasJoined = false;
@@ -493,29 +495,36 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         
         // Only increment if under limit
         if (currentCount < MAX_SPECTATORS) {
-          // Increment spectator count when joining (using Firestore increment)
-          updateDoc(statsRef, {
-            spectatorCount: increment(1)
-          }).catch(async (err) => {
-            // If document doesn't exist, create it first
-            if (err.code === 'not-found') {
-              try {
-                await setDoc(statsRef, {
-                  spectatorCount: 1,
-                  createdAt: serverTimestamp(),
-                });
-                hasJoined = true;
-              } catch (createErr: any) {
-                if (createErr.code !== 'permission-denied' && createErr.code !== 'unavailable') {
-                  console.error('Failed to create spectator count:', createErr);
-                }
+          // Create spectator document and increment count atomically
+          Promise.all([
+            setDoc(spectatorRef, {
+              wallet: currentWallet,
+              joinedAt: serverTimestamp(),
+            }).catch(async (err) => {
+              if (err.code !== 'permission-denied' && err.code !== 'unavailable') {
+                console.error('Failed to create spectator doc:', err);
               }
-            } else if (err.code !== 'permission-denied' && err.code !== 'unavailable') {
-              console.error('Failed to increment spectator count:', err);
-            } else {
-              hasJoined = true; // Assume it worked if permission denied
-            }
-          }).then(() => {
+            }),
+            updateDoc(statsRef, {
+              spectatorCount: increment(1)
+            }).catch(async (err) => {
+              // If document doesn't exist, create it first
+              if (err.code === 'not-found') {
+                try {
+                  await setDoc(statsRef, {
+                    spectatorCount: 1,
+                    createdAt: serverTimestamp(),
+                  });
+                } catch (createErr: any) {
+                  if (createErr.code !== 'permission-denied' && createErr.code !== 'unavailable') {
+                    console.error('Failed to create spectator count:', createErr);
+                  }
+                }
+              } else if (err.code !== 'permission-denied' && err.code !== 'unavailable') {
+                console.error('Failed to increment spectator count:', err);
+              }
+            })
+          ]).then(() => {
             hasJoined = true;
           });
         } else {
@@ -523,28 +532,35 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           console.log(`⚠️ Spectator limit reached (${MAX_SPECTATORS}). Cannot join as spectator.`);
         }
       }).catch(() => {
-        // If getDoc fails, try to increment anyway (optimistic - limit will be enforced by listener)
-        updateDoc(statsRef, {
-          spectatorCount: increment(1)
-        }).catch(async (err) => {
-          if (err.code === 'not-found') {
-            try {
-              await setDoc(statsRef, {
-                spectatorCount: 1,
-                createdAt: serverTimestamp(),
-              });
-              hasJoined = true;
-            } catch (createErr: any) {
-              if (createErr.code !== 'permission-denied' && createErr.code !== 'unavailable') {
-                console.error('Failed to create spectator count:', createErr);
-              }
+        // If getDoc fails, try to create spectator doc and increment anyway (optimistic - limit will be enforced by listener)
+        Promise.all([
+          setDoc(spectatorRef, {
+            wallet: currentWallet,
+            joinedAt: serverTimestamp(),
+          }).catch(async (err) => {
+            if (err.code !== 'permission-denied' && err.code !== 'unavailable') {
+              console.error('Failed to create spectator doc:', err);
             }
-          } else if (err.code !== 'permission-denied' && err.code !== 'unavailable') {
-            console.error('Failed to increment spectator count:', err);
-          } else {
-            hasJoined = true;
-          }
-        }).then(() => {
+          }),
+          updateDoc(statsRef, {
+            spectatorCount: increment(1)
+          }).catch(async (err) => {
+            if (err.code === 'not-found') {
+              try {
+                await setDoc(statsRef, {
+                  spectatorCount: 1,
+                  createdAt: serverTimestamp(),
+                });
+              } catch (createErr: any) {
+                if (createErr.code !== 'permission-denied' && createErr.code !== 'unavailable') {
+                  console.error('Failed to create spectator count:', createErr);
+                }
+              }
+            } else if (err.code !== 'permission-denied' && err.code !== 'unavailable') {
+              console.error('Failed to increment spectator count:', err);
+            }
+          })
+        ]).then(() => {
           hasJoined = true;
         });
       });
@@ -552,12 +568,15 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       // Handle page unload (user closes tab/browser) - cleanup as best effort
       let beforeUnloadHandler: ((e: BeforeUnloadEvent) => void) | null = null;
       if (typeof window !== 'undefined') {
-        beforeUnloadHandler = () => {
-          // Decrement counter and cleanup on page unload
+          beforeUnloadHandler = () => {
+          // Remove spectator and decrement counter on page unload
           if (hasJoined) {
-            updateDoc(statsRef, {
-              spectatorCount: increment(-1)
-            }).catch(() => {}); // Ignore errors on page unload
+            Promise.all([
+              deleteDoc(spectatorRef).catch(() => {}),
+              updateDoc(statsRef, {
+                spectatorCount: increment(-1)
+              }).catch(() => {})
+            ]);
             cleanupChatMessages();
           }
         };
@@ -573,15 +592,22 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           window.removeEventListener('beforeunload', beforeUnloadHandler);
         }
         
-        // Decrement spectator count on leave
+        // Remove spectator document and decrement count on leave
         if (hasJoined) {
-          updateDoc(statsRef, {
-            spectatorCount: increment(-1)
-          }).catch(err => {
-            if (err.code !== 'permission-denied' && err.code !== 'unavailable' && err.code !== 'not-found') {
-              console.error('Failed to decrement spectator count:', err);
-            }
-          });
+          Promise.all([
+            deleteDoc(spectatorRef).catch(err => {
+              if (err.code !== 'permission-denied' && err.code !== 'unavailable' && err.code !== 'not-found') {
+                console.error('Failed to delete spectator doc:', err);
+              }
+            }),
+            updateDoc(statsRef, {
+              spectatorCount: increment(-1)
+            }).catch(err => {
+              if (err.code !== 'permission-denied' && err.code !== 'unavailable' && err.code !== 'not-found') {
+                console.error('Failed to decrement spectator count:', err);
+              }
+            })
+          ]);
         }
         
         // Clean up all chat messages
@@ -592,16 +618,15 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     }
   }, [challengeId, currentWallet, participants]);
   
-  // Listen to spectator count in real-time - SINGLE DOCUMENT (1 read total, NOT per spectator!)
-  // ULTRA-COST-EFFECTIVE: Only 1 read per lobby, not per spectator
+  // Listen to individual spectators in real-time
   useEffect(() => {
     if (!challengeId) {
       setSpectatorCount(0);
+      setSpectators([]);
       return;
     }
     
-    // SINGLE DOCUMENT - cost-effective! 1 read total, not per spectator
-    const statsRef = doc(db, 'challenge_lobbies', challengeId, 'stats', 'count');
+    const spectatorsRef = collection(db, 'challenge_lobbies', challengeId, 'spectators');
     
     let unsubscribeFn: (() => void) | null = null;
     let isActive = true;
@@ -613,47 +638,46 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       
       try {
         unsubscribeFn = onSnapshot(
-          statsRef,
+          spectatorsRef,
           (snapshot) => {
             if (!isActive) return;
             
-            if (snapshot.exists()) {
-              const data = snapshot.data();
-              const count = data.spectatorCount || 0;
-              // Cap at MAX_SPECTATORS (shouldn't happen, but safety check)
-              setSpectatorCount(Math.max(0, Math.min(count, MAX_SPECTATORS)));
-            } else {
-              setSpectatorCount(0);
-            }
+            const spectatorWallets = snapshot.docs
+              .map(doc => doc.data().wallet)
+              .filter((wallet): wallet is string => !!wallet && typeof wallet === 'string');
+            
+            setSpectators(spectatorWallets);
+            setSpectatorCount(spectatorWallets.length);
           }, 
           (error) => {
             if (!isActive) return;
             
-            // Handle errors gracefully without causing Firebase assertion failures
+            // Handle errors gracefully
             if (error.code === 'permission-denied' || error.code === 'unavailable') {
-              // Expected errors - just clear spectators
               setSpectatorCount(0);
+              setSpectators([]);
               return;
             }
             
-            // For unexpected errors, log but don't throw
             console.error('Error listening to spectators:', error);
             setSpectatorCount(0);
+            setSpectators([]);
           }
         );
       } catch (error: any) {
-        // Catch synchronous errors during setup
         if (!isActive) return;
         
         if (error.code === 'permission-denied' || error.code === 'unavailable') {
           setSpectatorCount(0);
+          setSpectators([]);
           return;
         }
         
         console.error('Failed to set up spectator listener:', error);
         setSpectatorCount(0);
+        setSpectators([]);
       }
-    }, 100); // 100ms delay to prevent race conditions
+    }, 100);
     
     // Cleanup
     return () => {
@@ -663,20 +687,21 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       }
       if (unsubscribeFn) {
         try {
-          // Unsubscribe immediately - Firebase handles cleanup internally
           unsubscribeFn();
         } catch (error) {
-          // Ignore cleanup errors - listener may already be closed
+          // Ignore cleanup errors
         }
       }
     };
   }, [challengeId]);
   
-  // Fetch participant data (display names, profile images) - only for participants, not spectators
+  // Fetch participant and spectator data (display names, profile images)
   useEffect(() => {
     const fetchPlayerData = async () => {
       const data: Record<string, { displayName?: string; profileImage?: string }> = {};
-      for (const wallet of participants) {
+      const allWallets = [...participants, ...spectators];
+      
+      for (const wallet of allWallets) {
         if (wallet) {
           try {
             const stats = await getPlayerStats(wallet);
@@ -687,17 +712,17 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
               };
             }
           } catch (error) {
-            console.error(`Failed to fetch stats for participant ${wallet}:`, error);
+            console.error(`Failed to fetch stats for ${wallet}:`, error);
           }
         }
       }
       setPlayerData(data);
     };
     
-    if (participants.length > 0) {
+    if (participants.length > 0 || spectators.length > 0) {
       fetchPlayerData();
     }
-  }, [participants]);
+  }, [participants, spectators]);
 
   return (
     <div className="space-y-2">
@@ -744,18 +769,50 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           </div>
         </div>
         
-        {/* Spectators Section - Just show count (cost-effective, no individual tracking) */}
-        {spectatorCount > 0 && (
+        {/* Spectators Section - Show individual spectators */}
+        {spectators.length > 0 && (
           <div className="mt-2 pt-2 border-t border-white/5">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">
-              Spectators ({spectatorCount}/{MAX_SPECTATORS})
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1.5">
+              Spectators ({spectators.length}/{MAX_SPECTATORS})
             </h3>
-            <div className="text-[10px] text-gray-500 italic py-1">
-              {spectatorCount} {spectatorCount === 1 ? 'person is' : 'people are'} watching
-              {spectatorCount >= MAX_SPECTATORS && (
-                <span className="block text-amber-400 mt-0.5">⚠️ Spectator limit reached</span>
-              )}
+            <div className="space-y-1.5">
+              {spectators.map((wallet: string) => {
+                const data = playerData[wallet.toLowerCase()] || {};
+                const displayName = data.displayName || `${wallet.slice(0, 4)}...${wallet.slice(-4)}`;
+                const isCurrentUser = currentWallet && wallet.toLowerCase() === currentWallet.toLowerCase();
+                
+                return (
+                  <div
+                    key={wallet}
+                    className={`flex items-center gap-2 p-1.5 rounded-md ${
+                      isCurrentUser ? 'bg-purple-500/10 border border-purple-400/30' : 'bg-white/5'
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400/20 to-indigo-600/20 border border-purple-400/30 flex items-center justify-center overflow-hidden flex-shrink-0">
+                      {data.profileImage ? (
+                        <img src={data.profileImage} alt={displayName} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-purple-300 font-semibold text-xs">
+                          {displayName.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold text-white truncate">
+                        {displayName}
+                        {isCurrentUser && <span className="ml-1.5 text-[10px] text-purple-300">(You)</span>}
+                      </div>
+                      <div className="text-[10px] text-gray-400 truncate">
+                        {wallet.slice(0, 6)}...{wallet.slice(-4)}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
+            {spectatorCount >= MAX_SPECTATORS && (
+              <div className="text-[10px] text-amber-400 mt-1.5">⚠️ Spectator limit reached</div>
+            )}
           </div>
         )}
       </div>
@@ -1065,7 +1122,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
             Match Active
           </div>
           <div className="text-sm font-semibold text-white mb-1">
-            Head-to-Head: {opponentWallet ? `${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}` : 'Waiting for opponent'}
+            Head-to-Head: {opponentWallet && typeof opponentWallet === 'string' ? `${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}` : 'Waiting for opponent'}
           </div>
           <p className="text-[10px] text-amber-100/80 mt-0.5">
             Both players have funded. Play your match and submit results.
