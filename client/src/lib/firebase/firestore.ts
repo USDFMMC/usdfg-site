@@ -70,11 +70,11 @@ export interface ChallengeData {
   maxPlayers?: number;                // Maximum players allowed
   format?: 'standard' | 'tournament'; // Challenge format. Default = standard (1v1)
   tournament?: TournamentState;       // Tournament metadata when format === 'tournament'
-  // Prize claim fields
-  canClaim?: boolean;                 // Whether winner can claim prize
-  payoutTriggered?: boolean;          // Whether prize has been claimed
-  payoutSignature?: string;            // Transaction signature of prize claim
-  payoutTimestamp?: Timestamp;        // When prize was claimed
+  // Reward claim fields
+  canClaim?: boolean;                 // Whether winner can claim reward
+  payoutTriggered?: boolean;          // Whether reward has been claimed
+  payoutSignature?: string;            // Transaction signature of reward claim
+  payoutTimestamp?: Timestamp;        // When reward was claimed
   pda?: string;                       // Challenge PDA for smart contract
   prizePool?: number;                 // Total challenge reward amount
   // UI display fields
@@ -438,7 +438,7 @@ export const submitTournamentMatchResult = async (
       };
       
       await updateDoc(challengeRef, updates);
-      console.log('✅ Tournament completed! Champion:', winnerWallet, '- Prize claiming enabled');
+      console.log('✅ Tournament completed! Champion:', winnerWallet, '- Reward claiming enabled');
       return;
     }
 
@@ -706,7 +706,7 @@ export const advanceBracketWinner = async (
       };
       
       await updateDoc(challengeRef, updates);
-      console.log('✅ Tournament completed! Champion:', winnerWallet, '- Prize claiming enabled');
+      console.log('✅ Tournament completed! Champion:', winnerWallet, '- Reward claiming enabled');
       return;
     }
 
@@ -1307,6 +1307,20 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
     };
 
     await updateDoc(challengeRef, updates);
+    
+    // CRITICAL: Verify the update was applied
+    const verifySnap = await getDoc(challengeRef);
+    if (verifySnap.exists()) {
+      const verifiedData = verifySnap.data() as ChallengeData;
+      console.log('✅ Join intent expressed - Status updated to:', verifiedData.status, 'Pending joiner:', verifiedData.pendingJoiner);
+      
+      // Double-check the status was actually updated
+      if (verifiedData.status !== 'creator_confirmation_required') {
+        console.error('❌ Status update failed! Expected creator_confirmation_required, got:', verifiedData.status);
+        // Force update again
+        await updateDoc(challengeRef, { status: 'creator_confirmation_required' });
+      }
+    }
 
     // Update challenge notification status if this was a targeted challenge
     if (data.targetPlayer && data.targetPlayer.toLowerCase() === wallet.toLowerCase()) {
@@ -1691,7 +1705,7 @@ export async function recordFounderChallengeReward(
       });
     }
 
-    // Update challenge to mark prize as transferred and set actual challenge reward
+    // Update challenge to mark reward as transferred and set actual challenge reward
     const challengeRef = doc(db, 'challenges', challengeId);
     await updateDoc(challengeRef, {
       payoutTriggered: true,
@@ -2086,7 +2100,7 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
       console.log(`⚠️ Challenge reward not found in challenge data, calculated from challenge amount: ${entryFee} USDFG → ${prizePool} USDFG`);
     }
     
-    console.log('   Game:', data.game, 'Category:', data.category, 'Prize:', prizePool, 'Type:', isTeamChallenge ? 'Team' : 'Solo');
+    console.log('   Game:', data.game, 'Category:', data.category, 'Reward:', prizePool, 'Type:', isTeamChallenge ? 'Team' : 'Solo');
     
     // Update stats (player or team)
     if (isTeamChallenge) {
@@ -2120,7 +2134,7 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     });
     
     console.log('💰 Challenge reward ready for claim:', prizePool, 'USDFG to', winner);
-    console.log('✅ Winner can now claim their prize (they pay gas, not you!)');
+    console.log('✅ Winner can now claim their reward (they pay gas, not you!)');
     
   } catch (error) {
     console.error('❌ Error determining winner:', error);
@@ -3968,9 +3982,9 @@ export async function recalculateAllTrustScores(): Promise<void> {
 // ============================================
 
 /**
- * Claim prize for a completed challenge (WINNER ONLY)
+ * Claim reward for a completed challenge (WINNER ONLY)
  * 
- * Winner determines automatically, but winner must claim their prize themselves.
+ * Winner determines automatically, but winner must claim their reward themselves.
  * This way the WINNER pays the gas fee (~$0.0005), not the platform admin.
  * 
  * @param challengeId - Firestore challenge ID
@@ -3983,7 +3997,7 @@ export async function claimChallengePrize(
   connection: any
 ): Promise<void> {
   try {
-    console.log('🏆 Claiming prize for challenge:', challengeId);
+    console.log('🏆 Claiming reward for challenge:', challengeId);
     
     // Get challenge data from Firestore
     const challengeRef = doc(db, 'challenges', challengeId);
@@ -3997,7 +4011,7 @@ export async function claimChallengePrize(
     
     // CRITICAL: Idempotency guard - prevent double claiming
     if (data.payoutTriggered || data.prizeClaimedAt) {
-      console.log('✅ Prize already claimed - idempotent check passed');
+      console.log('✅ Reward already claimed - idempotent check passed');
       return; // Already claimed, return success
     }
     
@@ -4021,8 +4035,8 @@ export async function claimChallengePrize(
     const isFounderChallenge = !data.pda && (isFree || isAdmin);
     
     if (isFounderChallenge) {
-      // Founder Challenge prizes are transferred manually by the founder, not via smart contract
-      throw new Error('🏆 This is a Founder Challenge. Prizes are transferred manually by the founder after the challenge completes. Please contact the founder to receive your prize.');
+      // Founder Challenge rewards are transferred manually by the founder, not via smart contract
+      throw new Error('🏆 This is a Founder Challenge. Rewards are transferred manually by the founder after the challenge completes. Please contact the founder to receive your reward.');
     }
     
     // If no PDA, try to derive it from the challenge data
@@ -4036,7 +4050,7 @@ export async function claimChallengePrize(
       
       // Try to find the PDA by looking up the challenge on-chain
       // For now, we'll need to manually add the PDA to the challenge document
-      throw new Error('❌ Challenge has no on-chain PDA. This challenge was created before the PDA field was added. Please create a new challenge to use the claim prize functionality.');
+      throw new Error('❌ Challenge has no on-chain PDA. This challenge was created before the PDA field was added. Please create a new challenge to use the claim reward functionality.');
     }
     
     if (!data.canClaim) {
@@ -4050,12 +4064,12 @@ export async function claimChallengePrize(
     
     const callerAddress = winnerWallet.publicKey.toString();
     if (callerAddress !== data.winner) {
-      throw new Error('❌ Only the winner can claim the prize');
+      throw new Error('❌ Only the winner can claim the reward');
     }
     
     // Prevent duplicate claims
     if (data.payoutTriggered) {
-      throw new Error('⚠️  Prize already claimed');
+      throw new Error('⚠️  Reward already claimed');
     }
     
     console.log('✅ Validation passed - calling smart contract...');
@@ -4063,18 +4077,18 @@ export async function claimChallengePrize(
     console.log('   Challenge Reward:', data.prizePool, 'USDFG');
     console.log('   Challenge PDA:', challengePDA);
     
-    // ✅ REMOVED: Expiration check for prize claims
-    // Winners can claim prizes ANYTIME after challenge completion (no expiration).
+    // ✅ REMOVED: Expiration check for reward claims
+    // Winners can claim rewards ANYTIME after challenge completion (no expiration).
     // Once both players submit results and challenge is completed in Firestore,
-    // the winner should be able to claim their prize whenever they want.
-    // The dispute_timer only prevents joining expired challenges, not claiming prizes.
+    // the winner should be able to claim their reward whenever they want.
+    // The dispute_timer only prevents joining expired challenges, not claiming rewards.
     
     // Import the resolveChallenge function
     const { resolveChallenge } = await import('../chain/contract');
     
     // Call smart contract (winner pays gas!)
     console.log('🚀 Winner calling smart contract to release escrow...');
-    console.log('   Note: Prize claims have NO expiration - winners can claim anytime!');
+    console.log('   Note: Reward claims have NO expiration - winners can claim anytime!');
     
     try {
       const signature = await resolveChallenge(
@@ -4084,27 +4098,27 @@ export async function claimChallengePrize(
         data.winner
       );
     
-      // Update Firestore to mark prize as claimed
+      // Update Firestore to mark reward as claimed
       await updateDoc(challengeRef, {
         payoutTriggered: true,
-        prizeClaimedAt: Timestamp.now(), // Mark as claimed for unclaimed prize filter
+        prizeClaimedAt: Timestamp.now(), // Mark as claimed for unclaimed reward filter
         payoutSignature: signature,
         payoutTimestamp: Timestamp.now(),
         updatedAt: Timestamp.now(),
       });
       
-      console.log('✅ PRIZE CLAIMED!');
+      console.log('✅ REWARD CLAIMED!');
       console.log('   Transaction:', signature);
       console.log('   Winner received:', data.prizePool, 'USDFG');
     } catch (contractError: any) {
       // Handle specific smart contract errors
-      // Note: ChallengeExpired should no longer occur for prize claims since we removed the check
+      // Note: ChallengeExpired should no longer occur for reward claims since we removed the check
       // But keep this handler for backwards compatibility with old deployed contracts
       if (contractError.message?.includes('ChallengeExpired') || 
           contractError.message?.includes('6005') ||
           contractError.logs?.some((log: string) => log.includes('ChallengeExpired') || log.includes('Challenge has expired'))) {
         console.error('⚠️ Old contract version detected - still has expiration check. Please redeploy with updated contract.');
-        const expiredError = new Error('❌ Old contract version detected. Please contact support to redeploy the contract without expiration check for prize claims.');
+        const expiredError = new Error('❌ Old contract version detected. Please contact support to redeploy the contract without expiration check for reward claims.');
         expiredError.name = 'ChallengeExpired';
         throw expiredError;
       }
@@ -4112,7 +4126,7 @@ export async function claimChallengePrize(
     }
     
   } catch (error) {
-    console.error('❌ Error claiming prize:', error);
+    console.error('❌ Error claiming reward:', error);
     throw error;
   }
 }

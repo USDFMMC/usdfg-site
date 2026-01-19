@@ -114,6 +114,22 @@ service cloud.firestore {
         allow update: if true; // Allow users to update their own lastSeen (wallet matches doc ID)
         allow delete: if true; // Allow users to remove themselves when they leave
       }
+      
+      // Voice Controls subcollection - creator mute controls for participants/spectators
+      match /voice_controls/{wallet} {
+        allow read: if true; // Anyone can read mute status
+        allow create: if true; // Allow creators to mute participants/spectators
+        allow update: if true; // Allow updates to mute status
+        allow delete: if true; // Allow creators to unmute (by deleting the doc)
+      }
+      
+      // Stats subcollection - spectator count tracking
+      match /stats/{statId} {
+        allow read: if true; // Anyone can read stats
+        allow create: if true; // Allow creation for spectator count
+        allow update: if true; // Allow updates to spectator count
+        allow delete: if true; // Allow deletion for cleanup
+      }
     }
   }
 }

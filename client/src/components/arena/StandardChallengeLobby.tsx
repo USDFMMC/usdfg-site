@@ -58,7 +58,17 @@ const MuteAllSpectatorsButton: React.FC<{ challengeId: string; spectators: strin
       await Promise.all(mutePromises);
     } catch (error: any) {
       console.error('Failed to mute all spectators:', error);
-      alert('Failed to mute all spectators. Please try again.');
+      const errorMsg = error.message || error.toString() || 'Unknown error';
+      const errorCode = error.code || 'unknown';
+      
+      // Provide more specific error messages
+      if (errorCode === 'permission-denied') {
+        alert('❌ Permission denied. You may not have permission to mute spectators. Please refresh and try again.');
+      } else if (errorCode === 'unavailable') {
+        alert('⚠️ Firestore is temporarily unavailable. Please check your connection and try again.');
+      } else {
+        alert(`Failed to mute all spectators: ${errorMsg}. Please try again.`);
+      }
     } finally {
       setIsMuting(false);
     }
@@ -121,7 +131,17 @@ const MuteParticipantButton: React.FC<{ challengeId: string; wallet: string; dis
       }
     } catch (error: any) {
       console.error('Failed to toggle mute:', error);
-      alert('Failed to toggle mute. Please try again.');
+      const errorMsg = error.message || error.toString() || 'Unknown error';
+      const errorCode = error.code || 'unknown';
+      
+      // Provide more specific error messages
+      if (errorCode === 'permission-denied') {
+        alert('❌ Permission denied. You may not have permission to mute this player. Please refresh and try again.');
+      } else if (errorCode === 'unavailable') {
+        alert('⚠️ Firestore is temporarily unavailable. Please check your connection and try again.');
+      } else {
+        alert(`Failed to toggle mute: ${errorMsg}. Please try again.`);
+      }
     } finally {
       setIsToggling(false);
     }
@@ -184,14 +204,32 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     
     const challengeRef = doc(db, 'challenges', challenge.id);
     
+    // Use includeMetadataChanges to get updates faster
     const unsubscribe = onSnapshot(
       challengeRef,
+      {
+        includeMetadataChanges: true // Get updates even for metadata changes (faster)
+      },
       async (snapshot) => {
         if (snapshot.exists()) {
           const updatedData = { id: snapshot.id, ...snapshot.data(), rawData: snapshot.data() };
+          const status = getChallengeStatus(updatedData);
+          const pendingJoiner = getChallengePendingJoiner(updatedData);
+          
+          // Only log significant status changes to reduce noise
+          const prevStatus = liveChallenge ? getChallengeStatus(liveChallenge) : null;
+          if (status !== prevStatus || pendingJoiner !== getChallengePendingJoiner(liveChallenge || challenge)) {
+            console.log('🔄 Challenge real-time update received:', {
+              challengeId: challenge.id,
+              status,
+              prevStatus,
+              pendingJoiner,
+              hasCreator: !!(updatedData as any).creator,
+              timestamp: new Date().toISOString()
+            });
+          }
           
           // Auto-fix: If challenge is active but players array is empty, fix it
-          const status = getChallengeStatus(updatedData);
           if (status === 'active') {
             const players = (updatedData as any).players || (updatedData as any).rawData?.players || [];
             const creator = (updatedData as any).creator || (updatedData as any).rawData?.creator;
@@ -207,6 +245,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
             }
           }
           
+          // Update immediately - don't wait for async operations
           setLiveChallenge(updatedData);
         } else {
           setLiveChallenge(challenge);
@@ -379,16 +418,22 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const statusDisplay = getStatusDisplay();
   
   // CRITICAL: Use resolved role for all participant checks (deterministic)
+  // Also check if user is challenger by wallet even if role says pending_joiner (for creator_funded state)
   const isCreator = userRole === 'creator';
-  const isChallenger = userRole === 'challenger';
-  const isPendingJoiner = userRole === 'pending_joiner';
+  const challengerWallet = getChallengeValue<string | null>('challenger', null);
+  const pendingJoinerWallet = getChallengeValue<string | null>('pendingJoiner', null);
+  const isChallengerByWallet = currentWallet && challengerWallet && challengerWallet.toLowerCase() === currentWallet.toLowerCase();
+  const isPendingJoinerByWallet = currentWallet && pendingJoinerWallet && pendingJoinerWallet.toLowerCase() === currentWallet.toLowerCase();
+  
+  // If status is creator_funded and user is the challenger (by wallet), treat them as challenger
+  const isChallenger = userRole === 'challenger' || (status === 'creator_funded' && isChallengerByWallet);
+  const isPendingJoiner = userRole === 'pending_joiner' && !isChallenger;
   const isPlayer = userRole === 'player';
   const isParticipant = userRole !== 'spectator';
   
   // Get wallet addresses for participant count calculation
   const creatorWallet = getChallengeValue<string>('creator', '') || '';
-  const challengerWallet = getChallengeValue<string | null>('challenger', null);
-  const pendingJoinerWallet = getChallengeValue<string | null>('pendingJoiner', null);
+  // challengerWallet and pendingJoinerWallet already defined above
   
   const maxPlayers = getChallengeValue('maxPlayers', 2);
   
@@ -441,12 +486,50 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     // Creator funding: creator + creator_confirmation_required + deadline not expired
     if (userRole === 'creator' && status === 'creator_confirmation_required' && !isDeadlineExpired && onCreatorFund) {
       state.showCreatorFund = true;
+      console.log('✅ Creator fund button should be visible:', {
+        userRole,
+        status,
+        isDeadlineExpired,
+        hasHandler: !!onCreatorFund,
+        pendingJoiner: getChallengePendingJoiner(activeChallenge)
+      });
+    } else if (userRole === 'creator' && status === 'creator_confirmation_required') {
+      console.log('⚠️ Creator fund button NOT showing:', {
+        userRole,
+        status,
+        isDeadlineExpired,
+        hasHandler: !!onCreatorFund,
+        pendingJoiner: getChallengePendingJoiner(activeChallenge)
+      });
     }
     
     // Joiner funding: challenger + creator_funded + deadline not expired
     // CRITICAL: Challenger must always see Fund Entry when status is creator_funded
-    if (userRole === 'challenger' && status === 'creator_funded' && !isJoinerDeadlineExpired && onJoinerFund) {
+    // Also check by wallet in case role resolution is delayed (pendingJoiner -> challenger transition)
+    const isChallengerByWallet = currentWallet && challengerWallet && challengerWallet.toLowerCase() === currentWallet.toLowerCase();
+    const isActuallyChallenger = userRole === 'challenger' || (status === 'creator_funded' && isChallengerByWallet);
+    
+    if (isActuallyChallenger && status === 'creator_funded' && !isJoinerDeadlineExpired && onJoinerFund) {
       state.showJoinerFund = true;
+      console.log('✅ Joiner fund button should be visible:', {
+        userRole,
+        isActuallyChallenger,
+        status,
+        isJoinerDeadlineExpired,
+        hasHandler: !!onJoinerFund,
+        joinerFundingDeadline: joinerFundingDeadline?.toMillis(),
+        challengerWallet
+      });
+    } else if (isActuallyChallenger && status === 'creator_funded') {
+      console.log('⚠️ Joiner fund button NOT showing:', {
+        userRole,
+        isActuallyChallenger,
+        status,
+        isJoinerDeadlineExpired,
+        hasHandler: !!onJoinerFund,
+        joinerFundingDeadline: joinerFundingDeadline?.toMillis(),
+        challengerWallet
+      });
     }
     
     // Join button: spectator + joinable status + not full + handler available
@@ -476,7 +559,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       state.showSubmit = true;
     }
     
-    // Claim prize: participant + completed + won + not claimed
+    // Claim reward: participant + completed + won + not claimed
     const winner = getChallengeValue<string | null>('winner', null) as string | null;
     const userWon = currentWallet && winner && typeof winner === 'string' && winner.toLowerCase() === currentWallet.toLowerCase();
     const prizeClaimed = activeChallenge.rawData?.prizeClaimed || activeChallenge.prizeClaimed;
@@ -485,7 +568,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     }
     
     return state;
-  }, [isRoleResolved, userRole, status, isDeadlineExpired, isJoinerDeadlineExpired, isFull, onCreatorFund, onJoinerFund, onJoinChallenge, onCancelChallenge, players, creatorWallet, challengerWallet, hasAlreadySubmitted, currentWallet, activeChallenge]);
+  }, [isRoleResolved, userRole, status, isDeadlineExpired, isJoinerDeadlineExpired, isFull, onCreatorFund, onJoinerFund, onJoinChallenge, onCancelChallenge, players, creatorWallet, challengerWallet, hasAlreadySubmitted, currentWallet, activeChallenge, joinerFundingDeadline]);
   
   // Extract CTA flags
   const canCreatorFund = ctaState.showCreatorFund;
@@ -495,7 +578,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const canSubmitResult = ctaState.showSubmit;
   const canClaimPrize = ctaState.showClaim;
   
-  // Prize claimed check (for display)
+  // Reward claimed check (for display)
   const prizeClaimed = activeChallenge.rawData?.prizeClaimed || activeChallenge.prizeClaimed;
   
   // Winner check (for display)
@@ -1509,7 +1592,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         </div>
       )}
 
-      {/* Prize Claiming Section - Show when challenge is completed and user won */}
+      {/* Reward Claiming Section - Show when challenge is completed and user won */}
       {canClaimPrize && !prizeClaimed && (
         <div className="rounded-lg border border-emerald-400/30 bg-gradient-to-br from-emerald-500/10 to-green-500/10 p-2.5 space-y-2">
           <div className="text-center">
@@ -1521,7 +1604,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                 try {
                   await onClaimPrize(activeChallenge);
                 } catch (error) {
-                  console.error('Error claiming prize:', error);
+                  console.error('Error claiming reward:', error);
                 }
               }}
               disabled={isClaiming}
@@ -1533,14 +1616,14 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                   Claiming… Confirm in wallet
                 </span>
               ) : (
-                'Claim Prize'
+                'Claim Reward'
               )}
             </button>
             <div className="text-[10px] text-emerald-100/90 font-medium mb-1">
               This will open your wallet
             </div>
             <div className="text-xs text-emerald-100/80 mb-1">
-              Prize payout minus platform fee
+              Reward payout minus platform fee
             </div>
             <div className="text-[10px] text-emerald-100/60 italic">
               This action releases escrowed USDFG to the winner.
@@ -1549,12 +1632,12 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         </div>
       )}
 
-      {/* Prize Claimed Message */}
+      {/* Reward Claimed Message */}
       {canClaimPrize && prizeClaimed && (
         <div className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 p-2.5 text-center">
           <div className="text-xl mb-1.5">✅</div>
           <p className="text-xs font-semibold text-emerald-200">
-            Prize claimed! Check your wallet for {prizePool} USDFG
+            Reward claimed! Check your wallet for {prizePool} USDFG
           </p>
         </div>
       )}

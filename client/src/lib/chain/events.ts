@@ -467,14 +467,14 @@ export async function fetchEvents(): Promise<any[]> {
       id: "1",
       title: "Solana Gaming Tournament",
       date: "2024-01-15",
-      prize: "100 SOL",
+      reward: "100 SOL",
       participants: 45
     },
     {
       id: "2", 
       title: "DeFi Challenge",
       date: "2024-01-20",
-      prize: "50 SOL",
+      reward: "50 SOL",
       participants: 23
     }
   ];

@@ -37,7 +37,7 @@ export function getChallengeEntryFee(challenge: any): number {
 }
 
 /**
- * Get challenge prize pool (challenge reward)
+ * Get challenge reward pool (challenge reward)
  */
 export function getChallengePrizePool(challenge: any): number {
   return challenge?.prizePool || 

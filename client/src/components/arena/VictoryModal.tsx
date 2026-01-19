@@ -127,9 +127,9 @@ const VictoryModal: React.FC<VictoryModalProps> = ({
                 <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-amber-500/10 via-transparent to-amber-500/10" />
                 <div className="absolute inset-0 rounded-lg bg-gradient-to-b from-amber-500/10 via-transparent to-amber-500/10" />
               
-                {/* Content - Match claim prize box sizing exactly */}
+                {/* Content - Match claim reward box sizing exactly */}
                 <div className="relative p-2.5 text-center space-y-2">
-                {/* Trophy Icon - Match claim prize box (text-2xl emoji size) */}
+                {/* Trophy Icon - Match claim reward box (text-2xl emoji size) */}
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
@@ -158,7 +158,7 @@ const VictoryModal: React.FC<VictoryModalProps> = ({
                   </div>
                 </motion.div>
 
-                {/* Header - Match claim prize box exactly */}
+                {/* Header - Match claim reward box exactly */}
                 <motion.h2
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -168,7 +168,7 @@ const VictoryModal: React.FC<VictoryModalProps> = ({
                   You Won!
                 </motion.h2>
 
-                {/* Body Copy - Match claim prize box exactly */}
+                {/* Body Copy - Match claim reward box exactly */}
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -185,7 +185,7 @@ const VictoryModal: React.FC<VictoryModalProps> = ({
                   )}
                 </motion.div>
 
-                {/* CTA Button - Match claim prize box exactly */}
+                {/* CTA Button - Match claim reward box exactly */}
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}

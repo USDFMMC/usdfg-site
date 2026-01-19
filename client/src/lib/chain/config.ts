@@ -10,7 +10,7 @@ import { PublicKey } from '@solana/web3.js';
 // Smart Contract Program ID (deployed on devnet) - DEPLOYED VIA PLAYGROUND
 // Old contract: 2KL4BKvUtDmABvuvRopkCEb33myWM1W9BGodAZ82RWDT
 // Previous: 9NBcMx3x8EotQi63fukhXpYbcBRgyWj6PcEFyEaL9oqo (had authority bug)
-// Previous: DX4C2FyAKSiycDVSoYgm7WyDgmPNTdBKbvVDyKGGH6wK (had per-challenge authority fix but prize claim expiration)
+// Previous: DX4C2FyAKSiycDVSoYgm7WyDgmPNTdBKbvVDyKGGH6wK (had per-challenge authority fix but reward claim expiration)
 // Previous: 3UCz8aURYFXUqNWgHDfbiRziVKjPB8G7BYrgj93MyHUp (old intent-first version)
 // LATEST: New intent-first flow - NO payment during challenge creation
 // Deployed via Solana Playground: FXxGzstg3FXqfbX5DRKTabf518SBWRP5d2zumbCim5WP

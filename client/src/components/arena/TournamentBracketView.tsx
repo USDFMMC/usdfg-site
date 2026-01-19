@@ -100,7 +100,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   const champion = tournament.champion;
   const isChampion = currentWallet && champion && currentWallet.toLowerCase() === champion.toLowerCase();
   
-  // Check if prize can be claimed
+  // Check if reward can be claimed
   const canClaim = challenge?.canClaim || challenge?.rawData?.canClaim;
   const prizeClaimed = challenge?.prizeClaimed || challenge?.rawData?.prizeClaimed || challenge?.rawData?.prizeClaimedAt || challenge?.payoutTriggered;
   const canClaimPrize = isChampion && isCompleted && canClaim && !prizeClaimed;
@@ -124,7 +124,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
               {canClaimPrize && onClaimPrize ? (
                 <div className="space-y-2">
                   <div className="text-xs text-emerald-100/80 mb-2">
-                    Claim your prize to receive the tournament reward!
+                    Claim your reward to receive the tournament reward!
                   </div>
                   <button
                     onClick={async () => {
@@ -132,24 +132,24 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
                         try {
                           await onClaimPrize(challenge);
                         } catch (error: any) {
-                          console.error('Error claiming prize:', error);
-                          alert(error.message || 'Failed to claim prize');
+                          console.error('Error claiming reward:', error);
+                          alert(error.message || 'Failed to claim reward');
                         }
                       }
                     }}
                     disabled={isClaiming}
                     className="w-full rounded-lg bg-emerald-500/20 px-4 py-2 text-sm font-semibold text-emerald-200 transition-all hover:bg-emerald-500/30 hover:shadow-[0_0_12px_rgba(16,185,129,0.3)] border border-emerald-400/40 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isClaiming ? 'Claiming...' : '🏆 Claim Prize'}
+                    {isClaiming ? 'Claiming...' : '🏆 Claim Reward'}
                   </button>
                 </div>
               ) : prizeClaimed ? (
                 <div className="text-xs text-emerald-100/80">
-                  ✅ Prize claimed! Check your wallet for the USDFG reward.
+                  ✅ Reward claimed! Check your wallet for the USDFG reward.
                 </div>
               ) : (
                 <div className="text-xs text-emerald-100/80">
-                  Prize claiming will be available soon...
+                  Reward claiming will be available soon...
                 </div>
               )}
             </div>

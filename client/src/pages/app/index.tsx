@@ -836,7 +836,7 @@ const ArenaHome: React.FC = () => {
     challengeId?: string;
     opponentWallet?: string; // Store opponent wallet for trust review
     autoWon?: boolean; // Flag to indicate this win was auto-determined (opponent submitted loss)
-    needsClaim?: boolean; // Flag to indicate user needs to claim prize after review
+    needsClaim?: boolean; // Flag to indicate user needs to claim reward after review
   } | null>(null);
   const [copiedWallet, setCopiedWallet] = useState<string | null>(null);
   const [showAllPlayers, setShowAllPlayers] = useState<boolean>(false);
@@ -1177,7 +1177,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       setShowTrustReview(false);
       setTrustReviewOpponent('');
       
-      // Clear prize claiming states
+      // Clear reward claiming states
       setClaimingPrize(null);
       setMarkingPrizeTransferred(null);
   }, [publicKey]);
@@ -1286,10 +1286,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   // Use Firestore real-time challenges
   const { challenges: firestoreChallenges, loading: challengesLoading, error: challengesError } = useChallenges();
   
-  // Separate state for completed challenges with unclaimed prizes (persists even after refresh)
+  // Separate state for completed challenges with unclaimed rewards (persists even after refresh)
   const [unclaimedPrizeChallenges, setUnclaimedPrizeChallenges] = useState<any[]>([]);
   
-  // Listen for completed challenges where current user won but hasn't claimed prize
+  // Listen for completed challenges where current user won but hasn't claimed reward
   useEffect(() => {
     if (!publicKey || !isConnected) {
       setUnclaimedPrizeChallenges([]);
@@ -1298,7 +1298,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     
     const currentWallet = publicKey.toString().toLowerCase();
     
-    // Check firestoreChallenges for completed challenges with unclaimed prizes
+    // Check firestoreChallenges for completed challenges with unclaimed rewards
     const unclaimed = firestoreChallenges.filter((challenge: any) => {
       const status = challenge.status || challenge.rawData?.status;
       const winner = challenge.rawData?.winner || challenge.winner;
@@ -1306,7 +1306,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const payoutTriggered = challenge.rawData?.payoutTriggered || challenge.payoutTriggered;
       const userWon = winner && winner.toLowerCase() === currentWallet.toLowerCase();
       
-      // Prize is claimed if either prizeClaimedAt exists OR payoutTriggered is true
+      // Reward is claimed if either prizeClaimedAt exists OR payoutTriggered is true
       const isClaimed = prizeClaimedAt || payoutTriggered;
       
       return status === 'completed' && userWon && !isClaimed;
@@ -1916,7 +1916,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         setShowTournamentLobby(false);
       }
       
-      // Open standard lobby for active challenges only (completed challenges with prizes handled separately)
+      // Open standard lobby for active challenges only (completed challenges with rewards handled separately)
       const status = challenge.status || challenge.rawData?.status;
       if (status === 'active') {
       setSelectedChallenge({
@@ -2230,8 +2230,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const challengePDA = null; // PDA will be created later in creatorFund
       console.log('📝 Challenge created in Firestore only. PDA will be created when creator funds.');
       
-      // Calculate prize pool
-      // For Founder Challenges: admin sets prize pool manually (no platform fee)
+      // Calculate reward pool
+      // For Founder Challenges: admin sets reward pool manually (no platform fee)
       // For tournaments: entryFee * maxPlayers minus 5% platform fee
       // For regular challenges: 2x entry fee minus 5% platform fee
       const isTournament = challengeData.format === 'tournament' || challengeData.tournament;
@@ -2286,9 +2286,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         maxPlayers: challengeData.maxPlayers || maxPlayers, // Respect tournament size when provided
         format: challengeData.format || (challengeData.tournament ? 'tournament' : 'standard'),
         tournament: challengeData.format === 'tournament' ? challengeData.tournament : undefined,
-        // Prize claim fields
+        // Reward claim fields
         pda: isFounderChallenge ? null : undefined, // PDA will be created when creator funds (null for Founder Challenges)
-        prizePool: prizePool, // Prize pool (for Founder Challenges, admin sets this)
+        prizePool: prizePool, // Reward pool (for Founder Challenges, admin sets this)
         // Store only the title which contains game info - saves storage costs
         title: challengeTitle, // Generated title with game info
         // Store game name for display - players need to know which game
@@ -2619,11 +2619,72 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         }
       }
       
-      // CRITICAL: Express intent in Firestore ONLY - no on-chain calls
-      // This is now a UI-only action - no wallet popup, no SOL fee
+      // Express intent in Firestore first
       await expressJoinIntent(challenge.id, walletAddr);
       
-      // Immediately update selectedChallenge to trigger UI update
+      // CRITICAL: Immediately update the challenge in state for instant UI update
+      // This ensures creator sees the update immediately without waiting for Firestore listener
+      const optimisticUpdate = {
+        ...challenge,
+        status: 'creator_confirmation_required',
+        pendingJoiner: walletAddr,
+        creatorFundingDeadline: { toMillis: () => Date.now() + (5 * 60 * 1000) }, // 5 minutes from now
+        rawData: {
+          ...(challenge.rawData || challenge),
+          status: 'creator_confirmation_required',
+          pendingJoiner: walletAddr,
+          creatorFundingDeadline: { toMillis: () => Date.now() + (5 * 60 * 1000) }
+        }
+      };
+      
+      // Update selectedChallenge immediately for instant UI feedback
+      setSelectedChallenge({
+        id: optimisticUpdate.id,
+        title: optimisticUpdate.title || extractGameFromTitle(optimisticUpdate.title || '') || "Challenge",
+        ...optimisticUpdate,
+        rawData: optimisticUpdate.rawData || optimisticUpdate
+      });
+      
+      // Also update in firestoreChallenges array if it exists
+      if (firestoreChallenges) {
+        const updatedChallenges = firestoreChallenges.map((c: any) => 
+          c.id === challenge.id ? optimisticUpdate : c
+        );
+        // Trigger a re-render by updating a state that depends on firestoreChallenges
+        // The real-time listener will sync the actual data shortly
+      }
+      
+      // CRITICAL: Also express intent on-chain so creator can fund
+      // This ensures on-chain state matches Firestore state
+      let challengePDA = challenge.pda || challenge.rawData?.pda;
+      
+      if (challengePDA && publicKey && connection && wallet.signTransaction) {
+        try {
+          console.log('🔗 Expressing join intent on-chain to sync with Firestore...');
+          const { expressJoinIntent: expressJoinIntentOnChain } = await import('@/lib/chain/contract');
+          await expressJoinIntentOnChain(
+            { signTransaction: wallet.signTransaction, publicKey },
+            connection,
+            challengePDA
+          );
+          console.log('✅ Join intent expressed on-chain successfully');
+        } catch (onChainError: any) {
+          const errorMsg = onChainError.message || onChainError.toString() || '';
+          // If intent was already expressed on-chain, that's OK
+          if (errorMsg.includes('already') || errorMsg.includes('Already') || 
+              errorMsg.includes('duplicate') || errorMsg.includes('Constraint')) {
+            console.log('ℹ️ Join intent already expressed on-chain - this is OK');
+          } else {
+            console.warn('⚠️ Failed to express join intent on-chain (non-critical):', onChainError);
+            // Don't throw - Firestore update succeeded, on-chain can be done later
+            // The creator will get a helpful error message if they try to fund
+          }
+        }
+      } else if (!challengePDA) {
+        console.log('ℹ️ Challenge PDA not created yet - on-chain intent will be expressed when creator funds');
+      }
+      
+      // Fetch fresh data to ensure we have the latest (real-time listener will also update)
       const updatedChallenge = await fetchChallengeById(challenge.id);
       if (updatedChallenge) {
         setSelectedChallenge({
@@ -2993,7 +3054,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             // Continue anyway - transaction may have succeeded (don't throw, let it proceed to Firestore update)
           }
         } else if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770') || errorMsg.includes('6000') || errorMsg.includes('Challenge is not open')) {
-          throw new Error('⚠️ Challenge state mismatch on-chain. The contract may need to be redeployed to support funding without on-chain challenger intent. Please contact support or try again after contract update.');
+          // Challenge state mismatch - challenger needs to express intent on-chain first
+          // This happens when challenger joined in Firestore but didn't express intent on-chain
+          const pendingJoinerWallet = freshChallenge.pendingJoiner || challenge.rawData?.pendingJoiner;
+          if (pendingJoinerWallet) {
+            throw new Error(`⚠️ The challenger (${pendingJoinerWallet.slice(0, 8)}...) needs to express their intent on-chain before you can fund.\n\n` +
+              `Please ask them to click "Join Challenge" again - this will express their intent on-chain (no payment required, just a small transaction fee).\n\n` +
+              `Once they've done that, you'll be able to fund the challenge.`);
+          } else {
+            throw new Error('⚠️ Challenge state mismatch on-chain. Please refresh and try again.');
+          }
         } else {
           throw fundError; // Re-throw if it's a different error
         }
@@ -3353,13 +3423,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const challengeStatus = selectedChallenge?.status || selectedChallenge?.rawData?.status;
       const isCompleted = challengeStatus === 'completed';
       
-      // Keep lobby open if needs claim or if challenge is completed (for prize claiming)
+      // Keep lobby open if needs claim or if challenge is completed (for reward claiming)
       if (!needsClaim && !isCompleted) {
       setSelectedChallenge(null);
         // Only close lobby if challenge is not completed
         setShowStandardLobby(false);
       } else {
-        // Keep lobby open for prize claiming - ensure it's open
+        // Keep lobby open for reward claiming - ensure it's open
         if (!showStandardLobby) {
           setShowStandardLobby(true);
         }
@@ -3477,7 +3547,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         
         if (!hasReviewed) {
           // User hasn't reviewed yet - show review modal first
-          console.log('🎯 User tried to claim prize but hasn\'t reviewed yet - showing review modal');
+          console.log('🎯 User tried to claim reward but hasn\'t reviewed yet - showing review modal');
           
           // Get players array - handle both rawData and challenge.players formats
           const playersArray = challenge.rawData?.players || (Array.isArray(challenge.players) ? challenge.players : []);
@@ -3528,9 +3598,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               return;
             }
             
-            // ✅ REMOVED: Expiration check for prize claims
-            // Winners can claim prizes ANYTIME after challenge completion (no expiration).
-            // The dispute_timer only prevents joining expired challenges, not claiming prizes.
+            // ✅ REMOVED: Expiration check for reward claims
+            // Winners can claim rewards ANYTIME after challenge completion (no expiration).
+            // The dispute_timer only prevents joining expired challenges, not claiming rewards.
           }
         } catch (onChainError) {
         }
@@ -3549,7 +3619,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       alert("🏆 Reward claimed! Check your wallet for the USDFG tokens.");
       
-      // Refresh USDFG balance after successful prize claim
+      // Refresh USDFG balance after successful reward claim
       setTimeout(() => {
         refreshUSDFGBalance().catch(() => {
           // Silently handle errors
@@ -3559,7 +3629,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // The real-time listener will update the UI automatically
       // But we've already optimistically removed it from the list above
     } catch (error) {
-      console.error("❌ Failed to claim prize:", error);
+      console.error("❌ Failed to claim reward:", error);
       
       // Check for expired challenge error
       let errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -3568,7 +3638,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           errorMessage.includes("6005") || 
           errorMessage.includes("challenge has expired") ||
           errorMessage.includes("Challenge has expired")) {
-        errorMessage = "⚠️ Old contract version detected. The contract needs to be redeployed to remove the expiration check for prize claims. Please contact support.";
+        errorMessage = "⚠️ Old contract version detected. The contract needs to be redeployed to remove the expiration check for reward claims. Please contact support.";
       } else if (errorMessage.includes("already been processed") || 
                  errorMessage.includes("already processed")) {
         errorMessage = "✅ This reward has already been claimed. Please refresh the page to see the latest status.";
@@ -3579,7 +3649,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         errorMessage = "❌ Challenge is not in progress. It may have already been completed or cancelled.";
       }
       
-      alert("Failed to claim prize: " + errorMessage);
+      alert("Failed to claim reward: " + errorMessage);
     } finally {
       setClaimingPrize(null);
     }
@@ -3614,11 +3684,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       return;
     }
 
-    // Check if already marked as transferred
-    if (challenge.rawData?.payoutTriggered) {
-      alert("Prize has already been marked as transferred");
-      return;
-    }
+      // Check if already marked as transferred
+      if (challenge.rawData?.payoutTriggered) {
+        alert("Reward has already been marked as transferred");
+        return;
+      }
 
     // Prevent double-clicks
     if (markingPrizeTransferred === challenge.id) {
@@ -4755,7 +4825,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               </div>
             )}
             
-            {/* Unclaimed Prize Notification */}
+            {/* Unclaimed Reward Notification */}
             {isConnected && unclaimedPrizeChallenges.length > 0 && (
               <div className="bg-gradient-to-r from-emerald-500/20 to-green-500/20 border-2 border-emerald-400/50 rounded-xl p-4 max-w-md mx-auto mt-4 shadow-[0_0_30px_rgba(34,197,94,0.4)]">
                 <div className="flex items-center justify-between">
@@ -4763,7 +4833,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     <div className="text-2xl">💰</div>
                     <div>
                       <p className="text-emerald-200 font-bold text-sm">
-                        {unclaimedPrizeChallenges.length} Unclaimed Prize{unclaimedPrizeChallenges.length > 1 ? 's' : ''}!
+                        {unclaimedPrizeChallenges.length} Unclaimed Reward{unclaimedPrizeChallenges.length > 1 ? 's' : ''}!
                       </p>
                       <p className="text-emerald-300/80 text-xs mt-1">
                         Click to claim your rewards
@@ -5090,7 +5160,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           <div className="font-semibold">{challenge.entryFee} USDFG</div>
                                         </div>
                         <div className="rounded-lg bg-black/45 p-2">
-                          <div className="text-white/70">🏆 Prize</div>
+                          <div className="text-white/70">🏆 Reward</div>
                           <div className="font-semibold">{challenge.prizePool} USDFG</div>
                             </div>
                           </div>

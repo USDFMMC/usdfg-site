@@ -982,10 +982,10 @@ export async function cancelChallenge(
 }
 
 /**
- * Resolve Challenge (Winner Claims Prize OR Admin Resolves)
+ * Resolve Challenge (Winner Claims Reward OR Admin Resolves)
  * 
  * SECURITY FEATURES:
- * ✅ Winner can claim their own prize (pays gas)
+ * ✅ Winner can claim their own reward (pays gas)
  * ✅ OR Admin can resolve for disputes (admin pays gas)
  * ✅ Smart contract validates winner address
  * ✅ Smart contract validates caller is winner OR admin
@@ -1139,7 +1139,7 @@ export async function resolveChallenge(
     // Handle "already processed" error during send
     if (sendError.message?.includes('This transaction has already been processed') ||
         sendError.message?.includes('already been processed')) {
-      console.log('✅ Transaction already processed - prize likely claimed successfully');
+      console.log('✅ Transaction already processed - reward likely claimed successfully');
       console.log('💰 Winner received payout:', winnerAddress);
       return 'already-processed'; // Return success indicator
     }
