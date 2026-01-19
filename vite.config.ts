@@ -12,13 +12,13 @@ export default defineConfig(async () => {
       : null;
 
   return {
-    plugins: [
-      react({
-        // Optimize React refresh for better HMR
-        fastRefresh: true,
-      }),
-      runtimeErrorOverlay(),
-      VitePWA({
+  plugins: [
+    react({
+      // Optimize React refresh for better HMR
+      fastRefresh: true,
+    }),
+    runtimeErrorOverlay(),
+    VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'robots.txt', 'sitemap.xml'],
       manifest: {
@@ -108,7 +108,7 @@ export default defineConfig(async () => {
       }
     }),
       ...(cartographerPlugin ? [cartographerPlugin] : []),
-    ],
+  ],
   define: {
     global: 'globalThis',
   },
