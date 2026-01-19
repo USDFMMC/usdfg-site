@@ -65,10 +65,10 @@ const ElegantNavbar: React.FC<ElegantNavbarProps> = ({ children }) => {
                 <img 
                 src="/assets/usdfgToken2.png" 
                 alt="USDFG Logo" 
-                  className="w-6 h-6 object-contain transition-transform duration-150 group-hover:scale-105"
+                  className="w-10 h-10 object-contain transition-transform duration-300 group-hover:scale-110"
                   loading="lazy" decoding="async"
                 />
-              <div className="absolute inset-0 bg-gradient-to-r from-amber-300 to-yellow-200 rounded blur-sm opacity-0 group-hover:opacity-20 transition-opacity duration-150"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-amber-300 to-yellow-200 rounded-lg blur-md opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
             </div>
             <span className="bg-gradient-to-r from-amber-300 to-yellow-200 bg-clip-text text-transparent font-medium text-sm tracking-tight whitespace-nowrap" style={{ letterSpacing: '-0.015em' }}>
               USDFG
