@@ -399,32 +399,6 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     ? (players.find((p: string) => p?.toLowerCase() !== currentWallet?.toLowerCase()) as string | undefined) || null
     : null;
 
-  // Fetch player display names and profile images
-  useEffect(() => {
-    const fetchPlayerData = async () => {
-      const data: Record<string, { displayName?: string; profileImage?: string }> = {};
-      for (const wallet of players) {
-        if (wallet && typeof wallet === 'string') {
-          try {
-            const stats = await getPlayerStats(wallet);
-            if (stats) {
-              data[wallet.toLowerCase()] = {
-                displayName: stats.displayName,
-                profileImage: stats.profileImage,
-              };
-            }
-          } catch (error) {
-            console.error(`Failed to fetch stats for ${wallet}:`, error);
-          }
-        }
-      }
-      setPlayerData(data);
-    };
-    
-    if (players.length > 0) {
-      fetchPlayerData();
-    }
-  }, [players]);
 
   // Build participants list - includes creator, challenger, pendingJoiner, and players array
   // This ensures both players show as participants even before joiner funds
