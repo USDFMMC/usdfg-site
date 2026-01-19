@@ -520,8 +520,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const participants = Array.from(participantsSet);
   
   // Creator controls should be available in pre-match lobby and during active matches
-  // Show when creator is viewing and there are participants/spectators to manage
-  const canShowCreatorControls = isCreator && (participants.length > 0 || spectators.length > 0) && status !== 'completed' && status !== 'cancelled';
+  // Show when creator is viewing (even if no spectators yet, so they can see the controls are available)
+  const canShowCreatorControls = isCreator && status !== 'completed' && status !== 'cancelled';
   
   // Ephemeral spectator tracking - NO PERSISTENT DATA
   // Users can join as spectators (real-time only)

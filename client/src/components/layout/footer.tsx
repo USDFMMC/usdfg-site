@@ -19,16 +19,13 @@ const Footer: React.FC<FooterProps> = ({ isRevealed }) => {
         <div className="grid grid-cols-1 md:grid-cols-3 items-center gap-6 md:gap-0 w-full">
           {/* Left: Mascot + Tagline */}
           <div className="flex items-center justify-center md:justify-start">
-            <picture>
-              <source srcSet="/assets/usdfg-logo-transparent.webp" type="image/webp" />
-              <img 
-                src="/assets/usdfg-logo-transparent.png" 
-                alt="USDFG Logo" 
-                className="w-10 h-10 sm:w-12 sm:h-12 object-contain mr-3 mascot-glow"
-                style={{filter: 'drop-shadow(0 0 10px rgba(251, 191, 36, 0.4))'}} 
-                loading="lazy" decoding="async"
-              />
-            </picture>
+            <img 
+              src="/assets/usdfgtoken.png" 
+              alt="USDFG Logo" 
+              className="w-10 h-10 sm:w-12 sm:h-12 object-contain mr-3 mascot-glow"
+              style={{filter: 'drop-shadow(0 0 10px rgba(251, 191, 36, 0.4))'}} 
+              loading="lazy" decoding="async"
+            />
             <span className="text-sm text-amber-300 font-medium whitespace-nowrap">
                 USDFGaming — The Last Great Token for Gamers.
               </span>

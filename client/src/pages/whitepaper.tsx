@@ -204,15 +204,12 @@ const Whitepaper: React.FC = () => {
           <div className="container mx-auto px-4 py-12 sm:py-16 md:py-20">
             {/* Animated Logo */}
             <div className="flex justify-center mb-6 mt-8">
-              <picture>
-                <source srcSet="/assets/usdfg-logo-transparent.webp" type="image/webp" />
-                <img
-                  src="/assets/usdfg-logo-transparent.png"
-                  alt="USDFG Logo"
-                  className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full border-2 border-cyan-400 shadow-[0_0_32px_#22d3ee99] animate-float"
-                  style={{ background: 'rgba(11,11,12,0.7)' }}
-                />
-              </picture>
+              <img
+                src="/assets/usdfgtoken.png"
+                alt="USDFG Logo"
+                className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full border-2 border-cyan-400 shadow-[0_0_32px_#22d3ee99] animate-float"
+                style={{ background: 'rgba(11,11,12,0.7)' }}
+              />
             </div>
             <div className="max-w-2xl mx-auto mb-8 mt-8 px-6 py-4 rounded-xl bg-gradient-to-br from-white/10 to-[#a78bfa22] border border-purple-700/40 shadow-lg backdrop-blur-md animate-fade-in">
               <p className="text-base md:text-lg text-white/90 text-center">
@@ -332,10 +329,7 @@ const Whitepaper: React.FC = () => {
                 <p className="text-white mb-4">For questions, compliance inquiries, or media, contact <a href="mailto:founder@usdfg.pro" className="text-cyan-300 underline">founder@usdfg.pro</a> or <a href="mailto:support@usdfg.pro" className="text-cyan-300 underline">support@usdfg.pro</a> or DM <a href="https://twitter.com/USDFGAMING" className="text-cyan-300 underline" target="_blank" rel="noopener noreferrer">@USDFGAMING</a> on Twitter.</p>
                 <div className="mt-8 text-left max-w-md mx-auto">
                   <div className="flex items-center gap-3 mb-2">
-                    <picture>
-                      <source srcSet="/assets/usdfg-logo-transparent.webp" type="image/webp" />
-                      <img src="/assets/usdfg-logo-transparent.png" alt="USDFG Logo" className="w-10 h-10 rounded-full border border-cyan-400" />
-                    </picture>
+                    <img src="/assets/usdfgtoken.png" alt="USDFG Logo" className="w-10 h-10 rounded-full border border-cyan-400" />
                     <span className="font-bold text-cyan-300">Hussein Ali</span>
                   </div>
                   <div className="text-xs text-cyan-200 italic">Founder & Lead Developer, USDFGAMING</div>
