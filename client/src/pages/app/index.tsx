@@ -5145,15 +5145,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                             players={challenge.players || 0} 
                             capacity={challenge.capacity || 2} 
                           />
-                          {/* Expiration Timer - Show for active/live challenges (compact, top-right) */}
+                          {/* Expiration Timer - Show for active/live challenges (same size as LIVE button) */}
                           {isLive && expirationTimestamp && (
-                            <div className="rounded-md bg-red-500/15 border border-red-400/30 px-1.5 py-0.5">
+                            <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-red-500/20 text-red-200 border-red-500/30 ring-1 ring-red-400/40 shadow-[0_0_16px_rgba(239,68,68,0.35)]">
                               <CountdownTimer 
                                 deadline={expirationTimestamp} 
                                 expiredMessage="Expired"
-                                className="text-[9px] font-semibold text-red-300"
+                                className="font-semibold"
                               />
-                            </div>
+                            </span>
                           )}
                           {/* Share button - positioned below status */}
                                         <button
