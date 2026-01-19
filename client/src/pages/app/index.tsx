@@ -5034,22 +5034,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 const isOpen = status === "pending_waiting_for_opponent";
                 const isLive = status === "active" || status === "creator_funded";
                 const isFull = challenge.players >= challenge.capacity;
-                
-                // Get expiration time for active/live challenges
-                const expiresAt = challenge.expiresAt || challenge.rawData?.expiresAt;
-                let expirationTimestamp: Timestamp | null = null;
-                if (expiresAt) {
-                  if (expiresAt.toMillis) {
-                    // Already a Timestamp object
-                    expirationTimestamp = expiresAt;
-                  } else if (typeof expiresAt === 'number') {
-                    // Milliseconds timestamp
-                    expirationTimestamp = Timestamp.fromMillis(expiresAt);
-                  } else if (expiresAt.toDate) {
-                    // Firestore Timestamp with toDate method
-                    expirationTimestamp = Timestamp.fromDate(expiresAt.toDate());
-                  }
-                }
 
                 const edgeGlow = isOpen
                   ? 'border-emerald-400/50 shadow-[0_0_18px_rgba(16,185,129,0.40)] ring-1 ring-emerald-400/20'
@@ -5145,16 +5129,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                             players={challenge.players || 0} 
                             capacity={challenge.capacity || 2} 
                           />
-                          {/* Expiration Timer - Show for active/live challenges (same size as LIVE button) */}
-                          {isLive && expirationTimestamp && (
-                            <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-red-500/20 text-red-200 border-red-500/30 ring-1 ring-red-400/40 shadow-[0_0_16px_rgba(239,68,68,0.35)]">
-                              <CountdownTimer 
-                                deadline={expirationTimestamp} 
-                                expiredMessage="Expired"
-                                className="font-semibold"
-                              />
-                            </span>
-                          )}
                           {/* Share button - positioned below status */}
                                         <button
                             type="button"
