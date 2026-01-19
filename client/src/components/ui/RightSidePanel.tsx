@@ -86,16 +86,13 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
     }
   }, [isMinimized, isMobile, safePlayers]);
 
-  // Auto-minimize on mobile when panel opens (shows pill immediately)
+  // Reset minimized state when panel closes
   useEffect(() => {
-    if (isOpen && isMobile) {
-      // On mobile, show minimized pill immediately when panel opens
-      setIsMinimized(true);
-    } else if (!isOpen) {
-      // Reset when panel closes
+    if (!isOpen) {
+      // Reset when panel closes so it opens maximized next time
       setIsMinimized(false);
     }
-  }, [isOpen, isMobile]);
+  }, [isOpen]);
 
   const handleExpand = () => {
     setIsMinimized(false);
