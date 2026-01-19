@@ -125,8 +125,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   
   const status = getChallengeValue('status', 'pending_waiting_for_opponent') as string;
   // CRITICAL: Ensure players is always an array (getChallengeValue might return non-array)
-  const playersRaw = getChallengeValue('players', []);
-  const players: string[] = Array.isArray(playersRaw) ? playersRaw.filter((p): p is string => typeof p === 'string') : [];
+  const playersRaw = getChallengeValue('players', []) as any;
+  const players: string[] = Array.isArray(playersRaw) ? playersRaw.filter((p: any): p is string => typeof p === 'string' && !!p) : [];
   const entryFee = getChallengeValue('entryFee', 0);
   const prizePool = getChallengeValue('prizePool', entryFee * 2);
   const game = getChallengeValue('game', 'USDFG Arena');
