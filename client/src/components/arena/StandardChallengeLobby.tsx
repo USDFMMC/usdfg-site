@@ -231,7 +231,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   };
   
   const status = getChallengeValue('status', 'pending_waiting_for_opponent') as string;
-  const isActiveMatch = status === 'active';
+  const isActiveMatch = status === 'active' || status === 'in-progress';
   // CRITICAL: Ensure players is always an array (getChallengeValue might return non-array)
   const playersRaw = getChallengeValue('players', []) as any;
   const players: string[] = Array.isArray(playersRaw) ? playersRaw.filter((p: any): p is string => typeof p === 'string' && !!p) : [];
@@ -518,6 +518,10 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     if (p) participantsSet.add(p);
   });
   const participants = Array.from(participantsSet);
+  
+  // Creator controls should be available in pre-match lobby and during active matches
+  // Show when creator is viewing and there are participants/spectators to manage
+  const canShowCreatorControls = isCreator && (participants.length > 0 || spectators.length > 0) && status !== 'completed' && status !== 'cancelled';
   
   // Ephemeral spectator tracking - NO PERSISTENT DATA
   // Users can join as spectators (real-time only)
@@ -1596,9 +1600,9 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
             <div className="text-[10px] font-semibold uppercase tracking-wider text-gray-300/80">
               Voice Room
             </div>
-            {isActiveMatch && isCreator && (
+            {canShowCreatorControls && (
               <div className="text-[9px] text-amber-300/70">
-                Creator Controls Active
+                Creator Controls {isActiveMatch ? 'Active' : 'Available'}
               </div>
             )}
           </div>
@@ -1625,11 +1629,11 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
             spectators={spectators}
           />
           
-          {/* Creator Mute Controls - Only show during active matches */}
-          {isActiveMatch && isCreator && (
+          {/* Creator Mute Controls - Show in pre-match lobby and during active matches */}
+          {canShowCreatorControls && (
             <div className="mt-2 pt-2 border-t border-white/5">
               <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-300/80 mb-1.5">
-                Creator Controls
+                Creator Controls {isActiveMatch ? '(Active Match)' : '(Pre-Match Lobby)'}
               </div>
               <div className="space-y-1.5">
                 {/* Mute All Spectators Button */}
