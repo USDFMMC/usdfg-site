@@ -1060,7 +1060,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
               Waiting for creator to fund
             </div>
             <div className="text-[10px] text-blue-100/90 font-medium mb-1">
-              No wallet required
+              No transaction required
             </div>
             {creatorFundingDeadline && (
               <div className="text-[10px] text-blue-300/70 mb-2">

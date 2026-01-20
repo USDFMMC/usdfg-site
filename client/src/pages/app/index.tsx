@@ -2534,7 +2534,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
   // Handle joiner express intent from ChallengeDetailSheet
   const handleDirectJoinerExpressIntent = async (challenge: any) => {
-    // CRITICAL: Joining is now Firestore-only - no wallet connection or on-chain calls required
+    // CRITICAL: Join intent is Firestore-only - no on-chain transaction required
     const walletAddr = publicKey?.toString() || null;
     if (!walletAddr) {
       alert('Please connect your wallet first');
@@ -2654,36 +2654,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         // The real-time listener will sync the actual data shortly
       }
       
-      // CRITICAL: Also express intent on-chain so creator can fund
-      // This ensures on-chain state matches Firestore state
-      let challengePDA = challenge.pda || challenge.rawData?.pda;
-      
-      if (challengePDA && publicKey && connection && wallet.signTransaction) {
-        try {
-          console.log('🔗 Expressing join intent on-chain to sync with Firestore...');
-          const { expressJoinIntent: expressJoinIntentOnChain } = await import('@/lib/chain/contract');
-          await expressJoinIntentOnChain(
-            { signTransaction: wallet.signTransaction, publicKey },
-            connection,
-            challengePDA
-          );
-          console.log('✅ Join intent expressed on-chain successfully');
-        } catch (onChainError: any) {
-          const errorMsg = onChainError.message || onChainError.toString() || '';
-          // If intent was already expressed on-chain, that's OK
-          if (errorMsg.includes('already') || errorMsg.includes('Already') || 
-              errorMsg.includes('duplicate') || errorMsg.includes('Constraint')) {
-            console.log('ℹ️ Join intent already expressed on-chain - this is OK');
-          } else {
-            console.warn('⚠️ Failed to express join intent on-chain (non-critical):', onChainError);
-            // Don't throw - Firestore update succeeded, on-chain can be done later
-            // The creator will get a helpful error message if they try to fund
-          }
-        }
-      } else if (!challengePDA) {
-        console.log('ℹ️ Challenge PDA not created yet - on-chain intent will be expressed when creator funds');
-      }
-      
       // Fetch fresh data to ensure we have the latest (real-time listener will also update)
       const updatedChallenge = await fetchChallengeById(challenge.id);
       if (updatedChallenge) {
@@ -2695,7 +2665,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         });
       }
       
-      alert('✅ Join intent expressed! Creator can now fund the challenge.');
+      alert('✅ Join intent recorded! Creator can now fund the challenge.');
       setShowDetailSheet(false);
       
       // Open minimized nav bar lobby first (auto-minimizes on mobile)
@@ -3054,16 +3024,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             // Continue anyway - transaction may have succeeded (don't throw, let it proceed to Firestore update)
           }
         } else if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770') || errorMsg.includes('6000') || errorMsg.includes('Challenge is not open')) {
-          // Challenge state mismatch - challenger needs to express intent on-chain first
-          // This happens when challenger joined in Firestore but didn't express intent on-chain
-          const pendingJoinerWallet = freshChallenge.pendingJoiner || challenge.rawData?.pendingJoiner;
-          if (pendingJoinerWallet) {
-            throw new Error(`⚠️ The challenger (${pendingJoinerWallet.slice(0, 8)}...) needs to express their intent on-chain before you can fund.\n\n` +
-              `Please ask them to click "Join Challenge" again - this will express their intent on-chain (no payment required, just a small transaction fee).\n\n` +
-              `Once they've done that, you'll be able to fund the challenge.`);
-          } else {
-            throw new Error('⚠️ Challenge state mismatch on-chain. Please refresh and try again.');
-          }
+          throw new Error('⚠️ Challenge is not open for creator funding on-chain. Please refresh and try again.');
         } else {
           throw fundError; // Re-throw if it's a different error
         }
@@ -4389,32 +4350,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               </button>
             )}
 
-            {/* Show button for challenger who already joined in Firestore but needs to express on-chain intent */}
-            {/* CRITICAL: This button must be visible when PDA exists but challenger hasn't expressed on-chain yet */}
-            {/* Hidden on mobile - shown in sticky container instead */}
-            {(() => {
-              if (isOwner || status !== 'creator_confirmation_required' || !onExpressIntent) return false;
-              
-              const pendingJoiner = challenge.rawData?.pendingJoiner || challenge.pendingJoiner;
-              const challengePDA = challenge.rawData?.pda || challenge.pda;
-              const currentWallet = publicKey?.toString()?.toLowerCase() || '';
-              const isPendingJoiner = pendingJoiner && pendingJoiner.toLowerCase() === currentWallet;
-              
-              // Show button if user is the pending joiner and PDA exists (meaning they need to express on-chain)
-              return isPendingJoiner && challengePDA;
-            })() && (
-              <button
-                type="button"
-                className="mt-5 w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-white font-semibold hover:brightness-110 transition-all shadow-[0_0_20px_rgba(251,146,60,0.35)] hidden sm:block"
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  await onExpressIntent(challenge);
-                }}
-              >
-                ⚡ Express Intent On-Chain (PDA Created)
-              </button>
-            )}
-
             {/* Show Fund button for joiner when creator has funded */}
             {/* Hidden on mobile - shown in sticky container instead */}
             {!isOwner && status === 'creator_funded' && onJoinerFund && (
@@ -4545,39 +4480,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 }}
               >
                 ✨ Confirm and Fund Challenge ✨
-              </button>
-            )}
-            
-            {/* PRIORITY: Show button for challenger who already joined in Firestore but needs to express on-chain intent */}
-            {/* This must appear BEFORE the regular Express Join Intent button */}
-            {(() => {
-              if (isOwner || status !== 'creator_confirmation_required' || !onExpressIntent) return false;
-              
-              const pendingJoiner = challenge.rawData?.pendingJoiner || challenge.pendingJoiner;
-              const challengePDA = challenge.rawData?.pda || challenge.pda;
-              const currentWallet = publicKey?.toString()?.toLowerCase() || '';
-              const isPendingJoiner = pendingJoiner && pendingJoiner.toLowerCase() === currentWallet;
-              
-              // Show button if user is the pending joiner and PDA exists (meaning they need to express on-chain)
-              // BUT: Only show if PDA exists and user hasn't already expressed on-chain intent
-              // Note: We can't check on-chain state here (too expensive), so we show the button
-              // and let the handler check if intent was already expressed
-              return isPendingJoiner && challengePDA;
-            })() && (
-              <button
-                type="button"
-                className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-white font-semibold mb-2 shadow-[0_0_20px_rgba(251,146,60,0.4)] animate-pulse"
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  try {
-                  await onExpressIntent(challenge);
-                  } catch (error: any) {
-                    // Error is already handled in handleDirectJoinerExpressIntent
-                    console.error('Error expressing intent:', error);
-                  }
-                }}
-              >
-                ⚡ Express Intent On-Chain (PDA Created) - REQUIRED
               </button>
             )}
             
