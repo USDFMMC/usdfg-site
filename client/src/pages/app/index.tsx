@@ -20,7 +20,7 @@ import { useConnection } from '@solana/wallet-adapter-react';
 import { ADMIN_WALLET, USDFG_MINT, PROGRAM_ID, SEEDS } from '@/lib/chain/config';
 import { getExplorerTxUrl } from '@/lib/chain/explorer';
 import { PublicKey, Transaction } from '@solana/web3.js';
-import { createAssociatedTokenAccountInstruction, getAccount, getAssociatedTokenAddress } from '@solana/spl-token';
+import { createAssociatedTokenAccountInstruction, createTransferInstruction, getAccount, getAssociatedTokenAddress } from '@solana/spl-token';
 import { testFirestoreConnection } from "@/lib/firebase/firestore";
 import { getWalletScopedValue, setWalletScopedValue, clearWalletScopedValue, PROFILE_STORAGE_KEYS } from "@/lib/storage/profile";
 import { getPhantomConnectionState, setPhantomConnectionState, clearPhantomConnectionState } from "@/lib/utils/wallet-state";
@@ -805,6 +805,7 @@ const ArenaHome: React.FC = () => {
   const [filterGame, setFilterGame] = useState<string>('All');
   const [showMyChallenges, setShowMyChallenges] = useState<boolean>(false);
   const [claimingPrize, setClaimingPrize] = useState<string | null>(null);
+  const [isAirdropping, setIsAirdropping] = useState(false);
   const [markingPrizeTransferred, setMarkingPrizeTransferred] = useState<string | null>(null);
   const [usdfgPrice, setUsdfgPrice] = useState<number>(0.15); // Mock price: $0.15 per USDFG
   const [userUsdfgBalance, setUserUsdfgBalance] = useState<number | null>(null);
@@ -2562,6 +2563,63 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
   }, [normalizedCurrentWallet, currentWallet, currentLockTarget, connect, createFriendlyMatchId, topPlayers, userGamerTag, formatWalletAddress, userLocks]);
 
+  const ensureUsdfgTokenAccount = useCallback(async (walletAddr: string): Promise<boolean> => {
+    if (!connection) {
+      alert('Please connect your wallet first');
+      return false;
+    }
+    if (!signTransaction) {
+      alert('Wallet does not support transaction signing');
+      return false;
+    }
+
+    const walletPubkey = new PublicKey(walletAddr);
+    const ata = await getAssociatedTokenAddress(USDFG_MINT, walletPubkey);
+
+    let hasUsdfgAccount = true;
+    try {
+      await getAccount(connection, ata);
+    } catch (error: any) {
+      const errorMsg = error?.message || '';
+      if (error?.name === 'TokenAccountNotFoundError' || errorMsg.includes('could not find account') || errorMsg.includes('InvalidAccountData')) {
+        hasUsdfgAccount = false;
+      } else {
+        console.warn('⚠️ Could not check USDFG token account:', error);
+        hasUsdfgAccount = false;
+      }
+    }
+
+    if (hasUsdfgAccount) {
+      return true;
+    }
+
+    const shouldCreate = window.confirm(
+      'Founder payouts use airdrops. You need a USDFG token account (one-time ~0.002 SOL rent). Create it now?'
+    );
+    if (!shouldCreate) {
+      alert('You must initialize a USDFG token account to receive Founder rewards.');
+      return false;
+    }
+
+    const transaction = new Transaction().add(
+      createAssociatedTokenAccountInstruction(
+        walletPubkey,
+        ata,
+        walletPubkey,
+        USDFG_MINT
+      )
+    );
+    const { blockhash } = await connection.getLatestBlockhash();
+    transaction.recentBlockhash = blockhash;
+    transaction.feePayer = walletPubkey;
+
+    const signedTransaction = await signTransaction(transaction);
+    const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+    await connection.confirmTransaction(signature, 'confirmed');
+    alert('✅ USDFG token account initialized. You can now join Founder rewards.');
+    return true;
+  }, [connection, signTransaction]);
+
   // Handle joiner express intent from ChallengeDetailSheet
   const handleDirectJoinerExpressIntent = async (challenge: any) => {
     // CRITICAL: Join intent is Firestore-only - no on-chain transaction required
@@ -2587,56 +2645,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     const isFounderChallenge = isAdminChallenge && (entryFeeValue === 0 || entryFeeValue < 0.000000001);
 
     if (isFounderChallenge) {
-      if (!connection) {
-        alert('Please connect your wallet first');
+      const initialized = await ensureUsdfgTokenAccount(walletAddr);
+      if (!initialized) {
         return;
-      }
-      if (!signTransaction) {
-        alert('Wallet does not support transaction signing');
-        return;
-      }
-
-      const walletPubkey = new PublicKey(walletAddr);
-      const ata = await getAssociatedTokenAddress(USDFG_MINT, walletPubkey);
-
-      let hasUsdfgAccount = true;
-      try {
-        await getAccount(connection, ata);
-      } catch (error: any) {
-        const errorMsg = error?.message || '';
-        if (error?.name === 'TokenAccountNotFoundError' || errorMsg.includes('could not find account') || errorMsg.includes('InvalidAccountData')) {
-          hasUsdfgAccount = false;
-        } else {
-          console.warn('⚠️ Could not check USDFG token account:', error);
-          hasUsdfgAccount = false;
-        }
-      }
-
-      if (!hasUsdfgAccount) {
-        const shouldCreate = window.confirm(
-          'Founder Challenges pay out via airdrop. You need a USDFG token account (one-time ~0.002 SOL rent). Create it now?'
-        );
-        if (!shouldCreate) {
-          alert('You must initialize a USDFG token account to receive Founder Challenge rewards.');
-          return;
-        }
-
-        const transaction = new Transaction().add(
-          createAssociatedTokenAccountInstruction(
-            walletPubkey,
-            ata,
-            walletPubkey,
-            USDFG_MINT
-          )
-        );
-        const { blockhash } = await connection.getLatestBlockhash();
-        transaction.recentBlockhash = blockhash;
-        transaction.feePayer = walletPubkey;
-
-        const signedTransaction = await signTransaction(transaction);
-        const signature = await connection.sendRawTransaction(signedTransaction.serialize());
-        await connection.confirmTransaction(signature, 'confirmed');
-        alert('✅ USDFG token account initialized. You can now join Founder Challenges.');
       }
     }
     
@@ -3724,6 +3735,145 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       setClaimingPrize(null);
     }
   };
+
+  const handleFounderTournamentAirdrop = useCallback(async (
+    recipients: { wallet: string; amount: number }[],
+    challenge: any
+  ) => {
+    if (isAirdropping) {
+      return;
+    }
+    if (!publicKey || !connection) {
+      alert('Please connect your wallet first');
+      return;
+    }
+    if (!signTransaction && !signAllTransactions) {
+      alert('Wallet does not support transaction signing');
+      return;
+    }
+
+    const adminWallet = publicKey.toString().toLowerCase();
+    if (adminWallet !== ADMIN_WALLET.toString().toLowerCase()) {
+      alert('Only the founder can send airdrops');
+      return;
+    }
+
+    const recipientMap = new Map<string, { wallet: string; amount: number }>();
+    recipients.forEach((entry) => {
+      if (!entry.wallet || entry.amount <= 0) return;
+      const key = entry.wallet.toLowerCase();
+      const existing = recipientMap.get(key);
+      if (existing) {
+        existing.amount += entry.amount;
+      } else {
+        recipientMap.set(key, { wallet: entry.wallet, amount: entry.amount });
+      }
+    });
+
+    const uniqueRecipients = Array.from(recipientMap.values());
+    if (uniqueRecipients.length === 0) {
+      alert('No payout recipients available.');
+      return;
+    }
+
+    const totalAmount = uniqueRecipients.reduce((sum, entry) => sum + entry.amount, 0);
+    const confirmed = window.confirm(
+      `Send ${totalAmount} USDFG to ${uniqueRecipients.length} wallets?`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setIsAirdropping(true);
+    const payer = publicKey;
+    try {
+      const payerAta = await getAssociatedTokenAddress(USDFG_MINT, payer);
+      const payerAccount = await getAccount(connection, payerAta);
+      const totalLamports = uniqueRecipients.reduce(
+        (sum, entry) => sum + Math.floor(entry.amount * Math.pow(10, 9)),
+        0
+      );
+      if (Number(payerAccount.amount) < totalLamports) {
+        throw new Error('Insufficient USDFG balance to send this airdrop.');
+      }
+
+      const missingAccounts: string[] = [];
+      const transferTargets: { wallet: string; ata: PublicKey; amountLamports: number }[] = [];
+
+      for (const entry of uniqueRecipients) {
+        const amountLamports = Math.floor(entry.amount * Math.pow(10, 9));
+        if (amountLamports <= 0) {
+          continue;
+        }
+        const recipientPubkey = new PublicKey(entry.wallet);
+        const recipientAta = await getAssociatedTokenAddress(USDFG_MINT, recipientPubkey);
+        try {
+          await getAccount(connection, recipientAta);
+          transferTargets.push({
+            wallet: entry.wallet,
+            ata: recipientAta,
+            amountLamports
+          });
+        } catch {
+          missingAccounts.push(entry.wallet);
+        }
+      }
+
+      if (transferTargets.length === 0) {
+        throw new Error('No recipients have a USDFG token account.');
+      }
+
+      const batchSize = 8;
+      const transactions: Transaction[] = [];
+      for (let i = 0; i < transferTargets.length; i += batchSize) {
+        const batch = transferTargets.slice(i, i + batchSize);
+        const tx = new Transaction();
+        batch.forEach((target) => {
+          tx.add(createTransferInstruction(payerAta, target.ata, payer, target.amountLamports));
+        });
+        const { blockhash } = await connection.getLatestBlockhash();
+        tx.recentBlockhash = blockhash;
+        tx.feePayer = payer;
+        transactions.push(tx);
+      }
+
+      const signedTransactions = signAllTransactions
+        ? await signAllTransactions(transactions)
+        : await Promise.all(transactions.map((tx) => signTransaction!(tx)));
+
+      const signatures: string[] = [];
+      for (const signedTx of signedTransactions) {
+        const signature = await connection.sendRawTransaction(signedTx.serialize());
+        signatures.push(signature);
+        await connection.confirmTransaction(signature, 'confirmed');
+      }
+
+      const sentCount = transferTargets.length;
+      const sentTotal = transferTargets.reduce(
+        (sum, t) => sum + t.amountLamports,
+        0
+      ) / Math.pow(10, 9);
+
+      if (challenge?.id && signatures.length > 0) {
+        const explorerUrl = getExplorerTxUrl(signatures[signatures.length - 1]);
+        await postChallengeSystemMessage(
+          challenge.id,
+          `🚀 Founder airdrop sent: ${sentCount} wallets · ${sentTotal} USDFG · ${explorerUrl}`
+        );
+      }
+
+      let message = `✅ Airdrop sent to ${sentCount} wallets (${sentTotal} USDFG).`;
+      if (missingAccounts.length > 0) {
+        message += `\n\nSkipped ${missingAccounts.length} wallets without USDFG accounts.`;
+      }
+      alert(message);
+    } catch (error: any) {
+      console.error('❌ Airdrop failed:', error);
+      alert(`Airdrop failed: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsAirdropping(false);
+    }
+  }, [isAirdropping, publicKey, connection, signTransaction, signAllTransactions]);
 
   // Handle marking Founder Challenge reward as transferred (admin only)
   const handleMarkPrizeTransferred = async (challenge: any) => {
@@ -6131,11 +6281,31 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                         alert('Please connect your wallet first');
                         return;
                       }
+                      const currentChallenge = selectedChallenge?.rawData || selectedChallenge;
+                      const creatorWallet = currentChallenge?.creator || '';
+                      const entryFeeValue = Number(currentChallenge?.entryFee ?? 0);
+                      const founderParticipantReward = Number(currentChallenge?.founderParticipantReward ?? 0);
+                      const founderWinnerBonus = Number(currentChallenge?.founderWinnerBonus ?? 0);
+                      const isAdminChallenge =
+                        creatorWallet &&
+                        creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+                      const isFounderTournament =
+                        isAdminChallenge &&
+                        (entryFeeValue === 0 || entryFeeValue < 0.000000001) &&
+                        (founderParticipantReward > 0 || founderWinnerBonus > 0);
+                      if (isFounderTournament) {
+                        const initialized = await ensureUsdfgTokenAccount(publicKey.toString());
+                        if (!initialized) {
+                          return;
+                        }
+                      }
                       await joinTournament(challengeId, publicKey.toString());
                     }}
                     onClaimPrize={handleClaimPrize}
                     challenge={selectedChallenge}
                     isClaiming={claimingPrize === selectedChallenge.id}
+                    onAirdropPayouts={handleFounderTournamentAirdrop}
+                    isAirdropping={isAirdropping}
                   />
                 </ElegantModal>
               );

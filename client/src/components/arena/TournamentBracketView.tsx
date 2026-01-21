@@ -15,6 +15,8 @@ interface TournamentBracketViewProps {
   onClaimPrize?: (challenge: any) => Promise<void>;
   challenge?: any; // Full challenge object for claim prize logic
   isClaiming?: boolean; // Whether claim is in progress
+  onAirdropPayouts?: (recipients: { wallet: string; amount: number }[], challenge: any) => Promise<void>;
+  isAirdropping?: boolean;
 }
 
 const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
@@ -27,6 +29,8 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   onClaimPrize,
   challenge,
   isClaiming = false,
+  onAirdropPayouts,
+  isAirdropping = false,
 }) => {
 
   if (!tournament || !tournament.bracket?.length) {
@@ -172,6 +176,21 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
     return rows.map((row) => row.join(',')).join('\n');
   };
 
+  const buildCombinedRecipients = () => {
+    if (uniqueParticipants.length === 0) {
+      return [];
+    }
+    return uniqueParticipants
+      .map((wallet) => {
+        let amount = founderParticipantReward > 0 ? founderParticipantReward : 0;
+        if (champion && wallet.toLowerCase() === champion.toLowerCase()) {
+          amount += founderWinnerBonus > 0 ? founderWinnerBonus : 0;
+        }
+        return { wallet, amount };
+      })
+      .filter((entry) => entry.amount > 0);
+  };
+
   const copyCsv = async (csv: string, label: string) => {
     if (!csv) {
       alert('No payout data available yet.');
@@ -266,6 +285,15 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
                 className="rounded-lg border border-purple-300/40 bg-purple-500/20 px-3 py-2 text-xs font-semibold text-purple-100 hover:bg-purple-500/30"
               >
                 Copy Winner Bonus CSV
+              </button>
+            )}
+            {onAirdropPayouts && (
+              <button
+                onClick={() => onAirdropPayouts(buildCombinedRecipients(), challenge)}
+                disabled={isAirdropping}
+                className="rounded-lg border border-purple-300/40 bg-purple-500/20 px-3 py-2 text-xs font-semibold text-purple-100 hover:bg-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isAirdropping ? 'Sending Airdrop...' : 'Send Airdrop Now'}
               </button>
             )}
           </div>
