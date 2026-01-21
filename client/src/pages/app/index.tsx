@@ -19,8 +19,8 @@ import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
 import { ADMIN_WALLET, USDFG_MINT, PROGRAM_ID, SEEDS } from '@/lib/chain/config';
 import { getExplorerTxUrl } from '@/lib/chain/explorer';
-import { PublicKey } from '@solana/web3.js';
-import { getAssociatedTokenAddress } from '@solana/spl-token';
+import { PublicKey, Transaction } from '@solana/web3.js';
+import { createAssociatedTokenAccountInstruction, getAccount, getAssociatedTokenAddress } from '@solana/spl-token';
 import { testFirestoreConnection } from "@/lib/firebase/firestore";
 import { getWalletScopedValue, setWalletScopedValue, clearWalletScopedValue, PROFILE_STORAGE_KEYS } from "@/lib/storage/profile";
 import { getPhantomConnectionState, setPhantomConnectionState, clearPhantomConnectionState } from "@/lib/utils/wallet-state";
@@ -2573,6 +2573,64 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     const isDeadlineExpired = isCreatorFundingDeadlineExpired(challenge);
     const isAlreadyPendingJoiner = isPendingJoiner(challenge, currentWallet);
     const isChallenger = isChallengeChallenger(challenge, currentWallet);
+
+    const entryFeeValue = getChallengeEntryFee(challenge);
+    const isAdminChallenge = creatorWallet && creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+    const isFounderChallenge = isAdminChallenge && (entryFeeValue === 0 || entryFeeValue < 0.000000001);
+
+    if (isFounderChallenge) {
+      if (!connection) {
+        alert('Please connect your wallet first');
+        return;
+      }
+      if (!signTransaction) {
+        alert('Wallet does not support transaction signing');
+        return;
+      }
+
+      const walletPubkey = new PublicKey(walletAddr);
+      const ata = await getAssociatedTokenAddress(USDFG_MINT, walletPubkey);
+
+      let hasUsdfgAccount = true;
+      try {
+        await getAccount(connection, ata);
+      } catch (error: any) {
+        const errorMsg = error?.message || '';
+        if (error?.name === 'TokenAccountNotFoundError' || errorMsg.includes('could not find account') || errorMsg.includes('InvalidAccountData')) {
+          hasUsdfgAccount = false;
+        } else {
+          console.warn('⚠️ Could not check USDFG token account:', error);
+          hasUsdfgAccount = false;
+        }
+      }
+
+      if (!hasUsdfgAccount) {
+        const shouldCreate = window.confirm(
+          'Founder Challenges pay out via airdrop. You need a USDFG token account (one-time ~0.002 SOL rent). Create it now?'
+        );
+        if (!shouldCreate) {
+          alert('You must initialize a USDFG token account to receive Founder Challenge rewards.');
+          return;
+        }
+
+        const transaction = new Transaction().add(
+          createAssociatedTokenAccountInstruction(
+            walletPubkey,
+            ata,
+            walletPubkey,
+            USDFG_MINT
+          )
+        );
+        const { blockhash } = await connection.getLatestBlockhash();
+        transaction.recentBlockhash = blockhash;
+        transaction.feePayer = walletPubkey;
+
+        const signedTransaction = await signTransaction(transaction);
+        const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+        await connection.confirmTransaction(signature, 'confirmed');
+        alert('✅ USDFG token account initialized. You can now join Founder Challenges.');
+      }
+    }
     
     // Only prevent creator from joining if deadline hasn't expired and challenge is still waiting for creator funding
     if (isCreator && !isDeadlineExpired && status === 'creator_confirmation_required') {
