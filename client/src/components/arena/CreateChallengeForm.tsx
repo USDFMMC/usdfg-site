@@ -79,6 +79,8 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     username: userGamerTag || '',
     entryFee: 50,
     founderChallengeCount: 1,
+    founderParticipantReward: 0,
+    founderWinnerBonus: 0,
       mode: defaultMode, // Use first preset mode (Full Match) instead of 'Head-to-Head'
     customMode: '',
     customGame: '', // Custom game name when "Custom" is selected
@@ -319,6 +321,20 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
           errors.push('Founder challenge count must be at least 1');
         } else if (founderChallengeCount > 25) {
           errors.push('Founder challenge count cannot exceed 25');
+        }
+      }
+
+      if (isAdmin && entryFee === 0 && isTournamentMode) {
+        const participantReward = Number(formData.founderParticipantReward ?? 0);
+        const winnerBonus = Number(formData.founderWinnerBonus ?? 0);
+        if (!Number.isFinite(participantReward) || participantReward < 0) {
+          errors.push('Participant reward must be 0 or more');
+        }
+        if (!Number.isFinite(winnerBonus) || winnerBonus < 0) {
+          errors.push('Winner bonus must be 0 or more');
+        }
+        if (participantReward <= 0 && winnerBonus <= 0) {
+          errors.push('Set a participant reward or winner bonus for Founder Tournaments');
         }
       }
 
@@ -761,6 +777,9 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                   const isAdmin = currentWallet && currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
                   const entryFee = typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) || 0 : formData.entryFee || 0;
                   if (isAdmin && entryFee === 0) {
+                    if (isTournamentMode) {
+                      return <span className="text-purple-300">🏆 Founder Tournament - Set participant reward and winner bonus below</span>;
+                    }
                     return <span className="text-purple-300">🏆 Founder Challenge - Set challenge reward manually when transferring USDFG</span>;
                   }
                   if (isTournamentMode) {
@@ -795,6 +814,47 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                     />
                     <p className="text-xs text-purple-300/80 mt-1">
                       Creates multiple identical Founder Challenges at once.
+                    </p>
+                  </div>
+                );
+              })()}
+
+              {(() => {
+                const isAdmin = currentWallet && currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+                const entryFee = typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) || 0 : formData.entryFee || 0;
+                if (!isAdmin || entryFee !== 0 || !isTournamentMode) {
+                  return null;
+                }
+                const participantReward = Number(formData.founderParticipantReward || 0);
+                const winnerBonus = Number(formData.founderWinnerBonus || 0);
+                const totalEstimate = (participantReward * (formData.tournamentMaxPlayers || 0)) + winnerBonus;
+                return (
+                  <div className="mt-3 p-3 border border-purple-400/30 rounded-lg bg-purple-500/10">
+                    <div className="text-xs font-semibold text-purple-300 mb-2">Founder Tournament Payouts</div>
+                    <label className="block text-xs font-medium text-gray-300 mb-1.5">
+                      Participant Reward (USDFG)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.000000001"
+                      value={formData.founderParticipantReward ?? 0}
+                      onChange={(e) => handleInputChange('founderParticipantReward', e.target.value)}
+                      className="w-full px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white placeholder-zinc-500 focus:border-amber-400/50 focus:outline-none transition-all"
+                    />
+                    <label className="block text-xs font-medium text-gray-300 mt-2 mb-1.5">
+                      Winner Bonus (USDFG)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.000000001"
+                      value={formData.founderWinnerBonus ?? 0}
+                      onChange={(e) => handleInputChange('founderWinnerBonus', e.target.value)}
+                      className="w-full px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white placeholder-zinc-500 focus:border-amber-400/50 focus:outline-none transition-all"
+                    />
+                    <p className="text-xs text-purple-200/80 mt-2">
+                      Estimated total payout: {totalEstimate} USDFG ({formData.tournamentMaxPlayers} players + winner bonus)
                     </p>
                   </div>
                 );

@@ -94,6 +94,8 @@ export interface ChallengeData {
   payoutTimestamp?: Timestamp;        // When reward was claimed
   pda?: string;                       // Challenge PDA for smart contract
   prizePool?: number;                 // Total challenge reward amount
+  founderParticipantReward?: number;  // Founder tournament reward per participant
+  founderWinnerBonus?: number;        // Founder tournament winner bonus
   // UI display fields
   title?: string;                     // Challenge title (contains game info)
   game?: string;                      // Game name for display

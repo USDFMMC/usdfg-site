@@ -2147,6 +2147,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const founderChallengeCount = isFounderChallenge
         ? Math.min(25, Math.max(1, Math.floor(Number(challengeData.founderChallengeCount || 1))))
         : 1;
+      const isTournament = challengeData.format === 'tournament' || challengeData.tournament;
+      const founderParticipantReward = isFounderChallenge && isTournament
+        ? Math.max(0, Number(challengeData.founderParticipantReward || 0))
+        : 0;
+      const founderWinnerBonus = isFounderChallenge && isTournament
+        ? Math.max(0, Number(challengeData.founderWinnerBonus || 0))
+        : 0;
 
       // 🔍 Check if the user already has an active challenge (as creator OR participant)
       // EXCLUDE completed, cancelled, disputed, and expired challenges
@@ -2242,12 +2249,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // For Founder Challenges: admin sets reward pool manually (no platform fee)
       // For tournaments: entryFee * maxPlayers minus 5% platform fee
       // For regular challenges: 2x entry fee minus 5% platform fee
-      const isTournament = challengeData.format === 'tournament' || challengeData.tournament;
       const platformFee = 0.05; // 5% platform fee
       
       let totalPrize: number;
       if (isFounderChallenge) {
-        totalPrize = challengeData.prizePool || 0;
+        totalPrize = isTournament ? founderWinnerBonus : (challengeData.prizePool || 0);
       } else if (isTournament) {
         // Tournament: all entry fees collected
         totalPrize = entryFee * maxPlayers;
@@ -2297,6 +2303,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         // Reward claim fields
         pda: isFounderChallenge ? null : undefined, // PDA will be created when creator funds (null for Founder Challenges)
         prizePool: prizePool, // Reward pool (for Founder Challenges, admin sets this)
+        founderParticipantReward: isFounderChallenge && isTournament ? founderParticipantReward : undefined,
+        founderWinnerBonus: isFounderChallenge && isTournament ? founderWinnerBonus : undefined,
         // Store only the title which contains game info - saves storage costs
         title: challengeTitle, // Generated title with game info
         // Store game name for display - players need to know which game
