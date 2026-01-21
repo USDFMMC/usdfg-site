@@ -3,6 +3,7 @@ import type { TournamentState } from "@/lib/firebase/firestore";
 import { cn } from "@/lib/utils";
 import { VoiceChat } from "./VoiceChat";
 import { ChatBox } from "./ChatBox";
+import { ADMIN_WALLET } from "@/lib/chain/config";
 
 interface TournamentBracketViewProps {
   tournament?: TournamentState;
@@ -105,6 +106,85 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   const prizeClaimed = challenge?.prizeClaimed || challenge?.rawData?.prizeClaimed || challenge?.rawData?.prizeClaimedAt || challenge?.payoutTriggered;
   const canClaimPrize = isChampion && isCompleted && canClaim && !prizeClaimed;
 
+  const creatorWallet = challenge?.creator || challenge?.rawData?.creator || '';
+  const entryFee = Number(challenge?.entryFee ?? challenge?.rawData?.entryFee ?? 0);
+  const founderParticipantReward = Number(
+    challenge?.founderParticipantReward ?? challenge?.rawData?.founderParticipantReward ?? 0
+  );
+  const founderWinnerBonus = Number(
+    challenge?.founderWinnerBonus ?? challenge?.rawData?.founderWinnerBonus ?? 0
+  );
+  const isAdminCreator =
+    creatorWallet &&
+    creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+  const isFounderTournament =
+    isAdminCreator &&
+    (entryFee === 0 || entryFee < 0.000000001) &&
+    (founderParticipantReward > 0 || founderWinnerBonus > 0);
+  const isAdminViewer =
+    currentWallet &&
+    currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+
+  const uniqueParticipants = (() => {
+    const map = new Map<string, string>();
+    players.forEach((wallet) => {
+      if (!wallet) return;
+      const key = wallet.toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, wallet);
+      }
+    });
+    return Array.from(map.values());
+  })();
+
+  const buildParticipantCsv = () => {
+    if (founderParticipantReward <= 0 || uniqueParticipants.length === 0) {
+      return '';
+    }
+    const rows = [['wallet', 'amount']];
+    uniqueParticipants.forEach((wallet) => {
+      rows.push([wallet, founderParticipantReward.toString()]);
+    });
+    return rows.map((row) => row.join(',')).join('\n');
+  };
+
+  const buildWinnerCsv = () => {
+    if (!champion || founderWinnerBonus <= 0) {
+      return '';
+    }
+    return `wallet,amount\n${champion},${founderWinnerBonus}`;
+  };
+
+  const buildCombinedCsv = () => {
+    if (uniqueParticipants.length === 0) {
+      return '';
+    }
+    const rows = [['wallet', 'amount']];
+    uniqueParticipants.forEach((wallet) => {
+      let amount = founderParticipantReward > 0 ? founderParticipantReward : 0;
+      if (champion && wallet.toLowerCase() === champion.toLowerCase()) {
+        amount += founderWinnerBonus > 0 ? founderWinnerBonus : 0;
+      }
+      if (amount > 0) {
+        rows.push([wallet, amount.toString()]);
+      }
+    });
+    return rows.map((row) => row.join(',')).join('\n');
+  };
+
+  const copyCsv = async (csv: string, label: string) => {
+    if (!csv) {
+      alert('No payout data available yet.');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(csv);
+      alert(`${label} copied to clipboard.`);
+    } catch {
+      window.prompt(`Copy ${label} below:`, csv);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {isCompleted && champion && (
@@ -154,6 +234,41 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {isCompleted && isFounderTournament && isAdminViewer && (
+        <div className="rounded-xl border border-purple-400/40 bg-purple-500/10 p-4 text-sm text-purple-100">
+          <div className="text-xs uppercase tracking-widest text-purple-300">
+            Founder Tournament Payouts
+          </div>
+          <div className="mt-2 text-xs text-purple-100/80">
+            Participants: {uniqueParticipants.length} · Participant Reward: {founderParticipantReward} USDFG · Winner Bonus: {founderWinnerBonus} USDFG
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <button
+              onClick={() => copyCsv(buildCombinedCsv(), 'Combined payout CSV')}
+              className="rounded-lg border border-purple-300/40 bg-purple-500/20 px-3 py-2 text-xs font-semibold text-purple-100 hover:bg-purple-500/30"
+            >
+              Copy Combined CSV
+            </button>
+            {founderParticipantReward > 0 && (
+              <button
+                onClick={() => copyCsv(buildParticipantCsv(), 'Participant CSV')}
+                className="rounded-lg border border-purple-300/40 bg-purple-500/20 px-3 py-2 text-xs font-semibold text-purple-100 hover:bg-purple-500/30"
+              >
+                Copy Participant CSV
+              </button>
+            )}
+            {founderWinnerBonus > 0 && champion && (
+              <button
+                onClick={() => copyCsv(buildWinnerCsv(), 'Winner bonus CSV')}
+                className="rounded-lg border border-purple-300/40 bg-purple-500/20 px-3 py-2 text-xs font-semibold text-purple-100 hover:bg-purple-500/30"
+              >
+                Copy Winner Bonus CSV
+              </button>
+            )}
+          </div>
         </div>
       )}
 
