@@ -78,6 +78,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     platform: 'PS5',
     username: userGamerTag || '',
     entryFee: 50,
+    founderChallengeCount: 1,
       mode: defaultMode, // Use first preset mode (Full Match) instead of 'Head-to-Head'
     customMode: '',
     customGame: '', // Custom game name when "Custom" is selected
@@ -312,6 +313,15 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
         // Valid - no error for Founder Challenges
       }
 
+      const founderChallengeCount = Number(formData.founderChallengeCount || 1);
+      if (isAdmin && entryFee === 0) {
+        if (!Number.isFinite(founderChallengeCount) || founderChallengeCount < 1) {
+          errors.push('Founder challenge count must be at least 1');
+        } else if (founderChallengeCount > 25) {
+          errors.push('Founder challenge count cannot exceed 25');
+        }
+      }
+
       // Validate tournament bracket size
       if (isTournamentMode) {
         const maxPlayers = Number(formData.tournamentMaxPlayers);
@@ -379,6 +389,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
         mode: isTournamentSelected ? 'Tournament (Bracket Mode)' : formData.mode, // Set mode for tournaments
         maxPlayers: resolvedMaxPlayers,
         format: isTournamentSelected ? 'tournament' : 'standard',
+        founderChallengeCount: formData.founderChallengeCount,
         tournament: isTournamentSelected
           ? {
               format: 'tournament',
@@ -758,6 +769,36 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                   return <>Challenge Reward: {entryFee * 2} USDFG (2x challenge amount)</>;
                 })()}
               </div>
+
+              {(() => {
+                const isAdmin = currentWallet && currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+                const entryFee = typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) || 0 : formData.entryFee || 0;
+                if (!isAdmin || entryFee !== 0) {
+                  return null;
+                }
+                return (
+                  <div className="mt-2">
+                    <label className="block text-xs font-medium text-gray-300 mb-1.5">
+                      Number of Founder Challenges
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={25}
+                      value={formData.founderChallengeCount ?? 1}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        const parsed = value === '' ? 1 : Math.floor(Number(value));
+                        handleInputChange('founderChallengeCount', Number.isFinite(parsed) ? Math.max(1, parsed) : 1);
+                      }}
+                      className="w-full px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white placeholder-zinc-500 focus:border-amber-400/50 focus:outline-none transition-all"
+                    />
+                    <p className="text-xs text-purple-300/80 mt-1">
+                      Creates multiple identical Founder Challenges at once.
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>

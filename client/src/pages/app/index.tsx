@@ -2139,6 +2139,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         currentWallet = userTeam.teamKey;
       }
 
+      const entryFeeValue = typeof challengeData.entryFee === 'string'
+        ? parseFloat(challengeData.entryFee) || 0
+        : challengeData.entryFee || 0;
+      const isAdmin = currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+      const isFounderChallenge = isAdmin && (entryFeeValue === 0 || entryFeeValue < 0.000000001);
+      const founderChallengeCount = isFounderChallenge
+        ? Math.min(25, Math.max(1, Math.floor(Number(challengeData.founderChallengeCount || 1))))
+        : 1;
+
       // 🔍 Check if the user already has an active challenge (as creator OR participant)
       // EXCLUDE completed, cancelled, disputed, and expired challenges
       
@@ -2180,7 +2189,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         return shouldBlock;
       });
 
-      if (existingActive) {
+      if (existingActive && !isFounderChallenge) {
         const status = existingActive.status || existingActive.rawData?.status || 'unknown';
         // Debug: Blocked by active challenge
         // console.log("❌ Blocked: User already has active challenge:", existingActive.id, "Status:", status);
@@ -2222,9 +2231,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         throw new Error("Wallet address not found. Please connect your wallet first.");
       }
       
-      const isAdmin = currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
-      const entryFee = challengeData.entryFee || 0;
-      const isFounderChallenge = isAdmin && (entryFee === 0 || entryFee < 0.000000001);
+      const entryFee = entryFeeValue;
       
       // CRITICAL: No PDA creation here - PDA will be created when creator funds
       // This ensures no SOL is spent until real money movement happens
@@ -2243,10 +2250,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         totalPrize = challengeData.prizePool || 0;
       } else if (isTournament) {
         // Tournament: all entry fees collected
-        totalPrize = challengeData.entryFee * maxPlayers;
+        totalPrize = entryFee * maxPlayers;
       } else {
         // Regular 1v1 challenge: 2x entry fee
-        totalPrize = challengeData.entryFee * 2;
+        totalPrize = entryFee * 2;
       }
       
       // Apply platform fee to all challenges except Founder Challenges
@@ -2271,7 +2278,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const firestoreChallengeData = {
         creator: currentWallet,
         // challenger: undefined, // Will be set when someone expresses join intent (don't include undefined fields)
-        entryFee: challengeData.entryFee,
+        entryFee: entryFee,
         status: 'pending_waiting_for_opponent' as const, // NEW: No payment required, waiting for opponent
         createdAt: Timestamp.now(),
         expiresAt: Timestamp.fromDate(new Date(now + (2 * 60 * 60 * 1000))), // 2 hours from now (legacy, kept for compatibility)
@@ -2321,11 +2328,25 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         throw new Error("Status is required");
       }
       
-      const firestoreId = await addChallenge(firestoreChallengeData);
+      const totalChallengesToCreate = isFounderChallenge ? founderChallengeCount : 1;
+      const createdChallengeIds: string[] = [];
+      for (let i = 1; i <= totalChallengesToCreate; i++) {
+        const titleSuffix = totalChallengesToCreate > 1 ? ` #${i}` : '';
+        const payload = {
+          ...firestoreChallengeData,
+          title: `${challengeTitle}${titleSuffix}`,
+        };
+        const createdId = await addChallenge(payload);
+        createdChallengeIds.push(createdId);
+      }
       // The real-time listener will automatically update the UI
       
       // Close the modal after successful creation
       setShowCreateModal(false);
+
+      if (totalChallengesToCreate > 1) {
+        alert(`✅ Created ${totalChallengesToCreate} Founder Challenges`);
+      }
       
       // No balance refresh needed - no USDFG was moved (challenge creation is free)
       
@@ -3822,7 +3843,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   // Check if user has active challenge (for button disable logic)
   // EXCLUDE completed, cancelled, disputed, and expired challenges
   // Use Firestore data directly for most reliable status check
-  const hasActiveChallenge = currentWallet && firestoreChallenges.some((fc: any) => {
+  const isAdminUser = currentWallet && currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+  const hasActiveChallenge = !isAdminUser && currentWallet && firestoreChallenges.some((fc: any) => {
     // Check if user created this challenge
     const isCreator = fc.creator === currentWallet;
     
