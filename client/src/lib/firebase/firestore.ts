@@ -1759,7 +1759,7 @@ export async function addChallengeDoc(data: any) {
   return docRef.id;
 }
 
-// Auto-cleanup for completed challenges (delete after 24 hours)
+// Auto-cleanup for completed challenges (delete after short retention window)
 export async function cleanupCompletedChallenge(id: string) {
   try {
     // First, clean up all chat messages for this challenge

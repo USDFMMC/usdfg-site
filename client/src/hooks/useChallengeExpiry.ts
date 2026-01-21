@@ -8,6 +8,7 @@ import { updateChallengeStatus, cleanupExpiredChallenge, cleanupCompletedChallen
 export function useChallengeExpiry(challenges: any[]) {
   const processedChallenges = useRef(new Set<string>());
   const archiveTimers = useRef(new Map<string, NodeJS.Timeout>());
+  const completedRetentionHours = 2;
 
   useEffect(() => {
     if (!challenges?.length) return;
@@ -94,7 +95,7 @@ export function useChallengeExpiry(challenges: any[]) {
           }, 1000); // Short delay to show "Expired" status
         }
 
-        // Auto-cleanup completed challenges (delete after 24 hours to save storage)
+        // Auto-cleanup completed challenges (delete after short retention window)
         if (challenge.status === "completed" && !archiveTimers.current.has(challenge.id) && !processedChallenges.current.has(challenge.id + '_cleanup_completed')) {
           const completedTime = challenge.results ? 
             Math.max(...Object.values(challenge.results).map(r => r.submittedAt.toMillis())) : 
@@ -102,8 +103,8 @@ export function useChallengeExpiry(challenges: any[]) {
           
           const hoursSinceCompletion = (Date.now() - completedTime) / (1000 * 60 * 60);
           
-          if (hoursSinceCompletion >= 24) {
-            console.log("🗑️ Found completed challenge that needs cleanup (24h old):", challenge.id);
+          if (hoursSinceCompletion >= completedRetentionHours) {
+            console.log(`🗑️ Found completed challenge that needs cleanup (${completedRetentionHours}h old):`, challenge.id);
             processedChallenges.current.add(challenge.id + '_cleanup_completed');
 
             setTimeout(async () => {
