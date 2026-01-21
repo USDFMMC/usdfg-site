@@ -20,6 +20,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from './config';
+import { getExplorerTxUrl } from '../chain/explorer';
 
 // Test Firestore connection
 export async function testFirestoreConnection() {
@@ -36,6 +37,22 @@ export async function testFirestoreConnection() {
 // Collection references
 const usersCollection = collection(db, 'users');
 const lockNotificationsCollection = collection(db, 'lock_notifications');
+
+export async function postChallengeSystemMessage(challengeId: string, text: string): Promise<void> {
+  if (!challengeId || !text) {
+    return;
+  }
+  try {
+    await addDoc(collection(db, 'challenge_chats'), {
+      challengeId,
+      text,
+      sender: 'SYSTEM',
+      timestamp: Timestamp.now(),
+    });
+  } catch (error) {
+    console.warn('⚠️ Failed to post system message to chat:', error);
+  }
+}
 
 // Optimized Challenge Data - Minimal Collection
 export interface ChallengeData {
@@ -4106,6 +4123,11 @@ export async function claimChallengePrize(
         payoutTimestamp: Timestamp.now(),
         updatedAt: Timestamp.now(),
       });
+
+      const explorerUrl = getExplorerTxUrl(signature);
+      if (explorerUrl) {
+        await postChallengeSystemMessage(challengeId, `🏆 Reward claimed on-chain: ${explorerUrl}`);
+      }
       
       console.log('✅ REWARD CLAIMED!');
       console.log('   Transaction:', signature);

@@ -16,6 +16,9 @@ import { PublicKey } from '@solana/web3.js';
 // Deployed via Solana Playground: FXxGzstg3FXqfbX5DRKTabf518SBWRP5d2zumbCim5WP
 export const PROGRAM_ID = new PublicKey('FXxGzstg3FXqfbX5DRKTabf518SBWRP5d2zumbCim5WP');
 
+// Solana cluster used for explorer links
+export const SOLANA_CLUSTER = 'devnet' as const;
+
 // Admin wallet address
 export const ADMIN_WALLET = new PublicKey('3SeLoDGsajuQUt2pzSkZV7LmB7gKtckmrD693U69kcUd');
 

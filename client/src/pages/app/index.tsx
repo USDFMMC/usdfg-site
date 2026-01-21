@@ -13,11 +13,12 @@ import RightSidePanel from "@/components/ui/RightSidePanel";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
-import { ChallengeData, expressJoinIntent, creatorFund, joinerFund, revertCreatorTimeout, revertJoinerTimeout, expirePendingChallenge, cleanupExpiredChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage, uploadTeamImage, updateTeamImage, upsertChallengeNotification, listenToChallengeNotifications, ChallengeNotification, fetchChallengeById, submitTournamentMatchResult, deleteChallenge, joinTournament } from "@/lib/firebase/firestore";
+import { ChallengeData, expressJoinIntent, creatorFund, joinerFund, revertCreatorTimeout, revertJoinerTimeout, expirePendingChallenge, cleanupExpiredChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage, uploadTeamImage, updateTeamImage, upsertChallengeNotification, listenToChallengeNotifications, ChallengeNotification, fetchChallengeById, postChallengeSystemMessage, submitTournamentMatchResult, deleteChallenge, joinTournament } from "@/lib/firebase/firestore";
 import { Timestamp } from "firebase/firestore";
 import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
 import { ADMIN_WALLET, USDFG_MINT, PROGRAM_ID, SEEDS } from '@/lib/chain/config';
+import { getExplorerTxUrl } from '@/lib/chain/explorer';
 import { PublicKey } from '@solana/web3.js';
 import { getAssociatedTokenAddress } from '@solana/spl-token';
 import { testFirestoreConnection } from "@/lib/firebase/firestore";
@@ -2740,7 +2741,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       }
 
       // Joiner funds on-chain
-      await joinerFundOnChain(
+      const fundingSignature = await joinerFundOnChain(
         { signTransaction, publicKey },
         connection,
         challengePDA,
@@ -2749,6 +2750,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       // Update Firestore
       await joinerFund(challenge.id, walletAddr);
+
+      const explorerUrl = fundingSignature && fundingSignature.length > 30
+        ? getExplorerTxUrl(fundingSignature)
+        : '';
+      if (explorerUrl) {
+        await postChallengeSystemMessage(challenge.id, `💸 Challenger funded on-chain: ${explorerUrl}`);
+      }
       
       // Refresh balance
       setTimeout(() => {
@@ -2939,6 +2947,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // This is the ONLY place PDA creation happens - ensures no SOL is spent until funding
       let challengePDA = freshChallenge.pda || challenge.rawData?.pda || challenge.pda;
       let fundedOnChain = false;
+      let fundingSignature: string | null = null;
       
       if (!challengePDA) {
         // PDA doesn't exist - create + fund in one transaction (single fee)
@@ -2952,6 +2961,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           );
           challengePDA = result.pda;
           fundedOnChain = true;
+          fundingSignature = result.signature;
           
           // Update Firestore with PDA
           const { updateDoc, doc } = await import('firebase/firestore');
@@ -2981,7 +2991,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       if (!fundedOnChain) {
         try {
-          await creatorFundOnChain(
+          fundingSignature = await creatorFundOnChain(
             { signTransaction, publicKey },
             connection,
             challengePDA,
@@ -3039,6 +3049,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Update Firestore - wrap in try-catch to handle errors gracefully
       try {
       await creatorFund(challenge.id, currentWallet);
+      const explorerUrl = fundingSignature && fundingSignature.length > 30
+        ? getExplorerTxUrl(fundingSignature)
+        : '';
+      if (explorerUrl) {
+        await postChallengeSystemMessage(challenge.id, `💸 Creator funded on-chain: ${explorerUrl}`);
+      }
       } catch (firestoreError: any) {
         // If Firestore update fails but on-chain succeeded, we have a state mismatch
         // Check if the challenge status might have changed (e.g., already funded)

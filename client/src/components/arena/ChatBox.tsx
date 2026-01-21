@@ -3,6 +3,28 @@ import { Send } from "lucide-react";
 import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp } from "firebase/firestore";
 import { db } from "../../lib/firebase/config";
 
+const linkRegex = /(https?:\/\/[^\s]+)/g;
+
+const renderMessageText = (text: string) => {
+  const parts = text.split(linkRegex);
+  return parts.map((part, index) => {
+    if (part.startsWith('http://') || part.startsWith('https://')) {
+      return (
+        <a
+          key={`link-${index}`}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-amber-300 underline hover:text-amber-200"
+        >
+          {part}
+        </a>
+      );
+    }
+    return <span key={`text-${index}`}>{part}</span>;
+  });
+};
+
 interface Message {
   id: string;
   text: string;
@@ -131,7 +153,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet, st
               return (
                 <div key={msg.id} className="flex justify-center my-1">
                   <div className="max-w-[90%] px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded text-[10px] text-amber-300/80 text-center">
-                    {msg.text}
+                    {renderMessageText(msg.text)}
                   </div>
                 </div>
               );
@@ -155,7 +177,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet, st
                       {msg.sender.slice(0, 6)}...
                     </p>
                   )}
-                  <p className="break-words leading-snug">{msg.text}</p>
+                  <p className="break-words leading-snug">{renderMessageText(msg.text)}</p>
                 </div>
               </div>
             );
