@@ -2935,20 +2935,23 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         throw new Error(`Invalid entry fee: ${entryFee}. Cannot fund challenge with zero or negative entry fee.`);
       }
       
-      // CRITICAL: Create PDA if it doesn't exist, then immediately fund
+      // CRITICAL: Create PDA and fund in a single transaction if it doesn't exist
       // This is the ONLY place PDA creation happens - ensures no SOL is spent until funding
       let challengePDA = freshChallenge.pda || challenge.rawData?.pda || challenge.pda;
+      let fundedOnChain = false;
       
       if (!challengePDA) {
-        // PDA doesn't exist - create it now (this is the first on-chain call)
-        console.log('📝 Creating challenge PDA on-chain...');
-        const { createChallenge } = await import('@/lib/chain/contract');
+        // PDA doesn't exist - create + fund in one transaction (single fee)
+        console.log('📝 Creating challenge PDA and funding on-chain (single transaction)...');
+        const { createAndFundChallenge } = await import('@/lib/chain/contract');
         try {
-          challengePDA = await createChallenge(
+          const result = await createAndFundChallenge(
             { signTransaction, publicKey },
             connection,
             entryFee
           );
+          challengePDA = result.pda;
+          fundedOnChain = true;
           
           // Update Firestore with PDA
           const { updateDoc, doc } = await import('firebase/firestore');
@@ -2972,61 +2975,64 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         entryFee,
         entryFeeUSDFG: `${entryFee} USDFG`,
         challengePDA,
-        challengeId: challenge.id
+        challengeId: challenge.id,
+        combinedTransaction: fundedOnChain
       });
       
-      try {
-        await creatorFundOnChain(
-          { signTransaction, publicKey },
-          connection,
-          challengePDA,
-          entryFee
-        );
-      } catch (fundError: any) {
-        const errorMsg = fundError.message || fundError.toString() || '';
-        console.error('❌ Creator funding on-chain error:', {
-          error: fundError,
-          message: errorMsg,
-          logs: fundError.logs || [],
-          code: fundError.code
-        });
-        
-        // Handle "already processed" error - transaction may have succeeded
-        if (errorMsg.includes('already been processed') || errorMsg.includes('already processed')) {
-          console.log('⚠️ Transaction already processed - checking if challenge was funded...');
+      if (!fundedOnChain) {
+        try {
+          await creatorFundOnChain(
+            { signTransaction, publicKey },
+            connection,
+            challengePDA,
+            entryFee
+          );
+        } catch (fundError: any) {
+          const errorMsg = fundError.message || fundError.toString() || '';
+          console.error('❌ Creator funding on-chain error:', {
+            error: fundError,
+            message: errorMsg,
+            logs: fundError.logs || [],
+            code: fundError.code
+          });
           
-          // Check if challenge was actually funded by checking escrow balance
-          try {
-            const { getAccount } = await import('@solana/spl-token');
-            const [escrowTokenAccountPDA] = PublicKey.findProgramAddressSync(
-              [Buffer.from('escrow_wallet'), new PublicKey(challengePDA).toBuffer(), USDFG_MINT.toBuffer()],
-              PROGRAM_ID
-            );
-            const escrowAccount = await getAccount(connection, escrowTokenAccountPDA);
-            const escrowBalance = Number(escrowAccount.amount) / Math.pow(10, 9);
+          // Handle "already processed" error - transaction may have succeeded
+          if (errorMsg.includes('already been processed') || errorMsg.includes('already processed')) {
+            console.log('⚠️ Transaction already processed - checking if challenge was funded...');
             
-            if (escrowBalance >= entryFee) {
-              console.log('✅ Challenge was already funded successfully!', {
-                escrowBalance: `${escrowBalance} USDFG`,
-                expected: `${entryFee} USDFG`
-              });
-              // Funding succeeded, continue to Firestore update
-              // Don't throw error - just continue (break out of catch block)
-            } else {
-              throw new Error('Transaction was already processed, but challenge may not be funded. Please refresh and check the challenge status.');
+            // Check if challenge was actually funded by checking escrow balance
+            try {
+              const { getAccount } = await import('@solana/spl-token');
+              const [escrowTokenAccountPDA] = PublicKey.findProgramAddressSync(
+                [Buffer.from('escrow_wallet'), new PublicKey(challengePDA).toBuffer(), USDFG_MINT.toBuffer()],
+                PROGRAM_ID
+              );
+              const escrowAccount = await getAccount(connection, escrowTokenAccountPDA);
+              const escrowBalance = Number(escrowAccount.amount) / Math.pow(10, 9);
+              
+              if (escrowBalance >= entryFee) {
+                console.log('✅ Challenge was already funded successfully!', {
+                  escrowBalance: `${escrowBalance} USDFG`,
+                  expected: `${entryFee} USDFG`
+                });
+                // Funding succeeded, continue to Firestore update
+                // Don't throw error - just continue (break out of catch block)
+              } else {
+                throw new Error('Transaction was already processed, but challenge may not be funded. Please refresh and check the challenge status.');
+              }
+            } catch (checkError: any) {
+              // If we can't verify, show a helpful message
+              if (checkError.message?.includes('may not be funded')) {
+                throw checkError;
+              }
+              console.warn('⚠️ Could not verify funding status, but transaction may have succeeded:', checkError);
+              // Continue anyway - transaction may have succeeded (don't throw, let it proceed to Firestore update)
             }
-          } catch (checkError: any) {
-            // If we can't verify, show a helpful message
-            if (checkError.message?.includes('may not be funded')) {
-              throw checkError;
-            }
-            console.warn('⚠️ Could not verify funding status, but transaction may have succeeded:', checkError);
-            // Continue anyway - transaction may have succeeded (don't throw, let it proceed to Firestore update)
+          } else if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770') || errorMsg.includes('6000') || errorMsg.includes('Challenge is not open')) {
+            throw new Error('⚠️ Challenge is not open for creator funding on-chain. Please refresh and try again.');
+          } else {
+            throw fundError; // Re-throw if it's a different error
           }
-        } else if (errorMsg.includes('NotOpen') || errorMsg.includes('0x1770') || errorMsg.includes('6000') || errorMsg.includes('Challenge is not open')) {
-          throw new Error('⚠️ Challenge is not open for creator funding on-chain. Please refresh and try again.');
-        } else {
-          throw fundError; // Re-throw if it's a different error
         }
       }
       

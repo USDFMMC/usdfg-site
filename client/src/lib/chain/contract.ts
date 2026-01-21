@@ -315,10 +315,8 @@ export async function expressJoinIntent(
 }
 
 /**
- * Create challenge PDA and fund in one transaction (for when challenge was created in Firestore only)
- * This combines create_challenge + creator_fund into a single transaction to save network fees
- * 
- * NOTE: This function may not work with the deployed contract structure. Use createChallenge() separately.
+ * Create challenge PDA and fund in one transaction (for Firestore-only challenges).
+ * This combines create_challenge + creator_fund into a single transaction to save network fees.
  */
 export async function createAndFundChallenge(
   wallet: any,
@@ -326,57 +324,149 @@ export async function createAndFundChallenge(
   entryFeeUsdfg: number
 ): Promise<{ pda: string; signature: string }> {
   console.log('🚀 Creating challenge PDA and funding in one transaction...');
-  
+
   if (!wallet || !wallet.publicKey) {
     throw new Error('Wallet not connected');
   }
+  if (!wallet.signTransaction) {
+    throw new Error('Wallet does not support transaction signing');
+  }
+
+  // Validate challenge amount (matches contract requirement: 0.000000001 to 1000 USDFG)
+  if (entryFeeUsdfg < 0.000000001 || entryFeeUsdfg > 1000) {
+    throw new Error('Challenge amount must be between 0.000000001 and 1000 USDFG');
+  }
 
   const creator = new PublicKey(wallet.publicKey.toString());
-  const pdas = await derivePDAs(creator);
-  
+  const challengeSeedKeypair = Keypair.generate();
+  const challengeSeedPubkey = challengeSeedKeypair.publicKey;
+
+  // Derive challenge PDA using deployed contract seeds
+  const [challengePDA, challengeBump] = PublicKey.findProgramAddressSync(
+    [SEEDS.CHALLENGE, creator.toBuffer(), challengeSeedPubkey.toBuffer()],
+    PROGRAM_ID
+  );
+  console.log('📍 Challenge PDA derived:', challengePDA.toString(), 'bump:', challengeBump);
+
+  // Ensure account doesn't already exist
+  const accountInfo = await connection.getAccountInfo(challengePDA);
+  if (accountInfo) {
+    throw new Error(`Challenge account ${challengePDA.toString()} already exists. Please try again.`);
+  }
+
   // Convert USDFG to lamports
   const entryFeeLamports = Math.floor(entryFeeUsdfg * Math.pow(10, 9));
-  
-  // Create instruction for create_challenge
+  if (entryFeeLamports <= 0) {
+    throw new Error(`Invalid entry fee conversion: ${entryFeeUsdfg} USDFG = ${entryFeeLamports} lamports`);
+  }
+
   const { sha256 } = await import('@noble/hashes/sha2.js');
+
+  // Create instruction data for create_challenge
   const createHash = sha256(new TextEncoder().encode('global:create_challenge'));
   const createDiscriminator = Buffer.from(createHash.slice(0, 8));
   const createInstructionData = Buffer.alloc(8 + 8);
   createDiscriminator.copy(createInstructionData, 0);
   const entryFeeBuffer = numberToU64Buffer(entryFeeLamports);
   entryFeeBuffer.copy(createInstructionData, 8);
-  
-  // Verify System Program ID
-  const systemProgramId = SystemProgram.programId;
-  if (systemProgramId.toString() !== '11111111111111111111111111111111') {
-    throw new Error(`System Program ID mismatch! Expected 11111111111111111111111111111111, got ${systemProgramId.toString()}`);
-  }
-  
-  // Deployed contract CreateChallenge has only 3 accounts (no challenge_seed)
+
   const createInstruction = new TransactionInstruction({
     programId: PROGRAM_ID,
     keys: [
-      { pubkey: pdas.challengePDA, isSigner: false, isWritable: true }, // challenge
-      { pubkey: creator, isSigner: true, isWritable: true }, // creator (mut)
-      { pubkey: systemProgramId, isSigner: false, isWritable: false }, // system_program
+      { pubkey: challengePDA, isSigner: false, isWritable: true }, // challenge (PDA)
+      { pubkey: creator, isSigner: true, isWritable: true }, // creator
+      { pubkey: challengeSeedPubkey, isSigner: true, isWritable: false }, // challenge_seed
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
     ],
     data: createInstructionData,
   });
-  
-  // For now, just create the challenge - funding should be done separately
-  // as the deployed contract structure may not support combining them
-  const transaction = new Transaction().add(createInstruction);
+
+  // Build creator_fund instruction
+  const creatorTokenAccount = await getAssociatedTokenAddress(USDFG_MINT, creator);
+
+  // Check creator balance before funding
+  try {
+    const { getAccount } = await import('@solana/spl-token');
+    const creatorTokenAccountInfo = await getAccount(connection, creatorTokenAccount);
+    const balance = Number(creatorTokenAccountInfo.amount);
+    const requiredBalance = entryFeeLamports;
+
+    if (balance < requiredBalance) {
+      throw new Error(`Insufficient USDFG balance. You have ${balance / Math.pow(10, 9)} USDFG, but need ${entryFeeUsdfg} USDFG to fund this challenge.`);
+    }
+  } catch (error: any) {
+    if (error.message?.includes('InvalidAccountData') || error.message?.includes('TokenAccountNotFoundError')) {
+      throw new Error(`You don't have a USDFG token account. Please acquire some USDFG tokens first.`);
+    }
+    if (error.message?.includes('Insufficient')) {
+      throw error;
+    }
+    console.warn('⚠️ Could not check USDFG balance:', error.message);
+  }
+
+  const [escrowTokenAccountPDA, escrowTokenBump] = PublicKey.findProgramAddressSync(
+    [SEEDS.ESCROW_WALLET, challengePDA.toBuffer(), USDFG_MINT.toBuffer()],
+    PROGRAM_ID
+  );
+  console.log('📍 Escrow Token Account PDA:', escrowTokenAccountPDA.toString(), 'bump:', escrowTokenBump);
+
+  const fundHash = sha256(new TextEncoder().encode('global:creator_fund'));
+  const fundDiscriminator = Buffer.from(fundHash.slice(0, 8));
+  const fundInstructionData = Buffer.alloc(8 + 8);
+  fundDiscriminator.copy(fundInstructionData, 0);
+  entryFeeBuffer.copy(fundInstructionData, 8);
+
+  const creatorFundInstruction = new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      { pubkey: challengePDA, isSigner: false, isWritable: true }, // challenge
+      { pubkey: creator, isSigner: true, isWritable: true }, // creator
+      { pubkey: creatorTokenAccount, isSigner: false, isWritable: true }, // creator_token_account
+      { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // escrow_token_account
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
+      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // mint
+    ],
+    data: fundInstructionData,
+  });
+
+  const transaction = new Transaction().add(createInstruction, creatorFundInstruction);
   const { blockhash } = await connection.getLatestBlockhash();
   transaction.recentBlockhash = blockhash;
   transaction.feePayer = creator;
-  
+
+  // CRITICAL: challenge_seed must sign
+  transaction.partialSign(challengeSeedKeypair);
   const signedTransaction = await wallet.signTransaction(transaction);
-  const signature = await connection.sendRawTransaction(signedTransaction.serialize());
-  await connection.confirmTransaction(signature);
-  
-  console.log('✅ Challenge PDA created!');
-  console.log('⚠️ Note: Funding must be done separately using creatorFund()');
-  return { pda: pdas.challengePDA.toString(), signature };
+
+  let signature: string;
+  try {
+    signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
+      skipPreflight: false,
+      maxRetries: 0,
+    });
+  } catch (sendError: any) {
+    if (sendError.message?.includes('already been processed') ||
+        sendError.message?.includes('already processed')) {
+      console.log('✅ Transaction already processed - challenge likely created and funded');
+      return { pda: challengePDA.toString(), signature: 'already_processed' };
+    }
+    throw sendError;
+  }
+
+  try {
+    await connection.confirmTransaction(signature, 'confirmed');
+  } catch (confirmError: any) {
+    if (!confirmError.message?.includes('Transaction was not confirmed') &&
+        !confirmError.message?.includes('already been processed') &&
+        !confirmError.message?.includes('This transaction has already been processed')) {
+      throw confirmError;
+    }
+    console.log('✅ Transaction likely succeeded despite confirmation error');
+  }
+
+  console.log('✅ Challenge created and funded successfully!');
+  return { pda: challengePDA.toString(), signature };
 }
 
 /**
