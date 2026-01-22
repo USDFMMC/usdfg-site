@@ -26,6 +26,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   const { publicKey, connecting, connect, disconnect, connection } = useUSDFGWallet();
   const [balance, setBalance] = useState<number | null>(null);
   const [usdfgBalance, setUsdfgBalance] = useState<number | null>(null);
+  const [hoveringDisconnect, setHoveringDisconnect] = useState(false);
 
   // Fetch balances when publicKey exists
   useEffect(() => {
@@ -197,6 +198,10 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           )}
           <button
             onClick={handleDisconnect}
+            onMouseEnter={() => setHoveringDisconnect(true)}
+            onMouseLeave={() => setHoveringDisconnect(false)}
+            onFocus={() => setHoveringDisconnect(true)}
+            onBlur={() => setHoveringDisconnect(false)}
             className="text-[11px] text-emerald-300 font-semibold hover:text-emerald-200 transition-colors whitespace-nowrap"
             style={{ 
               touchAction: 'manipulation',
@@ -204,7 +209,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
             }}
             title="Disconnect wallet"
           >
-            {shortAddress}
+            {hoveringDisconnect ? 'Disconnect' : shortAddress}
           </button>
         </div>
       );
@@ -234,6 +239,10 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
         </div>
         <button
           onClick={handleDisconnect}
+          onMouseEnter={() => setHoveringDisconnect(true)}
+          onMouseLeave={() => setHoveringDisconnect(false)}
+          onFocus={() => setHoveringDisconnect(true)}
+          onBlur={() => setHoveringDisconnect(false)}
           className="text-emerald-300 text-xs font-semibold hover:text-emerald-200 transition-colors"
           style={{
             touchAction: 'manipulation',
@@ -241,7 +250,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           }}
           title="Disconnect wallet"
         >
-          {shortAddress}
+          {hoveringDisconnect ? 'Disconnect' : shortAddress}
         </button>
       </div>
     );
