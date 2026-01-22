@@ -3900,6 +3900,58 @@ export async function getTopTeams(limitCount: number = 10, sortBy: 'wins' | 'win
   }
 }
 
+export async function getLeaderboardTeams(
+  limitCount?: number,
+  sortBy: 'wins' | 'winRate' | 'totalEarned' = 'totalEarned',
+  includeAll: boolean = false
+): Promise<TeamStats[]> {
+  if (!includeAll) {
+    return getTopTeams(limitCount ?? 10, sortBy);
+  }
+  try {
+    const teamsRef = collection(db, 'teams');
+    const snapshot = await getDocs(teamsRef);
+    const teams: TeamStats[] = [];
+
+    snapshot.forEach((doc) => {
+      const data = doc.data() as TeamStats;
+      if (data.trustScore === undefined) {
+        data.trustScore = 0;
+      }
+      if (data.trustReviews === undefined) {
+        data.trustReviews = 0;
+      }
+      if (data.wins === undefined) {
+        data.wins = 0;
+      }
+      if (data.losses === undefined) {
+        data.losses = 0;
+      }
+      if (data.totalEarned === undefined) {
+        data.totalEarned = 0;
+      }
+      if (data.winRate === undefined) {
+        data.winRate = 0;
+      }
+      teams.push(data);
+    });
+
+    teams.sort((a, b) => {
+      const aValue = (a as any)[sortBy] ?? 0;
+      const bValue = (b as any)[sortBy] ?? 0;
+      return bValue - aValue;
+    });
+
+    if (limitCount && limitCount > 0) {
+      return teams.slice(0, limitCount);
+    }
+    return teams;
+  } catch (error) {
+    console.error('❌ Error fetching leaderboard teams:', error);
+    return [];
+  }
+}
+
 /**
  * Get top players for leaderboard
  */
@@ -3941,6 +3993,61 @@ export async function getTopPlayers(limitCount: number = 10, sortBy: 'wins' | 'w
   } catch (error) {
     console.error('❌ Error fetching top players:', error);
     console.error('   Error details:', error);
+    return [];
+  }
+}
+
+export async function getLeaderboardPlayers(
+  limitCount?: number,
+  sortBy: 'wins' | 'winRate' | 'totalEarned' = 'totalEarned',
+  includeAll: boolean = false
+): Promise<PlayerStats[]> {
+  if (!includeAll) {
+    return getTopPlayers(limitCount ?? 10, sortBy);
+  }
+  try {
+    const statsCollection = collection(db, 'player_stats');
+    const snapshot = await getDocs(statsCollection);
+    const players: PlayerStats[] = [];
+
+    snapshot.forEach((doc) => {
+      const data = doc.data() as PlayerStats;
+      if (data.trustScore === undefined) {
+        data.trustScore = 0;
+      }
+      if (data.trustReviews === undefined) {
+        data.trustReviews = 0;
+      }
+      if (data.wins === undefined) {
+        data.wins = 0;
+      }
+      if (data.losses === undefined) {
+        data.losses = 0;
+      }
+      if (data.totalEarned === undefined) {
+        data.totalEarned = 0;
+      }
+      if (data.winRate === undefined) {
+        data.winRate = 0;
+      }
+      if (data.gamesPlayed === undefined) {
+        data.gamesPlayed = 0;
+      }
+      players.push(data);
+    });
+
+    players.sort((a, b) => {
+      const aValue = (a as any)[sortBy] ?? 0;
+      const bValue = (b as any)[sortBy] ?? 0;
+      return bValue - aValue;
+    });
+
+    if (limitCount && limitCount > 0) {
+      return players.slice(0, limitCount);
+    }
+    return players;
+  } catch (error) {
+    console.error('❌ Error fetching leaderboard players:', error);
     return [];
   }
 }

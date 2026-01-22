@@ -13,7 +13,7 @@ import RightSidePanel from "@/components/ui/RightSidePanel";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
-import { ChallengeData, expressJoinIntent, creatorFund, joinerFund, revertCreatorTimeout, revertJoinerTimeout, expirePendingChallenge, cleanupExpiredChallenge, submitChallengeResult, startResultSubmissionPhase, getTopPlayers, getTopTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage, uploadTeamImage, updateTeamImage, upsertChallengeNotification, listenToChallengeNotifications, ChallengeNotification, fetchChallengeById, postChallengeSystemMessage, submitTournamentMatchResult, deleteChallenge, joinTournament } from "@/lib/firebase/firestore";
+import { ChallengeData, expressJoinIntent, creatorFund, joinerFund, revertCreatorTimeout, revertJoinerTimeout, expirePendingChallenge, cleanupExpiredChallenge, submitChallengeResult, startResultSubmissionPhase, getLeaderboardPlayers, getLeaderboardTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage, uploadTeamImage, updateTeamImage, upsertChallengeNotification, listenToChallengeNotifications, ChallengeNotification, fetchChallengeById, postChallengeSystemMessage, submitTournamentMatchResult, deleteChallenge, joinTournament } from "@/lib/firebase/firestore";
 import { Timestamp } from "firebase/firestore";
 import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
@@ -1018,14 +1018,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     return lockValue === normalizedCurrentWallet ? currentLockTarget : null;
   }, [normalizedCurrentWallet, currentLockTarget, userLocks]);
 
-  const refreshTopTeams = useCallback(async () => {
+  const refreshTopTeams = useCallback(async (limitOverride?: number, includeAllOverride?: boolean) => {
     const shouldToggleLoading = leaderboardView === 'teams';
     try {
       if (shouldToggleLoading) {
         setLoadingTopTeams(true);
       }
-      const limit = showAllPlayers ? leaderboardLimit : 5;
-      const teams = await getTopTeams(limit, 'totalEarned');
+      const includeAll = includeAllOverride ?? showAllPlayers;
+      const limit = includeAll ? limitOverride : (limitOverride ?? (showAllPlayers ? leaderboardLimit : 5));
+      const teams = await getLeaderboardTeams(limit, 'totalEarned', includeAll);
       setTopTeams(teams);
     } catch (error) {
       console.error('Failed to refresh team leaderboard:', error);
@@ -1036,10 +1037,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
   }, [leaderboardView, showAllPlayers, leaderboardLimit]);
 
-  const loadTopPlayers = useCallback(async (limitOverride?: number) => {
+  const loadTopPlayers = useCallback(async (limitOverride?: number, includeAllOverride?: boolean) => {
     try {
-      const limit = limitOverride ?? (showAllPlayers ? leaderboardLimit : 5);
-      const players = await getTopPlayers(limit, 'totalEarned');
+      const includeAll = includeAllOverride ?? showAllPlayers;
+      const limit = includeAll ? limitOverride : (limitOverride ?? (showAllPlayers ? leaderboardLimit : 5));
+      const players = await getLeaderboardPlayers(limit, 'totalEarned', includeAll);
       setTopPlayers(players);
     } catch (error) {
       console.error('Failed to load top players:', error);
@@ -1663,7 +1665,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const timeoutId = setTimeout(async () => {
         try {
           const limit = showAllPlayers ? leaderboardLimit : 5;
-          const players = await getTopPlayers(limit, 'totalEarned');
+          const players = await getLeaderboardPlayers(limit, 'totalEarned', showAllPlayers);
           setTopPlayers(players);
         } catch (error) {
           console.error('Failed to refresh leaderboard:', error);
@@ -3470,7 +3472,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         setTimeout(async () => {
         try {
           const limit = showAllPlayers ? leaderboardLimit : 5;
-          const players = await getTopPlayers(limit, 'totalEarned');
+          const players = await getLeaderboardPlayers(limit, 'totalEarned', showAllPlayers);
           setTopPlayers(players);
         } catch (error) {
           console.error('Failed to refresh leaderboard after trust review:', error);
@@ -6065,9 +6067,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                             setLeaderboardLoading(true);
                             try {
                               if (isTeamsView) {
-                                await refreshTopTeams();
+                                await refreshTopTeams(5, false);
                               } else {
-                                await loadTopPlayers(5);
+                                await loadTopPlayers(5, false);
                               }
                             } catch (error) {
                               console.error('Failed to load top 5:', error);
@@ -6089,9 +6091,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                               setLeaderboardLimit(newLimit);
                               try {
                                 if (isTeamsView) {
-                                  await refreshTopTeams();
+                                  await refreshTopTeams(newLimit, false);
                                 } else {
-                                  await loadTopPlayers(newLimit);
+                                  await loadTopPlayers(newLimit, false);
                                 }
                               } catch (error) {
                                 console.error('Failed to load more players:', error);
@@ -6110,13 +6112,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                       <button
                         onClick={async () => {
                           setShowAllPlayers(true);
-                          setLeaderboardLimit(30); // Start with 30
                           setLeaderboardLoading(true);
                           try {
                             if (isTeamsView) {
-                              await refreshTopTeams();
+                              await refreshTopTeams(undefined, true);
                             } else {
-                              await loadTopPlayers(30);
+                              await loadTopPlayers(undefined, true);
                             }
                           } catch (error) {
                             console.error('Failed to load all players:', error);
@@ -6459,7 +6460,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 try {
                   await updatePlayerDisplayName(publicKey.toString(), newName);
                   const limit = showAllPlayers ? 50 : 5;
-                  const players = await getTopPlayers(limit, 'totalEarned');
+                  const players = await getLeaderboardPlayers(limit, 'totalEarned', showAllPlayers);
                   setTopPlayers(players);
                 } catch (error) {
                   console.error('Failed to update display name in Firestore:', error);
@@ -6501,7 +6502,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     
                     // Refresh leaderboard to show updated image
                     const limit = showAllPlayers ? 50 : 5;
-                    const players = await getTopPlayers(limit, 'totalEarned');
+                    const players = await getLeaderboardPlayers(limit, 'totalEarned', showAllPlayers);
                     setTopPlayers(players);
                   } catch (error) {
                     console.error('❌ Failed to upload profile image:', error);
@@ -6516,7 +6517,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     
                     // Refresh leaderboard
                     const limit = showAllPlayers ? 50 : 5;
-                    const players = await getTopPlayers(limit, 'totalEarned');
+                    const players = await getLeaderboardPlayers(limit, 'totalEarned', showAllPlayers);
                     setTopPlayers(players);
                   } catch (error) {
                     console.error('❌ Failed to remove profile image:', error);
