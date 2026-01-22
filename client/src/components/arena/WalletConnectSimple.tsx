@@ -170,16 +170,26 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     
     if (compact) {
       return (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 rounded-full border border-amber-500/30 bg-[#07080C]/90 px-2 py-1.5 shadow-[0_0_18px_rgba(255,215,130,0.15)] backdrop-blur-sm">
+          {profileAvatar ? (
+            <button
+              type="button"
+              onClick={onProfileClick}
+              className="flex items-center"
+              title="View profile"
+            >
+              {profileAvatar}
+            </button>
+          ) : null}
           {(usdfgBalance !== null || balance !== null) && (
-            <div className="text-right">
+            <div className="flex flex-col leading-tight">
               {usdfgBalance !== null && (
-                <div className="text-[10px] text-cyan-400 font-semibold leading-tight">
+                <div className="text-[11px] text-amber-200 font-semibold">
                   {usdfgBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} USDFG
                 </div>
               )}
               {balance !== null && (
-                <div className="text-[9px] text-gray-400 leading-tight">
+                <div className="text-[10px] text-gray-400">
                   {balance.toFixed(2)} SOL
                 </div>
               )}
@@ -187,11 +197,12 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           )}
           <button
             onClick={handleDisconnect}
-            className="px-2.5 py-1.5 bg-gradient-to-r from-green-500/20 to-emerald-600/20 text-green-300 font-light tracking-wide rounded-md hover:from-green-500/30 hover:to-emerald-600/30 transition-all border border-green-500/50 shadow-sm shadow-green-500/10 text-xs backdrop-blur-sm touch-manipulation whitespace-nowrap"
+            className="text-[11px] text-emerald-300 font-semibold hover:text-emerald-200 transition-colors whitespace-nowrap"
             style={{ 
               touchAction: 'manipulation',
               WebkitTapHighlightColor: 'transparent'
             }}
+            title="Disconnect wallet"
           >
             {shortAddress}
           </button>

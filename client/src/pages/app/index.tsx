@@ -4865,26 +4865,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             
           </div>
 
-          {/* Mobile Only - Wallet and Profile Buttons */}
+          {/* Mobile Only - Wallet */}
           <div className="flex md:hidden items-center gap-2">
-            {publicKey && isConnected && (
-              <button
-                onClick={() => {
-                  void handleOpenProfile();
-                }}
-                className="flex items-center justify-center gap-2 px-2.5 py-1.5 bg-zinc-800/50 hover:bg-zinc-700/50 rounded-xl border border-zinc-700 hover:border-amber-300/50 transition-all text-white text-sm font-semibold"
-                title="Profile"
-              >
-                {renderNavAvatar("sm")}
-                <span className="hidden sm:inline text-white text-sm font-semibold">
-                  {userGamerTag && userGamerTag.trim().length > 0
-                    ? userGamerTag.trim()
-                    : `${publicKey.toString().slice(0, 4)}...${publicKey
-                        .toString()
-                        .slice(-4)}`}
-                </span>
-              </button>
-            )}
             <WalletConnectSimple 
               isConnected={isConnected}
               onConnect={() => {
@@ -4900,6 +4882,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 setPhantomConnectionState({ connected: false, publicKey: null });
               }}
               compact={true}
+              profileAvatar={publicKey ? renderNavAvatar("sm") : undefined}
+              onProfileClick={() => {
+                void handleOpenProfile();
+              }}
             />
           </div>
         </ElegantNavbar>
