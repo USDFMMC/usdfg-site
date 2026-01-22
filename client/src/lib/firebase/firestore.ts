@@ -915,10 +915,14 @@ export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'cr
       }
     }
     
+    const initialPlayers = Array.isArray(challengeData.players)
+      ? challengeData.players
+      : [challengeData.creator];
+
     const challengePayload: any = {
       ...challengeData,
       createdAt: Timestamp.now(),
-      players: [challengeData.creator], // Creator is first player
+      players: initialPlayers,
     };
 
     Object.keys(challengePayload).forEach((key) => {

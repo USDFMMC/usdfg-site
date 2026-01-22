@@ -2284,6 +2284,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const now = Date.now();
       const expirationTimer = Timestamp.fromDate(new Date(now + (60 * 60 * 1000))); // 60 minutes TTL for pending challenges
       
+      const initialPlayers = isFounderChallenge && isTournament ? [] : [currentWallet];
+
       const firestoreChallengeData = {
         creator: currentWallet,
         // challenger: undefined, // Will be set when someone expresses join intent (don't include undefined fields)
@@ -2299,7 +2301,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         // fundedByJoinerAt: undefined, // Will be set when joiner funds
         // winner: undefined, // Will be set when match completes (don't include undefined fields)
         // UI fields for display
-        players: [currentWallet], // Creator is first player
+        players: initialPlayers,
         maxPlayers: challengeData.maxPlayers || maxPlayers, // Respect tournament size when provided
         format: challengeData.format || (challengeData.tournament ? 'tournament' : 'standard'),
         tournament: challengeData.format === 'tournament' ? challengeData.tournament : undefined,
