@@ -4823,28 +4823,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             
             {publicKey && (
               <>
-                <button
-                  onClick={() => {
-                    void handleOpenProfile();
-                  }}
-                  className="flex items-center gap-3 px-3 py-2 h-10 bg-zinc-800/50 hover:bg-zinc-700/50 rounded-xl border border-zinc-700 hover:border-amber-300/50 transition-all text-white text-sm font-semibold"
-                  title="View profile"
-                >
-                  {renderNavAvatar("md")}
-                  <div className="flex flex-col items-start leading-tight">
-                    <span className="text-[10px] uppercase tracking-wide text-amber-300">
-                      Profile
-                    </span>
-                    <span className="text-xs sm:text-sm font-semibold text-white max-w-[140px] truncate">
-                      {userGamerTag && userGamerTag.trim().length > 0
-                        ? userGamerTag.trim()
-                        : `${publicKey.toString().slice(0, 4)}...${publicKey
-                            .toString()
-                            .slice(-4)}`}
-                    </span>
-                  </div>
-                </button>
-                
                 {/* Team Management Button */}
                 <button
                   onClick={async () => {
@@ -4876,6 +4854,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 clearPhantomConnectionState();
                 // Force state update
                 setPhantomConnectionState({ connected: false, publicKey: null });
+              }}
+              profileAvatar={publicKey ? renderNavAvatar("md") : undefined}
+              onProfileClick={() => {
+                void handleOpenProfile();
               }}
             />
             

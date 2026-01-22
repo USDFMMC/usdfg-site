@@ -11,13 +11,17 @@ interface WalletConnectSimpleProps {
   onConnect: () => void;
   onDisconnect: () => void;
   compact?: boolean;
+  profileAvatar?: React.ReactNode;
+  onProfileClick?: () => void;
 }
 
 const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   isConnected,
   onConnect,
   onDisconnect,
-  compact = false
+  compact = false,
+  profileAvatar,
+  onProfileClick
 }) => {
   const { publicKey, connecting, connect, disconnect, connection } = useUSDFGWallet();
   const [balance, setBalance] = useState<number | null>(null);
@@ -196,22 +200,35 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     }
     
     return (
-      <div className="flex items-center gap-3">
-        <div className="text-right">
-          <div className="text-cyan-400 font-semibold text-xs leading-tight">
-            {usdfgBalance !== null ? `${usdfgBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} USDFG` : "Loading..."}
+      <div className="flex items-center gap-3 rounded-full border border-amber-500/30 bg-[#07080C]/90 px-3 py-1.5 shadow-[0_0_20px_rgba(255,215,130,0.15)] backdrop-blur-sm">
+        {profileAvatar ? (
+          <button
+            type="button"
+            onClick={onProfileClick}
+            className="flex items-center"
+            title="View profile"
+          >
+            {profileAvatar}
+          </button>
+        ) : null}
+        <div className="flex flex-col leading-tight">
+          <div className="text-amber-200 font-semibold text-sm">
+            {usdfgBalance !== null
+              ? `${usdfgBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} USDFG`
+              : "Loading..."}
           </div>
-          <div className="text-gray-400 text-[10px] leading-tight">
-            {balance !== null ? `${balance.toFixed(4)} SOL` : "Loading..."}
+          <div className="text-xs text-gray-400">
+            {balance !== null ? `${balance.toFixed(2)} SOL` : "Loading..."}
           </div>
         </div>
         <button
           onClick={handleDisconnect}
-          className="px-4 py-1.5 bg-gradient-to-r from-green-500/20 to-emerald-600/20 text-green-300 font-light tracking-wide rounded-md hover:from-green-500/30 hover:to-emerald-600/30 transition-all border border-green-500/50 shadow-sm shadow-green-500/10 text-sm backdrop-blur-sm"
-          style={{ 
+          className="text-emerald-300 text-xs font-semibold hover:text-emerald-200 transition-colors"
+          style={{
             touchAction: 'manipulation',
             WebkitTapHighlightColor: 'transparent'
           }}
+          title="Disconnect wallet"
         >
           {shortAddress}
         </button>
