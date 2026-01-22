@@ -6232,14 +6232,18 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             // Render tournament lobby modal - persistent room
             if (showTournamentLobby) {
               return (
-                <ElegantModal
+                <RightSidePanel
                   isOpen={showTournamentLobby}
                   onClose={() => {
                     setShowTournamentLobby(false);
                     setSelectedChallenge(null);
                   }}
                   title={`${selectedChallenge.title || "Tournament"} Bracket`}
-                  className="tournament-modal"
+                  className="max-w-none sm:max-w-[95vw] w-full"
+                  players={players.map((wallet: string) => ({ wallet }))}
+                  gameName={selectedChallenge.title || "Tournament"}
+                  voiceChatChallengeId={selectedChallenge.id}
+                  voiceChatCurrentWallet={publicKey?.toString() || ""}
                 >
                   <TournamentBracketView
                     tournament={selectedChallenge.rawData?.tournament}
@@ -6278,7 +6282,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     onAirdropPayouts={handleFounderTournamentAirdrop}
                     isAirdropping={isAirdropping}
                   />
-                </ElegantModal>
+                </RightSidePanel>
               );
             }
             
