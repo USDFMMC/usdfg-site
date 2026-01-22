@@ -5,6 +5,29 @@ export function useUSDFGWallet() {
   const wallet = useWallet();
   const { connection } = useConnection();
 
+  const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  async function selectWalletWithRetry(adapterName: string, maxRetries: number = 2): Promise<void> {
+    let lastError: any = null;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        await wallet.select(adapterName);
+        await wait(150 + attempt * 150);
+        if (wallet.wallet) {
+          return;
+        }
+      } catch (error: any) {
+        lastError = error;
+      }
+      await wait(250 + attempt * 150);
+    }
+
+    if (lastError) {
+      throw lastError;
+    }
+    throw new Error("Failed to select wallet");
+  }
+
   async function connect() {
     
     // Check if user is on Safari desktop (Phantom doesn't support Safari)
@@ -42,6 +65,9 @@ export function useUSDFGWallet() {
       }
     }
     
+    // Give adapter state a moment to settle (helps quick reconnects)
+    await wait(150);
+
     // Select Phantom if not already selected
     if (!wallet.wallet) {
       const phantomWallet = wallet.wallets.find(
@@ -66,12 +92,10 @@ export function useUSDFGWallet() {
       if (phantomWallet.adapter.readyState === "Installed" || phantomWallet.adapter.readyState === "Loadable") {
         console.log("🔍 Selecting Phantom wallet...");
         try {
-          await wallet.select(phantomWallet.adapter.name);
-          await new Promise((resolve) => setTimeout(resolve, 100));
-          
+          await selectWalletWithRetry(phantomWallet.adapter.name, 2);
           // Verify selection worked
           if (!wallet.wallet) {
-            const errorMsg = "Failed to select Phantom wallet. Please refresh the page and try again.";
+            const errorMsg = "Failed to select Phantom wallet. Please wait a moment and try again.";
             console.error("❌", errorMsg);
             throw new Error(errorMsg);
           }
@@ -107,6 +131,20 @@ export function useUSDFGWallet() {
       await wallet.connect();
       console.log("✅ Successfully connected to Phantom");
     } catch (error: any) {
+      const message = error?.message || "";
+      const shouldRetry = message.includes("not selected") || message.includes("WalletNotSelected") || message.includes("Failed to select");
+      if (shouldRetry) {
+        await wait(200);
+        const phantomWallet = wallet.wallets.find(
+          (w) => w.adapter.name === "Phantom"
+        );
+        if (phantomWallet) {
+          await selectWalletWithRetry(phantomWallet.adapter.name, 1);
+        }
+        await wallet.connect();
+        console.log("✅ Successfully connected to Phantom after retry");
+        return;
+      }
       console.error("❌ Connection error:", error);
       throw error;
     }
