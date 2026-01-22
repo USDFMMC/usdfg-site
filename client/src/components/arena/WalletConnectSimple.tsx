@@ -115,16 +115,8 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           message: error.message || 'Connection failed',
           error: String(error)
         });
-        
         if (error.message?.includes('User rejected') || error.message?.includes('User cancelled')) {
           console.log('User cancelled wallet connection');
-        } else {
-          const errorMessage = error.message || 'Unknown error';
-          if (errorMessage.includes('not found') || errorMessage.includes('not detected')) {
-            alert(`Phantom wallet not found. Please install Phantom from https://phantom.app and try again.`);
-          } else {
-            alert(`Connection failed: ${errorMessage}`);
-          }
         }
       }
     })();

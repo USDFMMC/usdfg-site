@@ -38,7 +38,6 @@ export function useUSDFGWallet() {
     if (isSafariDesktop) {
       const errorMsg = "⚠️ Phantom wallet doesn't support Safari desktop.\n\nPlease use one of these browsers:\n• Chrome\n• Firefox\n• Brave\n• Edge\n\nOr use the Phantom mobile app on your phone.";
       console.error("❌", errorMsg);
-      alert(errorMsg);
       throw new Error("Phantom doesn't support Safari desktop. Please use Chrome, Firefox, Brave, or Edge.");
     }
     
