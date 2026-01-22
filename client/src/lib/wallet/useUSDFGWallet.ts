@@ -145,6 +145,12 @@ export function useUSDFGWallet() {
         console.log("✅ Successfully connected to Phantom after retry");
         return;
       }
+      // If connection completed despite error, silently succeed
+      await wait(300);
+      if (wallet.connected || wallet.publicKey) {
+        console.log("✅ Connected despite transient error");
+        return;
+      }
       console.error("❌ Connection error:", error);
       throw error;
     }
