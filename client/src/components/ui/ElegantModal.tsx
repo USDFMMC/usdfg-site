@@ -181,7 +181,10 @@ const ElegantModal: React.FC<ElegantModalProps> = ({
         )}
         
         {/* Content */}
-        <div className={`p-3 overflow-y-auto max-h-[calc(90vh-80px)] ${className.includes('tournament-modal') ? 'overflow-x-auto' : ''}`}>
+        <div
+          className={`p-3 overflow-y-auto max-h-[calc(90vh-80px)] overscroll-contain ${className.includes('tournament-modal') ? 'overflow-x-auto' : ''}`}
+          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+        >
           {children}
         </div>
       </div>
