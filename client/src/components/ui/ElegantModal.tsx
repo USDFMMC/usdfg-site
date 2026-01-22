@@ -112,6 +112,7 @@ const ElegantModal: React.FC<ElegantModalProps> = ({
 
   const opacity = dragY > 0 ? Math.max(0.3, 1 - dragY / 300) : 1;
   const scale = dragY > 0 ? Math.max(0.95, 1 - dragY / 1000) : 1;
+  const isTournamentModal = className.includes('tournament-modal');
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
@@ -131,7 +132,7 @@ const ElegantModal: React.FC<ElegantModalProps> = ({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         className={`
-          relative w-full sm:w-[90vw] max-w-2xl max-h-[90vh] sm:max-h-[90vh] overflow-hidden rounded-t-2xl sm:rounded-xl border border-amber-400/20
+          relative w-full sm:w-[90vw] max-w-2xl max-h-[90vh] sm:max-h-[90vh] ${isTournamentModal ? 'overflow-y-auto' : 'overflow-hidden'} rounded-t-2xl sm:rounded-xl border border-amber-400/20
           bg-gradient-to-br from-gray-900/95 via-gray-900/95 to-black/95 backdrop-blur-md
           shadow-[0_0_40px_rgba(0,0,0,0.6)] shadow-amber-400/8
           transition-transform duration-200 ease-out
@@ -140,7 +141,7 @@ const ElegantModal: React.FC<ElegantModalProps> = ({
         `}
         style={{
           transform: `translateY(${dragY}px) scale(${scale})`,
-          ...(className.includes('tournament-modal') ? { maxWidth: '1400px', width: '95vw' } : {})
+          ...(isTournamentModal ? { maxWidth: '1400px', width: '95vw' } : {})
         }}
       >
         {/* Drag Handle */}
@@ -182,7 +183,7 @@ const ElegantModal: React.FC<ElegantModalProps> = ({
         
         {/* Content */}
         <div
-          className={`p-3 overflow-y-auto max-h-[calc(90vh-80px)] overscroll-contain ${className.includes('tournament-modal') ? 'overflow-x-auto' : ''}`}
+          className={`p-3 ${isTournamentModal ? 'overflow-x-auto' : 'overflow-y-auto max-h-[calc(90vh-80px)]'} overscroll-contain`}
           style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
         >
           {children}
