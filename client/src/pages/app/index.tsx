@@ -6283,6 +6283,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                       await joinTournament(challengeId, publicKey.toString());
                     }}
                     onClaimPrize={handleClaimPrize}
+                    onCancelChallenge={handleCancelChallenge}
                     challenge={selectedChallenge}
                     isClaiming={claimingPrize === selectedChallenge.id}
                     onAirdropPayouts={handleFounderTournamentAirdrop}

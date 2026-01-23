@@ -13,6 +13,7 @@ interface TournamentBracketViewProps {
   onOpenSubmitResult?: (matchId: string, opponentWallet: string) => void;
   onJoinTournament?: (challengeId: string) => Promise<void>;
   onClaimPrize?: (challenge: any) => Promise<void>;
+  onCancelChallenge?: (challenge: any) => Promise<void>;
   challenge?: any; // Full challenge object for claim prize logic
   isClaiming?: boolean; // Whether claim is in progress
   onAirdropPayouts?: (recipients: { wallet: string; amount: number }[], challenge: any) => Promise<void>;
@@ -27,6 +28,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   onOpenSubmitResult,
   onJoinTournament,
   onClaimPrize,
+  onCancelChallenge,
   challenge,
   isClaiming = false,
   onAirdropPayouts,
@@ -128,6 +130,16 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   const isAdminViewer =
     currentWallet &&
     currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+  const isCreator =
+    currentWallet &&
+    creatorWallet &&
+    currentWallet.toLowerCase() === creatorWallet.toLowerCase();
+  const nonCreatorPlayers = players.filter((wallet) => {
+    if (!wallet || !creatorWallet) return Boolean(wallet);
+    return wallet.toLowerCase() !== creatorWallet.toLowerCase();
+  });
+  const canCancelTournament =
+    Boolean(isCreator) && isWaitingForPlayers && nonCreatorPlayers.length === 0;
 
   const uniqueParticipants = (() => {
     const map = new Map<string, string>();
@@ -323,6 +335,23 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
               className="mt-3 w-full rounded-lg bg-blue-500/20 px-4 py-2 text-sm font-semibold text-blue-200 transition-all hover:bg-blue-500/30 hover:shadow-[0_0_12px_rgba(59,130,246,0.3)] border border-blue-400/40"
             >
               Join Tournament
+            </button>
+          )}
+          {canCancelTournament && onCancelChallenge && challenge && (
+            <button
+              onClick={async () => {
+                if (!window.confirm('Are you sure you want to delete this tournament? This action cannot be undone.')) {
+                  return;
+                }
+                try {
+                  await onCancelChallenge(challenge);
+                } catch (error: any) {
+                  alert(error.message || 'Failed to delete tournament');
+                }
+              }}
+              className="mt-3 w-full rounded-lg bg-red-600/20 px-4 py-2 text-sm font-semibold text-red-200 transition-all hover:bg-red-600/30 hover:shadow-[0_0_12px_rgba(239,68,68,0.35)] border border-red-500/40"
+            >
+              🗑️ Delete Tournament
             </button>
           )}
         </div>
