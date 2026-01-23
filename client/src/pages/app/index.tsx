@@ -5246,7 +5246,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                             <span className="text-[10px] text-white/60">👥</span>
                             <span className="text-[10px] font-semibold text-white/80">
                               {(() => {
-                                const playersCount = Array.isArray(challenge.players) ? challenge.players.length : (typeof challenge.players === 'number' ? challenge.players : 0);
+                                const rawPlayers = Array.isArray(challenge.players)
+                                  ? challenge.players
+                                  : (typeof challenge.players === 'number' ? [] : []);
+                                const creatorWallet = challenge.creator || challenge.rawData?.creator;
+                                const playersCount = rawPlayers.filter((player: string) =>
+                                  creatorWallet ? player?.toLowerCase() !== creatorWallet.toLowerCase() : true
+                                ).length;
                                 const maxPlayers = challenge.capacity || challenge.maxPlayers || 2;
                                 return `${playersCount}/${maxPlayers}`;
                               })()}
