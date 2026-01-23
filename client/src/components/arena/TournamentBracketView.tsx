@@ -84,6 +84,22 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
     currentWallet?.toLowerCase()
       ? playerMatch.match.player2
       : playerMatch.match.player1);
+  const currentPlayerIsP1 =
+    playerMatch?.match.player1?.toLowerCase() === currentWallet?.toLowerCase();
+  const currentPlayerIsP2 =
+    playerMatch?.match.player2?.toLowerCase() === currentWallet?.toLowerCase();
+  const currentPlayerResult = currentPlayerIsP1
+    ? playerMatch?.match.player1Result
+    : currentPlayerIsP2
+    ? playerMatch?.match.player2Result
+    : undefined;
+  const opponentResult = currentPlayerIsP1
+    ? playerMatch?.match.player2Result
+    : currentPlayerIsP2
+    ? playerMatch?.match.player1Result
+    : undefined;
+  const opponentSubmitted = opponentResult !== undefined;
+  const canEditResult = currentPlayerResult !== undefined && !opponentSubmitted;
 
   // Debug logging
   if (playerMatch) {
@@ -378,15 +394,27 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
           {onOpenSubmitResult ? (
             (() => {
               // Check if player already submitted
-              const isPlayer1 = playerMatch.match.player1?.toLowerCase() === currentWallet?.toLowerCase();
-              const isPlayer2 = playerMatch.match.player2?.toLowerCase() === currentWallet?.toLowerCase();
-              const existingResult = isPlayer1 ? playerMatch.match.player1Result : (isPlayer2 ? playerMatch.match.player2Result : undefined);
-              const alreadySubmitted = existingResult !== undefined;
+              const alreadySubmitted = currentPlayerResult !== undefined;
               
               if (alreadySubmitted) {
                 return (
-                  <div className="mt-3 w-full rounded-lg bg-blue-500/20 px-4 py-2 text-sm font-semibold text-blue-200 border border-blue-400/40 text-center">
-                    ✅ Result submitted. Waiting for opponent...
+                  <div className="mt-3 space-y-2">
+                    <div className="w-full rounded-lg bg-blue-500/20 px-4 py-2 text-sm font-semibold text-blue-200 border border-blue-400/40 text-center">
+                      ✅ Result submitted. {opponentSubmitted ? 'Waiting for bracket update...' : 'Waiting for opponent...'}
+                    </div>
+                    {canEditResult && onOpenSubmitResult && (
+                      <button
+                        onClick={() => onOpenSubmitResult(playerMatch.match.id, opponentWallet)}
+                        className="w-full rounded-lg bg-amber-400/20 px-4 py-2 text-sm font-semibold text-amber-200 transition-all hover:bg-amber-400/30 hover:shadow-[0_0_12px_rgba(255,215,130,0.3)] border border-amber-400/40"
+                      >
+                        Update Result
+                      </button>
+                    )}
+                    {canEditResult && (
+                      <div className="text-[10px] text-amber-100/70 text-center">
+                        You can update until your opponent submits.
+                      </div>
+                    )}
                   </div>
                 );
               }

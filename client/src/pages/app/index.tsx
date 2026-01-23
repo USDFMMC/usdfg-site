@@ -3256,9 +3256,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               const isPlayer1 = match.player1?.toLowerCase() === currentWalletLower;
               const isPlayer2 = match.player2?.toLowerCase() === currentWalletLower;
               const existingResult = isPlayer1 ? match.player1Result : (isPlayer2 ? match.player2Result : undefined);
-              if (existingResult !== undefined) {
-                console.log('⚠️ Player already submitted - preventing submit modal from opening');
-                alert("You have already submitted your result for this match. Waiting for opponent...");
+              const opponentResult = isPlayer1 ? match.player2Result : (isPlayer2 ? match.player1Result : undefined);
+              const opponentSubmitted = opponentResult !== undefined;
+              if (existingResult !== undefined && opponentSubmitted) {
+                console.log('⚠️ Both players already submitted - preventing submit modal from opening');
+                alert("Results are already submitted for this match. Waiting for bracket update...");
                 return;
               }
               break;
