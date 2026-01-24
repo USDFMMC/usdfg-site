@@ -6057,7 +6057,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     {showAllPlayers ? (
                       <>
                     <button
-                      onClick={async () => {
+                      type="button"
+                      onClick={async (event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
                             setShowAllPlayers(false);
                             setLeaderboardLimit(30); // Reset to default
                             setLeaderboardLoading(true);
@@ -6079,17 +6082,20 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           {isLoadingLeaderboard ? 'Loading...' : '← Show Less (Top 5)'}
                     </button>
                         {/* Load More button - only show if we got the full limit (meaning there might be more) */}
-                        {currentLeaderboardItems.length === leaderboardLimit && (
+                        {leaderboardLimit > 0 && currentLeaderboardItems.length === leaderboardLimit && (
                           <button
-                            onClick={async () => {
+                            type="button"
+                            onClick={async (event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
                               setLeaderboardLoading(true);
                               const newLimit = leaderboardLimit + 30; // Load 30 more
                               setLeaderboardLimit(newLimit);
                               try {
                                 if (isTeamsView) {
-                                  await refreshTopTeams(newLimit, false);
+                                  await refreshTopTeams(newLimit, true);
                                 } else {
-                                  await loadTopPlayers(newLimit, false);
+                                  await loadTopPlayers(newLimit, true);
                                 }
                               } catch (error) {
                                 console.error('Failed to load more players:', error);
@@ -6106,14 +6112,18 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                       </>
                     ) : (
                       <button
-                        onClick={async () => {
+                        type="button"
+                        onClick={async (event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
                           setShowAllPlayers(true);
+                          setLeaderboardLimit(0); // 0 = no limit (show all)
                           setLeaderboardLoading(true);
                           try {
                             if (isTeamsView) {
-                              await refreshTopTeams(undefined, true);
+                              await refreshTopTeams(0, true);
                             } else {
-                              await loadTopPlayers(undefined, true);
+                              await loadTopPlayers(0, true);
                             }
                           } catch (error) {
                             console.error('Failed to load all players:', error);
