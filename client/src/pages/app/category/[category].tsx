@@ -203,51 +203,6 @@ const getGameImage = (game: string): string => {
   }
 };
 
-// MOCK DATA - Remove when real data is integrated
-// This generates 18 mock challenges for UI testing only
-const generateMockChallenges = (category: string) => {
-  const mockChallenges = [];
-  const gameNames = [
-    'COD MW3', 'Valorant', 'Fortnite', 'Battlefield 2042',
-    'FC 26', 'NBA 2K26', 'Madden NFL 26',
-    'Mortal Kombat 1', 'Street Fighter 6', 'Tekken 8',
-    'Gran Turismo 7', 'Forza Horizon 5', 'F1 24',
-    'Chess.com', '8 Ball Pool', 'Monopoly Plus',
-    'Custom Game', 'Tournament Mode'
-  ];
-  
-  const entryFees = [10, 25, 50, 75, 100, 150, 200, 250, 500];
-  const usernames = [
-    'ProGamer99', 'ElitePlayer', 'ChampionX', 'AceShooter',
-    'MasterMind', 'QuickDraw', 'VictoryKing', 'SkillDemon',
-    'TopPlayer', 'WinStreak', 'Unbeatable', 'Legendary',
-    'RookieKiller', 'VeteranPro', 'NewChallenger', 'OldGuard',
-    'SpeedRunner', 'TacticalMind'
-  ];
-  
-  const statuses = ['Open', 'Waiting', 'Open', 'Open', 'Waiting', 'Open'];
-  const modes = ['Head-to-Head', 'Best of 3', 'Quick Match', 'Full Match', 'Tournament', 'Custom'];
-  
-  // Generate mock challenges - DO NOT include image field
-  // Images will be determined by getGameImage() function to ensure consistency
-  for (let i = 0; i < 18; i++) {
-    const gameIndex = i % gameNames.length;
-    
-    mockChallenges.push({
-      id: `mock-${category}-${i}`,
-      game: gameNames[gameIndex],
-      entryFee: entryFees[i % entryFees.length],
-      opponent: usernames[i % usernames.length],
-      status: statuses[i % statuses.length],
-      mode: modes[i % modes.length],
-      // DO NOT include image field - let getGameImage() determine it
-      isMock: true, // Clearly marked as mock data
-    });
-  }
-  
-  return mockChallenges;
-};
-
 const CategoryDetailPage: React.FC = () => {
   const { category } = useParams<{ category: string }>();
   const navigate = useNavigate();
@@ -292,8 +247,7 @@ const CategoryDetailPage: React.FC = () => {
     });
   }, [category, allChallenges]);
   
-  // Use real challenges if available, otherwise fall back to mock data for testing
-  const challenges = filteredChallenges.length > 0 ? filteredChallenges : generateMockChallenges(category || '');
+  const challenges = filteredChallenges;
   
   const handleChallengeTap = (challengeId: string) => {
     // TODO: Navigate to challenge detail when implemented
@@ -404,12 +358,6 @@ const CategoryDetailPage: React.FC = () => {
         )}
       </div>
       
-      {/* Mock Data Indicator (Development Only) - Only show if using mock data */}
-      {process.env.NODE_ENV === 'development' && filteredChallenges.length === 0 && challenges.length > 0 && (
-        <div className="fixed bottom-4 right-4 px-3 py-1.5 bg-yellow-500/20 border border-yellow-500/30 rounded-lg text-xs text-yellow-400">
-          MOCK DATA - {challenges.length} challenges
-        </div>
-      )}
     </div>
   );
 };
