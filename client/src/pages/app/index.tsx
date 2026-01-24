@@ -5444,8 +5444,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
           {/* Arena Leaders Section */}
           <div className="relative rounded-[20px] bg-[#07080C]/95 border border-zinc-800 overflow-hidden shadow-[0_0_40px_rgba(255,215,130,0.08)] mb-6">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
-              <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-amber-400/10 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60 pointer-events-none" />
+              <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-amber-400/10 via-transparent to-transparent pointer-events-none" />
               <div className="relative z-10 text-center py-6">
                 <h2 className="text-2xl font-bold uppercase tracking-wider text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)] flex items-center justify-center">
                   <span className="mr-2">🏆</span>
@@ -5499,7 +5499,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                   </div>
                 </div>
               </div>
-              <div className="p-6">
+              <div className="relative z-10 p-6">
                 
                 {isLoadingLeaderboard ? (
                   <div className="flex justify-center items-center py-8">
