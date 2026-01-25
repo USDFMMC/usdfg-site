@@ -296,6 +296,7 @@ const CategoryDetailPage: React.FC = () => {
             const creator = challenge.creator || challenge.opponent || 'Unknown';
             // Always use getGameImage to ensure consistent images (ignore stored challenge.image which may be old)
             const image = getGameImage(game);
+            const imageUrl = `${image}?v=3&game=${encodeURIComponent(game)}`;
             
             // Get opponent (for real challenges)
             const players = challenge.players || [];
@@ -311,7 +312,7 @@ const CategoryDetailPage: React.FC = () => {
               {/* Challenge Image (Left) */}
               <div className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border border-gray-700/30">
                 <img
-                  src={image}
+                  src={imageUrl}
                   alt={game}
                   className="w-full h-full object-cover"
                   key={`${challengeId}-${image}`}
