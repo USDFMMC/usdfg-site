@@ -2,206 +2,7 @@ import React, { useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useChallenges } from '@/hooks/useChallenges';
-
-// Helper function to determine game category (matches logic from index.tsx)
-const getGameCategory = (game: string): string => {
-  if (!game || game === 'Gaming' || game === 'Other/Custom') {
-    return 'Sports'; // Default to Sports for unknown games
-  }
-  
-  const normalizedGame = game.trim();
-  const lowerGame = normalizedGame.toLowerCase();
-  
-  // Check for UFC games
-  if (['EA Sports UFC 6', 'EA Sports UFC 5', 'EA Sports UFC 4', 'EA Sports UFC 3', 'EA UFC 6', 'EA UFC 5', 'EA UFC 4', 'EA UFC 3'].includes(normalizedGame)) return 'UFC';
-  if (lowerGame.includes('ufc') || lowerGame.includes('ea sports ufc')) return 'UFC';
-  
-  // Check for Football games (American football)
-  if (['Madden NFL 26', 'Madden NFL 24', 'Madden NFL 23', 'Madden NFL 22', 'NFL Blitz', 'Mutant Football League', 'Retro Bowl', 'Axis Football'].includes(normalizedGame)) return 'Football';
-  if (lowerGame.includes('madden') || lowerGame.includes('nfl') || lowerGame.includes('retro bowl') || lowerGame.includes('axis football') || lowerGame.includes('mutant football')) return 'Football';
-  
-  // Check for Board Games
-  if (['Chess.com', 'Lichess', 'Chess Ultra', '8 Ball Pool', 'Pool Hall', 'PBA Bowling Challenge', 'Brunswick Pro Bowling', 'Checkers', 'Backgammon', 'Monopoly Plus', 'Uno', 'Scrabble'].includes(normalizedGame)) return 'BoardGames';
-  if (lowerGame.includes('chess') || lowerGame.includes('pool') || lowerGame.includes('bowling') || lowerGame.includes('checkers') || lowerGame.includes('backgammon') || lowerGame.includes('monopoly') || lowerGame.includes('uno') || lowerGame.includes('scrabble')) return 'BoardGames';
-  
-  // Fighting games
-  if (['Street Fighter 6', 'Tekken 8', 'Mortal Kombat', 'Mortal Kombat 1', 'Mortal Kombat 11'].includes(normalizedGame)) return 'Fighting';
-  if (lowerGame.includes('street fighter') || lowerGame.includes('tekken') || lowerGame.includes('mortal kombat') || lowerGame.includes('guilty gear') || lowerGame.includes('fighting')) return 'Fighting';
-  
-  // Shooting/FPS games
-  if (['Call of Duty', 'Valorant'].includes(normalizedGame)) return 'Shooting';
-  if (lowerGame.includes('call of duty') || lowerGame.includes('cod') || lowerGame.includes('valorant') || lowerGame.includes('cs:go') || lowerGame.includes('counter-strike') || lowerGame.includes('apex') || lowerGame.includes('overwatch') || lowerGame.includes('rainbow six') || lowerGame.includes('fps') || lowerGame.includes('shooting')) return 'Shooting';
-  
-  // Racing games
-  if (['Forza Horizon', 'Gran Turismo 7', 'Forza Motorsport'].includes(normalizedGame)) return 'Racing';
-  if (lowerGame.includes('forza') || lowerGame.includes('gran turismo') || lowerGame.includes('f1') || lowerGame.includes('racing')) return 'Racing';
-  
-  // Sports games
-  if (['NBA 2K25', 'FIFA 24'].includes(normalizedGame)) return 'Sports';
-  if (lowerGame.includes('nba') || lowerGame.includes('2k') || lowerGame.includes('fifa') || lowerGame.includes('fc ') || lowerGame.includes('ea sports fc') || lowerGame.includes('soccer') || lowerGame.includes('basketball') || lowerGame.includes('sports')) return 'Sports';
-  
-  return 'Sports'; // Default fallback
-};
-
-// Helper function to get game image (matches logic from index.tsx)
-const getGameImage = (game: string): string => {
-  if (!game || game === 'Gaming') {
-    return '/assets/categories/basketball.png'; // Default fallback
-  }
-  
-  // Check for specific games first (check this FIRST before category check)
-  const lowerGame = game.toLowerCase().trim();
-  
-  // Valorant - use specific Valorant image
-  if (lowerGame === 'valorant' || lowerGame.includes('valorant')) {
-    return '/assets/categories/valorant.png';
-  }
-  
-  // Fortnite - use specific Fortnite image
-  if (lowerGame.includes('fortnite')) {
-    return '/assets/categories/fortnite.png';
-  }
-  
-  // UFC games - use ufc.png (EA Sports UFC, UFC)
-  if (lowerGame.includes('ufc') || lowerGame.includes('ea sports ufc')) {
-    return '/assets/categories/ufc.png';
-  }
-  
-  // American Football games - use football.png (Madden, NFL, etc.) - CHECK THIS BEFORE SOCCER
-  if (lowerGame.includes('madden') || 
-      lowerGame.includes('nfl') ||
-      lowerGame.includes('retro bowl') ||
-      lowerGame.includes('axis football') ||
-      lowerGame.includes('mutant football')) {
-    return '/assets/categories/football.png';
-  }
-  
-  // Basketball games - use basketball.png (NBA 2K, basketball, etc.)
-  // Check for NBA 2K26 specifically first (most common)
-  if (lowerGame.includes('nba 2k26') || lowerGame.includes('nba2k26')) {
-    return '/assets/categories/basketball.png';
-  }
-  if (lowerGame.includes('nba') || 
-      lowerGame.includes('2k') ||
-      lowerGame.includes('basketball')) {
-    return '/assets/categories/basketball.png';
-  }
-  
-  // Soccer games - use soccer.png (FIFA, FC, EA Sports FC, etc.)
-  if (lowerGame.includes('fifa') || 
-      lowerGame.startsWith('fc') || 
-      lowerGame.includes('fc 26') || 
-      lowerGame.includes('fc26') || 
-      lowerGame.includes('fc ') ||
-      lowerGame.includes('ea sports fc') ||
-      lowerGame.includes('soccer')) {
-    return '/assets/categories/soccer.png';
-  }
-  
-  // Street Fighter games - use tekken.png (Street Fighter 6, Street Fighter V, etc.)
-  if (lowerGame.includes('street fighter')) {
-    return '/assets/categories/tekken.png';
-  }
-  
-  // Tekken games - use tekken.png (Tekken 8, Tekken 7, etc.)
-  if (lowerGame.includes('tekken')) {
-    return '/assets/categories/tekken.png';
-  }
-  
-  // Mortal Kombat games - use tekken.png (Mortal Kombat 1, Mortal Kombat 11, etc.)
-  if (lowerGame.includes('mortal kombat')) {
-    return '/assets/categories/tekken.png';
-  }
-  
-  // Battlefield games - use battlefield.png (Battlefield 2042, V, 1, etc.)
-  if (lowerGame.includes('battlefield')) {
-    return '/assets/categories/battlefield.png';
-  }
-  
-  // GTA games - use gta.png (GTA 6, GTA V, GTA IV, etc.)
-  if (lowerGame.includes('gta')) {
-    return '/assets/categories/gta.png';
-  }
-  
-  // Call of Duty games - use cod.png (COD MW3, Black Ops, Warzone, etc.)
-  if (lowerGame.includes('cod') || lowerGame.includes('call of duty')) {
-    return '/assets/categories/cod.png';
-  }
-  
-  // Boxing games - use boxing.png (Undisputed, Fight Night, Creed, etc.)
-  if (lowerGame.includes('boxing') || 
-      lowerGame.includes('fight night') || 
-      lowerGame.includes('creed') || 
-      lowerGame.includes('undisputed') ||
-      lowerGame.includes('esports boxing')) {
-    return '/assets/categories/boxing.png';
-  }
-  
-  // Board games
-  if (lowerGame.includes('chess') || lowerGame.includes('pool') || lowerGame.includes('bowling') || lowerGame.includes('checkers') || lowerGame.includes('backgammon') || lowerGame.includes('monopoly') || lowerGame.includes('uno') || lowerGame.includes('scrabble')) {
-    return '/assets/categories/boardgames.png';
-  }
-  
-  // Baseball games - use baseball.png (MLB The Show, RBI Baseball, etc.)
-  if (lowerGame.includes('mlb') || 
-      lowerGame.includes('baseball') ||
-      lowerGame.includes('the show')) {
-    return '/assets/categories/baseball.png';
-  }
-  
-  // Golf games - use golf.png (PGA Tour, The Golf Club, etc.) - EXCLUDE Mario Golf
-  if ((lowerGame.includes('golf') || lowerGame.includes('pga')) && !lowerGame.includes('mario')) {
-    return '/assets/categories/golf.png';
-  }
-  
-  // Tennis games - use tennis.png (TopSpin, AO Tennis, Tennis World Tour, etc.)
-  if (lowerGame.includes('tennis') || lowerGame.includes('topspin') || lowerGame.includes('matchpoint')) {
-    return '/assets/categories/tennis.png';
-  }
-  
-  // Street Basketball games - use nbastreet.png (NBA Street, Playgrounds, NBA The Run, etc.)
-  if (lowerGame.includes('nba street') || 
-      lowerGame.includes('playgrounds') || 
-      lowerGame.includes('street hoops') ||
-      lowerGame.includes('street basketball') ||
-      lowerGame.includes('nba the run')) {
-    return '/assets/categories/nbastreet.png';
-  }
-  
-  // Racing games - use racing.png (Gran Turismo, Forza, F1, etc.) - EXCLUDE Mario Kart
-  if (!lowerGame.includes('mario') && 
-      (lowerGame.includes('forza') || 
-       lowerGame.includes('gran turismo') || 
-       lowerGame.includes('f1') || 
-       lowerGame.includes('assetto corsa') || 
-       lowerGame.includes('project cars') || 
-       lowerGame.includes('iracing') || 
-       lowerGame.includes('need for speed') || 
-       lowerGame.includes('the crew'))) {
-    return '/assets/categories/racing.png';
-  }
-  
-  // Get category and return appropriate image (fallback)
-  const category = getGameCategory(game);
-  switch (category) {
-    case 'UFC':
-      return '/assets/categories/ufc.png';
-    case 'Football':
-      return '/assets/categories/football.png';
-    case 'BoardGames':
-      return '/assets/categories/boardgames.png';
-    case 'Sports':
-      return '/assets/categories/basketball.png'; // Using basketball.png (sports.png doesn't exist)
-    case 'Racing':
-      return '/assets/categories/racing.png';
-    case 'Shooting':
-      return '/assets/categories/cod.png'; // Using cod.png (shooting.png doesn't exist)
-    case 'Fighting':
-      return '/assets/categories/tekken.png'; // Fighting games category
-    default:
-      return '/assets/categories/basketball.png'; // Default to basketball category image
-  }
-};
+import { getGameCategory, getGameImage, resolveGameName } from '@/lib/gameAssets';
 
 const CategoryDetailPage: React.FC = () => {
   const { category } = useParams<{ category: string }>();
@@ -217,9 +18,9 @@ const CategoryDetailPage: React.FC = () => {
     const categoryUpper = category.toUpperCase();
     
     return allChallenges.filter((challenge: any) => {
-      const game = challenge.game || challenge.title || '';
+      const gameName = resolveGameName(challenge.game, challenge.title);
       const challengeCategory = challenge.category?.toUpperCase() || '';
-      const gameCategory = getGameCategory(game);
+      const gameCategory = getGameCategory(gameName);
       
       // Map category parameter to our category system
       if (categoryUpper === 'FPS') {
@@ -289,14 +90,13 @@ const CategoryDetailPage: React.FC = () => {
           challenges.map((challenge: any) => {
             // Extract challenge data (handle both real and mock challenges)
             const challengeId = challenge.id || challenge.challengeId;
-            const game = challenge.game || challenge.title || 'Unknown Game';
+            const gameName = resolveGameName(challenge.game, challenge.title);
             const entryFee = challenge.entryFee || 0;
             const status = challenge.status || 'Open';
             const mode = challenge.mode || challenge.challengeMode || 'Standard';
             const creator = challenge.creator || challenge.opponent || 'Unknown';
-            // Always use getGameImage to ensure consistent images (ignore stored challenge.image which may be old)
-            const image = getGameImage(game);
-            const imageUrl = `${image}?v=3&game=${encodeURIComponent(game)}`;
+            const imagePath = getGameImage(gameName);
+            const imageUrl = `${imagePath}?v=2&game=${encodeURIComponent(gameName)}`;
             
             // Get opponent (for real challenges)
             const players = challenge.players || [];
@@ -313,7 +113,7 @@ const CategoryDetailPage: React.FC = () => {
               <div className="flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border border-gray-700/30">
                 <img
                   src={imageUrl}
-                  alt={game}
+                  alt={gameName}
                   className="w-full h-full object-cover"
                   key={`${challengeId}-${image}`}
                   onError={(e) => {
@@ -327,7 +127,7 @@ const CategoryDetailPage: React.FC = () => {
               <div className="flex-1 min-w-0 text-left">
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <h3 className="text-sm font-semibold text-white truncate">
-                    {game}
+                    {gameName}
                   </h3>
                   <span className={`
                     text-xs font-semibold px-2 py-0.5 rounded
