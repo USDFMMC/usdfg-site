@@ -17,5 +17,5 @@ npm run test:challenge-flow
 - Timeout handling
 - Safety checks
 
-**Note**: For manual E2E testing with real wallets, see `TESTING_CHECKLIST.md` in the root directory.
+**Note**: For manual E2E testing with real wallets, see `TESTING_CHECKLIST.md`.
 

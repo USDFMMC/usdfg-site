@@ -1990,6 +1990,190 @@ export async function cleanupChatMessages(challengeId: string): Promise<void> {
 }
 
 /**
+ * Resolve a disputed challenge with an admin decision.
+ * - outcome: "award" -> declare a winner and update stats
+ * - outcome: "cancel" -> cancel the challenge without payout
+ */
+export async function resolveDisputedChallenge(
+  challengeId: string,
+  resolution: {
+    outcome: 'award' | 'cancel';
+    winnerWallet?: string;
+    note?: string;
+  }
+): Promise<void> {
+  try {
+    const challengeRef = doc(db, 'challenges', challengeId);
+    const snap = await getDoc(challengeRef);
+
+    if (!snap.exists()) {
+      throw new Error('Challenge not found');
+    }
+
+    const data = snap.data() as ChallengeData;
+    if (data.status !== 'disputed') {
+      throw new Error('Challenge is not in dispute');
+    }
+
+    const { ADMIN_WALLET } = await import('../chain/config');
+    const entryFeeValue = Number(data.entryFee || 0);
+    const creatorWallet = (data.creator || '').toLowerCase();
+    const isAdminCreator =
+      creatorWallet &&
+      creatorWallet === ADMIN_WALLET.toString().toLowerCase();
+    const isFree = entryFeeValue === 0 || entryFeeValue < 0.000000001;
+    const isFounderChallenge = isAdminCreator && isFree;
+
+    const isTournament = data.format === 'tournament' || Boolean(data.tournament);
+    if (isTournament) {
+      throw new Error('Tournament disputes must be resolved in the Arena view.');
+    }
+
+    if (resolution.outcome === 'cancel') {
+      await updateDoc(challengeRef, {
+        status: 'cancelled',
+        winner: null,
+        canClaim: false,
+        needsPayout: false,
+        payoutTriggered: false,
+        updatedAt: Timestamp.now(),
+      });
+
+      await postChallengeSystemMessage(
+        challengeId,
+        `🛑 Admin resolved dispute: challenge cancelled${resolution.note ? ` — ${resolution.note}` : ''}`
+      );
+
+      try {
+        await cleanupChatMessages(challengeId);
+      } catch (error) {
+        console.warn('⚠️ Failed to cleanup chat after dispute resolution:', error);
+      }
+      return;
+    }
+
+    if (!resolution.winnerWallet) {
+      throw new Error('Winner wallet is required to resolve a dispute.');
+    }
+
+    const normalizedWinner = resolution.winnerWallet.toLowerCase();
+    const players = (data.players && data.players.length > 0)
+      ? data.players
+      : [data.creator, data.challenger, data.pendingJoiner];
+    const participantWallets = players.filter(
+      (wallet): wallet is string => Boolean(wallet)
+    );
+    const uniquePlayers = Array.from(
+      new Map(
+        participantWallets.map((wallet) => [wallet.toLowerCase(), wallet])
+      ).values()
+    );
+
+    if (
+      uniquePlayers.length > 0 &&
+      !uniquePlayers.some((wallet) => wallet.toLowerCase() === normalizedWinner)
+    ) {
+      throw new Error('Winner must be one of the challenge participants.');
+    }
+
+    const loserWallet = uniquePlayers.find(
+      (wallet) => wallet.toLowerCase() !== normalizedWinner
+    );
+
+    const game = data.game || 'Unknown';
+    const category = data.category || 'Sports';
+
+    let prizePool = Number(data.prizePool || 0);
+    if (!prizePool || prizePool <= 0) {
+      const totalPrize = entryFeeValue * 2;
+      const platformFee = totalPrize * 0.05;
+      prizePool = totalPrize - platformFee;
+    }
+
+    const updatePayload: any = {
+      status: 'completed',
+      winner: resolution.winnerWallet,
+      updatedAt: Timestamp.now(),
+    };
+
+    if (isFounderChallenge) {
+      updatePayload.canClaim = false;
+      updatePayload.needsPayout = false;
+      updatePayload.payoutTriggered = false;
+    } else {
+      updatePayload.prizePool = prizePool;
+      updatePayload.canClaim = true;
+      updatePayload.needsPayout = true;
+      updatePayload.payoutTriggered = false;
+    }
+
+    await updateDoc(challengeRef, updatePayload);
+
+    const amountEarned = isFounderChallenge ? 0 : prizePool;
+    if (data.challengeType === 'team') {
+      await updateTeamStats(
+        resolution.winnerWallet,
+        'win',
+        amountEarned,
+        game,
+        category
+      );
+      if (loserWallet) {
+        await updateTeamStats(loserWallet, 'loss', 0, game, category);
+      }
+    } else {
+      const creatorTag = (data as any).creatorTag;
+      const challengerTag = (data as any).challengerTag;
+      const winnerDisplayName =
+        data.creator && data.creator.toLowerCase() === normalizedWinner
+          ? creatorTag
+          : data.challenger && data.challenger.toLowerCase() === normalizedWinner
+          ? challengerTag
+          : undefined;
+      const loserDisplayName =
+        loserWallet && data.creator && data.creator.toLowerCase() === loserWallet.toLowerCase()
+          ? creatorTag
+          : loserWallet && data.challenger && data.challenger.toLowerCase() === loserWallet.toLowerCase()
+          ? challengerTag
+          : undefined;
+
+      await updatePlayerStats(
+        resolution.winnerWallet,
+        'win',
+        amountEarned,
+        game,
+        category,
+        winnerDisplayName
+      );
+      if (loserWallet) {
+        await updatePlayerStats(
+          loserWallet,
+          'loss',
+          0,
+          game,
+          category,
+          loserDisplayName
+        );
+      }
+    }
+
+    await postChallengeSystemMessage(
+      challengeId,
+      `✅ Admin resolved dispute: awarded win to ${resolution.winnerWallet.slice(0, 8)}...`
+    );
+
+    try {
+      await cleanupChatMessages(challengeId);
+    } catch (error) {
+      console.warn('⚠️ Failed to cleanup chat after dispute resolution:', error);
+    }
+  } catch (error) {
+    console.error('❌ Error resolving disputed challenge:', error);
+    throw error;
+  }
+}
+
+/**
  * Clean up chat messages and voice signals for a challenge
  * Only deletes for normal completions - keeps chat for disputes (needed for evidence)
  * This balances data minimization with dispute resolution needs
@@ -4271,3 +4455,12 @@ export async function claimChallengePrize(
 // ============================================
 // This feature was replaced with Founder Challenges
 // Free claim functions removed as they are no longer used
+
+// Test-only exports for tournament logic validation
+export const __test__tournament = {
+  createInitialBracket,
+  seedPlayersIntoBracket,
+  activateRoundMatches,
+  ensureTournamentState,
+  sanitizeTournamentState
+};
