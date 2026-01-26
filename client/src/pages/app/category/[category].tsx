@@ -115,7 +115,7 @@ const CategoryDetailPage: React.FC = () => {
                   src={imageUrl}
                   alt={gameName}
                   className="w-full h-full object-cover"
-                  key={`${challengeId}-${image}`}
+                  key={`${challengeId}-${imagePath}`}
                   onError={(e) => {
                     // Fallback if image fails to load
                     (e.target as HTMLImageElement).src = '/assets/categories/basketball.png';
