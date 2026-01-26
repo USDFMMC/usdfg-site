@@ -157,6 +157,14 @@ export default defineConfig(async () => {
       format: {
         comments: false,
       },
+      compress: {
+        passes: 1, // Reduce compression passes to avoid variable mangling issues
+        pure_getters: false,
+      },
+      mangle: {
+        toplevel: false, // Disable top-level mangling to prevent lexical declaration errors
+        reserved: ['Buffer', 'global', 'globalThis'], // Preserve important globals
+      },
     },
     commonjsOptions: {
       transformMixedEsModules: true,
