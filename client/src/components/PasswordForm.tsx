@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import LetterGlitch from '@/components/effects/LetterGlitch';
+import { safeLocalStorageSetItem } from '@/lib/utils/storage';
 
 interface PasswordFormProps {
   onSuccess: () => void;
@@ -11,7 +12,7 @@ const PasswordForm: React.FC<PasswordFormProps> = ({ onSuccess }) => {
 
   const handleSubmit = () => {
     if (password === correctPassword) {
-      localStorage.setItem('arena-access', 'true');
+      safeLocalStorageSetItem('arena-access', 'true');
       onSuccess();
     } else {
       alert('Wrong password');

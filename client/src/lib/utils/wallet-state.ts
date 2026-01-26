@@ -7,6 +7,15 @@
 /**
  * Phantom connection state stored in localStorage
  */
+import {
+  safeLocalStorageGetItem,
+  safeLocalStorageRemoveItem,
+  safeLocalStorageSetItem,
+  safeSessionStorageGetItem,
+  safeSessionStorageRemoveItem,
+  safeSessionStorageSetItem
+} from './storage';
+
 export interface PhantomConnectionState {
   connected: boolean;
   publicKey: string | null;
@@ -20,9 +29,9 @@ export function getPhantomConnectionState(): PhantomConnectionState {
     return { connected: false, publicKey: null };
   }
 
-  const connected = localStorage.getItem('phantom_connected') === 'true';
-  const publicKey = localStorage.getItem('phantom_public_key');
-  const walletDisconnected = localStorage.getItem('wallet_disconnected') === 'true';
+  const connected = safeLocalStorageGetItem('phantom_connected') === 'true';
+  const publicKey = safeLocalStorageGetItem('phantom_public_key');
+  const walletDisconnected = safeLocalStorageGetItem('wallet_disconnected') === 'true';
 
   // If explicitly disconnected or no public key, return disconnected state
   if (walletDisconnected || (connected && !publicKey)) {
@@ -42,9 +51,9 @@ export function setPhantomConnectionState(connected: boolean, publicKey?: string
   if (typeof window === 'undefined') return;
 
   if (connected && publicKey) {
-    localStorage.setItem('phantom_connected', 'true');
-    localStorage.setItem('phantom_public_key', publicKey);
-    localStorage.removeItem('wallet_disconnected');
+    safeLocalStorageSetItem('phantom_connected', 'true');
+    safeLocalStorageSetItem('phantom_public_key', publicKey);
+    safeLocalStorageRemoveItem('wallet_disconnected');
   } else {
     clearPhantomConnectionState();
   }
@@ -56,9 +65,9 @@ export function setPhantomConnectionState(connected: boolean, publicKey?: string
 export function clearPhantomConnectionState(): void {
   if (typeof window === 'undefined') return;
 
-  localStorage.removeItem('phantom_connected');
-  localStorage.removeItem('phantom_public_key');
-  localStorage.setItem('wallet_disconnected', 'true');
+  safeLocalStorageRemoveItem('phantom_connected');
+  safeLocalStorageRemoveItem('phantom_public_key');
+  safeLocalStorageSetItem('wallet_disconnected', 'true');
 }
 
 /**
@@ -66,7 +75,7 @@ export function clearPhantomConnectionState(): void {
  */
 export function isPhantomConnecting(): boolean {
   if (typeof window === 'undefined') return false;
-  return sessionStorage.getItem('phantom_connecting') === 'true';
+  return safeSessionStorageGetItem('phantom_connecting') === 'true';
 }
 
 /**
@@ -76,9 +85,9 @@ export function setPhantomConnecting(isConnecting: boolean, timestamp?: number):
   if (typeof window === 'undefined') return;
 
   if (isConnecting) {
-    sessionStorage.setItem('phantom_connecting', 'true');
-    sessionStorage.setItem('phantom_connect_timestamp', (timestamp || Date.now()).toString());
-    sessionStorage.setItem('phantom_connect_attempt', new Date().toISOString());
+    safeSessionStorageSetItem('phantom_connecting', 'true');
+    safeSessionStorageSetItem('phantom_connect_timestamp', (timestamp || Date.now()).toString());
+    safeSessionStorageSetItem('phantom_connect_attempt', new Date().toISOString());
   } else {
     clearPhantomConnectingState();
   }
@@ -89,7 +98,7 @@ export function setPhantomConnecting(isConnecting: boolean, timestamp?: number):
  */
 export function getPhantomConnectTimestamp(): number | null {
   if (typeof window === 'undefined') return null;
-  const timestamp = sessionStorage.getItem('phantom_connect_timestamp');
+  const timestamp = safeSessionStorageGetItem('phantom_connect_timestamp');
   return timestamp ? parseInt(timestamp) : null;
 }
 
@@ -108,11 +117,11 @@ export function isRecentPhantomConnection(maxAgeMs: number = 10000): boolean {
 export function clearPhantomConnectingState(): void {
   if (typeof window === 'undefined') return;
 
-  sessionStorage.removeItem('phantom_connecting');
-  sessionStorage.removeItem('phantom_connect_timestamp');
-  sessionStorage.removeItem('phantom_connect_attempt');
-  sessionStorage.removeItem('phantom_redirect_count');
-  sessionStorage.removeItem('phantom_original_tab');
+  safeSessionStorageRemoveItem('phantom_connecting');
+  safeSessionStorageRemoveItem('phantom_connect_timestamp');
+  safeSessionStorageRemoveItem('phantom_connect_attempt');
+  safeSessionStorageRemoveItem('phantom_redirect_count');
+  safeSessionStorageRemoveItem('phantom_original_tab');
 }
 
 /**
@@ -123,9 +132,9 @@ export function clearAllPhantomState(): void {
   clearPhantomConnectingState();
   
   if (typeof window !== 'undefined') {
-    localStorage.removeItem('wallet_connected');
-    localStorage.removeItem('wallet_address');
-    sessionStorage.removeItem('last_logged_wallet');
+    safeLocalStorageRemoveItem('wallet_connected');
+    safeLocalStorageRemoveItem('wallet_address');
+    safeSessionStorageRemoveItem('last_logged_wallet');
   }
 }
 

@@ -24,6 +24,7 @@ import { createAssociatedTokenAccountInstruction, createTransferInstruction, get
 import { testFirestoreConnection } from "@/lib/firebase/firestore";
 import { getWalletScopedValue, setWalletScopedValue, clearWalletScopedValue, PROFILE_STORAGE_KEYS } from "@/lib/storage/profile";
 import { getPhantomConnectionState, setPhantomConnectionState, clearPhantomConnectionState } from "@/lib/utils/wallet-state";
+import { safeLocalStorageGetItem } from "@/lib/utils/storage";
 import { extractGameFromTitle, getGameCategory, getGameImage, resolveGameName } from "@/lib/gameAssets";
 import { 
   getChallengeStatus, 
@@ -193,7 +194,8 @@ const ArenaHome: React.FC = () => {
   // Check for stored Phantom connection (mobile deep link)
   // On mobile Safari, adapter.connect() doesn't work, so we use stored public key
   const hasStoredPhantomConnection = phantomConnectionState.connected || getPhantomConnectionState().connected;
-  const storedPhantomPublicKey = phantomConnectionState.publicKey || localStorage.getItem('phantom_public_key');
+  const storedPhantomPublicKey =
+    phantomConnectionState.publicKey || safeLocalStorageGetItem('phantom_public_key');
   
   // Use adapter connection OR stored Phantom connection
   // This allows mobile deep links to work even if adapter.connect() fails
