@@ -151,49 +151,77 @@ export default defineConfig(async () => {
     outDir: path.resolve(import.meta.dirname, "dist"), // ✅ output directly to dist/
     emptyOutDir: true,
     sourcemap: false,
-    minify: "terser",
-    terserOptions: {
-      safari10: true,
-      format: {
-        comments: false,
-      },
-      compress: {
-        passes: 1, // Reduce compression passes to avoid variable mangling issues
-        pure_getters: false,
-      },
-      mangle: {
-        toplevel: false, // Disable top-level mangling to prevent lexical declaration errors
-        reserved: ['Buffer', 'global', 'globalThis'], // Preserve important globals
-      },
-    },
+    minify: "esbuild", // Use esbuild instead of terser to avoid lexical declaration errors
     commonjsOptions: {
       transformMixedEsModules: true,
-      strictRequires: true,
+      strictRequires: false, // Set to false to allow hoisting and prevent TDZ errors
       esmExternals: true,
+      // Ensure proper hoisting of requires
+      requireReturnsDefault: 'auto',
     },
     rollupOptions: {
+      // Prevent circular dependency issues by using exports-only
+      preserveEntrySignatures: 'exports-only',
       output: {
+        // Use ES module format for better tree-shaking and module isolation
+        format: 'es',
+        // Ensure proper module boundaries to prevent TDZ errors
+        generatedCode: {
+          constBindings: true,
+          objectShorthand: true,
+        },
+        // Ultra-conservative chunking to prevent initialization order issues
+        // The goal is to minimize chunks and ensure proper load order
         manualChunks: (id) => {
-          // React and core dependencies - always needed, keep together
-          if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+          // Critical: Put ALL dependencies that might have circular deps in vendor
+          // This includes React, Solana, and all core libraries
+          if (id.includes('node_modules')) {
+            // React ecosystem - core framework
+            if (
+              id.includes('react') || 
+              id.includes('react-dom') || 
+              id.includes('react-router') ||
+              id.includes('scheduler') ||
+              id.includes('@tanstack')
+            ) {
+              return 'vendor';
+            }
+            
+            // ALL Solana code must be together to prevent circular deps
+            if (
+              id.includes('@solana/') || 
+              id.includes('@solana-mobile/') ||
+              id.includes('@coral-xyz/') ||
+              id.includes('bs58') ||
+              id.includes('tweetnacl') ||
+              id.includes('buffer') ||
+              id.includes('@noble/')
+            ) {
+              return 'vendor';
+            }
+            
+            // Radix UI - can be separate for lazy loading
+            if (id.includes('@radix-ui')) {
+              return 'ui';
+            }
+            
+            // Firebase - separate chunk for code splitting
+            if (id.includes('firebase')) {
+              return 'firebase';
+            }
+            
+            // Everything else in vendor to minimize chunk dependencies
             return 'vendor';
           }
-          // Radix UI components - lazy load these
-          if (id.includes('@radix-ui')) {
-            return 'ui';
-          }
-          // Solana wallet adapters - keep with vendor to avoid loading order issues
-          // Don't split wallet adapters separately as they depend on vendor modules
-          if (id.includes('@solana/wallet-adapter') || id.includes('@solana/web3.js')) {
-            return 'vendor'; // Keep with vendor to ensure proper load order
-          }
-          // Firebase - can be lazy loaded
-          if (id.includes('firebase')) {
-            return 'firebase';
-          }
-          // Don't create a separate vendor-deps chunk - it causes module loading issues
-          // Let Vite handle other node_modules automatically
+          
+          // Don't split application code - keep it in index chunk
+          return undefined;
         },
+        // Ensure consistent chunk naming
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        // Ensure proper chunk loading order
+        experimentalMinChunkSize: 20000,
       },
     },
   },
