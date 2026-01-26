@@ -166,63 +166,13 @@ export default defineConfig(async () => {
       output: {
         // Use ES module format for better tree-shaking and module isolation
         format: 'es',
-        // Ensure proper module boundaries to prevent TDZ errors
+        // Use var instead of const/let to avoid TDZ "can't access lexical declaration before initialization"
         generatedCode: {
-          constBindings: true,
+          constBindings: false,
           objectShorthand: true,
         },
-        // Ultra-conservative chunking to prevent initialization order issues
-        // The goal is to minimize chunks and ensure proper load order
-        manualChunks: (id) => {
-          // Critical: Put ALL dependencies that might have circular deps in vendor
-          // This includes React, Solana, and all core libraries
-          if (id.includes('node_modules')) {
-            // React ecosystem - core framework
-            if (
-              id.includes('react') || 
-              id.includes('react-dom') || 
-              id.includes('react-router') ||
-              id.includes('scheduler') ||
-              id.includes('@tanstack')
-            ) {
-              return 'vendor';
-            }
-            
-            // ALL Solana code must be together to prevent circular deps
-            if (
-              id.includes('@solana/') || 
-              id.includes('@solana-mobile/') ||
-              id.includes('@coral-xyz/') ||
-              id.includes('bs58') ||
-              id.includes('tweetnacl') ||
-              id.includes('buffer') ||
-              id.includes('@noble/')
-            ) {
-              return 'vendor';
-            }
-            
-            // Radix UI - can be separate for lazy loading
-            if (id.includes('@radix-ui')) {
-              return 'ui';
-            }
-            
-            // Firebase - separate chunk for code splitting
-            if (id.includes('firebase')) {
-              return 'firebase';
-            }
-            
-            // Everything else in vendor to minimize chunk dependencies
-            return 'vendor';
-          }
-          
-          // Don't split application code - keep it in index chunk
-          return undefined;
-        },
-        // Ensure consistent chunk naming
         chunkFileNames: 'assets/[name]-[hash].js',
         entryFileNames: 'assets/[name]-[hash].js',
-        // Ensure proper chunk loading order
-        experimentalMinChunkSize: 20000,
       },
     },
   },
