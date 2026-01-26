@@ -1,9 +1,10 @@
-# Netlify redirects for SPA routing
-# All routes should serve index.html for client-side routing
+# Cloudflare Pages SPA redirects (order matters – most specific first)
+# Explicit /index.html and /index first to avoid infinite loop with catch-all
 
-# App routes - serve index.html (SPA routing)
-/app/*    /index.html   200
-/app      /index.html   200
-
-# Root and other routes - serve index.html for client-side routing
-/*        /index.html   200
+/index.html    /index.html   200
+/index        /index.html   200
+/             /index.html   200
+/app          /index.html   200
+/app/         /index.html   200
+/app/*        /index.html   200
+/*            /index.html   200

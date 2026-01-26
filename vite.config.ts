@@ -152,6 +152,7 @@ export default defineConfig(async () => {
     emptyOutDir: true,
     sourcemap: false,
     minify: "esbuild", // Use esbuild instead of terser to avoid lexical declaration errors
+    chunkSizeWarningLimit: 2500, // vendor chunk is large; avoid noisy warning
     commonjsOptions: {
       transformMixedEsModules: true,
       strictRequires: false, // Set to false to allow hoisting and prevent TDZ errors
