@@ -1393,8 +1393,70 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         {/* Challenge Details Grid */}
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="rounded-md border border-white/5 bg-white/5 px-2 py-1.5">
-            <div className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Challenge Amount</div>
-            <div className="text-white font-semibold text-xs">{entryFee} USDFG</div>
+            <div className="flex items-center justify-between gap-2 mb-0.5">
+              <div className="text-[10px] uppercase tracking-wide text-gray-400">Challenge Amount</div>
+              {canEditEntryFee && !isEditingEntryFee && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsEditingEntryFee(true);
+                  }}
+                  className="text-[10px] text-amber-200/90 hover:text-amber-100 underline-offset-2 hover:underline"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
+            {!isEditingEntryFee && (
+              <div className="text-white font-semibold text-xs">{entryFee} USDFG</div>
+            )}
+            {canEditEntryFee && isEditingEntryFee && (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={entryFeeDraft}
+                    onChange={(e) => setEntryFeeDraft(e.target.value)}
+                    className="w-full rounded-md bg-black/40 border border-amber-400/40 px-2 py-1 text-white text-[11px] focus:outline-none focus:ring-1 focus:ring-amber-400/60"
+                    placeholder="USDFG amount"
+                  />
+                </div>
+                {entryFeeError && (
+                  <div className="text-[10px] text-red-300">{entryFeeError}</div>
+                )}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleSaveEntryFee();
+                    }}
+                    disabled={isUpdatingEntryFee}
+                    className="flex-1 rounded-md bg-emerald-500/20 px-2 py-1 text-[10px] font-semibold text-emerald-200 border border-emerald-400/40 hover:bg-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isUpdatingEntryFee ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsEditingEntryFee(false);
+                      setEntryFeeError(null);
+                      setEntryFeeDraft(String(entryFee || ''));
+                    }}
+                    className="flex-1 rounded-md bg-white/5 px-2 py-1 text-[10px] font-semibold text-white/70 border border-white/10 hover:bg-white/10"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           <div className="rounded-md border border-white/5 bg-white/5 px-2 py-1.5">
             <div className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">Challenge Reward</div>
@@ -1410,72 +1472,6 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           </div>
         </div>
 
-        {canEditEntryFee && (
-          <div className="mt-2 rounded-md border border-amber-400/30 bg-amber-500/10 p-2 text-[11px]">
-            {!isEditingEntryFee ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setIsEditingEntryFee(true);
-                }}
-                className="w-full rounded-md bg-amber-500/15 px-3 py-2 text-amber-200 font-semibold border border-amber-400/40 hover:bg-amber-500/25 transition-colors"
-              >
-                ✏️ Edit Challenge Amount
-              </button>
-            ) : (
-              <div className="space-y-2">
-                <div className="text-[10px] uppercase tracking-wide text-amber-200">Edit Challenge Amount</div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={entryFeeDraft}
-                    onChange={(e) => setEntryFeeDraft(e.target.value)}
-                    className="flex-1 rounded-md bg-black/40 border border-amber-400/40 px-2 py-1 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-400/60"
-                    placeholder="USDFG amount"
-                  />
-                  <span className="text-[10px] text-amber-200">USDFG</span>
-                </div>
-                {entryFeeError && (
-                  <div className="text-[10px] text-red-300">{entryFeeError}</div>
-                )}
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleSaveEntryFee();
-                    }}
-                    disabled={isUpdatingEntryFee}
-                    className="flex-1 rounded-md bg-emerald-500/20 px-3 py-1.5 text-emerald-200 text-[11px] font-semibold border border-emerald-400/40 hover:bg-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isUpdatingEntryFee ? 'Saving...' : 'Save'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setIsEditingEntryFee(false);
-                      setEntryFeeError(null);
-                      setEntryFeeDraft(String(entryFee || ''));
-                    }}
-                    className="flex-1 rounded-md bg-white/5 px-3 py-1.5 text-white/70 text-[11px] font-semibold border border-white/10 hover:bg-white/10"
-                  >
-                    Cancel
-                  </button>
-                </div>
-                <div className="text-[10px] text-amber-100/70">
-                  Only available before anyone joins.
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Submit Result Section */}
