@@ -2737,6 +2737,100 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
   };
 
+  const handleUpdateEntryFee = async (challenge: any, newEntryFee: number) => {
+    if (!publicKey) {
+      throw new Error('Please connect your wallet first.');
+    }
+
+    const currentWallet = publicKey.toString().toLowerCase();
+    const creatorWallet = getChallengeCreator(challenge);
+    if (!creatorWallet || creatorWallet.toLowerCase() !== currentWallet) {
+      throw new Error('Only the challenge creator can edit the amount.');
+    }
+
+    const status = getChallengeStatus(challenge);
+    if (status !== 'pending_waiting_for_opponent') {
+      throw new Error('Amount can only be edited before anyone joins.');
+    }
+
+    const pendingJoiner = getChallengePendingJoiner(challenge);
+    const challenger = getChallengeChallenger(challenge);
+    if (pendingJoiner || challenger) {
+      throw new Error('Amount can only be edited before anyone joins.');
+    }
+
+    const playersRaw = challenge.players ?? challenge.rawData?.players ?? [];
+    const players = Array.isArray(playersRaw) ? playersRaw : [];
+    if (players.length > 1) {
+      throw new Error('Amount can only be edited before anyone joins.');
+    }
+
+    const format =
+      challenge.rawData?.format || (challenge.rawData?.tournament ? 'tournament' : 'standard');
+    if (format === 'tournament') {
+      throw new Error('Tournament amounts cannot be edited.');
+    }
+
+    const entryFeeValue = Number(newEntryFee);
+    if (!Number.isFinite(entryFeeValue)) {
+      throw new Error('Enter a valid amount.');
+    }
+    if (entryFeeValue <= 0) {
+      throw new Error('Amount must be greater than 0.');
+    }
+    if (entryFeeValue > 1000) {
+      throw new Error('Max amount is 1000 USDFG.');
+    }
+
+    const previousEntryFee =
+      getChallengeEntryFee(challenge) || challenge.entryFee || challenge.rawData?.entryFee || 0;
+    if (Math.abs(entryFeeValue - previousEntryFee) < 0.000000001) {
+      return;
+    }
+
+    const isAdminChallenge =
+      creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+    const isFounderChallenge = isAdminChallenge && (previousEntryFee === 0 || previousEntryFee < 0.000000001);
+    if (isFounderChallenge) {
+      throw new Error('Founder challenges use fixed rewards and cannot be edited.');
+    }
+
+    const platformFee = 0.05;
+    const totalPrize = entryFeeValue * 2;
+    const prizePool = totalPrize - (totalPrize * platformFee);
+
+    const { updateChallenge, upsertChallengeNotification } = await import("@/lib/firebase/firestore");
+    await updateChallenge(challenge.id, {
+      entryFee: entryFeeValue,
+      prizePool,
+      updatedAt: Timestamp.now(),
+    });
+
+    const targetPlayer = challenge.targetPlayer || challenge.rawData?.targetPlayer;
+    if (targetPlayer) {
+      try {
+        await upsertChallengeNotification({
+          challengeId: challenge.id,
+          creator: creatorWallet,
+          targetPlayer,
+          challengeTitle: challenge.title || challenge.rawData?.title,
+          entryFee: entryFeeValue,
+          prizePool,
+          status: 'pending_waiting_for_opponent',
+        });
+      } catch (error) {
+        console.warn('⚠️ Failed to update challenge notification:', error);
+      }
+    }
+
+    setNotification({
+      isOpen: true,
+      title: 'Challenge updated',
+      message: `Challenge amount updated to ${entryFeeValue} USDFG.`,
+      type: 'success',
+    });
+  };
+
   // Handle direct creator funding from ChallengeDetailSheet
   const handleDirectCreatorFund = async (challenge: any) => {
     // CRITICAL: Disable button immediately on click to prevent double-submission
@@ -6128,6 +6222,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     onCreatorFund={handleDirectCreatorFund}
                     onJoinerFund={handleDirectJoinerFund}
                     onCancelChallenge={handleCancelChallenge}
+                    onUpdateEntryFee={handleUpdateEntryFee}
                     onClose={() => {
                       setShowStandardLobby(false);
                       setSelectedChallenge(null);

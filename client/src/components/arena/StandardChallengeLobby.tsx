@@ -27,6 +27,7 @@ interface StandardChallengeLobbyProps {
   onCreatorFund?: (challenge: any) => Promise<void>;
   onJoinerFund?: (challenge: any) => Promise<void>;
   onCancelChallenge?: (challenge: any) => Promise<void>;
+  onUpdateEntryFee?: (challenge: any, entryFee: number) => Promise<void>;
   onClose: () => void;
   isSubmitting?: boolean;
   isClaiming?: boolean;
@@ -172,6 +173,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   onCreatorFund,
   onJoinerFund,
   onCancelChallenge,
+  onUpdateEntryFee,
   onClose,
   isSubmitting = false,
   isClaiming = false,
@@ -280,6 +282,18 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const mode = getChallengeValue('mode', 'Head-to-Head');
   const platform = getChallengeValue('platform', 'All Platforms');
   const challengeId = activeChallenge.id;
+
+  const [isEditingEntryFee, setIsEditingEntryFee] = useState(false);
+  const [entryFeeDraft, setEntryFeeDraft] = useState<string>(String(entryFee || ''));
+  const [entryFeeError, setEntryFeeError] = useState<string | null>(null);
+  const [isUpdatingEntryFee, setIsUpdatingEntryFee] = useState(false);
+
+  useEffect(() => {
+    if (!isEditingEntryFee) {
+      setEntryFeeDraft(String(entryFee || ''));
+      setEntryFeeError(null);
+    }
+  }, [entryFee, isEditingEntryFee]);
   
   // VoiceChat props (no memoization needed - React handles this)
   const voiceChatChallengeId = challengeId;
@@ -319,6 +333,33 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     setProofFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  const handleSaveEntryFee = async () => {
+    if (!onUpdateEntryFee || isUpdatingEntryFee) return;
+    const parsed = Number(entryFeeDraft);
+    if (!Number.isFinite(parsed)) {
+      setEntryFeeError('Enter a valid amount.');
+      return;
+    }
+    if (parsed <= 0) {
+      setEntryFeeError('Amount must be greater than 0.');
+      return;
+    }
+    if (parsed > 1000) {
+      setEntryFeeError('Max amount is 1000 USDFG.');
+      return;
+    }
+    setEntryFeeError(null);
+    setIsUpdatingEntryFee(true);
+    try {
+      await onUpdateEntryFee(activeChallenge, parsed);
+      setIsEditingEntryFee(false);
+    } catch (error: any) {
+      setEntryFeeError(error?.message || 'Failed to update amount.');
+    } finally {
+      setIsUpdatingEntryFee(false);
     }
   };
 
@@ -436,6 +477,17 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   // challengerWallet and pendingJoinerWallet already defined above
   
   const maxPlayers = getChallengeValue('maxPlayers', 2);
+  const format = getChallengeValue('format', activeChallenge.rawData?.tournament ? 'tournament' : 'standard') as string;
+  const isTournament = format === 'tournament';
+
+  const canEditEntryFee =
+    Boolean(onUpdateEntryFee) &&
+    isCreator &&
+    status === 'pending_waiting_for_opponent' &&
+    !pendingJoinerWallet &&
+    !challengerWallet &&
+    !isTournament &&
+    players.length <= 1;
   
   // Calculate actual participant count (including creator, challenger, pendingJoiner, and players array)
   const allParticipantsSet = new Set<string>();
@@ -1357,6 +1409,73 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
             <div className="text-white font-semibold text-xs">Standard</div>
           </div>
         </div>
+
+        {canEditEntryFee && (
+          <div className="mt-2 rounded-md border border-amber-400/30 bg-amber-500/10 p-2 text-[11px]">
+            {!isEditingEntryFee ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsEditingEntryFee(true);
+                }}
+                className="w-full rounded-md bg-amber-500/15 px-3 py-2 text-amber-200 font-semibold border border-amber-400/40 hover:bg-amber-500/25 transition-colors"
+              >
+                ✏️ Edit Challenge Amount
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <div className="text-[10px] uppercase tracking-wide text-amber-200">Edit Challenge Amount</div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={entryFeeDraft}
+                    onChange={(e) => setEntryFeeDraft(e.target.value)}
+                    className="flex-1 rounded-md bg-black/40 border border-amber-400/40 px-2 py-1 text-white text-xs focus:outline-none focus:ring-1 focus:ring-amber-400/60"
+                    placeholder="USDFG amount"
+                  />
+                  <span className="text-[10px] text-amber-200">USDFG</span>
+                </div>
+                {entryFeeError && (
+                  <div className="text-[10px] text-red-300">{entryFeeError}</div>
+                )}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleSaveEntryFee();
+                    }}
+                    disabled={isUpdatingEntryFee}
+                    className="flex-1 rounded-md bg-emerald-500/20 px-3 py-1.5 text-emerald-200 text-[11px] font-semibold border border-emerald-400/40 hover:bg-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isUpdatingEntryFee ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsEditingEntryFee(false);
+                      setEntryFeeError(null);
+                      setEntryFeeDraft(String(entryFee || ''));
+                    }}
+                    className="flex-1 rounded-md bg-white/5 px-3 py-1.5 text-white/70 text-[11px] font-semibold border border-white/10 hover:bg-white/10"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <div className="text-[10px] text-amber-100/70">
+                  Only available before anyone joins.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Submit Result Section */}
