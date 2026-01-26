@@ -11,8 +11,7 @@
     "db:push": "drizzle-kit push --force --config=./drizzle.config.ts",
     "db:seed": "tsx db/seed.ts",
     "record:reward": "node record-founder-reward.js",
-    "test:challenge-flow": "tsx tests/challenge-flow.test.ts",
-    "test:tournament-firestore": "firebase emulators:exec --only firestore \"tsx tests/tournament-firestore.test.ts\""
+    "test:challenge-flow": "tsx tests/challenge-flow.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -122,7 +121,6 @@
     "bufferutil": "4.1.0",
     "drizzle-kit": "^0.18.1",
     "esbuild": "0.24.0",
-    "firebase-tools": "^15.4.0",
     "nft.storage": "^7.2.0",
     "postcss": "^8.4.47",
     "rollup": "4.52.3",
