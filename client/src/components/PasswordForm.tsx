@@ -11,7 +11,11 @@ const PasswordForm: React.FC<PasswordFormProps> = ({ onSuccess }) => {
 
   const handleSubmit = () => {
     if (password === correctPassword) {
-      localStorage.setItem('arena-access', 'true');
+      try {
+        localStorage.setItem('arena-access', 'true');
+      } catch (storageError) {
+        console.warn('⚠️ Unable to persist arena access:', storageError);
+      }
       onSuccess();
     } else {
       alert('Wrong password');

@@ -10,24 +10,37 @@ export default function ArenaRoute() {
   
   // Check access on mount and when location changes
   useEffect(() => {
-    // CRITICAL: If Phantom params are present — bypass password gate and unlock arena
-    if (location.search.includes("phantom_encryption_public_key")) {
-      console.log("🔥 Bypassing password for Phantom return");
-      localStorage.setItem("arena-access", "granted");
-      setHasAccess(true);
+    try {
+      // CRITICAL: If Phantom params are present — bypass password gate and unlock arena
+      if (location.search.includes("phantom_encryption_public_key")) {
+        console.log("🔥 Bypassing password for Phantom return");
+        try {
+          localStorage.setItem("arena-access", "granted");
+        } catch (storageError) {
+          console.warn("⚠️ Failed to persist arena access (storage blocked):", storageError);
+        }
+        setHasAccess(true);
+        return;
+      }
+
+      // Check if user already has access
+      let access: string | null = null;
+      try {
+        access = localStorage.getItem("arena-access");
+      } catch (storageError) {
+        console.warn("⚠️ Failed to read arena access (storage blocked):", storageError);
+      }
+
+      if (access === "true" || access === "granted") {
+        console.log("✅ Access found in localStorage");
+        setHasAccess(true);
+      } else {
+        console.log("🔒 Password gate ACTIVE - access required");
+        setHasAccess(false);
+      }
+    } finally {
       setLoading(false);
-      return;
     }
-    
-    // Check if user already has access
-    const access = localStorage.getItem("arena-access");
-    if (access === "true" || access === "granted") {
-      console.log("✅ Access found in localStorage");
-      setHasAccess(true);
-    } else {
-      console.log("🔒 Password gate ACTIVE - access required");
-    }
-    setLoading(false);
   }, [location.search]);
   
   // Don't render anything until we've checked access
