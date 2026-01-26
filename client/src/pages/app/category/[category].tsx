@@ -51,10 +51,7 @@ const CategoryDetailPage: React.FC = () => {
   const challenges = filteredChallenges;
   
   const handleChallengeTap = (challengeId: string) => {
-    // TODO: Navigate to challenge detail when implemented
-    console.log(`Challenge tapped: ${challengeId}`);
-    // For now, just navigate back or show challenge
-    // navigate(`/app/challenge/${challengeId}`);
+    navigate(`/app?challenge=${challengeId}`);
   };
   
   return (

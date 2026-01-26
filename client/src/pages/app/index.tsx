@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo, Suspense, lazy, useRef } from "react";
 import { Helmet } from "react-helmet";
 import ElegantNotification from "@/components/ui/ElegantNotification";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import WalletConnectSimple from "@/components/arena/WalletConnectSimple";
 import { useWallet } from '@solana/wallet-adapter-react';
 // Removed legacy wallet import - using MWA hooks instead
@@ -198,6 +198,7 @@ const ArenaHome: React.FC = () => {
   // Use adapter connection OR stored Phantom connection
   // This allows mobile deep links to work even if adapter.connect() fails
   const isConnected = connected || (hasStoredPhantomConnection && !!storedPhantomPublicKey);
+  const location = useLocation();
   
   // Use stored public key if adapter doesn't have one
   const effectivePublicKey = publicKey || (storedPhantomPublicKey ? new PublicKey(storedPhantomPublicKey) : null);
@@ -560,6 +561,47 @@ const ArenaHome: React.FC = () => {
       capacity: firestoreChallenge.maxPlayers || cardChallenge.capacity,
     };
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const challengeId = params.get('challenge');
+    if (!challengeId) return;
+
+    const openChallengeFromQuery = async () => {
+      try {
+        let challengeData: any = firestoreChallenges.find((c: any) => c.id === challengeId);
+        if (!challengeData) {
+          challengeData = await fetchChallengeById(challengeId);
+        }
+        if (!challengeData) {
+          return;
+        }
+
+        const merged = mergeChallengeDataForModal(challengeData, challengeData);
+        setSelectedChallenge(merged);
+        setShowDetailSheet(false);
+
+        const format = merged.rawData?.format || (merged.rawData?.tournament ? 'tournament' : 'standard');
+        if (format === 'tournament') {
+          setShowStandardLobby(false);
+          setShowTournamentLobby(true);
+        } else {
+          setShowTournamentLobby(false);
+          setShowStandardLobby(true);
+        }
+      } catch (error) {
+        console.error('Failed to open challenge from query:', error);
+      } finally {
+        const nextParams = new URLSearchParams(location.search);
+        nextParams.delete('challenge');
+        const nextSearch = nextParams.toString();
+        const nextUrl = nextSearch ? `${location.pathname}?${nextSearch}` : location.pathname;
+        window.history.replaceState({}, "", nextUrl);
+      }
+    };
+
+    openChallengeFromQuery();
+  }, [location.search, location.pathname, firestoreChallenges, mergeChallengeDataForModal]);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSubmitResultModal, setShowSubmitResultModal] = useState(false);
