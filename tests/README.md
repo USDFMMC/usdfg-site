@@ -8,6 +8,10 @@ Automated test suite for challenge state machine validation.
 npm run test:challenge-flow
 ```
 
+```bash
+npm run test:tournament-firestore
+```
+
 ## What It Tests
 
 - State machine logic and transitions
@@ -16,6 +20,9 @@ npm run test:challenge-flow
 - UI state logic
 - Timeout handling
 - Safety checks
+- Firestore emulator tournament integration (8 players)
 
-**Note**: For manual E2E testing with real wallets, see `TESTING_CHECKLIST.md` in the root directory.
+**Note**: The Firestore tournament integration test runs against the local emulator
+(`firebase emulators:exec --only firestore`) and will not touch production data.
+For manual E2E testing with real wallets, see `TESTING_CHECKLIST.md`.
 
