@@ -562,6 +562,9 @@ const ArenaHome: React.FC = () => {
     };
   }, []);
 
+  // Use Firestore real-time challenges (must be before any useEffect that uses firestoreChallenges)
+  const { challenges: firestoreChallenges, loading: challengesLoading, error: challengesError } = useChallenges();
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const challengeId = params.get('challenge');
@@ -1092,9 +1095,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   const usdfgToUsd = useCallback((usdfgAmount: number) => {
     return usdfgAmount * usdfgPrice;
   }, [usdfgPrice]);
-  
-  // Use Firestore real-time challenges
-  const { challenges: firestoreChallenges, loading: challengesLoading, error: challengesError } = useChallenges();
   
   // Separate state for completed challenges with unclaimed rewards (persists even after refresh)
   const [unclaimedPrizeChallenges, setUnclaimedPrizeChallenges] = useState<any[]>([]);
