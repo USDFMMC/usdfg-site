@@ -4455,3 +4455,12 @@ export async function claimChallengePrize(
 // ============================================
 // This feature was replaced with Founder Challenges
 // Free claim functions removed as they are no longer used
+
+// Test-only exports for tournament logic validation
+export const __test__tournament = {
+  createInitialBracket,
+  seedPlayersIntoBracket,
+  activateRoundMatches,
+  ensureTournamentState,
+  sanitizeTournamentState
+};

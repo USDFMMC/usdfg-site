@@ -204,6 +204,172 @@ function testUIStateLogic() {
   });
 }
 
+// Test: 8-Player Tournament Flow (Bracket Progression)
+async function testTournamentFlow8Players() {
+  console.log('\n🧪 Testing Tournament Flow (8 Players)...\n');
+
+  try {
+    const { __test__tournament } = await import('../client/src/lib/firebase/firestore.js');
+    const {
+      ensureTournamentState,
+      seedPlayersIntoBracket,
+      activateRoundMatches
+    } = __test__tournament;
+
+    const maxPlayers = 8;
+    const playerWallets = Array.from({ length: maxPlayers }, () =>
+      Keypair.generate().publicKey.toString()
+    );
+
+    const tournamentState = ensureTournamentState(undefined, maxPlayers);
+    let bracket = tournamentState.bracket;
+    let stage: string = tournamentState.stage;
+    let champion: string | null = null;
+
+    const roundCounts = bracket.map(round => round.matches.length);
+    const roundCountPass =
+      roundCounts.length === 3 &&
+      roundCounts[0] === 4 &&
+      roundCounts[1] === 2 &&
+      roundCounts[2] === 1;
+    logResult({
+      name: 'Tournament bracket shape (8 players)',
+      passed: roundCountPass,
+      details: `Rounds: ${roundCounts.join(' → ')}`
+    });
+
+    playerWallets.forEach((wallet, index) => {
+      const activePlayers = playerWallets.slice(0, index + 1);
+      bracket = seedPlayersIntoBracket(bracket, activePlayers);
+      const assigned = bracket[0].matches
+        .flatMap(match => [match.player1, match.player2])
+        .filter(Boolean) as string[];
+      const uniqueAssigned = new Set(assigned.map(w => w.toLowerCase()));
+      const expected = index + 1;
+      logResult({
+        name: `Tournament join: ${expected} player(s) assigned`,
+        passed: assigned.length === expected && uniqueAssigned.size === expected,
+        details: `${assigned.length}/${expected} slots filled`
+      });
+    });
+
+    stage = 'round_in_progress';
+    bracket = activateRoundMatches(bracket, 1);
+    const round1Active = bracket[0].matches.every(
+      match => match.player1 && match.player2 && match.status === 'in-progress'
+    );
+    logResult({
+      name: 'Round 1 activates when tournament is full',
+      passed: round1Active,
+      details: round1Active ? 'All matches in progress' : 'Missing active matches'
+    });
+
+    const advanceWinner = (roundIndex: number, matchIndex: number, winnerWallet: string) => {
+      const currentRound = bracket[roundIndex];
+      const match = currentRound.matches[matchIndex];
+      match.winner = winnerWallet;
+      match.status = 'completed';
+
+      if (roundIndex === bracket.length - 1) {
+        champion = winnerWallet;
+        stage = 'completed';
+        return;
+      }
+
+      const nextRound = bracket[roundIndex + 1];
+      const nextMatchIndex = Math.floor(matchIndex / 2);
+      const nextMatch = nextRound.matches[nextMatchIndex];
+      if (matchIndex % 2 === 0) {
+        nextMatch.player1 = winnerWallet;
+      } else {
+        nextMatch.player2 = winnerWallet;
+      }
+      if (nextMatch.player1 && nextMatch.player2) {
+        nextMatch.status = 'ready';
+      }
+    };
+
+    // Round 1 -> Round 2
+    bracket[0].matches.forEach((match, matchIndex) => {
+      const hasBothPlayers = Boolean(match.player1 && match.player2);
+      logResult({
+        name: `Round 1 match ${matchIndex + 1} has two players`,
+        passed: hasBothPlayers,
+        details: hasBothPlayers ? 'Ready' : 'Missing player'
+      });
+      if (!match.player1) return;
+      advanceWinner(0, matchIndex, match.player1);
+    });
+
+    const round1Complete = bracket[0].matches.every(
+      match => match.status === 'completed' && Boolean(match.winner)
+    );
+    logResult({
+      name: 'Round 1 completes with winners',
+      passed: round1Complete,
+      details: round1Complete ? 'All winners advanced' : 'Missing winners'
+    });
+
+    bracket = activateRoundMatches(bracket, 2);
+    const round2Active = bracket[1].matches.every(
+      match => match.player1 && match.player2 && match.status === 'in-progress'
+    );
+    logResult({
+      name: 'Round 2 activates with advanced winners',
+      passed: round2Active,
+      details: round2Active ? 'Semifinals in progress' : 'Semifinal slots missing'
+    });
+
+    // Round 2 -> Final
+    bracket[1].matches.forEach((match, matchIndex) => {
+      if (!match.player1) return;
+      advanceWinner(1, matchIndex, match.player1);
+    });
+
+    const round2Complete = bracket[1].matches.every(
+      match => match.status === 'completed' && Boolean(match.winner)
+    );
+    logResult({
+      name: 'Round 2 completes with finalists',
+      passed: round2Complete,
+      details: round2Complete ? 'Finalists assigned' : 'Missing finalists'
+    });
+
+    bracket = activateRoundMatches(bracket, 3);
+    const finalMatch = bracket[2].matches[0];
+    const finalReady = Boolean(finalMatch?.player1 && finalMatch?.player2);
+    logResult({
+      name: 'Final match is ready',
+      passed: finalReady,
+      details: finalReady ? 'Finalists present' : 'Finalists missing'
+    });
+
+    if (finalMatch?.player1) {
+      advanceWinner(2, 0, finalMatch.player1);
+    }
+
+    const finalComplete = finalMatch?.status === 'completed' && Boolean(champion);
+    logResult({
+      name: 'Final match completes with champion',
+      passed: Boolean(finalComplete) && stage === 'completed',
+      details: champion ? `Champion: ${champion.slice(0, 8)}...` : 'No champion set'
+    });
+
+    const championValid = champion ? playerWallets.includes(champion) : false;
+    logResult({
+      name: 'Champion is a tournament participant',
+      passed: championValid,
+      details: championValid ? 'Champion verified' : 'Champion not in players list'
+    });
+  } catch (error: any) {
+    logResult({
+      name: 'Tournament flow (8 players) - setup',
+      passed: false,
+      error: error?.message || 'Unknown error'
+    });
+  }
+}
+
 // Test: Timeout Logic
 function testTimeoutLogic() {
   console.log('\n🧪 Testing Timeout Logic...\n');
@@ -280,6 +446,7 @@ async function runTests() {
   await testFirestoreFunctions();
   await testContractFunctions();
   testUIStateLogic();
+  await testTournamentFlow8Players();
   testTimeoutLogic();
   testSafetyChecks();
   
