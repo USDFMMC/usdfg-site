@@ -5067,7 +5067,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     <div
                       role="button"
                       tabIndex={0}
-                      className={`relative text-left rounded-xl border overflow-hidden p-3 transition active:scale-[0.99] w-[176px] h-[176px] sm:w-[180px] sm:h-[180px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-400/50 ${edgeGlow}`}
+                      className={`relative text-left rounded-xl border overflow-hidden p-3 pb-4 transition active:scale-[0.99] w-[176px] min-h-[200px] sm:w-[180px] sm:min-h-[200px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-400/50 ${edgeGlow}`}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -5192,16 +5192,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                             </div>
                           </div>
 
-                      <div className="flex items-center justify-between gap-2 text-[12px] text-white/80">
-                        <div className="min-w-0 truncate">
-                          <span className="text-white/60">👤 Creator</span>{' '}
+                      <div className="flex items-center justify-between gap-2 text-[11px] text-white/80 mt-1.5">
+                        <div className="min-w-0 truncate flex-1">
+                          <span className="text-white/60">👤 </span>
                           <span className="font-semibold">{challenge.username || challenge.creator?.slice(0, 8) + '...'}</span>
-                            </div>
-                        <div className="shrink-0">
-                          <span className="text-white/60">{platformIconLocal(challenge.platform)}</span>{' '}
+                        </div>
+                        <div className="shrink-0 flex items-center gap-1">
+                          <span className="text-white/60">{platformIconLocal(challenge.platform)}</span>
                           <span className="font-semibold">{challenge.platform || 'All'}</span>
-                          </div>
-                              </div>
+                        </div>
+                      </div>
                                   </div>
                                 </div>
                               </div>
@@ -5224,7 +5224,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                   </div>
 
                         <div 
-                          className="flex gap-3 overflow-x-auto pb-2 px-4 md:px-0" 
+                          className="flex gap-3 overflow-x-auto pb-4 px-4 md:px-0 md:pb-2" 
                           style={{ 
                             WebkitOverflowScrolling: 'touch',
                             touchAction: 'pan-x',
