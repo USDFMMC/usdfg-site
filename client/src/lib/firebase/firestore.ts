@@ -458,15 +458,23 @@ export const submitTournamentMatchResult = async (
       throw new Error('Could not determine winner from submissions');
     }
 
+    // CRITICAL: Ensure match is in-progress before completing (for UI consistency)
+    // This ensures the submit button was visible to both players
+    if (match.status !== 'in-progress' && match.status !== 'ready') {
+      console.warn('⚠️ Match status was not in-progress/ready before completion:', match.status);
+      // Set to in-progress if it wasn't already (shouldn't happen, but safety check)
+      if (match.player1 && match.player2) {
+        match.status = 'in-progress';
+        if (!match.startedAt) {
+          match.startedAt = Timestamp.now();
+        }
+      }
+    }
+    
     // Mark match as completed
     match.winner = winnerWallet;
     match.status = 'completed';
     match.completedAt = Timestamp.now();
-    
-    // CRITICAL: Ensure match was in-progress before completing (for UI consistency)
-    if (match.status !== 'in-progress' && match.status !== 'ready') {
-      console.warn('⚠️ Match status was not in-progress/ready before completion:', match.status);
-    }
 
     // Advance winner to next round
     const currentRound = bracket[currentRoundIndex];
@@ -539,7 +547,13 @@ export const submitTournamentMatchResult = async (
       nextMatch.status = 'ready';
       // If this is the current round being played, activate immediately
       const nextRoundNumber = currentRound.roundNumber + 1;
-      if (nextRoundNumber === tournament.currentRound) {
+      // CRITICAL: Ensure currentRound is updated if we're advancing to final round
+      if (nextRoundNumber === bracket.length && tournament.currentRound < nextRoundNumber) {
+        // This is the final round and currentRound hasn't been updated yet
+        updates['tournament.currentRound'] = nextRoundNumber;
+        updates['tournament.stage'] = 'round_in_progress';
+      }
+      if (nextRoundNumber === tournament.currentRound || nextRoundNumber === bracket.length) {
         nextMatch.status = 'in-progress';
         nextMatch.startedAt = Timestamp.now();
       }
