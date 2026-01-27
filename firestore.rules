@@ -7,7 +7,18 @@ service cloud.firestore {
       allow read: if true;
       allow create: if true; // Allow anyone to create (Solana wallet verification happens on-chain)
       allow delete: if true; // Allow deletion (can add wallet-based rules later)
-      allow update: if true; // Allow updates from participants
+      // Allow updates from participants OR admins resolving disputes
+      allow update: if 
+        // Players can update their own results (proof images)
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['results', 'updatedAt'])) ||
+        // Admins can resolve disputed challenges
+        (resource.data.status == 'disputed' && 
+         request.auth != null && 
+         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+         request.resource.data.diff(resource.data).affectedKeys().hasAll(['status', 'winner', 'resolvedBy', 'resolvedAt']) &&
+         request.resource.data.status == 'completed') ||
+        // Regular participant updates (existing behavior)
+        true;
     }
     
     // Challenge Chats - temporary chat during result submission
@@ -130,6 +141,23 @@ service cloud.firestore {
         allow update: if true; // Allow updates to spectator count
         allow delete: if true; // Allow deletion for cleanup
       }
+    }
+    
+    // Admins Collection - only admins can read, no client writes
+    match /admins/{adminId} {
+      allow read: if request.auth != null && 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      allow write: if false; // Only server-side or manual Firebase Console
+    }
+    
+    // Admin Audit Log - only admins can read, only admins can create
+    match /admin_audit_log/{logId} {
+      allow read: if request.auth != null && 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      allow create: if request.auth != null && 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      allow update: if false; // Immutable
+      allow delete: if false; // Immutable
     }
   }
 }

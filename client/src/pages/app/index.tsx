@@ -3422,9 +3422,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         }
       }
       
-      // Show Victory Modal for wins, regular alert for losses
+      // Show Victory Modal immediately for wins (optimistic UI)
+      // If dispute detected later, we'll update the UI via challenge listener
       if (didWin || autoWon) {
-        // Show Victory Modal for wins
         const opponentName = opponentWallet 
           ? `${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}`
           : undefined;
@@ -3435,6 +3435,43 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           needsClaim: needsClaim || (isCompleted && didWin)
         });
         setShowVictoryModal(true);
+        
+        // Check for dispute in background (don't block UI)
+        if (selectedChallenge?.id) {
+          setTimeout(async () => {
+            try {
+              const { fetchChallengeById } = await import("@/lib/firebase/firestore");
+              const refreshed = await fetchChallengeById(selectedChallenge.id);
+              if (refreshed) {
+                const refreshedStatus = refreshed.status || refreshed.rawData?.status;
+                if (refreshedStatus === 'disputed') {
+                  // Dispute detected - close victory modal and show dispute message
+                  setShowVictoryModal(false);
+                  setVictoryModalData(null);
+                  setSelectedChallenge(refreshed);
+                  // Keep lobby open to show dispute status
+                  if (!showStandardLobby) {
+                    setShowStandardLobby(true);
+                  }
+                  alert("🔴 Dispute detected! Both players claimed victory. Waiting for admin resolution.");
+                } else if (refreshedStatus === 'completed') {
+                  // Challenge completed - update challenge data
+                  setSelectedChallenge(refreshed);
+                  const winner = refreshed.winner || refreshed.rawData?.winner;
+                  const isActualWinner = winner && winner.toLowerCase() === publicKey.toBase58().toLowerCase();
+                  
+                  if (!isActualWinner && !autoWon) {
+                    // Player claimed win but isn't the actual winner - close victory modal
+                    setShowVictoryModal(false);
+                    setVictoryModalData(null);
+                  }
+                }
+              }
+            } catch (error) {
+              console.warn('Could not refresh challenge status:', error);
+            }
+          }, 2000); // Check after 2 seconds (gives time for determineWinner to run)
+        }
       } else {
         // Show regular alert for losses
         let successMessage = opponentWallet 

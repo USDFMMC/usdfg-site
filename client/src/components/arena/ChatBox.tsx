@@ -130,11 +130,18 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet, st
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto space-y-1.5 mb-1.5 min-h-0 scrollbar-thin scrollbar-thumb-gray-700/50 scrollbar-track-transparent scrollbar-thumb-rounded">
-        {/* Automatic gamer tag exchange message - shown when challenge is active */}
-        {status === 'active' && playersCount && playersCount >= 2 && (
+        {/* Automatic gamer tag exchange message - shown when challenge is active or disputed */}
+        {(status === 'active' || status === 'disputed') && playersCount && playersCount >= 2 && (
           <div className="flex justify-center my-1">
-            <div className="max-w-[90%] px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded text-[10px] text-amber-300/80 text-center">
-              Share your platform ID (PSN, Xbox, Steam, etc.)
+            <div className={`max-w-[90%] px-2 py-1 rounded text-[10px] text-center ${
+              status === 'disputed' 
+                ? 'bg-red-500/10 border border-red-500/20 text-red-300/80'
+                : 'bg-amber-500/10 border border-amber-500/20 text-amber-300/80'
+            }`}>
+              {status === 'disputed' 
+                ? '🔴 Dispute: Waiting for admin resolution. Chat remains open.'
+                : 'Share your platform ID (PSN, Xbox, Steam, etc.)'
+              }
             </div>
           </div>
         )}

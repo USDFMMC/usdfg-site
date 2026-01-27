@@ -1864,11 +1864,13 @@ export async function archiveChallenge(id: string) {
  * @param challengeId - The challenge ID
  * @param wallet - The player's wallet address
  * @param didWin - Whether the player won (true) or lost (false)
+ * @param proofImageData - Optional base64 image data URL as proof
  */
 export const submitChallengeResult = async (
   challengeId: string,
   wallet: string,
-  didWin: boolean
+  didWin: boolean,
+  proofImageData?: string
 ): Promise<void> => {
   try {
     const challengeRef = doc(db, "challenges", challengeId);
@@ -1890,11 +1892,12 @@ export const submitChallengeResult = async (
       throw new Error("You have already submitted your result");
     }
 
-    // Add result
+    // Add result with optional proof image
     const results = data.results || {};
     results[wallet] = {
       didWin,
       submittedAt: Timestamp.now(),
+      ...(proofImageData && { proofImageData }), // Only include if provided
     };
 
     await updateDoc(challengeRef, {
@@ -4271,3 +4274,167 @@ export async function claimChallengePrize(
 // ============================================
 // This feature was replaced with Founder Challenges
 // Free claim functions removed as they are no longer used
+
+// ============================================
+// ADMIN DISPUTE RESOLUTION SYSTEM
+// ============================================
+
+/**
+ * Check if current user is an admin
+ * @param uid - Firebase Auth UID
+ * @returns true if user exists in admins collection and is active
+ */
+export const isAdmin = async (uid: string): Promise<boolean> => {
+  try {
+    const adminRef = doc(db, 'admins', uid);
+    const adminSnap = await getDoc(adminRef);
+    
+    if (!adminSnap.exists()) {
+      return false;
+    }
+    
+    const adminData = adminSnap.data();
+    return adminData.active !== false; // Default to true if not set
+  } catch (error) {
+    console.error('❌ Error checking admin status:', error);
+    return false;
+  }
+};
+
+/**
+ * Get all disputed challenges
+ * @returns Array of challenges with status 'disputed'
+ */
+export const getDisputedChallenges = async (): Promise<ChallengeData[]> => {
+  try {
+    const q = query(
+      collection(db, 'challenges'),
+      where('status', '==', 'disputed'),
+      orderBy('createdAt', 'desc')
+    );
+    
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as ChallengeData[];
+  } catch (error) {
+    console.error('❌ Error fetching disputed challenges:', error);
+    throw error;
+  }
+};
+
+/**
+ * Listen to disputed challenges in real-time
+ * @param callback - Function called when disputed challenges change
+ * @returns Unsubscribe function
+ */
+export const listenToDisputedChallenges = (
+  callback: (challenges: ChallengeData[]) => void
+): (() => void) => {
+  const q = query(
+    collection(db, 'challenges'),
+    where('status', '==', 'disputed'),
+    orderBy('createdAt', 'desc')
+  );
+  
+  return onSnapshot(q, (snapshot) => {
+    const challenges = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as ChallengeData[];
+    callback(challenges);
+  });
+};
+
+/**
+ * Resolve a disputed challenge as admin
+ * @param challengeId - Challenge ID
+ * @param winnerWallet - Wallet address of the winner
+ * @param adminUid - Firebase Auth UID of admin resolving
+ * @param adminEmail - Admin email for audit log
+ * @param onChainTx - Optional transaction signature from smart contract
+ * @param notes - Optional admin notes
+ */
+export const resolveAdminChallenge = async (
+  challengeId: string,
+  winnerWallet: string,
+  adminUid: string,
+  adminEmail: string,
+  onChainTx?: string,
+  notes?: string
+): Promise<void> => {
+  try {
+    const challengeRef = doc(db, 'challenges', challengeId);
+    const challengeSnap = await getDoc(challengeRef);
+    
+    if (!challengeSnap.exists()) {
+      throw new Error('Challenge not found');
+    }
+    
+    const challengeData = challengeSnap.data() as ChallengeData;
+    
+    // Verify challenge is in dispute
+    if (challengeData.status !== 'disputed') {
+      throw new Error(`Challenge is not in dispute. Current status: ${challengeData.status}`);
+    }
+    
+    // Verify winner is one of the players
+    const players = challengeData.players || [];
+    if (!players.includes(winnerWallet)) {
+      throw new Error('Winner must be one of the challenge participants');
+    }
+    
+    // Update challenge
+    await updateDoc(challengeRef, {
+      status: 'completed',
+      winner: winnerWallet,
+      resolvedBy: adminUid,
+      resolvedAt: Timestamp.now(),
+      adminResolutionTx: onChainTx || null,
+      updatedAt: Timestamp.now(),
+    });
+    
+    // Create audit log entry
+    await addDoc(collection(db, 'admin_audit_log'), {
+      adminUid,
+      adminEmail,
+      challengeId,
+      winner: winnerWallet,
+      action: 'resolve_dispute',
+      timestamp: Timestamp.now(),
+      onChainTx: onChainTx || null,
+      notes: notes || null,
+    });
+    
+    // Update player stats (same logic as determineWinner)
+    const isTeamChallenge = challengeData.challengeType === 'team';
+    const entryFee = challengeData.entryFee || 0;
+    const totalPrize = entryFee * 2;
+    const platformFee = totalPrize * 0.05;
+    const prizePool = totalPrize - platformFee;
+    
+    const loser = players.find(p => p !== winnerWallet);
+    if (loser) {
+      if (isTeamChallenge) {
+        await updateTeamStats(winnerWallet, 'win', prizePool, challengeData.game || 'Unknown', challengeData.category || 'Sports');
+        await updateTeamStats(loser, 'loss', 0, challengeData.game || 'Unknown', challengeData.category || 'Sports');
+      } else {
+        await updatePlayerStats(winnerWallet, 'win', prizePool, challengeData.game || 'Unknown', challengeData.category || 'Sports');
+        await updatePlayerStats(loser, 'loss', 0, challengeData.game || 'Unknown', challengeData.category || 'Sports');
+      }
+    }
+    
+    // Mark challenge as ready for winner to claim
+    await updateDoc(challengeRef, {
+      needsPayout: true,
+      payoutTriggered: false,
+      canClaim: true,
+    });
+    
+    console.log(`✅ Admin resolved dispute: Challenge ${challengeId}, Winner: ${winnerWallet}`);
+  } catch (error) {
+    console.error('❌ Error resolving admin challenge:', error);
+    throw error;
+  }
+};

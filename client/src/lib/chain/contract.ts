@@ -1358,3 +1358,122 @@ export async function transferTournamentEntryFee(
   
   return signature;
 }
+
+/**
+ * Admin Resolve Challenge (for dispute resolution)
+ * Only works if challenge is in dispute status
+ * @param wallet - Admin wallet (must be connected)
+ * @param connection - Solana connection
+ * @param challengeId - Challenge ID (Firestore ID, not PDA)
+ * @param winnerWallet - Winner wallet address
+ * @returns Transaction signature
+ */
+export async function resolveAdminChallengeOnChain(
+  wallet: any,
+  connection: Connection,
+  challengeId: string,
+  winnerWallet: string
+): Promise<string> {
+  console.log('🔧 Admin resolving challenge...');
+  console.log('   Challenge ID:', challengeId);
+  console.log('   Winner:', winnerWallet);
+  
+  if (!wallet || !wallet.publicKey) {
+    throw new Error('❌ Wallet not connected');
+  }
+
+  // Get challenge PDA from Firestore challenge data
+  const { fetchChallengeById } = await import('../firebase/firestore');
+  const challenge = await fetchChallengeById(challengeId);
+  
+  if (!challenge || !challenge.pda) {
+    throw new Error('❌ Challenge not found or missing PDA');
+  }
+
+  if (challenge.status !== 'disputed') {
+    throw new Error(`❌ Challenge is not in dispute. Current status: ${challenge.status}`);
+  }
+
+  const challengePDA = new PublicKey(challenge.pda);
+  const winnerPubkey = new PublicKey(winnerWallet);
+  const caller = new PublicKey(wallet.publicKey.toString());
+  
+  // Verify winner is one of the players
+  const players = challenge.players || [];
+  if (!players.includes(winnerWallet)) {
+    throw new Error('❌ Winner must be one of the challenge participants');
+  }
+
+  // Platform wallet is hardcoded in the contract
+  const platformWallet = new PublicKey('AcEV5t9TJdZP91ttbgKieWoWUxwUb4PT4MxvggDjjkkq');
+  
+  // Derive escrow token account PDA
+  const [escrowTokenAccountPDA, escrowTokenBump] = PublicKey.findProgramAddressSync(
+    [
+      SEEDS.ESCROW_WALLET,
+      challengePDA.toBuffer(),
+      USDFG_MINT.toBuffer()
+    ],
+    PROGRAM_ID
+  );
+  
+  // Derive escrow_wallet PDA
+  const [escrowWalletPDA, escrowWalletBump] = PublicKey.findProgramAddressSync(
+    [SEEDS.ESCROW_WALLET],
+    PROGRAM_ID
+  );
+  
+  // Get winner's token account
+  const winnerTokenAccount = await getAssociatedTokenAddress(USDFG_MINT, winnerPubkey);
+  
+  // Get platform's token account
+  const platformTokenAccount = await getAssociatedTokenAddress(USDFG_MINT, platformWallet);
+  
+  console.log('📍 Challenge PDA:', challengePDA.toString());
+  console.log('📍 Escrow Token Account PDA:', escrowTokenAccountPDA.toString());
+  console.log('📍 Escrow Wallet PDA:', escrowWalletPDA.toString());
+  
+  // Calculate discriminator for resolve_admin
+  const { sha256 } = await import('@noble/hashes/sha2.js');
+  const hash = sha256(new TextEncoder().encode('global:resolve_admin'));
+  const discriminator = Buffer.from(hash.slice(0, 8));
+  
+  // Instruction data: discriminator (8 bytes) + winner Pubkey (32 bytes)
+  const instructionData = Buffer.alloc(8 + 32);
+  discriminator.copy(instructionData, 0);
+  winnerPubkey.toBuffer().copy(instructionData, 8);
+  
+  // Create instruction - resolve_admin(ctx: Context<ResolveAdmin>, winner: Pubkey)
+  const instruction = new TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      { pubkey: challengePDA, isSigner: false, isWritable: true }, // challenge
+      { pubkey: escrowTokenAccountPDA, isSigner: false, isWritable: true }, // escrow_token_account
+      { pubkey: winnerTokenAccount, isSigner: false, isWritable: true }, // winner_token_account
+      { pubkey: platformTokenAccount, isSigner: false, isWritable: true }, // platform_token_account
+      { pubkey: escrowWalletPDA, isSigner: false, isWritable: false }, // escrow_wallet (PDA)
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
+      { pubkey: USDFG_MINT, isSigner: false, isWritable: false }, // mint
+    ],
+    data: instructionData,
+  });
+  
+  const transaction = new Transaction().add(instruction);
+  const { blockhash } = await connection.getLatestBlockhash();
+  transaction.recentBlockhash = blockhash;
+  transaction.feePayer = caller;
+  
+  const signedTransaction = await wallet.signTransaction(transaction);
+  const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
+    skipPreflight: false,
+    maxRetries: 3,
+  });
+  
+  console.log('⏳ Waiting for confirmation...');
+  await connection.confirmTransaction(signature, 'confirmed');
+  
+  console.log('✅ Admin challenge resolved! Winner paid out!');
+  console.log('🔗 Transaction:', `https://explorer.solana.com/tx/${signature}?cluster=devnet`);
+  
+  return signature;
+}

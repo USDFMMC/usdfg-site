@@ -1757,8 +1757,22 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         </div>
       )}
 
+      {/* Dispute Status Message */}
+      {status === 'disputed' && (
+        <div className="rounded-lg border border-red-400/30 bg-red-500/10 p-2.5 text-center">
+          <div className="text-xl mb-1.5">🔴</div>
+          <h3 className="text-sm font-bold text-red-200 mb-1">Dispute Detected</h3>
+          <p className="text-xs text-red-100/80 mb-2">
+            Both players claimed victory. Waiting for admin resolution.
+          </p>
+          <p className="text-[10px] text-red-100/60">
+            Lobby will remain open until admin resolves. You can continue chatting.
+          </p>
+        </div>
+      )}
+
       {/* Status message when can't submit or claim */}
-      {!canSubmitResult && !canClaimPrize && (
+      {!canSubmitResult && !canClaimPrize && status !== 'disputed' && (
         <div className="rounded-lg border border-white/10 bg-white/5 p-2 text-center">
           <div className="text-[10px] text-gray-400">
             {status !== 'active' && status !== 'completed' && `Status: ${statusDisplay.text}`}

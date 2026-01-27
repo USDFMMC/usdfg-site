@@ -13,6 +13,7 @@ import CategoryDetailPage from "@/pages/app/category/[category]";
 import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
 import Whitepaper from "@/pages/whitepaper";
+import DisputeConsole from "@/pages/admin/DisputeConsole";
 import { Helmet } from "react-helmet";
 import { startVersionMonitoring } from "@/lib/version";
 import UpdateBanner from "@/components/ui/UpdateBanner";
@@ -45,6 +46,10 @@ function RoutesWithLogging() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/whitepaper" element={<Whitepaper />} />
+        
+        {/* Admin routes */}
+        <Route path="/admin" element={<Navigate to="/admin/disputes" replace />} />
+        <Route path="/admin/disputes" element={<DisputeConsole />} />
         
         {/* Legacy redirects for backwards compatibility */}
         <Route path="/home" element={<Navigate to="/" replace />} />

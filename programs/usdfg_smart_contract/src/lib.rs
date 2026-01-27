@@ -550,6 +550,92 @@ pub mod usdfg_smart_contract {
         Ok(())
     }
 
+    /// Admin resolve dispute - only when both players claimed victory
+    /// Escrow stays locked; admin picks winner. No admin wallet authority, only program PDA.
+    pub fn resolve_admin(ctx: Context<ResolveAdmin>, winner: Pubkey) -> Result<()> {
+        let challenge = &mut ctx.accounts.challenge;
+
+        require!(!challenge.processing, ChallengeError::ReentrancyDetected);
+        challenge.processing = true;
+
+        // Only works when challenge is active (escrow still locked)
+        require!(
+            challenge.status == ChallengeStatus::Active,
+            ChallengeError::NotInProgress
+        );
+
+        // Both must have submitted results
+        require!(
+            challenge.creator_result.is_some() && challenge.challenger_result.is_some(),
+            ChallengeError::ResultsNotSubmitted
+        );
+
+        // Must be a dispute: both claimed victory
+        let creator_won = challenge.creator_result.unwrap();
+        let challenger_won = challenge.challenger_result.unwrap();
+        require!(
+            creator_won && challenger_won,
+            ChallengeError::NotInDispute
+        );
+
+        // Winner must be one of the two players
+        let challenger = challenge.challenger.unwrap();
+        require!(
+            winner == challenge.creator || winner == challenger,
+            ChallengeError::InvalidWinner
+        );
+
+        // Same payout logic as resolve_challenge
+        let total_prize = challenge.entry_fee * 2;
+        let platform_fee = (total_prize * PLATFORM_FEE_BPS as u64) / 10000;
+        let winner_payout = total_prize - platform_fee;
+
+        challenge.status = ChallengeStatus::Completed;
+        challenge.winner = Some(winner);
+        challenge.last_updated = Clock::get()?.unix_timestamp;
+
+        let escrow_seeds = [
+            ESCROW_WALLET_SEED,
+            challenge.to_account_info().key.as_ref(),
+            ctx.accounts.mint.to_account_info().key.as_ref(),
+            &[ctx.bumps.escrow_token_account],
+        ];
+        let signer_seeds = [&escrow_seeds[..]];
+
+        let winner_cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.escrow_token_account.to_account_info(),
+                to: ctx.accounts.winner_token_account.to_account_info(),
+                authority: ctx.accounts.escrow_token_account.to_account_info(),
+            },
+            &signer_seeds,
+        );
+        token::transfer(winner_cpi_ctx, winner_payout)?;
+
+        let platform_cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.escrow_token_account.to_account_info(),
+                to: ctx.accounts.platform_token_account.to_account_info(),
+                authority: ctx.accounts.escrow_token_account.to_account_info(),
+            },
+            &signer_seeds,
+        );
+        token::transfer(platform_cpi_ctx, platform_fee)?;
+
+        emit!(PayoutCompleted {
+            challenge: challenge.key(),
+            winner,
+            winner_amount: winner_payout,
+            platform_fee,
+            timestamp: challenge.last_updated,
+        });
+
+        challenge.processing = false;
+        Ok(())
+    }
+
     /// Auto-refund creator if joiner funding timer expired (permissionless)
     pub fn auto_refund_joiner_timeout(ctx: Context<AutoRefundJoinerTimeout>) -> Result<()> {
         let challenge = &mut ctx.accounts.challenge;
@@ -683,6 +769,38 @@ pub struct SubmitResult<'info> {
 
 #[derive(Accounts)]
 pub struct ResolveChallenge<'info> {
+    #[account(mut)]
+    pub challenge: Account<'info, Challenge>,
+    #[account(
+        mut,
+        seeds = [ESCROW_WALLET_SEED, challenge.key().as_ref(), mint.key().as_ref()],
+        bump,
+        token::mint = mint,
+        token::authority = escrow_token_account
+    )]
+    pub escrow_token_account: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        constraint = winner_token_account.mint == mint.key()
+    )]
+    pub winner_token_account: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        constraint = platform_token_account.mint == mint.key()
+    )]
+    pub platform_token_account: Account<'info, TokenAccount>,
+    /// CHECK: Escrow wallet PDA
+    #[account(
+        seeds = [ESCROW_WALLET_SEED],
+        bump
+    )]
+    pub escrow_wallet: AccountInfo<'info>,
+    pub token_program: Program<'info, Token>,
+    pub mint: Account<'info, Mint>,
+}
+
+#[derive(Accounts)]
+pub struct ResolveAdmin<'info> {
     #[account(mut)]
     pub challenge: Account<'info, Challenge>,
     #[account(
@@ -857,6 +975,8 @@ pub enum ChallengeError {
     ResultsNotSubmitted,
     #[msg("No dispute - players agree")]
     NoDispute,
+    #[msg("Admin can only resolve when both players claimed victory")]
+    NotInDispute,
     #[msg("Both players conceded - use refund function")]
     BothConceded,
     #[msg("Entry fee mismatch")]
