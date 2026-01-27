@@ -604,10 +604,16 @@ export const submitTournamentMatchResult = async (
       // Activate next round matches
       const updatedBracket = activateRoundMatches(bracket, nextRoundNumber);
       updates['tournament.bracket'] = sanitizeTournamentState({ ...tournament, bracket: updatedBracket }).bracket;
+      console.log(`✅ Advancing to round ${nextRoundNumber} (final: ${nextRoundNumber === bracket.length})`);
     }
 
     await updateDoc(challengeRef, updates);
     console.log('✅ Both players submitted - winner advanced to next round:', winnerWallet);
+    console.log('✅ Tournament state updated:', {
+      currentRound: updates['tournament.currentRound'] || tournament.currentRound,
+      stage: updates['tournament.stage'] || tournament.stage,
+      bracketLength: bracket.length
+    });
   } catch (error) {
     console.error('❌ Error submitting tournament match result:', error);
     throw error;
