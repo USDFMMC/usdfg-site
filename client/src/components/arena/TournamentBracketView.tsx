@@ -44,36 +44,85 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   }
 
   const { bracket, currentRound, stage } = tournament;
+  
+  // CRITICAL FIX: If final round match has both players but status is "ready", 
+  // automatically treat it as "in-progress" for UI purposes (backend will fix it on next submit)
+  const finalRound = bracket[bracket.length - 1];
+  if (finalRound && currentRound <= bracket.length) {
+    for (const match of finalRound.matches) {
+      if (match.player1 && match.player2 && match.status === 'ready') {
+        // Temporarily treat as in-progress for UI - backend will fix on next submit
+        match.status = 'in-progress' as any;
+        console.log(`🔧 UI Fix: Treating final match ${match.id} as in-progress (was ready)`);
+      }
+    }
+  }
 
   const findMatchForPlayer = (wallet?: string | null) => {
     if (!wallet) return null;
     const lower = wallet.toLowerCase();
     
+    // Debug: Log bracket structure with full details
+    console.log('🔍 Searching for match:', {
+      wallet: wallet.slice(0, 8),
+      walletFull: wallet,
+      walletLower: lower,
+      currentRound,
+      bracketRounds: bracket.map(r => ({
+        roundNumber: r.roundNumber,
+        matches: r.matches.map(m => ({
+          id: m.id,
+          player1: m.player1,
+          player2: m.player2,
+          player1Lower: m.player1?.toLowerCase(),
+          player2Lower: m.player2?.toLowerCase(),
+          status: m.status,
+          player1Result: m.player1Result,
+          player2Result: m.player2Result,
+          winner: m.winner
+        }))
+      }))
+    });
+    
     // First, try to find match in the current round (active match)
     const currentRoundData = bracket.find(r => r.roundNumber === currentRound);
     if (currentRoundData) {
+      console.log(`🔍 Checking currentRound ${currentRound}:`, currentRoundData.matches.length, 'matches');
       for (const match of currentRoundData.matches) {
-        if (
-          (match.player1?.toLowerCase() === lower || match.player2?.toLowerCase() === lower) &&
-          match.status !== 'completed'
-        ) {
+        const isPlayer1 = match.player1?.toLowerCase() === lower;
+        const isPlayer2 = match.player2?.toLowerCase() === lower;
+        if ((isPlayer1 || isPlayer2) && match.status !== 'completed') {
+          console.log('✅ Found match in currentRound:', match.id);
           return { round: currentRoundData, match };
         }
       }
     }
     
     // If no active match in current round, find any non-completed match
+    console.log('🔍 Searching all rounds for match...');
     for (const round of bracket) {
       for (const match of round.matches) {
-        if (
-          (match.player1?.toLowerCase() === lower || match.player2?.toLowerCase() === lower) &&
-          match.status !== 'completed'
-        ) {
+        const isPlayer1 = match.player1?.toLowerCase() === lower;
+        const isPlayer2 = match.player2?.toLowerCase() === lower;
+        console.log(`  Checking round ${round.roundNumber} match ${match.id}:`, {
+          player1: match.player1?.slice(0, 8),
+          player2: match.player2?.slice(0, 8),
+          isPlayer1,
+          isPlayer2,
+          status: match.status,
+          matches: isPlayer1 || isPlayer2
+        });
+        if ((isPlayer1 || isPlayer2) && match.status !== 'completed') {
+          console.log(`✅ Found match in round ${round.roundNumber}:`, match.id);
           return { round, match };
+        }
+        if (isPlayer1 || isPlayer2) {
+          console.log(`⚠️ Match found but status is 'completed':`, match.id, match.status);
         }
       }
     }
     
+    console.log('❌ No match found for player');
     return null;
   };
 
@@ -101,7 +150,13 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   const opponentSubmitted = opponentResult !== undefined;
   const canEditResult = currentPlayerResult !== undefined && !opponentSubmitted;
 
-  // Debug logging
+  const maxPlayers = tournament.maxPlayers || players.length;
+  const currentPlayers = players.length;
+  const isWaitingForPlayers = stage === 'waiting_for_players';
+  const isCompleted = stage === 'completed';
+  const champion = tournament.champion;
+
+  // Debug logging (after all variables are declared)
   if (playerMatch) {
     console.log('🔍 Tournament Match Debug:', {
       roundNumber: playerMatch.round.roundNumber,
@@ -112,15 +167,25 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
       currentWallet,
       opponentWallet,
       isFinal: playerMatch.round.roundNumber === bracket.length,
-      bracketLength: bracket.length
+      bracketLength: bracket.length,
+      currentRound,
+      currentPlayerResult,
+      opponentResult,
+      opponentSubmitted,
+      stage,
+      isCompleted,
+      champion
+    });
+  } else {
+    console.log('🔍 No active match found for player:', {
+      currentWallet,
+      currentRound,
+      bracketLength: bracket.length,
+      stage,
+      isCompleted,
+      champion
     });
   }
-
-  const maxPlayers = tournament.maxPlayers || players.length;
-  const currentPlayers = players.length;
-  const isWaitingForPlayers = stage === 'waiting_for_players';
-  const isCompleted = stage === 'completed';
-  const champion = tournament.champion;
   const isChampion = currentWallet && champion && currentWallet.toLowerCase() === champion.toLowerCase();
   
   // Check if reward can be claimed
@@ -374,7 +439,8 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
       )}
 
       {playerMatch && 
-       playerMatch.match.status !== 'completed' && 
+       playerMatch.match.status !== 'completed' &&
+       (playerMatch.match.status === 'in-progress' || playerMatch.match.status === 'ready') &&
        opponentWallet && (
         <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">
           <div className="text-xs uppercase tracking-widest text-amber-300">
