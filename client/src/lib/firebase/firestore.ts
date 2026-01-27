@@ -361,24 +361,24 @@ export const submitTournamentMatchResult = async (
       return;
     }
     
-    // If player already submitted but match not completed, check if we should process
-    if (existingResult !== undefined && !bothSubmitted) {
-      // Only this player submitted, nothing to do
-      console.log('⚠️ Player already submitted result - waiting for opponent');
-      const updates: any = {
-        'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
-        updatedAt: serverTimestamp(),
-      };
-      await updateDoc(challengeRef, updates);
-      return;
-    }
-    
     // CRITICAL FIX: Auto-determine winner if player submitted "I lost" (concede)
     // Same logic as standard challenges - if one player concedes, opponent wins automatically
+    // MUST check this BEFORE the early return for existing submissions
     if (!bothSubmitted && (match.player1Result === 'loss' || match.player2Result === 'loss')) {
       // One player submitted loss - automatically mark opponent as winner
       const opponentWallet = isPlayer1 ? match.player2 : match.player1;
       const opponentResult = isPlayer1 ? match.player2Result : match.player1Result;
+      
+      console.log('🔍 Auto-complete check:', {
+        playerWallet: playerWallet.slice(0, 8),
+        isPlayer1,
+        player1Result: match.player1Result,
+        player2Result: match.player2Result,
+        opponentWallet: opponentWallet?.slice(0, 8),
+        opponentResult,
+        bothSubmitted,
+        isFinal: currentRoundIndex === bracket.length - 1
+      });
       
       if (opponentWallet && opponentResult === undefined) {
         // Opponent hasn't submitted yet - automatically mark them as winner
@@ -405,9 +405,19 @@ export const submitTournamentMatchResult = async (
         
         // Now both players have "submitted" (one manually, one auto), process completion
         bothSubmitted = true;
-        console.log('✅ Auto-marked opponent as winner - processing match completion');
+        console.log('✅ Auto-marked opponent as winner - processing match completion', {
+          player1Result: match.player1Result,
+          player2Result: match.player2Result,
+          isFinal: currentRoundIndex === bracket.length - 1
+        });
+        // Continue to process completion below - don't return here
       } else {
         // Opponent already submitted or not found - just save and wait
+        console.log('⚠️ Auto-complete skipped:', {
+          opponentWallet: opponentWallet?.slice(0, 8),
+          opponentResult,
+          reason: opponentResult !== undefined ? 'opponent already submitted' : 'opponent not found'
+        });
         const updates: any = {
           'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
           updatedAt: serverTimestamp(),
@@ -419,6 +429,18 @@ export const submitTournamentMatchResult = async (
         });
         return;
       }
+    }
+    
+    // If player already submitted but match not completed, and auto-complete didn't trigger, just save and wait
+    if (existingResult !== undefined && !bothSubmitted) {
+      // Only this player submitted, nothing to do (auto-complete already checked above)
+      console.log('⚠️ Player already submitted result - waiting for opponent');
+      const updates: any = {
+        'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
+        updatedAt: serverTimestamp(),
+      };
+      await updateDoc(challengeRef, updates);
+      return;
     }
     
     // If both players have submitted, we MUST process completion (even if duplicate call)
@@ -510,6 +532,12 @@ export const submitTournamentMatchResult = async (
     // Check if this is the final round
     if (currentRoundIndex === bracket.length - 1) {
       // This is the final - tournament is complete
+      console.log('🏆 Final round match completed! Determining champion...', {
+        winnerWallet,
+        currentRoundIndex,
+        bracketLength: bracket.length
+      });
+      
       // CRITICAL: Double-check tournament isn't already completed (race condition guard)
       const finalSnap = await getDoc(challengeRef);
       if (finalSnap.exists()) {
@@ -531,6 +559,7 @@ export const submitTournamentMatchResult = async (
         'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
         'tournament.champion': winnerWallet,
         'tournament.stage': 'completed',
+        'tournament.currentRound': bracket.length, // Ensure currentRound is set to final round
         'status': 'completed',
         'winner': winnerWallet,
         'prizePool': prizePool,
@@ -543,6 +572,11 @@ export const submitTournamentMatchResult = async (
       await updateDoc(challengeRef, updates);
       console.log('✅ Tournament completed! Champion:', winnerWallet, '- Reward claiming enabled');
       console.log('💰 Prize pool:', prizePool, 'USDFG');
+      console.log('📊 Final tournament state:', {
+        champion: winnerWallet,
+        stage: 'completed',
+        currentRound: bracket.length
+      });
       return;
     }
 
@@ -578,20 +612,30 @@ export const submitTournamentMatchResult = async (
 
     // If both players are set in next match, mark it as ready and activate it
     if (nextMatch.player1 && nextMatch.player2) {
-      nextMatch.status = 'ready';
-      // If this is the current round being played, activate immediately
       const nextRoundNumber = currentRound.roundNumber + 1;
-      // CRITICAL: Ensure currentRound is updated if we're advancing to final round
-      if (nextRoundNumber === bracket.length && tournament.currentRound < nextRoundNumber) {
-        // This is the final round and currentRound hasn't been updated yet
-        updates['tournament.currentRound'] = nextRoundNumber;
-        updates['tournament.stage'] = 'round_in_progress';
-        console.log(`✅ Updated currentRound to final round: ${nextRoundNumber}`);
-      }
-      if (nextRoundNumber === tournament.currentRound || nextRoundNumber === bracket.length) {
+      
+      // CRITICAL: If this is the final round, set to in-progress immediately
+      if (nextRoundNumber === bracket.length) {
         nextMatch.status = 'in-progress';
-        nextMatch.startedAt = Timestamp.now();
-        console.log(`✅ Activated match in round ${nextRoundNumber} to in-progress`);
+        if (!nextMatch.startedAt) {
+          nextMatch.startedAt = Timestamp.now();
+        }
+        console.log(`✅ Final round match ${nextMatch.id} set to in-progress (both players set)`);
+        
+        // Also ensure currentRound is updated if not already
+        if (tournament.currentRound < nextRoundNumber) {
+          updates['tournament.currentRound'] = nextRoundNumber;
+          updates['tournament.stage'] = 'round_in_progress';
+          console.log(`✅ Updated currentRound to final round: ${nextRoundNumber}`);
+        }
+      } else {
+        // Non-final round: set to ready first, will be activated when round advances
+        nextMatch.status = 'ready';
+        if (nextRoundNumber === tournament.currentRound) {
+          nextMatch.status = 'in-progress';
+          nextMatch.startedAt = Timestamp.now();
+          console.log(`✅ Activated match in round ${nextRoundNumber} to in-progress`);
+        }
       }
     }
 
@@ -600,11 +644,82 @@ export const submitTournamentMatchResult = async (
       const nextRoundNumber = currentRound.roundNumber + 1;
       updates['tournament.currentRound'] = nextRoundNumber;
       updates['tournament.stage'] = 'round_in_progress';
+      console.log(`✅ Advancing to round ${nextRoundNumber} (final: ${nextRoundNumber === bracket.length})`);
       
-      // Activate next round matches
+      // Activate next round matches - this sets status to 'in-progress' if both players are set
       const updatedBracket = activateRoundMatches(bracket, nextRoundNumber);
       updates['tournament.bracket'] = sanitizeTournamentState({ ...tournament, bracket: updatedBracket }).bracket;
-      console.log(`✅ Advancing to round ${nextRoundNumber} (final: ${nextRoundNumber === bracket.length})`);
+      
+      // CRITICAL: If final round match has both players, ensure it's in-progress
+      if (nextRoundNumber === bracket.length) {
+        const finalRound = updatedBracket.find(r => r.roundNumber === nextRoundNumber);
+        if (finalRound) {
+          for (const match of finalRound.matches) {
+            if (match.player1 && match.player2 && match.status !== 'completed') {
+              match.status = 'in-progress';
+              if (!match.startedAt) {
+                match.startedAt = Timestamp.now();
+              }
+              console.log(`✅ Final round match ${match.id} set to in-progress`);
+            }
+          }
+          updates['tournament.bracket'] = sanitizeTournamentState({ ...tournament, bracket: updatedBracket }).bracket;
+        }
+      }
+    }
+    
+    // CRITICAL FIX: Also check if we're already in a situation where Round 1 is done but currentRound wasn't updated
+    // This handles existing tournaments that are stuck in this state
+    // ALSO fix if final round has both players but status is "ready" - should be "in-progress"
+    if (tournament.currentRound === 1 && bracket.length >= 2) {
+      const round1 = bracket.find(r => r.roundNumber === 1);
+      const round2 = bracket.find(r => r.roundNumber === 2);
+      if (round1 && round2) {
+        const round1AllCompleted = round1.matches.every(m => m.status === 'completed');
+        const round2HasBothPlayers = round2.matches.some(m => m.player1 && m.player2);
+        const round2MatchReady = round2.matches.some(m => m.player1 && m.player2 && (m.status === 'ready' || m.status === 'in-progress'));
+        
+        // Fix if Round 1 is complete OR if Round 2 has both players set (even if Round 1 isn't complete yet)
+        if ((round1AllCompleted || round2HasBothPlayers) && round2MatchReady) {
+          console.log('🔧 Fixing stuck tournament: Round 2 ready but currentRound not updated');
+          updates['tournament.currentRound'] = 2;
+          updates['tournament.stage'] = 'round_in_progress';
+          
+          // Ensure final round matches are in-progress
+          for (const match of round2.matches) {
+            if (match.player1 && match.player2 && match.status !== 'completed') {
+              match.status = 'in-progress';
+              if (!match.startedAt) {
+                match.startedAt = Timestamp.now();
+              }
+              console.log(`✅ Fixed final round match ${match.id} to in-progress`);
+            }
+          }
+          updates['tournament.bracket'] = sanitizeTournamentState({ ...tournament, bracket }).bracket;
+        }
+      }
+    }
+    
+    // CRITICAL FIX: Also check if final round match is "ready" but should be "in-progress"
+    // This can happen even if currentRound is correct
+    if (bracket.length >= 2) {
+      const finalRound = bracket.find(r => r.roundNumber === bracket.length);
+      if (finalRound) {
+        let needsUpdate = false;
+        for (const match of finalRound.matches) {
+          if (match.player1 && match.player2 && match.status === 'ready') {
+            match.status = 'in-progress';
+            if (!match.startedAt) {
+              match.startedAt = Timestamp.now();
+            }
+            needsUpdate = true;
+            console.log(`✅ Fixed final round match ${match.id} from ready to in-progress`);
+          }
+        }
+        if (needsUpdate) {
+          updates['tournament.bracket'] = sanitizeTournamentState({ ...tournament, bracket }).bracket;
+        }
+      }
     }
 
     await updateDoc(challengeRef, updates);
