@@ -164,6 +164,9 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
       status: playerMatch.match.status,
       player1: playerMatch.match.player1,
       player2: playerMatch.match.player2,
+      player1Result: playerMatch.match.player1Result,
+      player2Result: playerMatch.match.player2Result,
+      winner: playerMatch.match.winner,
       currentWallet,
       opponentWallet,
       isFinal: playerMatch.round.roundNumber === bracket.length,
@@ -174,7 +177,10 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
       opponentSubmitted,
       stage,
       isCompleted,
-      champion
+      champion,
+      canShowSubmitButton: playerMatch.match.status !== 'completed' && 
+                           (playerMatch.match.status === 'in-progress' || playerMatch.match.status === 'ready') &&
+                           opponentWallet
     });
   } else {
     console.log('🔍 No active match found for player:', {
