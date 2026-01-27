@@ -373,9 +373,45 @@ export const submitTournamentMatchResult = async (
       return;
     }
     
+    // CRITICAL FIX: Auto-determine winner if player submitted "I lost" (concede)
+    // Same logic as standard challenges - if one player concedes, opponent wins automatically
+    if (!bothSubmitted && (match.player1Result === 'loss' || match.player2Result === 'loss')) {
+      // One player submitted loss - automatically mark opponent as winner
+      const opponentWallet = isPlayer1 ? match.player2 : match.player1;
+      const opponentResult = isPlayer1 ? match.player2Result : match.player1Result;
+      
+      if (opponentWallet && opponentResult === undefined) {
+        // Opponent hasn't submitted yet - automatically mark them as winner
+        console.log(`🎯 Player ${playerWallet.slice(0, 8)}... submitted loss - automatically marking ${opponentWallet.slice(0, 8)}... as winner`);
+        
+        // Add automatic win result for opponent
+        if (isPlayer1) {
+          match.player2Result = 'win';
+        } else {
+          match.player1Result = 'win';
+        }
+        
+        // Now both players have "submitted" (one manually, one auto), process completion
+        bothSubmitted = true;
+        console.log('✅ Auto-marked opponent as winner - processing match completion');
+      } else {
+        // Opponent already submitted or not found - just save and wait
+        const updates: any = {
+          'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
+          updatedAt: serverTimestamp(),
+        };
+        await updateDoc(challengeRef, updates);
+        console.log('✅ Match result submitted, waiting for opponent...', {
+          player1Result: match.player1Result,
+          player2Result: match.player2Result
+        });
+        return;
+      }
+    }
+    
     // If both players have submitted, we MUST process completion (even if duplicate call)
     if (!bothSubmitted) {
-      // Only one player has submitted - just save the result and wait
+      // Only one player has submitted (and didn't concede) - just save the result and wait
       const updates: any = {
         'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
         updatedAt: serverTimestamp(),
@@ -426,6 +462,11 @@ export const submitTournamentMatchResult = async (
     match.winner = winnerWallet;
     match.status = 'completed';
     match.completedAt = Timestamp.now();
+    
+    // CRITICAL: Ensure match was in-progress before completing (for UI consistency)
+    if (match.status !== 'in-progress' && match.status !== 'ready') {
+      console.warn('⚠️ Match status was not in-progress/ready before completion:', match.status);
+    }
 
     // Advance winner to next round
     const currentRound = bracket[currentRoundIndex];
@@ -447,17 +488,28 @@ export const submitTournamentMatchResult = async (
         }
       }
       
+      // Calculate prize pool for champion
+      const entryFee = data.entryFee || 0;
+      const totalPrize = entryFee * (data.maxPlayers || players.length);
+      const platformFee = totalPrize * 0.05;
+      const prizePool = totalPrize - platformFee;
+      
       const updates: any = {
         'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
         'tournament.champion': winnerWallet,
         'tournament.stage': 'completed',
         'status': 'completed',
+        'winner': winnerWallet,
+        'prizePool': prizePool,
         'canClaim': true, // Enable prize claiming for the champion
+        'needsPayout': true,
+        'payoutTriggered': false,
         updatedAt: serverTimestamp(),
       };
       
       await updateDoc(challengeRef, updates);
       console.log('✅ Tournament completed! Champion:', winnerWallet, '- Reward claiming enabled');
+      console.log('💰 Prize pool:', prizePool, 'USDFG');
       return;
     }
 
@@ -482,9 +534,15 @@ export const submitTournamentMatchResult = async (
       nextMatch.player2 = winnerWallet;
     }
 
-    // If both players are set, mark the next match as ready
+    // If both players are set, mark the next match as ready and activate it
     if (nextMatch.player1 && nextMatch.player2) {
       nextMatch.status = 'ready';
+      // If this is the current round being played, activate immediately
+      const nextRoundNumber = currentRound.roundNumber + 1;
+      if (nextRoundNumber === tournament.currentRound) {
+        nextMatch.status = 'in-progress';
+        nextMatch.startedAt = Timestamp.now();
+      }
     }
 
     // Check if all matches in current round are completed
