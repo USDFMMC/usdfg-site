@@ -599,9 +599,19 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
         Stage:{" "}
         <span className="font-semibold text-white">
           {stage === "round_in_progress"
-            ? currentRound === bracket.length
-              ? "Final running"
-              : `Round ${currentRound} running`
+            ? (() => {
+                // Check if we're in the final round by comparing currentRound to bracket length
+                // For 4 players: Round 1 (roundNumber=1), Final (roundNumber=2), bracket.length=2
+                const isFinalRound = currentRound === bracket.length;
+                // Also check if any match in the last round is active
+                const finalRound = bracket[bracket.length - 1];
+                const hasActiveFinalMatch = finalRound?.matches.some(m => 
+                  m.status === 'in-progress' || m.status === 'ready'
+                );
+                return isFinalRound || hasActiveFinalMatch
+                  ? "Final running"
+                  : `Round ${currentRound} running`;
+              })()
             : stage.replace(/_/g, " ")}
         </span>
       </div>
