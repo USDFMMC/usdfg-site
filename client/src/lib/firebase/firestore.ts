@@ -431,21 +431,12 @@ export const submitTournamentMatchResult = async (
       }
     }
     
-    // If player already submitted but match not completed, and auto-complete didn't trigger, just save and wait
-    if (existingResult !== undefined && !bothSubmitted) {
-      // Only this player submitted, nothing to do (auto-complete already checked above)
-      console.log('⚠️ Player already submitted result - waiting for opponent');
-      const updates: any = {
-        'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
-        updatedAt: serverTimestamp(),
-      };
-      await updateDoc(challengeRef, updates);
-      return;
-    }
+    // Re-check bothSubmitted after auto-complete (it may have changed)
+    const finalBothSubmitted = match.player1Result !== undefined && match.player2Result !== undefined;
     
-    // If both players have submitted, we MUST process completion (even if duplicate call)
-    if (!bothSubmitted) {
-      // Only one player has submitted (and didn't concede) - just save the result and wait
+    // If both players have submitted (either manually or via auto-complete), process completion
+    if (!finalBothSubmitted) {
+      // Only one player has submitted - just save the result and wait
       const updates: any = {
         'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
         updatedAt: serverTimestamp(),
@@ -470,7 +461,7 @@ export const submitTournamentMatchResult = async (
       }
     }
     
-    // CRITICAL: Both players have submitted - MUST process completion
+    // CRITICAL: Both players have submitted (either manually or via auto-complete) - MUST process completion
     console.log('✅ Both players submitted! Processing match completion...', {
       player1: match.player1,
       player2: match.player2,
