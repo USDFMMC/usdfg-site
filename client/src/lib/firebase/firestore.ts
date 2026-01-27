@@ -384,6 +384,18 @@ export const submitTournamentMatchResult = async (
         // Opponent hasn't submitted yet - automatically mark them as winner
         console.log(`🎯 Player ${playerWallet.slice(0, 8)}... submitted loss - automatically marking ${opponentWallet.slice(0, 8)}... as winner`);
         
+        // CRITICAL: Ensure match is in-progress before auto-completing
+        // This ensures the other player can see the match before it completes
+        if (match.status !== 'in-progress' && match.status !== 'ready' && match.status !== 'completed') {
+          if (match.player1 && match.player2) {
+            match.status = 'in-progress';
+            if (!match.startedAt) {
+              match.startedAt = Timestamp.now();
+            }
+            console.log('✅ Match status set to in-progress before auto-completion');
+          }
+        }
+        
         // Add automatic win result for opponent
         if (isPlayer1) {
           match.player2Result = 'win';
@@ -424,6 +436,18 @@ export const submitTournamentMatchResult = async (
       return;
     }
     
+    // CRITICAL: Ensure match is in-progress before processing completion
+    // This ensures both players can see the submit button before match completes
+    if (match.status !== 'in-progress' && match.status !== 'ready' && match.status !== 'completed') {
+      if (match.player1 && match.player2) {
+        match.status = 'in-progress';
+        if (!match.startedAt) {
+          match.startedAt = Timestamp.now();
+        }
+        console.log('✅ Match status set to in-progress before processing completion');
+      }
+    }
+    
     // CRITICAL: Both players have submitted - MUST process completion
     console.log('✅ Both players submitted! Processing match completion...', {
       player1: match.player1,
@@ -460,7 +484,7 @@ export const submitTournamentMatchResult = async (
 
     // CRITICAL: Ensure match is in-progress before completing (for UI consistency)
     // This ensures the submit button was visible to both players
-    if (match.status !== 'in-progress' && match.status !== 'ready') {
+    if (match.status !== 'in-progress' && match.status !== 'ready' && match.status !== 'completed') {
       console.warn('⚠️ Match status was not in-progress/ready before completion:', match.status);
       // Set to in-progress if it wasn't already (shouldn't happen, but safety check)
       if (match.player1 && match.player2) {
@@ -468,6 +492,7 @@ export const submitTournamentMatchResult = async (
         if (!match.startedAt) {
           match.startedAt = Timestamp.now();
         }
+        console.log('✅ Match status set to in-progress before completion');
       }
     }
     
@@ -542,7 +567,16 @@ export const submitTournamentMatchResult = async (
       nextMatch.player2 = winnerWallet;
     }
 
-    // If both players are set, mark the next match as ready and activate it
+    // Check if all matches in current round are completed
+    const allMatchesCompleted = currentRound.matches.every(m => m.status === 'completed');
+    
+    // Update tournament state
+    const updates: any = {
+      'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
+      updatedAt: serverTimestamp(),
+    };
+
+    // If both players are set in next match, mark it as ready and activate it
     if (nextMatch.player1 && nextMatch.player2) {
       nextMatch.status = 'ready';
       // If this is the current round being played, activate immediately
@@ -552,21 +586,14 @@ export const submitTournamentMatchResult = async (
         // This is the final round and currentRound hasn't been updated yet
         updates['tournament.currentRound'] = nextRoundNumber;
         updates['tournament.stage'] = 'round_in_progress';
+        console.log(`✅ Updated currentRound to final round: ${nextRoundNumber}`);
       }
       if (nextRoundNumber === tournament.currentRound || nextRoundNumber === bracket.length) {
         nextMatch.status = 'in-progress';
         nextMatch.startedAt = Timestamp.now();
+        console.log(`✅ Activated match in round ${nextRoundNumber} to in-progress`);
       }
     }
-
-    // Check if all matches in current round are completed
-    const allMatchesCompleted = currentRound.matches.every(m => m.status === 'completed');
-    
-    // Update tournament state
-    const updates: any = {
-      'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
-      updatedAt: serverTimestamp(),
-    };
 
     // If all matches in current round are done, advance to next round
     if (allMatchesCompleted) {
