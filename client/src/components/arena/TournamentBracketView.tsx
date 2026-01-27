@@ -599,7 +599,9 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
         Stage:{" "}
         <span className="font-semibold text-white">
           {stage === "round_in_progress"
-            ? `Round ${currentRound} running`
+            ? currentRound === bracket.length
+              ? "Final running"
+              : `Round ${currentRound} running`
             : stage.replace(/_/g, " ")}
         </span>
       </div>
