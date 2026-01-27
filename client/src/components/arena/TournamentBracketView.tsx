@@ -188,6 +188,18 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   }
   const isChampion = currentWallet && champion && currentWallet.toLowerCase() === champion.toLowerCase();
   
+  // Debug: Log tournament completion state
+  if (isCompleted || champion) {
+    console.log('🏆 Tournament completion state:', {
+      isCompleted,
+      champion: champion?.slice(0, 8),
+      currentWallet: currentWallet?.slice(0, 8),
+      isChampion,
+      stage,
+      canClaim: challenge?.canClaim || challenge?.rawData?.canClaim
+    });
+  }
+  
   // Check if reward can be claimed
   const canClaim = challenge?.canClaim || challenge?.rawData?.canClaim;
   const prizeClaimed = challenge?.prizeClaimed || challenge?.rawData?.prizeClaimed || challenge?.rawData?.prizeClaimedAt || challenge?.payoutTriggered;
