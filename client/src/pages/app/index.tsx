@@ -47,6 +47,7 @@ import ElegantButton from "@/components/ui/ElegantButton";
 import ElegantModal from "@/components/ui/ElegantModal";
 import CreateChallengeForm from "@/components/arena/CreateChallengeForm";
 import ElegantNavbar from "@/components/layout/ElegantNavbar";
+import LiveActivityTicker from "@/components/LiveActivityTicker";
 import LiveChallengesGrid from "@/components/arena/LiveChallengesGrid";
 // Lazy load heavy modals for better performance on all devices
 const SubmitResultRoom = lazy(() => import("@/components/arena/SubmitResultRoom").then(module => ({ default: module.SubmitResultRoom })));
@@ -3774,7 +3775,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         batch.forEach((target) => {
           tx.add(createTransferInstruction(payerAta, target.ata, payer, target.amountLamports));
         });
-        const { blockhash } = await connection.getLatestBlockhash();
+        // CRITICAL: Get fresh blockhash for each transaction to avoid "already processed" errors
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('finalized');
         tx.recentBlockhash = blockhash;
         tx.feePayer = payer;
         transactions.push(tx);
@@ -3785,10 +3787,35 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         : await Promise.all(transactions.map((tx) => signTransaction!(tx)));
 
       const signatures: string[] = [];
-      for (const signedTx of signedTransactions) {
-        const signature = await connection.sendRawTransaction(signedTx.serialize());
-        signatures.push(signature);
-        await connection.confirmTransaction(signature, 'confirmed');
+      for (let i = 0; i < signedTransactions.length; i++) {
+        const signedTx = signedTransactions[i];
+        try {
+          // Send transaction
+          const signature = await connection.sendRawTransaction(signedTx.serialize(), {
+            skipPreflight: false,
+            maxRetries: 3
+          });
+          signatures.push(signature);
+          
+          // Wait for confirmation with timeout
+          await Promise.race([
+            connection.confirmTransaction(signature, 'confirmed'),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Transaction confirmation timeout')), 30000)
+            )
+          ]);
+          
+          console.log(`✅ Transaction ${i + 1}/${signedTransactions.length} confirmed: ${signature}`);
+        } catch (error: any) {
+          // Check if transaction was already processed (might have succeeded)
+          if (error.message?.includes('already been processed') || error.message?.includes('already processed')) {
+            console.warn(`⚠️ Transaction ${i + 1} was already processed (may have succeeded):`, error);
+            // Try to get the signature from the error or continue
+            // The transaction might have actually succeeded
+            continue;
+          }
+          throw error;
+        }
       }
 
       const sentCount = transferTargets.length;
@@ -3812,7 +3839,18 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       alert(message);
     } catch (error: any) {
       console.error('❌ Airdrop failed:', error);
-      alert(`Airdrop failed: ${error.message || 'Unknown error'}`);
+      
+      // Check if error is "already processed" - transaction might have succeeded
+      if (error.message?.includes('already been processed') || error.message?.includes('already processed')) {
+        const message = `⚠️ Transaction was already processed. This usually means:\n\n` +
+          `1. The airdrop may have already succeeded\n` +
+          `2. Check your wallet transactions or Solana Explorer\n` +
+          `3. If rewards were sent, you can ignore this error\n\n` +
+          `If rewards were NOT sent, please try again.`;
+        alert(message);
+      } else {
+        alert(`Airdrop failed: ${error.message || 'Unknown error'}\n\nPlease check your wallet balance and try again.`);
+      }
     } finally {
       setIsAirdropping(false);
     }
@@ -3957,12 +3995,45 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Also exclude completed and disputed challenges from joinable list
       const isCompleted = challenge.status === 'completed' || challenge.status === 'disputed';
       
+      // Check if this is a completed Founder Tournament that admin should see
+      const isAdmin = publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+      const isFounderTournament = challenge.format === 'tournament' && 
+        challenge.creator?.toLowerCase() === ADMIN_WALLET.toString().toLowerCase() &&
+        (challenge.entryFee === 0 || challenge.entryFee < 0.000000001) &&
+        ((challenge.founderParticipantReward || 0) > 0 || (challenge.founderWinnerBonus || 0) > 0);
+      const isCompletedFounderTournament = isCompleted && isFounderTournament && challenge.tournament?.stage === 'completed';
+      const adminShouldSeeCompletedFounderTournament = isAdmin && isCompletedFounderTournament;
+      
+      // Debug logging for admin viewing challenges
+      if (isAdmin && challenge.format === 'tournament') {
+        console.log('🔍 Admin viewing tournament:', {
+          challengeId: challenge.id,
+          status: challenge.status,
+          stage: challenge.tournament?.stage,
+          isCompleted,
+          isFounderTournament,
+          isCompletedFounderTournament,
+          entryFee: challenge.entryFee,
+          founderParticipantReward: challenge.founderParticipantReward,
+          founderWinnerBonus: challenge.founderWinnerBonus,
+          creator: challenge.creator?.slice(0, 8),
+          adminWallet: ADMIN_WALLET.toString().slice(0, 8),
+          currentWallet: publicKey?.toString().slice(0, 8),
+          willShow: adminShouldSeeCompletedFounderTournament,
+          shouldShow: categoryMatch && gameMatch && (isJoinable || adminShouldSeeCompletedFounderTournament)
+        });
+      }
+      
       // Only show joinable challenges (unless user wants to see their own challenges)
+      // OR if admin viewing completed Founder Tournament (for payout)
       const isJoinable = !isExpired && !isCompleted;
       
       // If showing "My Challenges", show all their challenges regardless of status
+      // OR if admin viewing completed Founder Tournament
       // Otherwise, only show joinable challenges
-      const shouldShow = showMyChallenges ? (categoryMatch && gameMatch && myChallengesMatch) : (categoryMatch && gameMatch && isJoinable);
+      const shouldShow = showMyChallenges 
+        ? (categoryMatch && gameMatch && myChallengesMatch) 
+        : (categoryMatch && gameMatch && (isJoinable || adminShouldSeeCompletedFounderTournament));
       
       return shouldShow;
     });
@@ -4855,6 +4926,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             />
           </div>
         </ElegantNavbar>
+
+        {/* Live Activity Ticker */}
+        <LiveActivityTicker />
 
         {/* Elegant Notification */}
         <ElegantNotification
@@ -6373,6 +6447,44 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     isClaiming={claimingPrize === selectedChallenge.id}
                     isCreatorFunding={isCreatorFunding === selectedChallenge.id}
                     isJoinerFunding={isJoinerFunding === selectedChallenge.id}
+                    onPlayerClick={async (wallet: string) => {
+                      try {
+                        const playerStats = await getPlayerStats(wallet);
+                        if (playerStats) {
+                          setSelectedPlayer(playerStats);
+                          setShowPlayerProfile(true);
+                        } else {
+                          // Fallback: create minimal player object from wallet
+                          const fallbackPlayer: PlayerStats = {
+                            wallet,
+                            displayName: '',
+                            totalEarned: 0,
+                            totalWon: 0,
+                            totalLost: 0,
+                            winRate: 0,
+                            trustScore: 0,
+                            trustReviews: 0,
+                          };
+                          setSelectedPlayer(fallbackPlayer);
+                          setShowPlayerProfile(true);
+                        }
+                      } catch (error) {
+                        console.error('Error fetching player stats:', error);
+                        // Fallback: create minimal player object from wallet
+                        const fallbackPlayer: PlayerStats = {
+                          wallet,
+                          displayName: '',
+                          totalEarned: 0,
+                          totalWon: 0,
+                          totalLost: 0,
+                          winRate: 0,
+                          trustScore: 0,
+                          trustReviews: 0,
+                        };
+                        setSelectedPlayer(fallbackPlayer);
+                        setShowPlayerProfile(true);
+                      }
+                    }}
                   />
                 </RightSidePanel>
               )}

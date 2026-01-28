@@ -201,6 +201,24 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
     });
   }
   
+  // Debug: Log Founder Tournament payout UI visibility
+  if (isCompleted && isFounderTournament) {
+    console.log('🔍 Founder Tournament Payout UI Check:', {
+      isCompleted,
+      isFounderTournament,
+      isAdminViewer,
+      stage,
+      champion: champion?.slice(0, 8),
+      founderParticipantReward,
+      founderWinnerBonus,
+      uniqueParticipantsCount: uniqueParticipants.length,
+      onAirdropPayouts: !!onAirdropPayouts,
+      currentWallet: currentWallet?.slice(0, 8),
+      adminWallet: ADMIN_WALLET.toString().slice(0, 8),
+      willShowPayoutUI: isCompleted && isFounderTournament && isAdminViewer
+    });
+  }
+  
   // Check if reward can be claimed
   const canClaim = challenge?.canClaim || challenge?.rawData?.canClaim;
   const prizeClaimed = challenge?.prizeClaimed || challenge?.rawData?.prizeClaimed || challenge?.rawData?.prizeClaimedAt || challenge?.payoutTriggered;

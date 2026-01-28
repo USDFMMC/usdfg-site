@@ -97,20 +97,53 @@ export function useChallengeExpiry(challenges: any[]) {
 
         // Auto-cleanup completed challenges (delete after short retention window)
         if (challenge.status === "completed" && !archiveTimers.current.has(challenge.id) && !processedChallenges.current.has(challenge.id + '_cleanup_completed')) {
+          // Check if this is a Founder Tournament or Founder Challenge
+          const entryFee = challenge.entryFee || 0;
+          const isFree = entryFee === 0 || entryFee < 0.000000001;
+          const isTournament = challenge.format === 'tournament';
+          const founderParticipantReward = challenge.founderParticipantReward || 0;
+          const founderWinnerBonus = challenge.founderWinnerBonus || 0;
+          
+          // Import ADMIN_WALLET dynamically to check if creator is admin
+          let isFounderTournamentOrChallenge = false;
+          try {
+            const { ADMIN_WALLET } = await import("../lib/chain/config");
+            const creatorWallet = challenge.creator || '';
+            const isAdminCreator = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+            
+            // Check if Founder Tournament (tournament with founder rewards)
+            const isFounderTournament = isTournament && 
+              isAdminCreator && 
+              isFree && 
+              (founderParticipantReward > 0 || founderWinnerBonus > 0);
+            
+            // Check if Founder Challenge (non-tournament, no PDA, admin creator, free)
+            const isFounderChallenge = !isTournament && 
+              !challenge.pda && 
+              (isFree || isAdminCreator);
+            
+            isFounderTournamentOrChallenge = isFounderTournament || isFounderChallenge;
+          } catch (error) {
+            console.error("Error checking Founder status:", error);
+          }
+          
+          // Use 24 hours retention for Founder Tournaments/Challenges, 2 hours for others
+          const retentionHours = isFounderTournamentOrChallenge ? 24 : completedRetentionHours;
+          
           const completedTime = challenge.results ? 
             Math.max(...Object.values(challenge.results).map(r => r.submittedAt.toMillis())) : 
             challenge.createdAt.toMillis();
           
           const hoursSinceCompletion = (Date.now() - completedTime) / (1000 * 60 * 60);
           
-          if (hoursSinceCompletion >= completedRetentionHours) {
-            console.log(`🗑️ Found completed challenge that needs cleanup (${completedRetentionHours}h old):`, challenge.id);
+          if (hoursSinceCompletion >= retentionHours) {
+            console.log(`🗑️ Found completed challenge that needs cleanup (${retentionHours}h old):`, challenge.id);
             processedChallenges.current.add(challenge.id + '_cleanup_completed');
 
             setTimeout(async () => {
               try {
                 await cleanupCompletedChallenge(challenge.id);
-                console.log("🏁 Completed challenge cleaned up (24h old):", challenge.id);
+                console.log(`🏁 Completed challenge cleaned up (${retentionHours}h old):`, challenge.id);
                 processedChallenges.current.delete(challenge.id + '_cleanup_completed');
               } catch (error) {
                 console.error("❌ Failed to cleanup completed challenge:", error);

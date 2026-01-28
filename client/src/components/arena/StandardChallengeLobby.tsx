@@ -33,6 +33,7 @@ interface StandardChallengeLobbyProps {
   isClaiming?: boolean;
   isCreatorFunding?: boolean;
   isJoinerFunding?: boolean;
+  onPlayerClick?: (wallet: string) => void; // Callback when player wallet is clicked
 }
 
 const MAX_SPECTATORS = 69;
@@ -179,6 +180,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   isClaiming = false,
   isCreatorFunding = false,
   isJoinerFunding = false,
+  onPlayerClick,
 }) => {
   const [showSubmitForm, setShowSubmitForm] = useState(false);
   const [selectedResult, setSelectedResult] = useState<boolean | null>(null);
@@ -962,9 +964,14 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
               return (
                 <div
                   key={wallet}
-                  className={`flex items-center gap-2 p-1.5 rounded-md ${
+                  className={`flex items-center gap-2 p-1.5 rounded-md transition-colors ${
                     isCurrentUser ? 'bg-amber-500/10 border border-amber-400/30' : 'bg-white/5'
-                  }`}
+                  } ${onPlayerClick ? 'cursor-pointer hover:bg-white/10' : ''}`}
+                  onClick={() => {
+                    if (onPlayerClick) {
+                      onPlayerClick(wallet);
+                    }
+                  }}
                 >
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400/20 to-amber-600/20 border border-amber-400/30 flex items-center justify-center overflow-hidden flex-shrink-0">
                     {data.profileImage ? (
@@ -976,11 +983,11 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-semibold text-white truncate">
+                    <div className={`text-xs font-semibold truncate ${onPlayerClick ? 'text-white hover:text-amber-200' : 'text-white'}`}>
                       {displayName}
                       {isCurrentUser && <span className="ml-1.5 text-[10px] text-amber-300">(You)</span>}
                     </div>
-                    <div className="text-[10px] text-gray-400 truncate">
+                    <div className={`text-[10px] truncate ${onPlayerClick ? 'text-gray-400 hover:text-gray-300' : 'text-gray-400'}`}>
                       {wallet.slice(0, 6)}...{wallet.slice(-4)}
                     </div>
                   </div>
@@ -1005,9 +1012,14 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                 return (
                   <div
                     key={wallet}
-                    className={`flex items-center gap-2 p-1.5 rounded-md ${
+                    className={`flex items-center gap-2 p-1.5 rounded-md transition-colors ${
                       isCurrentUser ? 'bg-purple-500/10 border border-purple-400/30' : 'bg-white/5'
-                    }`}
+                    } ${onPlayerClick ? 'cursor-pointer hover:bg-white/10' : ''}`}
+                    onClick={() => {
+                      if (onPlayerClick) {
+                        onPlayerClick(wallet);
+                      }
+                    }}
                   >
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400/20 to-indigo-600/20 border border-purple-400/30 flex items-center justify-center overflow-hidden flex-shrink-0">
                       {data.profileImage ? (
@@ -1019,11 +1031,11 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-semibold text-white truncate">
+                      <div className={`text-xs font-semibold truncate ${onPlayerClick ? 'text-white hover:text-purple-200' : 'text-white'}`}>
                         {displayName}
                         {isCurrentUser && <span className="ml-1.5 text-[10px] text-purple-300">(You)</span>}
                       </div>
-                      <div className="text-[10px] text-gray-400 truncate">
+                      <div className={`text-[10px] truncate ${onPlayerClick ? 'text-gray-400 hover:text-gray-300' : 'text-gray-400'}`}>
                         {wallet.slice(0, 6)}...{wallet.slice(-4)}
                       </div>
                     </div>

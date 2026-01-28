@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import Navbar from "@/components/layout/navbar";
+import LiveActivityTicker from "@/components/LiveActivityTicker";
 import Footer from "@/components/layout/footer";
 import HeroSection from "@/components/home/hero-section";
 import AboutSection from "@/components/home/development-banner";
@@ -93,6 +94,7 @@ const Home: React.FC = () => {
       </Helmet>
 
       <Navbar />
+      <LiveActivityTicker />
       <main id="main-content" role="main" aria-label="Homepage Main Content" className="min-h-screen flex-1 relative overflow-hidden bg-[#07080C]">
         {/* Elite Background - Simplified */}
         <div className="fixed inset-0 -z-10 bg-[#07080C]">

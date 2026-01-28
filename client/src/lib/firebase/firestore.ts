@@ -558,7 +558,9 @@ export const submitTournamentMatchResult = async (
         'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
         'tournament.champion': winnerWallet,
         'tournament.stage': 'completed',
+        'tournament.completedAt': serverTimestamp(), // Record when tournament was completed
         'tournament.currentRound': bracket.length, // Ensure currentRound is set to final round
+        'tournament.completedAt': serverTimestamp(), // Record when tournament was completed
         'status': 'completed',
         'winner': winnerWallet,
         'prizePool': prizePool,
@@ -938,6 +940,7 @@ export const advanceBracketWinner = async (
         'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
         'tournament.champion': winnerWallet,
         'tournament.stage': 'completed',
+        'tournament.completedAt': serverTimestamp(), // Record when tournament was completed
         'status': 'completed',
         'canClaim': true, // Enable prize claiming for the champion
         updatedAt: serverTimestamp(),
@@ -2005,6 +2008,82 @@ export async function cleanupCompletedChallenge(id: string) {
         console.log('⚠️ Skipping cleanup of active tournament:', id);
         return; // Don't delete active tournaments
       }
+      
+      // Check if this is a Founder Tournament or Founder Challenge
+      const entryFee = data.entryFee || 0;
+      const isFree = entryFee === 0 || entryFee < 0.000000001;
+      const founderParticipantReward = data.founderParticipantReward || 0;
+      const founderWinnerBonus = data.founderWinnerBonus || 0;
+      
+      // Import ADMIN_WALLET to check if creator is admin
+      const { ADMIN_WALLET } = await import('../chain/config');
+      const creatorWallet = data.creator || '';
+      const isAdminCreator = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+      
+      // Check if Founder Tournament (tournament with founder rewards)
+      const isFounderTournament = isTournament && 
+        isAdminCreator && 
+        isFree && 
+        (founderParticipantReward > 0 || founderWinnerBonus > 0);
+      
+      // Check if Founder Challenge (non-tournament, no PDA, admin creator, free)
+      const isFounderChallenge = !isTournament && 
+        !data.pda && 
+        (isFree || isAdminCreator);
+      
+      const isFounderTournamentOrChallenge = isFounderTournament || isFounderChallenge;
+      
+      if (isFounderTournamentOrChallenge) {
+        // For Founder Tournaments/Challenges, check if 24 hours have passed
+        let completedTime: number;
+        
+        // For tournaments, check tournament completion time
+        if (isTournament && data.tournament?.stage === 'completed') {
+          // Try to get completion timestamp from tournament metadata
+          if (data.tournament.completedAt?.toMillis) {
+            completedTime = data.tournament.completedAt.toMillis();
+          } else if (typeof data.tournament.completedAt === 'number') {
+            completedTime = data.tournament.completedAt;
+          } else if (data.results) {
+            // Fallback: use latest result submission time
+            const resultTimes = Object.values(data.results).map((r: any) => {
+              if (r.submittedAt?.toMillis) return r.submittedAt.toMillis();
+              if (typeof r.submittedAt === 'number') return r.submittedAt;
+              return 0;
+            });
+            completedTime = Math.max(...resultTimes);
+          } else {
+            // Last resort: use createdAt (but this means it was just created, so don't delete)
+            completedTime = Date.now();
+          }
+        } else if (data.results) {
+          // For standard challenges, use results
+          const resultTimes = Object.values(data.results).map((r: any) => {
+            if (r.submittedAt?.toMillis) return r.submittedAt.toMillis();
+            if (typeof r.submittedAt === 'number') return r.submittedAt;
+            return 0;
+          });
+          completedTime = Math.max(...resultTimes);
+        } else {
+          // Fallback to createdAt
+          if (data.createdAt?.toMillis) {
+            completedTime = data.createdAt.toMillis();
+          } else if (typeof data.createdAt === 'number') {
+            completedTime = data.createdAt;
+          } else {
+            completedTime = Date.now(); // Fallback to now if no timestamp available
+          }
+        }
+        
+        const hoursSinceCompletion = (Date.now() - completedTime) / (1000 * 60 * 60);
+        
+        if (hoursSinceCompletion < 24) {
+          console.log(`⚠️ Skipping cleanup of Founder Tournament/Challenge (${hoursSinceCompletion.toFixed(1)}h old, need 24h):`, id);
+          return; // Don't delete Founder Tournaments/Challenges until 24 hours have passed
+        }
+        
+        console.log(`✅ Founder Tournament/Challenge is 24h+ old, proceeding with cleanup:`, id);
+      }
     }
     
     // First, clean up all chat messages for this challenge
@@ -2030,7 +2109,7 @@ export async function cleanupCompletedChallenge(id: string) {
   }
 }
 
-// Auto-cleanup for expired challenges (delete immediately)
+// Auto-cleanup for expired challenges (delete immediately, except Founder Tournaments/Challenges)
 export async function cleanupExpiredChallenge(id: string) {
   try {
     // CRITICAL: Double-check this is not an active tournament before deleting
@@ -2050,6 +2129,48 @@ export async function cleanupExpiredChallenge(id: string) {
       if (isActiveTournament) {
         console.log('⚠️ Skipping cleanup of active tournament:', id);
         return; // Don't delete active tournaments
+      }
+      
+      // Check if this is a Founder Tournament or Founder Challenge
+      const entryFee = data.entryFee || 0;
+      const isFree = entryFee === 0 || entryFee < 0.000000001;
+      const founderParticipantReward = data.founderParticipantReward || 0;
+      const founderWinnerBonus = data.founderWinnerBonus || 0;
+      
+      // Import ADMIN_WALLET to check if creator is admin
+      const { ADMIN_WALLET } = await import('../chain/config');
+      const creatorWallet = data.creator || '';
+      const isAdminCreator = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+      
+      // Check if Founder Tournament (tournament with founder rewards)
+      const isFounderTournament = isTournament && 
+        isAdminCreator && 
+        isFree && 
+        (founderParticipantReward > 0 || founderWinnerBonus > 0);
+      
+      // Check if Founder Challenge (non-tournament, no PDA, admin creator, free)
+      const isFounderChallenge = !isTournament && 
+        !data.pda && 
+        (isFree || isAdminCreator);
+      
+      const isFounderTournamentOrChallenge = isFounderTournament || isFounderChallenge;
+      
+      if (isFounderTournamentOrChallenge) {
+        // For Founder Tournaments/Challenges, check if 24 hours have passed since expiration
+        let expiredTime: number | null = null;
+        if (data.expiresAt?.toMillis) {
+          expiredTime = data.expiresAt.toMillis();
+        } else if (typeof data.expiresAt === 'number') {
+          expiredTime = data.expiresAt;
+        }
+        const hoursSinceExpiration = expiredTime ? (Date.now() - expiredTime) / (1000 * 60 * 60) : 0;
+        
+        if (hoursSinceExpiration < 24) {
+          console.log(`⚠️ Skipping cleanup of expired Founder Tournament/Challenge (${hoursSinceExpiration.toFixed(1)}h old, need 24h):`, id);
+          return; // Don't delete expired Founder Tournaments/Challenges until 24 hours have passed
+        }
+        
+        console.log(`✅ Expired Founder Tournament/Challenge is 24h+ old, proceeding with cleanup:`, id);
       }
     }
     
