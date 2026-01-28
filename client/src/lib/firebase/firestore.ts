@@ -346,7 +346,7 @@ export const submitTournamentMatchResult = async (
     }
 
     // Check if both players have submitted
-    const bothSubmitted = match.player1Result !== undefined && match.player2Result !== undefined;
+    let bothSubmitted = match.player1Result !== undefined && match.player2Result !== undefined;
     
     console.log('🔍 Submission check:', {
       matchId,

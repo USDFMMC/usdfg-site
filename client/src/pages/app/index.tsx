@@ -3566,6 +3566,18 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     setClaimingPrize(challenge.id);
 
     try {
+      // CRITICAL: Ensure tournament lobby is open if this is a tournament
+      const isTournament = challenge.format === 'tournament' || challenge.rawData?.format === 'tournament' || challenge.tournament;
+      if (isTournament && !showTournamentLobby) {
+        // Merge challenge data and open tournament lobby
+        const merged = mergeChallengeDataForModal(challenge, challenge);
+        setSelectedChallenge(merged);
+        setShowStandardLobby(false);
+        setShowTournamentLobby(true);
+        // Small delay to ensure lobby opens before showing review modal
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
       // Check if user has reviewed this challenge before allowing claim
       try {
         const hasReviewed = await hasUserReviewedChallenge(publicKey.toBase58(), challenge.id);
@@ -3573,6 +3585,19 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         if (!hasReviewed) {
           // User hasn't reviewed yet - show review modal first
           console.log('🎯 User tried to claim reward but hasn\'t reviewed yet - showing review modal');
+          
+          // Ensure challenge is selected and lobby is open
+          if (!selectedChallenge || selectedChallenge.id !== challenge.id) {
+            const merged = mergeChallengeDataForModal(challenge, challenge);
+            setSelectedChallenge(merged);
+            if (isTournament) {
+              setShowStandardLobby(false);
+              setShowTournamentLobby(true);
+            } else {
+              setShowTournamentLobby(false);
+              setShowStandardLobby(true);
+            }
+          }
           
           // Get players array - handle both rawData and challenge.players formats
           const playersArray = challenge.rawData?.players || (Array.isArray(challenge.players) ? challenge.players : []);
@@ -3589,8 +3614,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             autoWon: true,
             needsClaim: true // Flag to indicate they need to claim after review
           });
-          
-          setSelectedChallenge(challenge);
           
           // Show trust review modal (must review before claiming)
           setTrustReviewOpponent(opponentName);
@@ -3995,38 +4018,53 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Also exclude completed and disputed challenges from joinable list
       const isCompleted = challenge.status === 'completed' || challenge.status === 'disputed';
       
-      // Check if this is a completed Founder Tournament that admin should see
-      const isAdmin = publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
-      const isFounderTournament = challenge.format === 'tournament' && 
-        challenge.creator?.toLowerCase() === ADMIN_WALLET.toString().toLowerCase() &&
-        (challenge.entryFee === 0 || challenge.entryFee < 0.000000001) &&
-        ((challenge.founderParticipantReward || 0) > 0 || (challenge.founderWinnerBonus || 0) > 0);
-      const isCompletedFounderTournament = isCompleted && isFounderTournament && challenge.tournament?.stage === 'completed';
-      const adminShouldSeeCompletedFounderTournament = isAdmin && isCompletedFounderTournament;
-      
-      // Debug logging for admin viewing challenges
-      if (isAdmin && challenge.format === 'tournament') {
-        console.log('🔍 Admin viewing tournament:', {
-          challengeId: challenge.id,
-          status: challenge.status,
-          stage: challenge.tournament?.stage,
-          isCompleted,
-          isFounderTournament,
-          isCompletedFounderTournament,
-          entryFee: challenge.entryFee,
-          founderParticipantReward: challenge.founderParticipantReward,
-          founderWinnerBonus: challenge.founderWinnerBonus,
-          creator: challenge.creator?.slice(0, 8),
-          adminWallet: ADMIN_WALLET.toString().slice(0, 8),
-          currentWallet: publicKey?.toString().slice(0, 8),
-          willShow: adminShouldSeeCompletedFounderTournament,
-          shouldShow: categoryMatch && gameMatch && (isJoinable || adminShouldSeeCompletedFounderTournament)
-        });
-      }
-      
       // Only show joinable challenges (unless user wants to see their own challenges)
       // OR if admin viewing completed Founder Tournament (for payout)
       const isJoinable = !isExpired && !isCompleted;
+      
+      // Check if this is a completed Founder Tournament that admin should see
+      const isAdmin = publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+      
+      // Check format from both challenge and rawData
+      const challengeFormat = challenge.format || challenge.rawData?.format;
+      const isTournamentFormat = challengeFormat === 'tournament' || challenge.tournament || challenge.rawData?.tournament;
+      
+      // Check founder tournament properties from both challenge and rawData
+      const entryFee = challenge.entryFee ?? challenge.rawData?.entryFee ?? 0;
+      const founderParticipantReward = challenge.founderParticipantReward ?? challenge.rawData?.founderParticipantReward ?? 0;
+      const founderWinnerBonus = challenge.founderWinnerBonus ?? challenge.rawData?.founderWinnerBonus ?? 0;
+      const creatorWallet = challenge.creator ?? challenge.rawData?.creator ?? '';
+      const tournamentStage = challenge.tournament?.stage ?? challenge.rawData?.tournament?.stage;
+      
+      const isFounderTournament = isTournamentFormat && 
+        creatorWallet?.toLowerCase() === ADMIN_WALLET.toString().toLowerCase() &&
+        (entryFee === 0 || entryFee < 0.000000001) &&
+        (founderParticipantReward > 0 || founderWinnerBonus > 0);
+      
+      const isCompletedFounderTournament = isCompleted && isFounderTournament && tournamentStage === 'completed';
+      const adminShouldSeeCompletedFounderTournament = isAdmin && isCompletedFounderTournament;
+      
+      // Debug logging for admin viewing challenges
+      if (isAdmin && isTournamentFormat) {
+        console.log('🔍 Admin viewing tournament:', {
+          challengeId: challenge.id,
+          status: challenge.status,
+          stage: tournamentStage,
+          isCompleted,
+          isFounderTournament,
+          isCompletedFounderTournament,
+          entryFee,
+          founderParticipantReward,
+          founderWinnerBonus,
+          creator: creatorWallet?.slice(0, 8),
+          adminWallet: ADMIN_WALLET.toString().slice(0, 8),
+          currentWallet: publicKey?.toString().slice(0, 8),
+          willShow: adminShouldSeeCompletedFounderTournament,
+          shouldShow: categoryMatch && gameMatch && (isJoinable || adminShouldSeeCompletedFounderTournament),
+          format: challengeFormat,
+          hasTournament: !!challenge.tournament || !!challenge.rawData?.tournament
+        });
+      }
       
       // If showing "My Challenges", show all their challenges regardless of status
       // OR if admin viewing completed Founder Tournament
@@ -4839,6 +4877,46 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         <ElegantNavbar>
           {/* Desktop Only Buttons */}
           <div className="hidden md:flex items-center justify-center gap-3 h-10">
+            {/* Admin: Quick access to completed Founder Tournament */}
+            {publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase() && (
+              <button
+                onClick={async () => {
+                  // Find completed Founder Tournament
+                  const completedFounderTournament = firestoreChallenges.find((c: any) => {
+                    const format = c.format || c.rawData?.format;
+                    const isTournament = format === 'tournament' || c.tournament || c.rawData?.tournament;
+                    const creator = c.creator || c.rawData?.creator || '';
+                    const entryFee = c.entryFee ?? c.rawData?.entryFee ?? 0;
+                    const founderParticipantReward = c.founderParticipantReward ?? c.rawData?.founderParticipantReward ?? 0;
+                    const founderWinnerBonus = c.founderWinnerBonus ?? c.rawData?.founderWinnerBonus ?? 0;
+                    const stage = c.tournament?.stage ?? c.rawData?.tournament?.stage;
+                    const status = c.status || c.rawData?.status;
+                    
+                    return isTournament &&
+                      creator?.toLowerCase() === ADMIN_WALLET.toString().toLowerCase() &&
+                      (entryFee === 0 || entryFee < 0.000000001) &&
+                      (founderParticipantReward > 0 || founderWinnerBonus > 0) &&
+                      (status === 'completed' || status === 'disputed') &&
+                      stage === 'completed';
+                  });
+                  
+                  if (completedFounderTournament) {
+                    const merged = mergeChallengeDataForModal(completedFounderTournament, completedFounderTournament);
+                    setSelectedChallenge(merged);
+                    setShowStandardLobby(false);
+                    setShowTournamentLobby(true);
+                  } else {
+                    alert('No completed Founder Tournament found. Check Firestore or use direct URL: /app?challenge=eQIatd7tEHwTr9y08i9I');
+                  }
+                }}
+                className="flex items-center justify-center gap-2 px-3 py-2 h-10 bg-purple-600/50 hover:bg-purple-600/70 rounded-xl border border-purple-500/50 transition-all text-white text-xs font-semibold"
+                title="Open completed Founder Tournament for payout"
+              >
+                <span className="text-purple-200">🏆</span>
+                <span className="text-white">Founder Payout</span>
+              </button>
+            )}
+            
             <button
               onClick={() => {
                 if (hasActiveChallenge) {
