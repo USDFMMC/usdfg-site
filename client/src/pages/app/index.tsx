@@ -3976,9 +3976,34 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     const expiredIds: string[] = [];
     
     challenges.forEach(challenge => {
+      // CRITICAL: Never delete active tournaments or active challenges
+      const isTournament = challenge.format === 'tournament' || challenge.tournament;
+      const tournamentStage = challenge.tournament?.stage || challenge.rawData?.tournament?.stage;
+      const isActiveTournament = isTournament && (
+        tournamentStage === 'round_in_progress' || 
+        tournamentStage === 'awaiting_results' ||
+        challenge.status === 'active'
+      );
+      const isActiveChallenge = challenge.status === 'active';
+      
+      // Skip active tournaments and active challenges - never delete them
+      if (isActiveTournament || isActiveChallenge) {
+        return;
+      }
+      
+      // Only delete if expired AND not active
       const isExpired = challenge.status === 'cancelled' || 
         (challenge.expiresAt && challenge.expiresAt < now) ||
         (challenge.rawData?.expirationTimer && challenge.rawData.expirationTimer.toMillis() < now);
+      
+      // For tournaments, only delete if completed or cancelled
+      if (isTournament) {
+        const isCompleted = tournamentStage === 'completed' || challenge.status === 'completed';
+        const isCancelled = challenge.status === 'cancelled';
+        if (!isCompleted && !isCancelled) {
+          return; // Don't delete active or in-progress tournaments
+        }
+      }
       
       if (isExpired) {
         expiredIds.push(challenge.id);
@@ -6191,6 +6216,44 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     currentWallet={publicKey?.toString() || null}
                     challengeId={selectedChallenge.id}
                     onOpenSubmitResult={handleOpenTournamentSubmitResult}
+                    onPlayerClick={async (wallet: string) => {
+                      try {
+                        const playerStats = await getPlayerStats(wallet);
+                        if (playerStats) {
+                          setSelectedPlayer(playerStats);
+                          setShowPlayerProfile(true);
+                        } else {
+                          // Fallback: create minimal player object from wallet
+                          const fallbackPlayer: PlayerStats = {
+                            wallet,
+                            displayName: '',
+                            totalEarned: 0,
+                            totalWon: 0,
+                            totalLost: 0,
+                            winRate: 0,
+                            trustScore: 0,
+                            trustReviews: 0,
+                          };
+                          setSelectedPlayer(fallbackPlayer);
+                          setShowPlayerProfile(true);
+                        }
+                      } catch (error) {
+                        console.error('Error fetching player stats:', error);
+                        // Fallback: create minimal player object from wallet
+                        const fallbackPlayer: PlayerStats = {
+                          wallet,
+                          displayName: '',
+                          totalEarned: 0,
+                          totalWon: 0,
+                          totalLost: 0,
+                          winRate: 0,
+                          trustScore: 0,
+                          trustReviews: 0,
+                        };
+                        setSelectedPlayer(fallbackPlayer);
+                        setShowPlayerProfile(true);
+                      }
+                    }}
                     onJoinTournament={async (challengeId: string) => {
                       if (!publicKey) {
                         alert('Please connect your wallet first');

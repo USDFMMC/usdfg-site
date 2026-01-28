@@ -34,13 +34,36 @@ const CategoryDetailPage: React.FC = () => {
       } else if (categoryUpper === 'STRATEGY') {
         return gameCategory === 'BoardGames' || challengeCategory.includes('STRATEGY') || challengeCategory.includes('BOARDGAMES');
       } else if (categoryUpper === 'TOURNAMENTS') {
-        return challenge.format === 'tournament' || challenge.tournament === true;
+        // Check both direct properties and rawData for tournament format
+        // Challenges from Firestore have format/tournament at root level, not in rawData
+        const format = challenge.format || challenge.rawData?.format;
+        const hasTournament = challenge.tournament || challenge.rawData?.tournament;
+        
+        // Determine if it's a tournament: format === 'tournament' OR tournament object exists
+        const isTournament = format === 'tournament' || 
+                            (hasTournament === true) || 
+                            (typeof hasTournament === 'object' && hasTournament !== null && Object.keys(hasTournament).length > 0);
+        
+        // Debug logging for all challenges when filtering tournaments
+        if (categoryUpper === 'TOURNAMENTS') {
+          console.log('🔍 Checking challenge for tournament:', {
+            challengeId: challenge.id,
+            format,
+            hasTournament: !!hasTournament,
+            tournamentType: typeof hasTournament,
+            isTournament,
+            status: challenge.status || challenge.rawData?.status
+          });
+        }
+        
+        return isTournament;
       }
       
       return false;
     }).filter((challenge: any) => {
       // Only show active/pending challenges
-      const status = challenge.status?.toLowerCase() || '';
+      // Check both direct status and rawData.status
+      const status = (challenge.status || challenge.rawData?.status || '').toLowerCase();
       return status === 'active' || 
              status === 'pending_waiting_for_opponent' || 
              status === 'creator_confirmation_required' || 

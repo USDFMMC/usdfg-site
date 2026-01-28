@@ -33,6 +33,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   isClaiming = false,
   onAirdropPayouts,
   isAirdropping = false,
+  onPlayerClick,
 }) => {
 
   if (!tournament || !tournament.bracket?.length) {
@@ -44,19 +45,6 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   }
 
   const { bracket, currentRound, stage } = tournament;
-  
-  // CRITICAL FIX: If final round match has both players but status is "ready", 
-  // automatically treat it as "in-progress" for UI purposes (backend will fix it on next submit)
-  const finalRound = bracket[bracket.length - 1];
-  if (finalRound && currentRound <= bracket.length) {
-    for (const match of finalRound.matches) {
-      if (match.player1 && match.player2 && match.status === 'ready') {
-        // Temporarily treat as in-progress for UI - backend will fix on next submit
-        match.status = 'in-progress' as any;
-        console.log(`🔧 UI Fix: Treating final match ${match.id} as in-progress (was ready)`);
-      }
-    }
-  }
 
   const findMatchForPlayer = (wallet?: string | null) => {
     if (!wallet) return null;
@@ -112,9 +100,16 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
           status: match.status,
           matches: isPlayer1 || isPlayer2
         });
-        if ((isPlayer1 || isPlayer2) && match.status !== 'completed') {
-          console.log(`✅ Found match in round ${round.roundNumber}:`, match.id);
-          return { round, match };
+        // CRITICAL: Treat "ready" status as "in-progress" for final round matches with both players
+        // This allows submit button to show even if backend hasn't updated status yet
+        const effectiveStatus = (round.roundNumber === bracket.length && 
+                                 match.player1 && match.player2 && 
+                                 match.status === 'ready') ? 'in-progress' : match.status;
+        
+        if ((isPlayer1 || isPlayer2) && effectiveStatus !== 'completed') {
+          console.log(`✅ Found match in round ${round.roundNumber}:`, match.id, `(effective status: ${effectiveStatus})`);
+          // Return match with effective status for UI purposes
+          return { round, match: { ...match, status: effectiveStatus as any } };
         }
         if (isPlayer1 || isPlayer2) {
           console.log(`⚠️ Match found but status is 'completed':`, match.id, match.status);
@@ -324,7 +319,20 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
             Tournament Complete!
           </div>
           <div className="text-sm text-amber-100/90 mb-3">
-            Champion: <span className="font-semibold text-white">{champion.slice(0, 8)}...{champion.slice(-8)}</span>
+            Champion:{" "}
+            <span 
+              className={cn(
+                "font-semibold text-white",
+                onPlayerClick && "cursor-pointer hover:text-amber-200 underline transition-colors"
+              )}
+              onClick={() => {
+                if (onPlayerClick) {
+                  onPlayerClick(champion);
+                }
+              }}
+            >
+              {champion.slice(0, 8)}...{champion.slice(-8)}
+            </span>
           </div>
           {isChampion && (
             <div className="mt-4 p-3 rounded-lg bg-emerald-500/20 border border-emerald-400/40">
@@ -466,9 +474,22 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
           </div>
           <div className="mt-2 text-base font-semibold text-white">
             {playerMatch.round.roundNumber === bracket.length ? 'Final' : `Round ${playerMatch.round.roundNumber}`}:{" "}
-            {opponentWallet
-              ? `${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}`
-              : "Waiting for opponent"}
+            {opponentWallet ? (
+              <span
+                className={cn(
+                  onPlayerClick && "cursor-pointer hover:text-amber-200 underline transition-colors"
+                )}
+                onClick={() => {
+                  if (onPlayerClick) {
+                    onPlayerClick(opponentWallet);
+                  }
+                }}
+              >
+                {`${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}`}
+              </span>
+            ) : (
+              "Waiting for opponent"
+            )}
           </div>
           <p className="mt-1 text-xs text-amber-100/80">
             {playerMatch.round.roundNumber === bracket.length 
@@ -586,8 +607,14 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
                         "flex h-8 items-center justify-between rounded-lg border px-3 text-xs font-semibold",
                         isCurrent
                           ? "border-amber-400/50 bg-amber-400/10 text-amber-200"
-                          : "border-white/10 bg-white/5 text-white"
+                          : "border-white/10 bg-white/5 text-white",
+                        onPlayerClick && "cursor-pointer hover:bg-white/10 transition-colors"
                       )}
+                      onClick={() => {
+                        if (onPlayerClick) {
+                          onPlayerClick(slot);
+                        }
+                      }}
                     >
                       <span className="truncate">{`${slot.slice(
                         0,
@@ -634,7 +661,17 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
                     </div>
 
                     {match.winner && (
-                      <div className="mt-3 rounded-lg bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-300">
+                      <div 
+                        className={cn(
+                          "mt-3 rounded-lg bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-300",
+                          onPlayerClick && "cursor-pointer hover:bg-emerald-500/20 transition-colors"
+                        )}
+                        onClick={() => {
+                          if (onPlayerClick) {
+                            onPlayerClick(match.winner!);
+                          }
+                        }}
+                      >
                         Winner:{" "}
                         <span className="font-semibold">
                           {`${match.winner.slice(0, 4)}...${match.winner.slice(

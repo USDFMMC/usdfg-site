@@ -303,10 +303,13 @@ export const submitTournamentMatchResult = async (
       for (let matchIdx = 0; matchIdx < round.matches.length; matchIdx++) {
         const m = round.matches[matchIdx];
         if (m.id === matchId) {
-          match = m;
+          // Create a mutable copy to avoid const assignment issues
+          match = { ...m };
           matchFound = true;
           currentRoundIndex = roundIdx;
           matchIndex = matchIdx;
+          // Update the bracket array with the mutable match
+          bracket[roundIdx].matches[matchIdx] = match;
           break;
         }
       }
@@ -429,6 +432,11 @@ export const submitTournamentMatchResult = async (
         });
         return;
       }
+    }
+    
+    // Update the bracket array with the modified match before re-checking
+    if (matchFound && currentRoundIndex >= 0 && matchIndex >= 0) {
+      bracket[currentRoundIndex].matches[matchIndex] = match;
     }
     
     // Re-check bothSubmitted after auto-complete (it may have changed)
@@ -1979,6 +1987,26 @@ export async function addChallengeDoc(data: any) {
 // Auto-cleanup for completed challenges (delete after short retention window)
 export async function cleanupCompletedChallenge(id: string) {
   try {
+    // CRITICAL: Double-check this is not an active tournament before deleting
+    const challengeRef = doc(db, "challenges", id);
+    const challengeSnap = await getDoc(challengeRef);
+    
+    if (challengeSnap.exists()) {
+      const data = challengeSnap.data() as ChallengeData;
+      const isTournament = data.format === 'tournament' || data.tournament;
+      const tournamentStage = data.tournament?.stage;
+      const isActiveTournament = isTournament && (
+        tournamentStage === 'round_in_progress' || 
+        tournamentStage === 'awaiting_results' ||
+        data.status === 'active'
+      );
+      
+      if (isActiveTournament) {
+        console.log('⚠️ Skipping cleanup of active tournament:', id);
+        return; // Don't delete active tournaments
+      }
+    }
+    
     // First, clean up all chat messages for this challenge
     console.log('🗑️ Cleaning up chat messages for challenge:', id);
     const chatQuery = query(
@@ -1994,8 +2022,7 @@ export async function cleanupCompletedChallenge(id: string) {
     await Promise.all(chatDeletePromises);
     console.log(`🗑️ Deleted ${chatSnapshot.size} chat messages for challenge:`, id);
     
-    // Then delete the challenge document
-    const challengeRef = doc(db, "challenges", id);
+    // Then delete the challenge document (reuse challengeRef from above)
     await deleteDoc(challengeRef);
     console.log('🗑️ Completed challenge cleaned up:', id);
   } catch (error) {
@@ -2006,6 +2033,26 @@ export async function cleanupCompletedChallenge(id: string) {
 // Auto-cleanup for expired challenges (delete immediately)
 export async function cleanupExpiredChallenge(id: string) {
   try {
+    // CRITICAL: Double-check this is not an active tournament before deleting
+    const challengeRef = doc(db, "challenges", id);
+    const challengeSnap = await getDoc(challengeRef);
+    
+    if (challengeSnap.exists()) {
+      const data = challengeSnap.data() as ChallengeData;
+      const isTournament = data.format === 'tournament' || data.tournament;
+      const tournamentStage = data.tournament?.stage;
+      const isActiveTournament = isTournament && (
+        tournamentStage === 'round_in_progress' || 
+        tournamentStage === 'awaiting_results' ||
+        data.status === 'active'
+      );
+      
+      if (isActiveTournament) {
+        console.log('⚠️ Skipping cleanup of active tournament:', id);
+        return; // Don't delete active tournaments
+      }
+    }
+    
     console.log('🗑️ Starting complete cleanup for expired challenge:', id);
     
     // 1. Clean up all chat messages for this challenge
@@ -2050,8 +2097,7 @@ export async function cleanupExpiredChallenge(id: string) {
       console.log('ℹ️ No challenge notifications to delete for challenge:', id);
     }
     
-    // 4. Finally, delete the challenge document itself
-    const challengeRef = doc(db, "challenges", id);
+    // 4. Finally, delete the challenge document itself (reuse challengeRef from above)
     await deleteDoc(challengeRef);
     console.log('✅ Expired challenge and all related data cleaned up:', id);
   } catch (error) {

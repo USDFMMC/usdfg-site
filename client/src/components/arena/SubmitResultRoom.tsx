@@ -14,7 +14,7 @@ interface SubmitResultRoomProps {
   isSubmitting?: boolean;
 }
 
-export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = memo(({
+const SubmitResultRoomComponent: React.FC<SubmitResultRoomProps> = ({
   isOpen,
   onClose,
   challengeId,
@@ -356,5 +356,7 @@ export const SubmitResultRoom: React.FC<SubmitResultRoomProps> = memo(({
       )}
     </AnimatePresence>
   );
-});
+};
+
+export const SubmitResultRoom = memo(SubmitResultRoomComponent);
 
