@@ -4414,15 +4414,31 @@ export async function claimChallengePrize(
       throw new Error('❌ No valid winner to pay out');
     }
     
-    // Check if this is a Founder Challenge (no PDA, entryFee is 0, creator is ADMIN_WALLET)
+    // Check if this is a Founder Tournament (admin-created tournament with 0 entry fee and founder rewards)
     const entryFee = data.entryFee || 0;
     const creatorWallet = data.creator || '';
     const isFree = entryFee === 0 || entryFee < 0.000000001;
+    const isTournament = data.format === 'tournament';
     
     // Import ADMIN_WALLET to check if creator is admin
     const { ADMIN_WALLET } = await import('../chain/config');
-    const isAdmin = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
-    const isFounderChallenge = !data.pda && (isFree || isAdmin);
+    const isAdminCreator = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+    const founderParticipantReward = data.founderParticipantReward || 0;
+    const founderWinnerBonus = data.founderWinnerBonus || 0;
+    
+    // Check if this is specifically a Founder Tournament (not a regular Founder Challenge)
+    const isFounderTournament = isTournament && 
+      isAdminCreator && 
+      isFree && 
+      (founderParticipantReward > 0 || founderWinnerBonus > 0);
+    
+    if (isFounderTournament) {
+      // Founder Tournament rewards are distributed by the platform after the tournament concludes
+      throw new Error('🏆 This is a Founder Tournament. Rewards are distributed by the platform after the tournament concludes. No action is required from you.');
+    }
+    
+    // Check if this is a regular Founder Challenge (non-tournament)
+    const isFounderChallenge = !data.pda && (isFree || isAdminCreator);
     
     if (isFounderChallenge) {
       // Founder Challenge rewards are transferred manually by the founder, not via smart contract
