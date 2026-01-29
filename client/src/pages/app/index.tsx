@@ -4980,20 +4980,54 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             
           </div>
 
-          {/* Mobile Only - Wallet */}
+          {/* Mobile Only - Admin Founder Payout + Wallet */}
           <div className="flex md:hidden items-center gap-2">
+            {publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase() && (
+              <button
+                onClick={async () => {
+                  const completedFounderTournament = firestoreChallenges.find((c: any) => {
+                    const format = c.format || c.rawData?.format;
+                    const isTournament = format === 'tournament' || c.tournament || c.rawData?.tournament;
+                    const creator = (c.creator || c.rawData?.creator) ?? '';
+                    const entryFee = c.entryFee ?? c.rawData?.entryFee ?? 0;
+                    const founderParticipantReward = c.founderParticipantReward ?? c.rawData?.founderParticipantReward ?? 0;
+                    const founderWinnerBonus = c.founderWinnerBonus ?? c.rawData?.founderWinnerBonus ?? 0;
+                    const stage = c.tournament?.stage ?? c.rawData?.tournament?.stage;
+                    const status = c.status || c.rawData?.status;
+                    return isTournament &&
+                      creator?.toLowerCase() === ADMIN_WALLET.toString().toLowerCase() &&
+                      (entryFee === 0 || entryFee < 0.000000001) &&
+                      (founderParticipantReward > 0 || founderWinnerBonus > 0) &&
+                      (status === 'completed' || status === 'disputed') &&
+                      stage === 'completed';
+                  });
+                  if (completedFounderTournament) {
+                    const merged = mergeChallengeDataForModal(completedFounderTournament, completedFounderTournament);
+                    setSelectedChallenge(merged);
+                    setShowStandardLobby(false);
+                    setShowTournamentLobby(true);
+                  } else {
+                    alert('No completed Founder Tournament found. Check Firestore or use direct URL: /app?challenge=eQIatd7tEHwTr9y08i9I');
+                  }
+                }}
+                className="flex items-center justify-center gap-1.5 px-2.5 py-2 h-9 bg-purple-600/50 hover:bg-purple-600/70 rounded-xl border border-purple-500/50 transition-all text-white text-xs font-semibold shrink-0"
+                title="Founder Payout – Open completed Founder Tournament"
+                aria-label="Founder Payout"
+              >
+                <span className="text-purple-200">🏆</span>
+                <span>Payout</span>
+              </button>
+            )}
             <WalletConnectSimple 
               isConnected={isConnected}
               onConnect={() => {
                 localStorage.setItem('wallet_connected', 'true');
-                // Force state update
                 setPhantomConnectionState(prev => ({ ...prev }));
               }}
               onDisconnect={() => {
                 localStorage.removeItem('wallet_connected');
                 localStorage.removeItem('wallet_address');
                 clearPhantomConnectionState();
-                // Force state update
                 setPhantomConnectionState({ connected: false, publicKey: null });
               }}
               compact={true}
@@ -5454,18 +5488,31 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                               <DiscoveryCard 
                                 challenge={challenge}
                                 onSelect={async () => {
-                                  // Don't open join modal for completed, expired, or disputed challenges
                                   const isExpired = challenge.status === 'cancelled' || 
                                     (challenge.expiresAt && challenge.expiresAt < Date.now()) ||
                                     (challenge.rawData?.expirationTimer && challenge.rawData.expirationTimer.toMillis() < Date.now());
-                                  
-                                  if (challenge.status === "completed" || 
-                                      challenge.status === "disputed" || 
-                                      challenge.rawData?.payoutTriggered ||
-                                      isExpired) {
-                                    return;
+                                  if (isExpired) return;
+
+                                  const isCompletedOrDisputed = challenge.status === "completed" || challenge.status === "disputed";
+                                  const payoutTriggered = !!challenge.rawData?.payoutTriggered;
+                                  if (isCompletedOrDisputed || payoutTriggered) {
+                                    // Allow admin to open completed Founder Tournament for payout
+                                    const creator = (challenge.creator ?? challenge.rawData?.creator) ?? '';
+                                    const isAdmin = !!publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+                                    const fmt = challenge.format || challenge.rawData?.format;
+                                    const isTournament = fmt === 'tournament' || !!challenge.tournament || !!challenge.rawData?.tournament;
+                                    const fee = challenge.entryFee ?? challenge.rawData?.entryFee ?? 0;
+                                    const founderPart = challenge.founderParticipantReward ?? challenge.rawData?.founderParticipantReward ?? 0;
+                                    const founderWin = challenge.founderWinnerBonus ?? challenge.rawData?.founderWinnerBonus ?? 0;
+                                    const stage = challenge.tournament?.stage ?? challenge.rawData?.tournament?.stage;
+                                    const isCompletedFounder = isTournament &&
+                                      creator?.toLowerCase() === ADMIN_WALLET.toString().toLowerCase() &&
+                                      (fee === 0 || fee < 1e-9) &&
+                                      (founderPart > 0 || founderWin > 0) &&
+                                      stage === 'completed';
+                                    if (!(isAdmin && isCompletedFounder)) return;
                                   }
-                                  
+
                                   // Check if this is a team challenge with teamOnly restriction
                                   const challengeType = challenge.rawData?.challengeType;
                                   const teamOnly = challenge.rawData?.teamOnly;
