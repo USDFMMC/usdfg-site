@@ -5,6 +5,109 @@ import { VoiceChat } from "./VoiceChat";
 import { ChatBox } from "./ChatBox";
 import { ADMIN_WALLET } from "@/lib/chain/config";
 
+/** Inner component for payout buttons to avoid TDZ / closure order issues in minified build */
+function FounderPayoutButtons({
+  uniqueParticipants,
+  founderParticipantReward,
+  founderWinnerBonus,
+  champion,
+  challenge,
+  onAirdropPayouts,
+  isAirdropping,
+}: {
+  uniqueParticipants: string[];
+  founderParticipantReward: number;
+  founderWinnerBonus: number;
+  champion: string | undefined;
+  challenge: any;
+  onAirdropPayouts?: (recipients: { wallet: string; amount: number }[], challenge: any) => Promise<void>;
+  isAirdropping?: boolean;
+}) {
+  function buildParticipantCsv() {
+    if (founderParticipantReward <= 0 || uniqueParticipants.length === 0) return "";
+    const rows = [["wallet", "amount"]];
+    uniqueParticipants.forEach((wallet) => {
+      rows.push([wallet, founderParticipantReward.toString()]);
+    });
+    return rows.map((row) => row.join(",")).join("\n");
+  }
+  function buildWinnerCsv() {
+    if (!champion || founderWinnerBonus <= 0) return "";
+    return `wallet,amount\n${champion},${founderWinnerBonus}`;
+  }
+  function buildCombinedCsv() {
+    if (uniqueParticipants.length === 0) return "";
+    const rows = [["wallet", "amount"]];
+    uniqueParticipants.forEach((wallet) => {
+      let amount = founderParticipantReward > 0 ? founderParticipantReward : 0;
+      if (champion && wallet.toLowerCase() === champion.toLowerCase()) {
+        amount += founderWinnerBonus > 0 ? founderWinnerBonus : 0;
+      }
+      if (amount > 0) rows.push([wallet, amount.toString()]);
+    });
+    return rows.map((row) => row.join(",")).join("\n");
+  }
+  function buildCombinedRecipients() {
+    if (uniqueParticipants.length === 0) return [];
+    return uniqueParticipants
+      .map((wallet) => {
+        let amount = founderParticipantReward > 0 ? founderParticipantReward : 0;
+        if (champion && wallet.toLowerCase() === champion.toLowerCase()) {
+          amount += founderWinnerBonus > 0 ? founderWinnerBonus : 0;
+        }
+        return { wallet, amount };
+      })
+      .filter((entry) => entry.amount > 0);
+  }
+  async function copyCsv(csv: string, label: string) {
+    if (!csv) {
+      alert("No payout data available yet.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(csv);
+      alert(`${label} copied to clipboard.`);
+    } catch {
+      window.prompt(`Copy ${label} below:`, csv);
+    }
+  }
+  return (
+    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      <button
+        onClick={() => copyCsv(buildCombinedCsv(), "Combined payout CSV")}
+        className="rounded-lg border border-purple-300/40 bg-purple-500/20 px-3 py-2 text-xs font-semibold text-purple-100 hover:bg-purple-500/30"
+      >
+        Copy Combined CSV
+      </button>
+      {founderParticipantReward > 0 && (
+        <button
+          onClick={() => copyCsv(buildParticipantCsv(), "Participant CSV")}
+          className="rounded-lg border border-purple-300/40 bg-purple-500/20 px-3 py-2 text-xs font-semibold text-purple-100 hover:bg-purple-500/30"
+        >
+          Copy Participant CSV
+        </button>
+      )}
+      {founderWinnerBonus > 0 && champion && (
+        <button
+          onClick={() => copyCsv(buildWinnerCsv(), "Winner bonus CSV")}
+          className="rounded-lg border border-purple-300/40 bg-purple-500/20 px-3 py-2 text-xs font-semibold text-purple-100 hover:bg-purple-500/30"
+        >
+          Copy Winner Bonus CSV
+        </button>
+      )}
+      {onAirdropPayouts && (
+        <button
+          onClick={() => onAirdropPayouts(buildCombinedRecipients(), challenge)}
+          disabled={isAirdropping}
+          className="rounded-lg border border-purple-300/40 bg-purple-500/20 px-3 py-2 text-xs font-semibold text-purple-100 hover:bg-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isAirdropping ? "Sending Airdrop..." : "Send Airdrop Now"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 interface TournamentBracketViewProps {
   tournament?: TournamentState;
   players?: string[];
@@ -18,6 +121,7 @@ interface TournamentBracketViewProps {
   isClaiming?: boolean; // Whether claim is in progress
   onAirdropPayouts?: (recipients: { wallet: string; amount: number }[], challenge: any) => Promise<void>;
   isAirdropping?: boolean;
+  onPlayerClick?: (wallet: string) => void;
 }
 
 const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
@@ -34,7 +138,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   onAirdropPayouts,
   isAirdropping = false,
   onPlayerClick,
-}) => {
+}: TournamentBracketViewProps) => {
 
   if (!tournament || !tournament.bracket?.length) {
     return (
@@ -46,7 +150,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
 
   const { bracket, currentRound, stage } = tournament;
 
-  const findMatchForPlayer = (wallet?: string | null) => {
+  function findMatchForPlayer(wallet?: string | null) {
     if (!wallet) return null;
     const lower = wallet.toLowerCase();
     
@@ -119,7 +223,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
     
     console.log('❌ No match found for player');
     return null;
-  };
+  }
 
   const playerMatch = findMatchForPlayer(currentWallet);
   const opponentWallet =
@@ -201,24 +305,6 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
     });
   }
   
-  // Debug: Log Founder Tournament payout UI visibility
-  if (isCompleted && isFounderTournament) {
-    console.log('🔍 Founder Tournament Payout UI Check:', {
-      isCompleted,
-      isFounderTournament,
-      isAdminViewer,
-      stage,
-      champion: champion?.slice(0, 8),
-      founderParticipantReward,
-      founderWinnerBonus,
-      uniqueParticipantsCount: uniqueParticipants.length,
-      onAirdropPayouts: !!onAirdropPayouts,
-      currentWallet: currentWallet?.slice(0, 8),
-      adminWallet: ADMIN_WALLET.toString().slice(0, 8),
-      willShowPayoutUI: isCompleted && isFounderTournament && isAdminViewer
-    });
-  }
-  
   // Check if reward can be claimed
   const canClaim = challenge?.canClaim || challenge?.rawData?.canClaim;
   const prizeClaimed = challenge?.prizeClaimed || challenge?.rawData?.prizeClaimed || challenge?.rawData?.prizeClaimedAt || challenge?.payoutTriggered;
@@ -265,68 +351,23 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
     return Array.from(map.values());
   })();
 
-  const buildParticipantCsv = () => {
-    if (founderParticipantReward <= 0 || uniqueParticipants.length === 0) {
-      return '';
-    }
-    const rows = [['wallet', 'amount']];
-    uniqueParticipants.forEach((wallet) => {
-      rows.push([wallet, founderParticipantReward.toString()]);
+  // Debug: Log Founder Tournament payout UI visibility (moved after all variable declarations)
+  if (isCompleted && isFounderTournament) {
+    console.log('🔍 Founder Tournament Payout UI Check:', {
+      isCompleted,
+      isFounderTournament,
+      isAdminViewer,
+      stage,
+      champion: champion?.slice(0, 8),
+      founderParticipantReward,
+      founderWinnerBonus,
+      uniqueParticipantsCount: uniqueParticipants.length,
+      onAirdropPayouts: !!onAirdropPayouts,
+      currentWallet: currentWallet?.slice(0, 8),
+      adminWallet: ADMIN_WALLET.toString().slice(0, 8),
+      willShowPayoutUI: isCompleted && isFounderTournament && isAdminViewer
     });
-    return rows.map((row) => row.join(',')).join('\n');
-  };
-
-  const buildWinnerCsv = () => {
-    if (!champion || founderWinnerBonus <= 0) {
-      return '';
-    }
-    return `wallet,amount\n${champion},${founderWinnerBonus}`;
-  };
-
-  const buildCombinedCsv = () => {
-    if (uniqueParticipants.length === 0) {
-      return '';
-    }
-    const rows = [['wallet', 'amount']];
-    uniqueParticipants.forEach((wallet) => {
-      let amount = founderParticipantReward > 0 ? founderParticipantReward : 0;
-      if (champion && wallet.toLowerCase() === champion.toLowerCase()) {
-        amount += founderWinnerBonus > 0 ? founderWinnerBonus : 0;
-      }
-      if (amount > 0) {
-        rows.push([wallet, amount.toString()]);
-      }
-    });
-    return rows.map((row) => row.join(',')).join('\n');
-  };
-
-  const buildCombinedRecipients = () => {
-    if (uniqueParticipants.length === 0) {
-      return [];
-    }
-    return uniqueParticipants
-      .map((wallet) => {
-        let amount = founderParticipantReward > 0 ? founderParticipantReward : 0;
-        if (champion && wallet.toLowerCase() === champion.toLowerCase()) {
-          amount += founderWinnerBonus > 0 ? founderWinnerBonus : 0;
-        }
-        return { wallet, amount };
-      })
-      .filter((entry) => entry.amount > 0);
-  };
-
-  const copyCsv = async (csv: string, label: string) => {
-    if (!csv) {
-      alert('No payout data available yet.');
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(csv);
-      alert(`${label} copied to clipboard.`);
-    } catch {
-      window.prompt(`Copy ${label} below:`, csv);
-    }
-  };
+  }
 
   return (
     <div className="space-y-4">
@@ -401,39 +442,15 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
           <div className="mt-2 text-xs text-purple-100/80">
             Participants: {uniqueParticipants.length} · Participant Reward: {founderParticipantReward} USDFG · Winner Bonus: {founderWinnerBonus} USDFG
           </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <button
-              onClick={() => copyCsv(buildCombinedCsv(), 'Combined payout CSV')}
-              className="rounded-lg border border-purple-300/40 bg-purple-500/20 px-3 py-2 text-xs font-semibold text-purple-100 hover:bg-purple-500/30"
-            >
-              Copy Combined CSV
-            </button>
-            {founderParticipantReward > 0 && (
-              <button
-                onClick={() => copyCsv(buildParticipantCsv(), 'Participant CSV')}
-                className="rounded-lg border border-purple-300/40 bg-purple-500/20 px-3 py-2 text-xs font-semibold text-purple-100 hover:bg-purple-500/30"
-              >
-                Copy Participant CSV
-              </button>
-            )}
-            {founderWinnerBonus > 0 && champion && (
-              <button
-                onClick={() => copyCsv(buildWinnerCsv(), 'Winner bonus CSV')}
-                className="rounded-lg border border-purple-300/40 bg-purple-500/20 px-3 py-2 text-xs font-semibold text-purple-100 hover:bg-purple-500/30"
-              >
-                Copy Winner Bonus CSV
-              </button>
-            )}
-            {onAirdropPayouts && (
-              <button
-                onClick={() => onAirdropPayouts(buildCombinedRecipients(), challenge)}
-                disabled={isAirdropping}
-                className="rounded-lg border border-purple-300/40 bg-purple-500/20 px-3 py-2 text-xs font-semibold text-purple-100 hover:bg-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isAirdropping ? 'Sending Airdrop...' : 'Send Airdrop Now'}
-              </button>
-            )}
-          </div>
+          <FounderPayoutButtons
+            uniqueParticipants={uniqueParticipants}
+            founderParticipantReward={founderParticipantReward}
+            founderWinnerBonus={founderWinnerBonus}
+            champion={champion}
+            challenge={challenge}
+            onAirdropPayouts={onAirdropPayouts}
+            isAirdropping={isAirdropping}
+          />
         </div>
       )}
 

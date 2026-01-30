@@ -6,7 +6,8 @@ import CountryFlagPicker from "../ui/CountryFlagPicker";
 import ElegantButton from "@/components/ui/ElegantButton";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "../ui/tooltip";
 import { USDFG_RELICS, getUnlockedTrophies, getNextTrophy, getTrophyProgress, getTrophyColorClass, checkPlayerHasOgFirst1k, checkPlayerHasFounderChallenge } from "@/lib/trophies";
-import { getTeamByMember, joinTeam, leaveTeam, removeTeamMember, TeamStats } from "@/lib/firebase/firestore";
+import { getTeamByMember, joinTeam, leaveTeam, removeTeamMember, TeamStats, getPlayerEarningsByChallenge, type PlayerEarningByChallenge } from "@/lib/firebase/firestore";
+import { MOCK_EARNINGS_BY_CHALLENGE } from "@/lib/mock/earningsByChallenge";
 
 // Countries list for flag display - matches CountryFlagPicker
 const countries = [
@@ -254,34 +255,43 @@ export default function PlayerProfileModal({
   const [isRemovingFromTeam, setIsRemovingFromTeam] = useState(false);
   const [teamActionError, setTeamActionError] = useState<string | null>(null);
   const [teamActionSuccess, setTeamActionSuccess] = useState<string | null>(null);
-  
-  // No mock data - use real data from Firestore
+  const [earningsByChallenge, setEarningsByChallenge] = useState<PlayerEarningByChallenge[]>([]);
+  const [loadingEarnings, setLoadingEarnings] = useState(false);
 
-  // Check special trophies and team info when modal opens
+  const wallet = player.wallet || player.address;
+
+  // Check special trophies, team info, and earnings-by-challenge when modal opens
   useEffect(() => {
-    if (isOpen && player.wallet) {
+    if (isOpen && wallet) {
       const checkTrophies = async () => {
         const unlocked = new Set<string>();
-        const hasOgFirst1k = await checkPlayerHasOgFirst1k(player.wallet);
-        if (hasOgFirst1k) {
-          unlocked.add('og-1k');
-        }
-        const hasFounderChallenge = await checkPlayerHasFounderChallenge(player.wallet);
-        if (hasFounderChallenge) {
-          unlocked.add('founder-challenge');
-        }
+        const hasOgFirst1k = await checkPlayerHasOgFirst1k(wallet);
+        if (hasOgFirst1k) unlocked.add('og-1k');
+        const hasFounderChallenge = await checkPlayerHasFounderChallenge(wallet);
+        if (hasFounderChallenge) unlocked.add('founder-challenge');
         setSpecialTrophiesUnlocked(unlocked);
       };
 
       const fetchTeam = async () => {
-        const team = await getTeamByMember(player.wallet!);
+        const team = await getTeamByMember(wallet);
         setUserTeam(team);
+      };
+
+      const fetchEarnings = async () => {
+        setLoadingEarnings(true);
+        try {
+          const list = await getPlayerEarningsByChallenge(wallet, 20);
+          setEarningsByChallenge(list);
+        } finally {
+          setLoadingEarnings(false);
+        }
       };
 
       checkTrophies();
       fetchTeam();
+      fetchEarnings();
     }
-  }, [isOpen, player.wallet]);
+  }, [isOpen, wallet]);
 
   useEffect(() => {
     if (isOpen && currentWallet) {
@@ -944,6 +954,40 @@ export default function PlayerProfileModal({
               );
             })}
           </div>
+        </div>
+
+        {/* Earnings by challenge */}
+        <div className="relative z-10 w-full mt-4 px-1">
+          <h3 className="text-xs font-semibold text-amber-200/90 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+            <Trophy className="h-3.5 w-3.5" />
+            Earnings per challenge
+            {!loadingEarnings && earningsByChallenge.length === 0 && (
+              <span className="text-[10px] font-normal normal-case text-zinc-500">(demo)</span>
+            )}
+          </h3>
+          {loadingEarnings ? (
+            <p className="text-[11px] text-zinc-500">Loading…</p>
+          ) : (() => {
+            const list = earningsByChallenge.length > 0 ? earningsByChallenge : MOCK_EARNINGS_BY_CHALLENGE;
+            return list.length === 0 ? (
+              <p className="text-[11px] text-zinc-500">No completed challenges yet.</p>
+            ) : (
+              <div className="max-h-32 overflow-y-auto rounded-lg border border-white/10 bg-black/20 py-1.5 px-2 space-y-1.5">
+                {list.slice(0, 10).map((e) => (
+                  <div key={e.challengeId} className="flex items-center justify-between gap-2 text-[11px]">
+                    <span className="text-white/90 truncate flex-1 min-w-0">{e.game || e.title || "Challenge"}</span>
+                    <span className="text-amber-300 font-semibold shrink-0">{e.amount} USDFG</span>
+                    <span className="text-zinc-500 shrink-0">{e.completedAt.toLocaleDateString()}</span>
+                  </div>
+                ))}
+                {list.length > 10 && (
+                  <p className="text-[10px] text-zinc-500 pt-1 border-t border-white/5">
+                    +{list.length - 10} more
+                  </p>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Challenge CTA */}

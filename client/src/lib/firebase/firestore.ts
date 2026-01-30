@@ -3142,6 +3142,52 @@ export async function getPlayerStats(wallet: string): Promise<PlayerStats | null
   }
 }
 
+export interface PlayerEarningByChallenge {
+  challengeId: string;
+  title?: string;
+  game?: string;
+  amount: number;
+  completedAt: Date;
+  format?: 'standard' | 'tournament';
+}
+
+/**
+ * Fetch challenges where the player won, for "earnings per challenge" on profile.
+ * Returns completed challenges only, sorted by completion time (newest first).
+ */
+export async function getPlayerEarningsByChallenge(wallet: string, limitCount: number = 50): Promise<PlayerEarningByChallenge[]> {
+  try {
+    const challengesRef = collection(db, 'challenges');
+    const q = query(
+      challengesRef,
+      where('winner', '==', wallet),
+      limit(limitCount * 2)
+    );
+    const snap = await getDocs(q);
+    const items: PlayerEarningByChallenge[] = [];
+    snap.forEach((d) => {
+      const data = d.data() as ChallengeData;
+      if (data.status !== 'completed') return;
+      const amount = data.prizePool ?? 0;
+      const ts = data.payoutTimestamp ?? (data as { updatedAt?: Timestamp }).updatedAt ?? data.createdAt;
+      const completedAt = ts?.toMillis?.() ? new Date(ts.toMillis()) : new Date(0);
+      items.push({
+        challengeId: d.id,
+        title: data.title,
+        game: data.game,
+        amount,
+        completedAt,
+        format: data.format,
+      });
+    });
+    items.sort((a, b) => b.completedAt.getTime() - a.completedAt.getTime());
+    return items.slice(0, limitCount);
+  } catch (error) {
+    console.error('❌ Error fetching player earnings by challenge:', error);
+    return [];
+  }
+}
+
 /**
  * Update player's lastActive timestamp when they connect/view the page
  * This ensures they show as "online" in the stats

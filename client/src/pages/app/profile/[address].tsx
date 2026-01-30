@@ -5,18 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { 
-  ArrowLeft, 
-  Trophy, 
-  TrendingUp, 
-  Clock, 
-  Target,
-  Gamepad2,
-  Zap,
-  Shield
-} from "lucide-react";
-import { deriveStats } from "@/lib/derive/stats";
-import { fetchPlayerEvents } from "@/lib/chain/events";
+import { ArrowLeft, Trophy, Gamepad2, Zap } from "lucide-react";
+import { getPlayerStats, getPlayerEarningsByChallenge } from "@/lib/firebase/firestore";
+import { MOCK_EARNINGS_BY_CHALLENGE } from "@/lib/mock/earningsByChallenge";
 
 interface PlayerProfile {
   address: string;
@@ -27,16 +18,14 @@ interface PlayerProfile {
     losses: number;
     winRate: number;
     totalEarnings: number;
-    currentStreak: number;
-    bestStreak: number;
-    last10: Array<{ result: 'win' | 'loss'; game: string; amount: number; timestamp: number }>;
+    gamesPlayed: number;
   };
-  recentChallenges: Array<{
-    id: string;
-    game: string;
-    result: 'win' | 'loss';
+  earningsByChallenge: Array<{
+    challengeId: string;
+    game?: string;
+    title?: string;
     amount: number;
-    timestamp: number;
+    completedAt: Date;
   }>;
 }
 
@@ -48,40 +37,67 @@ const PlayerProfile: React.FC = () => {
   useEffect(() => {
     const loadProfile = async () => {
       if (!address) return;
-      
+
       setLoading(true);
       try {
-        // TODO: Replace with actual on-chain data fetching
-        const events = await fetchPlayerEvents(address);
-        const stats = deriveStats(events);
-        
-        // Mock profile data - replace with real data
-        const mockProfile: PlayerProfile = {
+        if (address.toLowerCase() === "demo") {
+          setProfile({
+            address: "demo",
+            displayName: "Demo Player",
+            stats: {
+              wins: 12,
+              losses: 4,
+              winRate: 75,
+              totalEarnings: 1375,
+              gamesPlayed: 16,
+            },
+            earningsByChallenge: MOCK_EARNINGS_BY_CHALLENGE.map((e) => ({
+              challengeId: e.challengeId,
+              game: e.game,
+              title: e.title,
+              amount: e.amount,
+              completedAt: e.completedAt,
+            })),
+          });
+          setLoading(false);
+          return;
+        }
+
+        const [stats, earnings] = await Promise.all([
+          getPlayerStats(address),
+          getPlayerEarningsByChallenge(address, 50),
+        ]);
+
+        if (!stats && earnings.length === 0) {
+          setProfile(null);
+          return;
+        }
+
+        const displayName = stats?.displayName?.trim()
+          ? stats.displayName
+          : `Player_${address.slice(0, 8)}`;
+
+        setProfile({
           address,
-          displayName: `Player_${address.slice(0, 8)}`,
+          displayName,
           stats: {
-            wins: 23,
-            losses: 7,
-            winRate: 76.7,
-            totalEarnings: 1250,
-            currentStreak: 5,
-            bestStreak: 12,
-            last10: [
-              { result: 'win', game: 'Street Fighter 6', amount: 100, timestamp: Date.now() - 2 * 60 * 60 * 1000 },
-              { result: 'loss', game: 'Tekken 8', amount: -50, timestamp: Date.now() - 5 * 60 * 60 * 1000 },
-              { result: 'win', game: 'Mortal Kombat 1', amount: 75, timestamp: Date.now() - 24 * 60 * 60 * 1000 },
-            ]
+            wins: stats?.wins ?? 0,
+            losses: stats?.losses ?? 0,
+            winRate: stats?.winRate ?? 0,
+            totalEarnings: stats?.totalEarned ?? 0,
+            gamesPlayed: stats?.gamesPlayed ?? 0,
           },
-          recentChallenges: [
-            { id: '1', game: 'Street Fighter 6', result: 'win', amount: 100, timestamp: Date.now() - 2 * 60 * 60 * 1000 },
-            { id: '2', game: 'Tekken 8', result: 'loss', amount: -50, timestamp: Date.now() - 5 * 60 * 60 * 1000 },
-            { id: '3', game: 'Mortal Kombat 1', result: 'win', amount: 75, timestamp: Date.now() - 24 * 60 * 60 * 1000 },
-          ]
-        };
-        
-        setProfile(mockProfile);
+          earningsByChallenge: earnings.map((e) => ({
+            challengeId: e.challengeId,
+            game: e.game,
+            title: e.title,
+            amount: e.amount,
+            completedAt: e.completedAt,
+          })),
+        });
       } catch (error) {
         console.error('Failed to load profile:', error);
+        setProfile(null);
       } finally {
         setLoading(false);
       }
@@ -109,11 +125,18 @@ const PlayerProfile: React.FC = () => {
         <div className="text-center space-y-4">
           <h1 className="text-2xl font-bold text-white">Player Not Found</h1>
           <p className="text-gray-400">This player profile could not be found.</p>
-          <Link to="/app">
-            <Button className="bg-gradient-to-r from-cyan-400 to-purple-500 text-black">
-              Back to Arena
-            </Button>
-          </Link>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Link to="/app">
+              <Button className="bg-gradient-to-r from-cyan-400 to-purple-500 text-black">
+                Back to Arena
+              </Button>
+            </Link>
+            <Link to="/app/profile/demo">
+              <Button variant="outline" className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10">
+                View demo profile
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -160,7 +183,14 @@ const PlayerProfile: React.FC = () => {
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
-                    <h1 className="text-3xl font-bold text-white">{profile.displayName}</h1>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h1 className="text-3xl font-bold text-white">{profile.displayName}</h1>
+                      {profile.address.toLowerCase() === "demo" && (
+                        <Badge variant="secondary" className="bg-amber-500/20 text-amber-400">
+                          Demo
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-gray-400 font-mono text-sm">{profile.address}</p>
                     <div className="flex items-center space-x-4 mt-2">
                       <Badge variant="secondary" className="bg-green-500/20 text-green-400">
@@ -191,16 +221,6 @@ const PlayerProfile: React.FC = () => {
 
               <Card className="bg-card/50 border-gray-800">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-gray-400">Current Streak</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-yellow-400">{profile.stats.currentStreak}</div>
-                  <p className="text-sm text-gray-400">Best: {profile.stats.bestStreak}</p>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-card/50 border-gray-800">
-                <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-medium text-gray-400">Total Earnings</CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -214,54 +234,74 @@ const PlayerProfile: React.FC = () => {
                   <CardTitle className="text-sm font-medium text-gray-400">Total Games</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold text-white">{profile.stats.wins + profile.stats.losses}</div>
+                  <div className="text-3xl font-bold text-white">{profile.stats.gamesPlayed}</div>
                   <p className="text-sm text-gray-400">Challenges</p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card/50 border-gray-800">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-gray-400">Challenges Won</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-amber-400">
+                    {profile.earningsByChallenge.length || MOCK_EARNINGS_BY_CHALLENGE.length}
+                  </div>
+                  <p className="text-sm text-gray-400">
+                    {profile.earningsByChallenge.length === 0 ? "Demo below" : "Earnings listed below"}
+                  </p>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Recent Activity */}
-            <Card className="bg-card/50 border-gray-800">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center">
-                  <Clock className="w-5 h-5 mr-2" />
-                  Recent Challenges
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {profile.recentChallenges.map((challenge, index) => (
-                    <div key={challenge.id} className="flex items-center justify-between p-3 rounded-lg bg-background/50 border border-gray-800">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                          challenge.result === 'win' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                        }`}>
-                          {challenge.result === 'win' ? <Trophy className="w-4 h-4" /> : <Target className="w-4 h-4" />}
-                        </div>
-                        <div>
-                          <p className="text-white font-semibold">{challenge.game}</p>
-                          <p className="text-sm text-gray-400">
-                            {new Date(challenge.timestamp).toLocaleDateString()}
-                          </p>
-                        </div>
+            {/* Earnings per challenge */}
+            {(() => {
+              const list = profile.earningsByChallenge.length > 0
+                ? profile.earningsByChallenge
+                : MOCK_EARNINGS_BY_CHALLENGE;
+              const isDemo = profile.earningsByChallenge.length === 0;
+              return (
+                <Card className="bg-card/50 border-gray-800">
+                  <CardHeader>
+                    <CardTitle className="text-white flex items-center">
+                      <Trophy className="w-5 h-5 mr-2" />
+                      Earnings per challenge
+                      {isDemo && (
+                        <span className="text-sm font-normal text-gray-500 ml-2">(demo)</span>
+                      )}
+                    </CardTitle>
+                    <p className="text-sm text-gray-400 mt-1">
+                      {isDemo ? "Preview with sample data." : "Wins only; amounts earned in USDFG."}
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    {list.length === 0 ? (
+                      <p className="text-gray-400">No completed challenges yet.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {list.map((e) => (
+                          <div
+                            key={e.challengeId}
+                            className="flex items-center justify-between p-3 rounded-lg bg-background/50 border border-gray-800"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="w-8 h-8 rounded-full flex items-center justify-center bg-green-500/20 text-green-400">
+                                <Trophy className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <p className="text-white font-semibold">{e.game || e.title || "Challenge"}</p>
+                                <p className="text-sm text-gray-400">{e.completedAt.toLocaleDateString()}</p>
+                              </div>
+                            </div>
+                            <p className="font-semibold text-green-400">+{e.amount} USDFG</p>
+                          </div>
+                        ))}
                       </div>
-                      <div className="text-right">
-                        <p className={`font-semibold ${
-                          challenge.amount > 0 ? "text-green-400" : "text-red-400"
-                        }`}>
-                          {challenge.amount > 0 ? "+" : ""}{challenge.amount} USDFG
-                        </p>
-                        <p className={`text-sm ${
-                          challenge.result === 'win' ? "text-green-400" : "text-red-400"
-                        }`}>
-                          {challenge.result === 'win' ? 'Victory' : 'Defeat'}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })()}
           </div>
         </main>
       </div>
