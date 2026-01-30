@@ -1895,6 +1895,21 @@ export const expirePendingChallenge = async (challengeId: string): Promise<boole
       return false; // Not expired yet
     }
     
+    // Never auto-delete Founder Tournaments (admin-created). Only manual or after airdrop + match ended.
+    const isTournament = data.format === 'tournament' || !!data.tournament;
+    const entryFee = data.entryFee || 0;
+    const isFree = entryFee === 0 || entryFee < 0.000000001;
+    const founderParticipantReward = (data.founderParticipantReward ?? 0) as number;
+    const founderWinnerBonus = (data.founderWinnerBonus ?? 0) as number;
+    const { ADMIN_WALLET } = await import('../chain/config');
+    const creatorWallet = (data.creator || '').toLowerCase();
+    const isAdminCreator = creatorWallet === ADMIN_WALLET.toString().toLowerCase();
+    const isFounderTournament = isTournament && isAdminCreator && isFree && (founderParticipantReward > 0 || founderWinnerBonus > 0);
+    if (isFounderTournament) {
+      console.log('⚠️ Skipping auto-delete of Founder Tournament (pending expired):', challengeId);
+      return false;
+    }
+    
     // Delete expired challenge immediately to save Firebase storage
     await cleanupExpiredChallenge(challengeId);
     
@@ -2060,55 +2075,14 @@ export async function cleanupCompletedChallenge(id: string) {
       const isFounderTournamentOrChallenge = isFounderTournament || isFounderChallenge;
       
       if (isFounderTournamentOrChallenge) {
-        // For Founder Tournaments/Challenges, check if 24 hours have passed
-        let completedTime: number;
-        
-        // For tournaments, check tournament completion time
-        if (isTournament && data.tournament?.stage === 'completed') {
-          // Try to get completion timestamp from tournament metadata
-          if (data.tournament.completedAt?.toMillis) {
-            completedTime = data.tournament.completedAt.toMillis();
-          } else if (typeof data.tournament.completedAt === 'number') {
-            completedTime = data.tournament.completedAt;
-          } else if (data.results) {
-            // Fallback: use latest result submission time
-            const resultTimes = Object.values(data.results).map((r: any) => {
-              if (r.submittedAt?.toMillis) return r.submittedAt.toMillis();
-              if (typeof r.submittedAt === 'number') return r.submittedAt;
-              return 0;
-            });
-            completedTime = Math.max(...resultTimes);
-          } else {
-            // Last resort: use createdAt (but this means it was just created, so don't delete)
-            completedTime = Date.now();
-          }
-        } else if (data.results) {
-          // For standard challenges, use results
-          const resultTimes = Object.values(data.results).map((r: any) => {
-            if (r.submittedAt?.toMillis) return r.submittedAt.toMillis();
-            if (typeof r.submittedAt === 'number') return r.submittedAt;
-            return 0;
-          });
-          completedTime = Math.max(...resultTimes);
-        } else {
-          // Fallback to createdAt
-          if (data.createdAt?.toMillis) {
-            completedTime = data.createdAt.toMillis();
-          } else if (typeof data.createdAt === 'number') {
-            completedTime = data.createdAt;
-          } else {
-            completedTime = Date.now(); // Fallback to now if no timestamp available
-          }
+        // Only delete Founder Tournaments/Challenges when admin has airdropped AND match has ended.
+        const founderPayoutSentAt = data.founderPayoutSentAt;
+        const matchEnded = data.status === 'completed' || (isTournament && data.tournament?.stage === 'completed');
+        if (!founderPayoutSentAt || !matchEnded) {
+          console.log(`⚠️ Skipping cleanup of Founder Tournament/Challenge (delete only after admin airdrop + match ended):`, id);
+          return; // Never delete until admin airdropped and match/tournament ended
         }
-        
-        const hoursSinceCompletion = (Date.now() - completedTime) / (1000 * 60 * 60);
-        
-        if (hoursSinceCompletion < 24) {
-          console.log(`⚠️ Skipping cleanup of Founder Tournament/Challenge (${hoursSinceCompletion.toFixed(1)}h old, need 24h):`, id);
-          return; // Don't delete Founder Tournaments/Challenges until 24 hours have passed
-        }
-        
-        console.log(`✅ Founder Tournament/Challenge is 24h+ old, proceeding with cleanup:`, id);
+        console.log(`✅ Founder Tournament/Challenge: airdrop sent and match ended, proceeding with cleanup:`, id);
       }
     }
     
@@ -2182,21 +2156,14 @@ export async function cleanupExpiredChallenge(id: string) {
       const isFounderTournamentOrChallenge = isFounderTournament || isFounderChallenge;
       
       if (isFounderTournamentOrChallenge) {
-        // For Founder Tournaments/Challenges, check if 24 hours have passed since expiration
-        let expiredTime: number | null = null;
-        if (data.expiresAt?.toMillis) {
-          expiredTime = data.expiresAt.toMillis();
-        } else if (typeof data.expiresAt === 'number') {
-          expiredTime = data.expiresAt;
+        // Only delete Founder Tournaments/Challenges when admin has airdropped AND match/tournament has ended.
+        const founderPayoutSentAt = data.founderPayoutSentAt;
+        const matchEnded = data.status === 'completed' || (isTournament && data.tournament?.stage === 'completed');
+        if (!founderPayoutSentAt || !matchEnded) {
+          console.log(`⚠️ Skipping cleanup of expired Founder Tournament/Challenge (delete only after admin airdrop + match ended):`, id);
+          return; // Never delete until admin airdropped and match/tournament ended
         }
-        const hoursSinceExpiration = expiredTime ? (Date.now() - expiredTime) / (1000 * 60 * 60) : 0;
-        
-        if (hoursSinceExpiration < 24) {
-          console.log(`⚠️ Skipping cleanup of expired Founder Tournament/Challenge (${hoursSinceExpiration.toFixed(1)}h old, need 24h):`, id);
-          return; // Don't delete expired Founder Tournaments/Challenges until 24 hours have passed
-        }
-        
-        console.log(`✅ Expired Founder Tournament/Challenge is 24h+ old, proceeding with cleanup:`, id);
+        console.log(`✅ Expired Founder Tournament/Challenge: airdrop sent and match ended, proceeding with cleanup:`, id);
       }
     }
     
