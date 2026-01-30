@@ -3629,6 +3629,21 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         console.error('Error checking if user reviewed challenge:', error);
         // Continue with claim if check fails (allow claim but log warning)
       }
+      // Founder Tournament: rewards distributed by platform — show info and return (don't call claimChallengePrize)
+      const data = challenge.rawData || challenge;
+      const entryFeeNum = Number(data.entryFee ?? 0);
+      const creatorWalletClaim = data.creator || '';
+      const isFreeClaim = entryFeeNum === 0 || entryFeeNum < 0.000000001;
+      const isTournamentClaim = data.format === 'tournament' || !!challenge.tournament;
+      const isAdminCreatorClaim = creatorWalletClaim && creatorWalletClaim.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+      const founderParticipantRewardNum = Number(data.founderParticipantReward ?? 0);
+      const founderWinnerBonusNum = Number(data.founderWinnerBonus ?? 0);
+      const isFounderTournamentClaim = isTournamentClaim && isAdminCreatorClaim && isFreeClaim && (founderParticipantRewardNum > 0 || founderWinnerBonusNum > 0);
+      if (isFounderTournamentClaim) {
+        setClaimingPrize(null);
+        alert('🏆 This is a Founder Tournament. Rewards are distributed by the platform after the tournament concludes. No action is required from you.');
+        return;
+      }
       // Pre-check: Verify challenge is actually claimable on-chain
       if (challenge.pda) {
         try {
@@ -5127,12 +5142,18 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                   <button
                     onClick={() => {
                       const challenge = unclaimedPrizeChallenges[0];
-                      setSelectedChallenge({
-                        id: challenge.id,
-                        title: (challenge as any).title || extractGameFromTitle((challenge as any).title || '') || "Challenge",
-                        ...challenge
-                      });
-                      setShowStandardLobby(true);
+                      const merged = mergeChallengeDataForModal(challenge, challenge);
+                      setSelectedChallenge(merged);
+                      const format = merged.format === 'tournament' || merged.rawData?.format === 'tournament' || merged.tournament;
+                      if (format) {
+                        setShowStandardLobby(false);
+                        setShowTournamentLobby(true);
+                      } else {
+                        setShowTournamentLobby(false);
+                        setShowStandardLobby(true);
+                      }
+                      // Start claim flow so lobby opens and review/claim runs (first click opens and proceeds)
+                      handleClaimPrize(merged);
                     }}
                     className="bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-all shadow-[0_0_15px_rgba(34,197,94,0.5)] hover:shadow-[0_0_25px_rgba(34,197,94,0.7)]"
                   >
@@ -6390,7 +6411,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             ((selectedChallenge.rawData as any)?.tournament ? "tournament" : "standard");
           const isTournament = format === "tournament";
           const currentWallet = publicKey?.toString()?.toLowerCase();
-          const players = selectedChallenge.rawData?.players || [];
+          const playersRaw = (selectedChallenge.rawData as any)?.players ?? (selectedChallenge as any).players;
+          const players = Array.isArray(playersRaw) ? playersRaw : [];
 
           if (isTournament) {
             // Render tournament lobby modal - persistent room
