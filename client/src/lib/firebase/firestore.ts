@@ -4629,12 +4629,16 @@ export async function claimChallengePrize(
     console.log('🚀 Winner calling smart contract to release escrow...');
     console.log('   Note: Reward claims have NO expiration - winners can claim anytime!');
     
+    // Pass caller (winner) in canonical form: wallet.publicKey.toString().
+    // Firestore stores winner lowercase; base58 is case-sensitive, so data.winner would
+    // decode to different bytes than on-chain creator/challenger and cause InvalidWinner.
+    const winnerCanonical = callerAddress;
     try {
       const signature = await resolveChallenge(
         winnerWallet,
         connection,
         challengePDA,
-        data.winner
+        winnerCanonical
       );
     
       // Update Firestore to mark reward as claimed
