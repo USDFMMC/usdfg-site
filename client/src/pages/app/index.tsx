@@ -3365,23 +3365,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const autoWon = pendingMatchResult.autoWon;
       const challengeForClaim = needsClaim ? selectedChallenge : null;
       
-      // Clear pending match result but keep challenge if needs claim or completed
+      // Clear pending match result but keep challenge so both players stay in lobby
       setPendingMatchResult(null);
       
       // Get challenge status to check if completed
       const challengeStatus = selectedChallenge?.status || selectedChallenge?.rawData?.status;
       const isCompleted = challengeStatus === 'completed';
       
-      // Keep lobby open if needs claim or if challenge is completed (for reward claiming)
-      if (!needsClaim && !isCompleted) {
-      setSelectedChallenge(null);
-        // Only close lobby if challenge is not completed
-        setShowStandardLobby(false);
-      } else {
-        // Keep lobby open for reward claiming - ensure it's open
-        if (!showStandardLobby) {
-          setShowStandardLobby(true);
-        }
+      // Keep lobby open for BOTH winner and loser so they can chat and use mic after match ends
+      if (!showStandardLobby) {
+        setShowStandardLobby(true);
       }
       
       // Show Victory Modal immediately for wins (optimistic UI)
@@ -3995,8 +3988,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const categoryMatch = filterCategory === 'All' || challenge.category === filterCategory;
       // Filter by game
       const gameMatch = filterGame === 'All' || challenge.game === filterGame;
-      // Filter by "My Challenges" toggle
-      const myChallengesMatch = !showMyChallenges || challenge.creator === (publicKey?.toString() || null);
+      // Filter by "My Challenges" toggle (creator OR challenger OR in players so loser can see their challenges)
+      const cw = (challenge.creator ?? challenge.rawData?.creator ?? '').toLowerCase();
+      const ch = (challenge.challenger ?? challenge.rawData?.challenger ?? '').toLowerCase();
+      const pl = challenge.players ?? challenge.rawData?.players ?? [];
+      const currentWalletLower = (publicKey?.toString() || '').toLowerCase();
+      const myChallengesMatch = !showMyChallenges || cw === currentWalletLower || ch === currentWalletLower || pl.some((p: string) => (p || '').toLowerCase() === currentWalletLower);
       
       // Check if challenge is expired (these will be deleted automatically)
       const isExpired = challenge.status === 'cancelled' || 
@@ -4032,6 +4029,17 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const isCompletedFounderTournament = isCompleted && isFounderTournament && tournamentStage === 'completed';
       const adminShouldSeeCompletedFounderTournament = isAdmin && isCompletedFounderTournament;
       
+      // Show completed/disputed challenges to participants so they can re-open lobby (chat/mic)
+      const currentWalletStr = publicKey?.toString()?.toLowerCase() || '';
+      const challengerWallet = (challenge.challenger ?? challenge.rawData?.challenger ?? '').toLowerCase();
+      const players = challenge.players ?? challenge.rawData?.players ?? [];
+      const isParticipant = currentWalletStr && (
+        (creatorWallet?.toLowerCase() === currentWalletStr) ||
+        challengerWallet === currentWalletStr ||
+        players.some((p: string) => (p || '').toLowerCase() === currentWalletStr)
+      );
+      const participantSeesCompleted = isParticipant && isCompleted && categoryMatch && gameMatch;
+      
       // Debug logging for admin viewing challenges
       if (isAdmin && isTournamentFormat) {
         console.log('🔍 Admin viewing tournament:', {
@@ -4056,10 +4064,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       // If showing "My Challenges", show all their challenges regardless of status
       // OR if admin viewing completed Founder Tournament
+      // OR if user is participant in completed challenge (so they can re-open lobby to chat/mic)
       // Otherwise, only show joinable challenges
       const shouldShow = showMyChallenges 
         ? (categoryMatch && gameMatch && myChallengesMatch) 
-        : (categoryMatch && gameMatch && (isJoinable || adminShouldSeeCompletedFounderTournament));
+        : (categoryMatch && gameMatch && (isJoinable || adminShouldSeeCompletedFounderTournament || participantSeesCompleted));
       
       return shouldShow;
     });
