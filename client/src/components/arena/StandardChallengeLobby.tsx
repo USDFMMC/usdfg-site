@@ -616,7 +616,10 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     // Claim reward: participant + completed + won + not claimed
     const winner = getChallengeValue<string | null>('winner', null) as string | null;
     const userWon = currentWallet && winner && typeof winner === 'string' && winner.toLowerCase() === currentWallet.toLowerCase();
-    const prizeClaimed = activeChallenge.rawData?.prizeClaimed || activeChallenge.prizeClaimed;
+    // Reward is claimed if Firestore has prizeClaimedAt, payoutTriggered, or legacy prizeClaimed
+    const prizeClaimedAt = activeChallenge.rawData?.prizeClaimedAt ?? activeChallenge.prizeClaimedAt;
+    const payoutTriggered = activeChallenge.rawData?.payoutTriggered ?? activeChallenge.payoutTriggered;
+    const prizeClaimed = !!(activeChallenge.rawData?.prizeClaimed ?? activeChallenge.prizeClaimed ?? prizeClaimedAt ?? payoutTriggered);
     if (isParticipant && status === 'completed' && userWon && !prizeClaimed) {
       state.showClaim = true;
     }
@@ -632,8 +635,10 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const canSubmitResult = ctaState.showSubmit;
   const canClaimPrize = ctaState.showClaim;
   
-  // Reward claimed check (for display)
-  const prizeClaimed = activeChallenge.rawData?.prizeClaimed || activeChallenge.prizeClaimed;
+  // Reward claimed check (for display) - must match Firestore fields written on claim (prizeClaimedAt, payoutTriggered)
+  const prizeClaimedAtDisplay = activeChallenge.rawData?.prizeClaimedAt ?? activeChallenge.prizeClaimedAt;
+  const payoutTriggeredDisplay = activeChallenge.rawData?.payoutTriggered ?? activeChallenge.payoutTriggered;
+  const prizeClaimed = !!(activeChallenge.rawData?.prizeClaimed ?? activeChallenge.prizeClaimed ?? prizeClaimedAtDisplay ?? payoutTriggeredDisplay);
   
   // Winner check (for display)
   const winner = getChallengeValue<string | null>('winner', null) as string | null;

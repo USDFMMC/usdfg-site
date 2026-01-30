@@ -4601,7 +4601,8 @@ export async function claimChallengePrize(
     }
     
     const callerAddress = winnerWallet.publicKey.toString();
-    if (callerAddress !== data.winner) {
+    // Firestore stores winner as lowercase (normalizeWinnerWallet); compare case-insensitively
+    if (!data.winner || callerAddress.toLowerCase() !== data.winner.toLowerCase()) {
       throw new Error('❌ Only the winner can claim the reward');
     }
     

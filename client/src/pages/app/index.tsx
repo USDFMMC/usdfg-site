@@ -3670,9 +3670,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           errorMessage.includes("Challenge has expired")) {
         errorMessage = "⚠️ Old contract version detected. The contract needs to be redeployed to remove the expiration check for reward claims. Please contact support.";
       } else if (errorMessage.includes("already been processed") || 
-                 errorMessage.includes("already processed")) {
+                 errorMessage.includes("already processed") ||
+                 errorMessage.includes("already claimed") ||
+                 errorMessage.includes("Reward already claimed")) {
         errorMessage = "✅ This reward has already been claimed. Please refresh the page to see the latest status.";
-        // Force refresh after a delay
+        // Remove from unclaimed so the green button disappears
+        setUnclaimedPrizeChallenges(prev => prev.filter(c => c.id !== challenge.id));
+        // Force refresh after a delay so UI shows "Reward claimed"
         setTimeout(() => window.location.reload(), 2000);
       } else if (errorMessage.includes("NotInProgress") || 
                  errorMessage.includes("not in progress")) {
