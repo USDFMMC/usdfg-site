@@ -52,9 +52,9 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     'Mortal Kombat 1': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Tournament (Bracket Mode)', 'Custom Challenge'],
     'Street Fighter 6': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Tournament (Bracket Mode)', 'Custom Challenge'],
     'Tekken 8': ['Best of 3', 'Mirror Match', '2v2 Team Fight', 'Tournament (Bracket Mode)', 'Custom Challenge'],
-    'COD MW3': ['Run the Fade', '10 and Done', 'Snipers Only', 'Tournament (Bracket Mode)', 'Custom Challenge'],
-    'Fortnite': ['Run the Fade', '10 and Done', 'Snipers Only', 'Tournament (Bracket Mode)', 'Custom Challenge'],
-    'Valorant': ['Run the Fade', '10 and Done', 'Snipers Only', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'COD MW3': ['Search and Destroy', 'Run the Fade', '10 and Done', 'Snipers Only', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Fortnite': ['Search and Destroy', 'Run the Fade', '10 and Done', 'Snipers Only', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Valorant': ['Search and Destroy', 'Run the Fade', '10 and Done', 'Snipers Only', 'Tournament (Bracket Mode)', 'Custom Challenge'],
     'Custom': ['Custom Challenge', 'Tournament (Bracket Mode)']
   };
   
@@ -183,6 +183,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
       { label: "Custom Challenge", tooltip: "Manual review required. Use only when standard modes don't apply." }
     ],
     Shooting: [
+      { label: "Search and Destroy" },
       { label: "Run the Fade" },
       { label: "10 and Done" },
       { label: "Snipers Only" },
@@ -209,6 +210,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
       '2v2 Team Fight': 'Team coordination required. Communication and strategy are crucial for team victory.',
       
       // Shooting modes
+      'Search and Destroy': 'Attack or defend. One life per round, plant or defuse the bomb. First to 6 rounds wins.',
       'Run the Fade': 'Intense 1v1 combat. No teammates, no excuses - just pure skill and reflexes.',
       '10 and Done': 'First to 10 kills wins. Fast-paced action with clear victory conditions.',
       'Snipers Only': 'Sniper rifles only. Precision and patience are key to victory.',
@@ -260,6 +262,8 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
       rules = '• Same character for both players\n• Pure skill competition\n• No character advantages\n• The winner claims the challenge reward';
     } else if (mode === '2v2 Team Fight') {
       rules = '• Team coordination required\n• Communication essential\n• Team strategy\n• Team victory';
+    } else if (mode === 'Search and Destroy') {
+      rules = '• First to 6 rounds (attack/defend)\n• One life per round\n• Plant or defuse the bomb\n• Standard SnD maps\n• The winner claims the challenge reward';
     } else if (mode === 'Run the Fade') {
       rules = '• 1v1 combat\n• No teammates\n• Pure skill and reflexes\n• The winner claims the challenge reward';
     } else if (mode === '10 and Done') {

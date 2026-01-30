@@ -45,6 +45,7 @@ const ChallengeSystem: React.FC = () => {
       { label: "Custom Challenge", tooltip: "Manual review required. Use only when standard modes don't apply." },
     ],
     Shooting: [
+      { label: "Search and Destroy" },
       { label: "Run the Fade" },
       { label: "10 and Done" },
       { label: "Snipers Only" },

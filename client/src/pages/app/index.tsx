@@ -7001,7 +7001,7 @@ const CreateChallengeModal: React.FC<{
     'NBA 2K25': ['Head-to-Head (Full Game)', 'Best of 3 Series', 'Quick Match (2 Quarters)', 'Park Match (2v2/3v3)', 'Tournament (Bracket Mode)', 'Custom Challenge'],
     'FIFA 24': ['Head-to-Head (Full Match)', 'Best of 3 Series', 'Quick Match (2 Halves)', 'Squad Match (2v2)', 'Tournament (Bracket Mode)', 'Custom Challenge'],
     'Street Fighter 6': ['Versus Match', 'Best of 3 Series', 'Elimination Bracket', 'First to 5', 'Tournament (Bracket Mode)', 'Custom Challenge'],
-    'Call of Duty': ['Duel (1v1)', 'Squad Battle (2v2)', 'Full Lobby (5v5)', 'Battle Royale', 'Tournament (Bracket Mode)', 'Custom Challenge'],
+    'Call of Duty': ['Search and Destroy', 'Duel (1v1)', 'Squad Battle (2v2)', 'Full Lobby (5v5)', 'Battle Royale', 'Tournament (Bracket Mode)', 'Custom Challenge'],
     'Tekken 8': ['Versus Match', 'Best of 3 Series', 'Elimination Bracket', 'First to 5', 'Tournament (Bracket Mode)', 'Custom Challenge'],
     'Forza Horizon': ['Time Trial', 'Head-to-Head Race', 'Grand Prix Series', 'Drift Challenge', 'Tournament (Bracket Mode)', 'Custom Challenge'],
     'Valorant': ['Duel (1v1)', 'Squad Battle (2v2)', 'Full Lobby (5v5)', 'Tournament Bracket', 'Tournament (Bracket Mode)', 'Custom Challenge'],
@@ -7063,6 +7063,9 @@ const CreateChallengeModal: React.FC<{
       }
     },
     'Call of Duty': {
+      'Search and Destroy': {
+        rules: ['First to 6 rounds wins (attack/defend)', 'One life per round', 'Plant/defuse the bomb', 'Standard SnD maps and settings', 'No killstreaks', 'Connection issues require rematch', 'The winner claims the challenge reward']
+      },
       'Duel (1v1)': {
         rules: ['First to 6 rounds wins', 'Random weapon rotation', 'No killstreaks', 'Standard gunfight maps', 'Connection issues require rematch', 'No camping allowed']
       },
