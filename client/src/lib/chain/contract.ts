@@ -1206,8 +1206,28 @@ export async function resolveChallenge(
   
   console.log('✅ Instruction created with', instruction.keys.length, 'accounts');
   
-  // Create and send transaction
-  const transaction = new Transaction().add(instruction);
+  // Ensure winner's USDFG token account exists (contract expects it initialized)
+  const { getAccount } = await import('@solana/spl-token');
+  const transaction = new Transaction();
+  try {
+    await getAccount(connection, winnerTokenAccount);
+    console.log('✅ Winner token account already exists');
+  } catch (err: any) {
+    if (err.name === 'TokenAccountNotFoundError' || err.message?.includes('could not find account')) {
+      console.log('📝 Creating winner USDFG token account (required for payout)...');
+      transaction.add(
+        createAssociatedTokenAccountInstruction(
+          caller,             // payer (winner pays rent for their ATA)
+          winnerTokenAccount,
+          winnerPubkey,
+          USDFG_MINT
+        )
+      );
+    } else {
+      throw err;
+    }
+  }
+  transaction.add(instruction);
   const { blockhash } = await connection.getLatestBlockhash();
   transaction.recentBlockhash = blockhash;
   transaction.feePayer = caller;
