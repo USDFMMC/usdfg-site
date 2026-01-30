@@ -1379,6 +1379,30 @@ export const listenToUserChallenges = (userId: string, callback: (challenges: Ch
   });
 };
 
+/**
+ * Real-time listener for recent challenges (e.g. live activity ticker).
+ * Returns up to maxCount challenges ordered by createdAt desc.
+ */
+export const listenToRecentChallenges = (
+  maxCount: number,
+  callback: (challenges: ChallengeData[]) => void
+) => {
+  const q = query(
+    collection(db, 'challenges'),
+    orderBy('createdAt', 'desc'),
+    limit(maxCount)
+  );
+  return onSnapshot(q, (snapshot) => {
+    const challenges = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as ChallengeData[];
+    callback(challenges);
+  }, (error) => {
+    console.error('❌ Recent challenges listener error:', error);
+  });
+};
+
 // One-time fetch operations
 export const fetchChallenges = async (): Promise<ChallengeData[]> => {
   try {
