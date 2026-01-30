@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Send } from "lucide-react";
-import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, query, where, getDocs, serverTimestamp } from "firebase/firestore";
 import { db } from "../../lib/firebase/config";
 
 const linkRegex = /(https?:\/\/[^\s]+)/g;
@@ -51,47 +51,27 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet, st
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Listen for real-time messages
+  // Load messages once when lobby opens; poll every 15s only while lobby is open (no realtime listener)
   useEffect(() => {
-    // Skip if challengeId is invalid
     if (!challengeId || challengeId.trim() === '') {
       setMessages([]);
       return;
     }
-
-    const messagesRef = collection(db, "challenge_chats");
-    // Query without orderBy to avoid index requirement - we'll sort client-side
-    const q = query(
-      messagesRef,
-      where("challengeId", "==", challengeId)
-    );
-
-    const unsubscribe = onSnapshot(
-      q, 
-      (snapshot) => {
-        const newMessages: Message[] = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          newMessages.push({ id: doc.id, ...data } as Message);
-        });
-        
-        // Sort manually by timestamp (client-side)
-        newMessages.sort((a, b) => {
-          const aTime = a.timestamp?.seconds || 0;
-          const bTime = b.timestamp?.seconds || 0;
-          return aTime - bTime;
-        });
-        
+    const loadMessages = async () => {
+      try {
+        const messagesRef = collection(db, "challenge_chats");
+        const q = query(messagesRef, where("challengeId", "==", challengeId));
+        const snapshot = await getDocs(q);
+        const newMessages: Message[] = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Message));
+        newMessages.sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
         setMessages(newMessages);
-      },
-      (error) => {
-        console.error("❌ Chat listener error:", error);
-        console.error("Error code:", error.code);
-        console.error("Error message:", error.message);
+      } catch (error) {
+        console.error("❌ Chat load error:", error);
       }
-    );
-
-    return () => unsubscribe();
+    };
+    loadMessages();
+    const interval = setInterval(loadMessages, 15000);
+    return () => clearInterval(interval);
   }, [challengeId]);
 
   const sendMessage = async () => {
@@ -106,6 +86,11 @@ export const ChatBox: React.FC<ChatBoxProps> = ({ challengeId, currentWallet, st
         timestamp: serverTimestamp(),
       });
       setInput("");
+      const q = query(collection(db, "challenge_chats"), where("challengeId", "==", challengeId));
+      const snapshot = await getDocs(q);
+      const newMessages: Message[] = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Message));
+      newMessages.sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
+      setMessages(newMessages);
     } catch (error) {
       console.error("❌ Failed to send message:", error);
       alert("Failed to send message. Check console for details.");

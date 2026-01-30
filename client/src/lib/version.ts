@@ -4,7 +4,7 @@
  */
 
 const APP_VERSION = Date.now().toString(); // Use timestamp as version
-const VERSION_CHECK_INTERVAL = 60000; // Check every 60 seconds
+const VERSION_CHECK_INTERVAL = 5 * 60 * 1000; // Check every 5 minutes
 
 export const getAppVersion = () => APP_VERSION;
 

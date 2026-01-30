@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ArrowLeft, Trophy, Gamepad2, Zap } from "lucide-react";
 import { getPlayerStats, getPlayerEarningsByChallenge } from "@/lib/firebase/firestore";
-import { MOCK_EARNINGS_BY_CHALLENGE } from "@/lib/mock/earningsByChallenge";
 
 interface PlayerProfile {
   address: string;
@@ -40,29 +39,6 @@ const PlayerProfile: React.FC = () => {
 
       setLoading(true);
       try {
-        if (address.toLowerCase() === "demo") {
-          setProfile({
-            address: "demo",
-            displayName: "Demo Player",
-            stats: {
-              wins: 12,
-              losses: 4,
-              winRate: 75,
-              totalEarnings: 1375,
-              gamesPlayed: 16,
-            },
-            earningsByChallenge: MOCK_EARNINGS_BY_CHALLENGE.map((e) => ({
-              challengeId: e.challengeId,
-              game: e.game,
-              title: e.title,
-              amount: e.amount,
-              completedAt: e.completedAt,
-            })),
-          });
-          setLoading(false);
-          return;
-        }
-
         const [stats, earnings] = await Promise.all([
           getPlayerStats(address),
           getPlayerEarningsByChallenge(address, 50),
@@ -131,11 +107,6 @@ const PlayerProfile: React.FC = () => {
                 Back to Arena
               </Button>
             </Link>
-            <Link to="/app/profile/demo">
-              <Button variant="outline" className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10">
-                View demo profile
-              </Button>
-            </Link>
           </div>
         </div>
       </div>
@@ -185,11 +156,6 @@ const PlayerProfile: React.FC = () => {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h1 className="text-3xl font-bold text-white">{profile.displayName}</h1>
-                      {profile.address.toLowerCase() === "demo" && (
-                        <Badge variant="secondary" className="bg-amber-500/20 text-amber-400">
-                          Demo
-                        </Badge>
-                      )}
                     </div>
                     <p className="text-gray-400 font-mono text-sm">{profile.address}</p>
                     <div className="flex items-center space-x-4 mt-2">
@@ -245,41 +211,32 @@ const PlayerProfile: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-3xl font-bold text-amber-400">
-                    {profile.earningsByChallenge.length || MOCK_EARNINGS_BY_CHALLENGE.length}
+                    {profile.earningsByChallenge.length}
                   </div>
                   <p className="text-sm text-gray-400">
-                    {profile.earningsByChallenge.length === 0 ? "Demo below" : "Earnings listed below"}
+                    Wins with earnings (live)
                   </p>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Earnings per challenge */}
-            {(() => {
-              const list = profile.earningsByChallenge.length > 0
-                ? profile.earningsByChallenge
-                : MOCK_EARNINGS_BY_CHALLENGE;
-              const isDemo = profile.earningsByChallenge.length === 0;
-              return (
-                <Card className="bg-card/50 border-gray-800">
-                  <CardHeader>
-                    <CardTitle className="text-white flex items-center">
-                      <Trophy className="w-5 h-5 mr-2" />
-                      Earnings per challenge
-                      {isDemo && (
-                        <span className="text-sm font-normal text-gray-500 ml-2">(demo)</span>
-                      )}
-                    </CardTitle>
-                    <p className="text-sm text-gray-400 mt-1">
-                      {isDemo ? "Preview with sample data." : "Wins only; amounts earned in USDFG."}
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    {list.length === 0 ? (
-                      <p className="text-gray-400">No completed challenges yet.</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {list.map((e) => (
+            {/* Earnings per challenge (live from Firestore) */}
+            <Card className="bg-card/50 border-gray-800">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center">
+                  <Trophy className="w-5 h-5 mr-2" />
+                  Earnings per challenge
+                </CardTitle>
+                <p className="text-sm text-gray-400 mt-1">
+                  Wins only; amounts earned in USDFG.
+                </p>
+              </CardHeader>
+              <CardContent>
+                {profile.earningsByChallenge.length === 0 ? (
+                  <p className="text-gray-400">No completed challenges yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {profile.earningsByChallenge.map((e) => (
                           <div
                             key={e.challengeId}
                             className="flex items-center justify-between p-3 rounded-lg bg-background/50 border border-gray-800"
@@ -295,13 +252,11 @@ const PlayerProfile: React.FC = () => {
                             </div>
                             <p className="font-semibold text-green-400">+{e.amount} USDFG</p>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })()}
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </main>
       </div>

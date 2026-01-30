@@ -13,7 +13,7 @@ import RightSidePanel from "@/components/ui/RightSidePanel";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
-import { ChallengeData, expressJoinIntent, creatorFund, joinerFund, revertCreatorTimeout, revertJoinerTimeout, expirePendingChallenge, cleanupExpiredChallenge, submitChallengeResult, startResultSubmissionPhase, getLeaderboardPlayers, getLeaderboardTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, getPlayersOnlineCount, updatePlayerLastActive, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, listenToAllUserLocks, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, listenToLockNotifications, LockNotification, uploadProfileImage, updatePlayerProfileImage, uploadTeamImage, updateTeamImage, upsertChallengeNotification, listenToChallengeNotifications, ChallengeNotification, fetchChallengeById, postChallengeSystemMessage, submitTournamentMatchResult, deleteChallenge, joinTournament } from "@/lib/firebase/firestore";
+import { ChallengeData, expressJoinIntent, creatorFund, joinerFund, revertCreatorTimeout, revertJoinerTimeout, expirePendingChallenge, cleanupExpiredChallenge, submitChallengeResult, startResultSubmissionPhase, getLeaderboardPlayers, getLeaderboardTeams, PlayerStats, TeamStats, getTotalUSDFGRewarded, updatePlayerDisplayName, getPlayerStats, storeTrustReview, hasUserReviewedChallenge, createTeam, joinTeam, leaveTeam, getTeamByMember, getTeamStats, ensureUserLockDocument, setUserCurrentLock, getLockNotificationsForWallet, clearMutualLock, recordFriendlyMatchResult, upsertLockNotification, LockNotification, uploadProfileImage, updatePlayerProfileImage, uploadTeamImage, updateTeamImage, upsertChallengeNotification, ChallengeNotification, fetchChallengeById, postChallengeSystemMessage, submitTournamentMatchResult, deleteChallenge, joinTournament } from "@/lib/firebase/firestore";
 import { Timestamp } from "firebase/firestore";
 import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
@@ -634,7 +634,7 @@ const ArenaHome: React.FC = () => {
   const [leaderboardSearchTerm, setLeaderboardSearchTerm] = useState<string>('');
   const [totalUSDFGRewarded, setTotalUSDFGRewarded] = useState<number>(0);
   const [activeChallengesCount, setActiveChallengesCount] = useState<number>(0);
-  const [playersOnlineCount, setPlayersOnlineCount] = useState<number>(0);
+  // Players online count removed — use static copy; no Firestore presence polling
   
   // Trust Review Modal state
   const [showTrustReview, setShowTrustReview] = useState(false);
@@ -678,7 +678,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     message: '',
     type: 'info'
   });
-  const [userLocks, setUserLocks] = useState<Record<string, string | null>>({});
+  // userLocks derived from lockNotificationsList (no listenToAllUserLocks)
   const [lockInProgress, setLockInProgress] = useState<string | null>(null);
   const [friendlyMatch, setFriendlyMatch] = useState<{
     opponentId: string;
@@ -816,10 +816,23 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     return `friendly-${[walletA, walletB].filter(Boolean).sort().join('-')}`;
   }, []);
 
+  // Derive lock state from lock_notifications (no full users collection listener)
+  const userLocks = useMemo(() => {
+    const locks: Record<string, string | null> = {};
+    lockNotificationsList.forEach((n) => {
+      if (n.status === 'accepted' && n.initiator && n.target) {
+        const a = n.initiator.toLowerCase();
+        const b = n.target.toLowerCase();
+        locks[a] = b;
+        locks[b] = a;
+      }
+    });
+    return locks;
+  }, [lockNotificationsList]);
+
   const currentLockTarget = useMemo(() => {
     if (!normalizedCurrentWallet) return null;
-    const rawTarget = userLocks[normalizedCurrentWallet] ?? null;
-    return rawTarget ?? null;
+    return userLocks[normalizedCurrentWallet] ?? null;
   }, [normalizedCurrentWallet, userLocks]);
 
   const mutualLockOpponentId = useMemo(() => {
@@ -999,8 +1012,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   // Update price every 30 seconds
   useEffect(() => {
     fetchUsdfgPrice();
-    const priceInterval = setInterval(fetchUsdfgPrice, 30000);
-    return () => clearInterval(priceInterval);
   }, [fetchUsdfgPrice]);
 
   // Function to refresh USDFG balance (reusable)
@@ -1115,10 +1126,19 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const winner = challenge.rawData?.winner || challenge.winner;
       const prizeClaimedAt = challenge.rawData?.prizeClaimedAt || challenge.prizeClaimedAt;
       const payoutTriggered = challenge.rawData?.payoutTriggered || challenge.payoutTriggered;
+      const founderPayoutSentAt = challenge.founderPayoutSentAt ?? challenge.rawData?.founderPayoutSentAt;
+      const founderPayoutAcknowledgedBy = challenge.founderPayoutAcknowledgedBy ?? challenge.rawData?.founderPayoutAcknowledgedBy ?? [];
       const userWon = winner && winner.toLowerCase() === currentWallet.toLowerCase();
       
       // Reward is claimed if either prizeClaimedAt exists OR payoutTriggered is true
-      const isClaimed = prizeClaimedAt || payoutTriggered;
+      let isClaimed = prizeClaimedAt || payoutTriggered;
+      // Founder Tournament: also treat as "claimed" for this user if they acknowledged or founder sent airdrop
+      const format = challenge.format || challenge.rawData?.format;
+      const isTournament = format === 'tournament';
+      if (isTournament && userWon) {
+        if (founderPayoutSentAt) isClaimed = true;
+        else if (Array.isArray(founderPayoutAcknowledgedBy) && founderPayoutAcknowledgedBy.some((w: string) => w.toLowerCase() === currentWallet.toLowerCase())) isClaimed = true;
+      }
       
       return status === 'completed' && userWon && !isClaimed;
     });
@@ -1186,70 +1206,23 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     return () => clearInterval(interval);
   }, [firestoreChallenges]);
   
-  // Update current user's lastActive when they connect/view the page
-  useEffect(() => {
-    if (publicKey) {
-      const wallet = publicKey.toString();
-      updatePlayerLastActive(wallet);
-      
-      // Update every 5 minutes while connected
-      const interval = setInterval(() => {
-        updatePlayerLastActive(wallet);
-      }, 5 * 60 * 1000); // 5 minutes
-      
-      return () => clearInterval(interval);
-    }
-  }, [publicKey]);
-  
   useEffect(() => {
     if (!publicKey) {
       return;
     }
-
     ensureUserLockDocument(publicKey.toString()).catch((error) => {
       console.error('❌ Failed to ensure user lock document:', error);
     });
   }, [publicKey]);
-  
-  // Fetch players online count
-  useEffect(() => {
-    const fetchPlayersOnline = async () => {
-      try {
-        const count = await getPlayersOnlineCount();
-        setPlayersOnlineCount(count);
-      } catch (error) {
-        console.error('❌ Error fetching players online count:', error);
-      }
-    };
-    fetchPlayersOnline();
-    
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchPlayersOnline, 30000);
-    return () => clearInterval(interval);
-  }, []);
-  
-  useEffect(() => {
-    const unsubscribe = listenToAllUserLocks((locks) => {
-      setUserLocks(locks);
-    });
 
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
+  // One-time fetch of lock notifications when wallet connects (no realtime listener)
   useEffect(() => {
     if (!publicKey) {
       setLockNotificationsList([]);
       lockNotificationStatusRef.current = {};
       return;
     }
-
-    const unsubscribe = listenToLockNotifications(publicKey.toString(), (notifications) => {
-      setLockNotificationsList(notifications);
-    });
-
-    return () => unsubscribe();
+    getLockNotificationsForWallet(publicKey.toString()).then(setLockNotificationsList);
   }, [publicKey]);
 
   useEffect(() => {
@@ -1315,22 +1288,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     );
   }, [lockNotificationsList, normalizedCurrentWallet, formatWalletAddress]);
 
-  // Listen to challenge notifications
-  useEffect(() => {
-    if (!publicKey) {
-      setChallengeNotificationsList([]);
-      challengeNotificationStatusRef.current = {};
-      return;
-    }
+  // Challenge notifications: no realtime listener; users see new challenges via listenToChallenges
 
-    const unsubscribe = listenToChallengeNotifications(publicKey.toString(), (notifications) => {
-      setChallengeNotificationsList(notifications);
-    });
-
-    return () => unsubscribe();
-  }, [publicKey]);
-
-  // Show toasts for new challenge notifications
+  // Show toasts for new challenge notifications (list stays empty without listener)
   useEffect(() => {
     const previousStatuses = challengeNotificationStatusRef.current;
 
@@ -2361,6 +2321,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           lastActionBy: normalizedCurrentWallet,
         });
       }
+      getLockNotificationsForWallet(publicKey!.toString()).then(setLockNotificationsList);
     } catch (error) {
       console.error('❌ Failed to update lock state:', error);
       setNotification({
@@ -3641,6 +3602,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const isFounderTournamentClaim = isTournamentClaim && isAdminCreatorClaim && isFreeClaim && (founderParticipantRewardNum > 0 || founderWinnerBonusNum > 0);
       if (isFounderTournamentClaim) {
         setClaimingPrize(null);
+        try {
+          const { acknowledgeFounderTournamentPayout } = await import('@/lib/firebase/firestore');
+          await acknowledgeFounderTournamentPayout(challenge.id, publicKey.toString());
+        } catch (e) {
+          console.warn('Could not save Founder Tournament acknowledgment:', e);
+        }
         alert('🏆 This is a Founder Tournament. Rewards are distributed by the platform after the tournament concludes. No action is required from you.');
         return;
       }
@@ -3868,6 +3835,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           challenge.id,
           `🚀 Founder airdrop sent: ${sentCount} wallets · ${sentTotal} USDFG · ${explorerUrl}`
         );
+        const { markFounderPayoutSent } = await import('@/lib/firebase/firestore');
+        await markFounderPayoutSent(challenge.id);
       }
 
       let message = `✅ Airdrop sent to ${sentCount} wallets (${sentTotal} USDFG).`;
@@ -4949,7 +4918,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             >
               <span className="text-amber-300">⚡</span>
               <span className="text-white">
-                {hasActiveChallenge ? "In Challenge" : isCreatingChallenge ? "Creating..." : "Create Challenge"}
+                {hasActiveChallenge ? "In Challenge" : isCreatingChallenge ? "Creating..." : "Start Match"}
               </span>
             </button>
             
@@ -5106,7 +5075,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     onClick={() => setShowCreateModal(true)}
                     className="elite-btn neocore-button px-2 sm:px-3 py-1 sm:py-1.5 w-full sm:w-auto text-xs sm:text-sm"
                   >
-                    Create Challenge
+                    Start Match
                   </button>
                   <Link 
                     to="#challenges"
@@ -5184,9 +5153,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               <div className="relative z-10">
                 <div className="text-lg mb-1">👥</div>
                 <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">
-                  {playersOnlineCount.toLocaleString()}
+                  —
                 </div>
-                <div className="text-sm text-amber-400 mt-1 font-semibold">Players Online</div>
+                <div className="text-sm text-amber-400 mt-1 font-semibold">Join the arena</div>
               </div>
             </div>
             
@@ -5216,6 +5185,34 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 
             {/* Helper function to map challenge categories to discovery categories */}
             {(() => {
+              const isAdminUser = !!publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+              const completedFounderForPayout = isAdminUser ? filteredChallenges.filter((c: any) => {
+                const fmt = c.format || c.rawData?.format;
+                const isTournament = fmt === 'tournament' || !!c.tournament || !!c.rawData?.tournament;
+                const creator = (c.creator ?? c.rawData?.creator) ?? '';
+                const fee = c.entryFee ?? c.rawData?.entryFee ?? 0;
+                const founderPart = c.founderParticipantReward ?? c.rawData?.founderParticipantReward ?? 0;
+                const founderWin = c.founderWinnerBonus ?? c.rawData?.founderWinnerBonus ?? 0;
+                const stage = c.tournament?.stage ?? c.rawData?.tournament?.stage;
+                const status = c.status || c.rawData?.status;
+                return isTournament && creator?.toLowerCase() === ADMIN_WALLET.toString().toLowerCase() &&
+                  (fee === 0 || fee < 1e-9) && (founderPart > 0 || founderWin > 0) &&
+                  (status === 'completed' || status === 'disputed') && stage === 'completed';
+              }) : [];
+
+              const openChallengeLobby = (challenge: any) => {
+                const merged = mergeChallengeDataForModal(challenge, challenge.rawData ?? challenge);
+                setSelectedChallenge(merged);
+                const format = (merged.rawData as any)?.format || ((merged.rawData as any)?.tournament ? "tournament" : "standard");
+                if (format === "tournament") {
+                  setShowStandardLobby(false);
+                  setShowTournamentLobby(true);
+                } else {
+                  if (showTournamentLobby) setShowTournamentLobby(false);
+                  setShowStandardLobby(true);
+                }
+              };
+
               // Group challenges by discovery category (Sports, Fighting, FPS, Racing)
               const categorizeChallenge = (challenge: any): 'Sports' | 'Fighting' | 'FPS' | 'Racing' | null => {
                 const category = challenge.category?.toUpperCase() || '';
@@ -5452,7 +5449,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
                       <div className="mt-auto grid grid-cols-2 gap-2 text-xs">
                         <div className="rounded-lg bg-black/45 p-2">
-                          <div className="text-white/70">💰 Entry</div>
+                          <div className="text-white/70">💰 Challenge Amount</div>
                           <div className="font-semibold">{challenge.entryFee} USDFG</div>
                                         </div>
                         <div className="rounded-lg bg-black/45 p-2">
@@ -5477,9 +5474,32 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                             );
               };
 
-              // Render category rows
-                            return (
+              // Render Founder Payout row for admin (so completed Founder Tournament is always clickable)
+              return (
                 <>
+                  {completedFounderForPayout.length > 0 && (
+                    <section className="mb-6">
+                      <div className="mb-2 flex items-center justify-between px-4 md:px-0">
+                        <h2 className="text-sm font-semibold tracking-wide text-purple-400">
+                          Founder Payout
+                        </h2>
+                        <span className="text-xs text-white/45">Tap to open & send airdrop</span>
+                      </div>
+                      <div
+                        className="flex gap-3 overflow-x-auto pb-4 px-4 md:px-0 md:pb-2"
+                        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                      >
+                        {completedFounderForPayout.map((challenge: any) => (
+                          <div key={challenge.id} className="flex-none">
+                            <DiscoveryCard
+                              challenge={challenge}
+                              onSelect={() => openChallengeLobby(challenge)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
                   {(Object.entries(categoryGroups) as Array<[string, any[]]>).map(([categoryTitle, items]) => {
                     if (items.length === 0) return null;
                     
@@ -5516,22 +5536,20 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
                                   const isCompletedOrDisputed = challenge.status === "completed" || challenge.status === "disputed";
                                   const payoutTriggered = !!challenge.rawData?.payoutTriggered;
+                                  const creator = (challenge.creator ?? challenge.rawData?.creator) ?? '';
+                                  const isAdmin = !!publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+                                  const fmt = challenge.format || challenge.rawData?.format;
+                                  const isTournament = fmt === 'tournament' || !!challenge.tournament || !!challenge.rawData?.tournament;
+                                  const fee = challenge.entryFee ?? challenge.rawData?.entryFee ?? 0;
+                                  const founderPart = challenge.founderParticipantReward ?? challenge.rawData?.founderParticipantReward ?? 0;
+                                  const founderWin = challenge.founderWinnerBonus ?? challenge.rawData?.founderWinnerBonus ?? 0;
+                                  const isFounderTournament = isTournament &&
+                                    creator?.toLowerCase() === ADMIN_WALLET.toString().toLowerCase() &&
+                                    (fee === 0 || fee < 1e-9) &&
+                                    (founderPart > 0 || founderWin > 0);
                                   if (isCompletedOrDisputed || payoutTriggered) {
-                                    // Allow admin to open completed Founder Tournament for payout
-                                    const creator = (challenge.creator ?? challenge.rawData?.creator) ?? '';
-                                    const isAdmin = !!publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
-                                    const fmt = challenge.format || challenge.rawData?.format;
-                                    const isTournament = fmt === 'tournament' || !!challenge.tournament || !!challenge.rawData?.tournament;
-                                    const fee = challenge.entryFee ?? challenge.rawData?.entryFee ?? 0;
-                                    const founderPart = challenge.founderParticipantReward ?? challenge.rawData?.founderParticipantReward ?? 0;
-                                    const founderWin = challenge.founderWinnerBonus ?? challenge.rawData?.founderWinnerBonus ?? 0;
-                                    const stage = challenge.tournament?.stage ?? challenge.rawData?.tournament?.stage;
-                                    const isCompletedFounder = isTournament &&
-                                      creator?.toLowerCase() === ADMIN_WALLET.toString().toLowerCase() &&
-                                      (fee === 0 || fee < 1e-9) &&
-                                      (founderPart > 0 || founderWin > 0) &&
-                                      stage === 'completed';
-                                    if (!(isAdmin && isCompletedFounder)) return;
+                                    // Block non-admin from opening completed challenges; allow admin to open Founder Tournament for payout
+                                    if (!(isAdmin && isFounderTournament)) return;
                                   }
 
                                   // Check if this is a team challenge with teamOnly restriction
@@ -5562,35 +5580,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                     }
                                   }
                                   
-                                  // Always open lobby directly (X Spaces style) instead of detail sheet
-                                  setSelectedChallenge({
-                                    id: challenge.id,
-                                    title: (challenge as any).title || extractGameFromTitle((challenge as any).title || '') || "Challenge",
-                                    ...challenge
-                                  });
-                                  
-                                  // Determine format and open appropriate lobby
-                                  const format = challenge.rawData?.format || (challenge.rawData?.tournament ? "tournament" : "standard");
-                                  const status = challenge.status || challenge.rawData?.status;
-                                  
-                                  // For tournament challenges, open tournament lobby
-                                  if (format === "tournament") {
-                                    // If standard lobby is open, close it first
-                                    if (showStandardLobby) {
-                                      setShowStandardLobby(false);
-                                    }
-                                    setShowTournamentLobby(true);
-                                  } else {
-                                    // For standard challenges, always open standard lobby
-                                    // If tournament lobby is open, close it first
-                                    if (showTournamentLobby) {
-                                      setShowTournamentLobby(false);
-                                    }
-                                    // If lobby is already open, just update the challenge (X Spaces style)
-                                    if (!showStandardLobby) {
-                                      setShowStandardLobby(true);
-                                    }
-                                  }
+                                  openChallengeLobby(challenge);
                                 }}
                               />
                                 </div>
@@ -6425,7 +6415,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     setSelectedChallenge(null);
                   }}
                   title={`${selectedChallenge.title || "Tournament"} Bracket`}
-                  className="max-w-none sm:max-w-[95vw] w-full"
+                  className="max-w-none w-full sm:max-w-[92vw] md:max-w-[88vw] lg:max-w-[85vw] xl:max-w-6xl"
                   players={players.map((wallet: string) => ({ wallet }))}
                   gameName={selectedChallenge.title || "Tournament"}
                   voiceChatChallengeId={selectedChallenge.id}
@@ -6669,7 +6659,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               ? 'bg-gray-600/50 cursor-not-allowed' 
               : 'bg-gradient-to-r from-amber-400 to-orange-500 hover:brightness-110'
           } text-white p-3 rounded-full shadow-[0_0_20px_rgba(255,215,130,0.5)] transition-all z-30 flex items-center justify-center w-12 h-12`}
-          title={hasActiveChallenge ? "You have an active challenge" : "Create Challenge"}
+          title={hasActiveChallenge ? "You have an active challenge" : "Start Match"}
         >
           <span className="text-xl font-bold">+</span>
         </button>
@@ -7402,7 +7392,7 @@ const CreateChallengeModal: React.FC<{
       <div className="relative w-[92vw] max-w-xl max-h-[90vh] rounded-xl border border-amber-400/20 bg-gradient-to-br from-gray-900/95 via-gray-900/95 to-black/95 backdrop-blur-md p-4 overflow-y-auto shadow-[0_0_40px_rgba(0,0,0,0.6)] shadow-amber-400/8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h3 className="text-lg font-semibold text-white">Create Challenge</h3>
+            <h3 className="text-lg font-semibold text-white">Start Match</h3>
             <p className="text-xs text-gray-400 mt-1">Step {currentStep} of {totalSteps}</p>
           </div>
           <button onClick={onClose} className="text-white/70 hover:text-white">
@@ -7656,7 +7646,7 @@ const CreateChallengeModal: React.FC<{
                     </PrimaryButton>
                   ) : (
                     <PrimaryButton onClick={nextStep} className="min-h-[44px] px-6 py-3 text-base touch-manipulation bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400">
-                      Review & Create Challenge
+                      Review & Start Match
                     </PrimaryButton>
                   )}
                 </div>
@@ -7721,10 +7711,10 @@ const CreateChallengeModal: React.FC<{
                 <div className="flex justify-between mt-6 mb-4 sticky bottom-0 bg-[#11051E] pt-4">
                   <TertiaryButton onClick={prevStep} className="min-h-[44px] px-6 py-3 text-base touch-manipulation">Back</TertiaryButton>
                   {formData.mode === 'Custom Mode' ? (
-                    <PrimaryButton onClick={nextStep} className="min-h-[44px] px-6 py-3 text-base touch-manipulation">Review & Create</PrimaryButton>
+                    <PrimaryButton onClick={nextStep} className="min-h-[44px] px-6 py-3 text-base touch-manipulation">Review & Start Match</PrimaryButton>
                   ) : (
                     <PrimaryButton type="submit" className="min-h-[44px] px-6 py-3 text-base touch-manipulation bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400">
-                      Create Challenge
+                      Start Match
                     </PrimaryButton>
                   )}
                 </div>
@@ -7789,7 +7779,7 @@ const CreateChallengeModal: React.FC<{
                 <div className="flex justify-between">
                   <TertiaryButton onClick={prevStep}>Back</TertiaryButton>
                   <PrimaryButton type="submit" className="bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400">
-                    Create Challenge
+                    Start Match
                   </PrimaryButton>
                 </div>
               </div>

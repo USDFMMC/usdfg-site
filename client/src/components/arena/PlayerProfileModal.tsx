@@ -7,7 +7,6 @@ import ElegantButton from "@/components/ui/ElegantButton";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "../ui/tooltip";
 import { USDFG_RELICS, getUnlockedTrophies, getNextTrophy, getTrophyProgress, getTrophyColorClass, checkPlayerHasOgFirst1k, checkPlayerHasFounderChallenge } from "@/lib/trophies";
 import { getTeamByMember, joinTeam, leaveTeam, removeTeamMember, TeamStats, getPlayerEarningsByChallenge, type PlayerEarningByChallenge } from "@/lib/firebase/firestore";
-import { MOCK_EARNINGS_BY_CHALLENGE } from "@/lib/mock/earningsByChallenge";
 
 // Countries list for flag display - matches CountryFlagPicker
 const countries = [
@@ -961,33 +960,27 @@ export default function PlayerProfileModal({
           <h3 className="text-xs font-semibold text-amber-200/90 uppercase tracking-wide mb-2 flex items-center gap-1.5">
             <Trophy className="h-3.5 w-3.5" />
             Earnings per challenge
-            {!loadingEarnings && earningsByChallenge.length === 0 && (
-              <span className="text-[10px] font-normal normal-case text-zinc-500">(demo)</span>
-            )}
           </h3>
           {loadingEarnings ? (
             <p className="text-[11px] text-zinc-500">Loading…</p>
-          ) : (() => {
-            const list = earningsByChallenge.length > 0 ? earningsByChallenge : MOCK_EARNINGS_BY_CHALLENGE;
-            return list.length === 0 ? (
-              <p className="text-[11px] text-zinc-500">No completed challenges yet.</p>
-            ) : (
-              <div className="max-h-32 overflow-y-auto rounded-lg border border-white/10 bg-black/20 py-1.5 px-2 space-y-1.5">
-                {list.slice(0, 10).map((e) => (
+          ) : earningsByChallenge.length === 0 ? (
+            <p className="text-[11px] text-zinc-500">No completed challenges yet.</p>
+          ) : (
+            <div className="max-h-32 overflow-y-auto rounded-lg border border-white/10 bg-black/20 py-1.5 px-2 space-y-1.5">
+              {earningsByChallenge.slice(0, 10).map((e) => (
                   <div key={e.challengeId} className="flex items-center justify-between gap-2 text-[11px]">
                     <span className="text-white/90 truncate flex-1 min-w-0">{e.game || e.title || "Challenge"}</span>
                     <span className="text-amber-300 font-semibold shrink-0">{e.amount} USDFG</span>
                     <span className="text-zinc-500 shrink-0">{e.completedAt.toLocaleDateString()}</span>
                   </div>
                 ))}
-                {list.length > 10 && (
-                  <p className="text-[10px] text-zinc-500 pt-1 border-t border-white/5">
-                    +{list.length - 10} more
-                  </p>
-                )}
-              </div>
-            );
-          })()}
+              {earningsByChallenge.length > 10 && (
+                <p className="text-[10px] text-zinc-500 pt-1 border-t border-white/5">
+                  +{earningsByChallenge.length - 10} more
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Challenge CTA */}

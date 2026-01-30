@@ -25,7 +25,7 @@ const CreateChallenge: React.FC = () => {
   return (
     <>
       <Helmet>
-        <title>Create Challenge - USDFG Arena | USDFGAMING</title>
+        <title>Start Match - USDFG Arena | USDFGAMING</title>
         <meta name="description" content="Create a new skill-based gaming challenge in the USDFG Arena." />
       </Helmet>
 
@@ -44,7 +44,7 @@ const CreateChallenge: React.FC = () => {
                 <div className="w-8 h-8 bg-gradient-to-r from-glow-cyan to-glow-electric rounded-lg flex items-center justify-center">
                   <Gamepad2 className="w-5 h-5 text-black" />
                 </div>
-                <h1 className="neocore-h2 text-text-primary">Create Challenge</h1>
+                <h1 className="neocore-h2 text-text-primary">Start Match</h1>
               </div>
             </div>
           </div>

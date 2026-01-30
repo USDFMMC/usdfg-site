@@ -868,16 +868,16 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
       {currentStep === 3 && (
         <div className="space-y-3">
           <div>
-            <h3 className="text-base font-semibold text-white mb-3">Challenge Rules</h3>
+            <h3 className="text-base font-semibold text-white mb-3">Optional Rules</h3>
             
             <div>
               <label className="block text-xs font-medium text-gray-300 mb-1.5">
-                Rules & Conditions
+                Rules (optional)
               </label>
               <textarea
                 value={formData.rules}
                 onChange={(e) => handleInputChange('rules', e.target.value)}
-                placeholder="Enter detailed rules for your challenge..."
+                placeholder="Optional · Add clarifying rules if needed"
                 rows={5}
                 className="w-full px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white placeholder-zinc-500 focus:border-amber-400/50 focus:outline-none resize-none transition-all"
               />
@@ -892,7 +892,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
       {/* Validation Errors */}
       {validationErrors.length > 0 && (
         <div className="p-2 bg-red-500/10 border border-red-500/30 rounded-lg">
-          <div className="text-red-400 font-medium mb-1.5 text-xs">Please fix the following errors:</div>
+          <div className="text-red-400 font-medium mb-1.5 text-xs">Missing details to enter the arena</div>
           <ul className="text-red-300 text-xs space-y-0.5">
             {validationErrors.map((error, index) => (
               <li key={index}>• {error}</li>
@@ -909,7 +909,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
           disabled={currentStep === 1}
           className="text-sm px-3 py-1.5"
         >
-          Previous
+          Back
         </ElegantButton>
 
         <div className="flex space-x-2">
@@ -919,7 +919,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
               variant="primary"
               className="text-sm px-3 py-1.5"
             >
-              Next
+              Continue
             </ElegantButton>
           ) : (
             <ElegantButton
@@ -928,7 +928,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
               disabled={!isConnected}
               className="text-sm px-3 py-1.5"
             >
-              Create Challenge
+              Start Match
             </ElegantButton>
           )}
         </div>

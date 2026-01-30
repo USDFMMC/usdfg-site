@@ -96,6 +96,8 @@ export interface ChallengeData {
   prizePool?: number;                 // Total challenge reward amount
   founderParticipantReward?: number;  // Founder tournament reward per participant
   founderWinnerBonus?: number;        // Founder tournament winner bonus
+  founderPayoutAcknowledgedBy?: string[]; // Wallets that saw "no action required" (hide Claim for them)
+  founderPayoutSentAt?: Timestamp;    // When founder airdrop was sent (hide Claim for all)
   // UI display fields
   title?: string;                     // Challenge title (contains game info)
   game?: string;                      // Game name for display
@@ -2482,7 +2484,7 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     
     await updateDoc(challengeRef, {
       status: 'completed',
-      winner,
+      winner: normalizeWinnerWallet(winner),
       updatedAt: Timestamp.now(),
     });
     console.log('🏆 WINNER DETERMINED:', winner);
@@ -2688,7 +2690,7 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
         // They claimed they won → They win by default
         await updateDoc(challengeRef, {
           status: 'completed',
-          winner: submittedWallet,
+          winner: normalizeWinnerWallet(submittedWallet),
           updatedAt: Timestamp.now(),
         });
         console.log('🏆 DEADLINE PASSED: Winner by default (opponent no-show):', submittedWallet);
@@ -2697,7 +2699,7 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
         const opponentWallet = data.players.find((p: string) => p !== submittedWallet);
         await updateDoc(challengeRef, {
           status: 'completed',
-          winner: opponentWallet || 'tie',
+          winner: opponentWallet ? normalizeWinnerWallet(opponentWallet) : 'tie',
           updatedAt: Timestamp.now(),
         });
         console.log('🏆 DEADLINE PASSED: Opponent wins (player admitted defeat, opponent no-show):', opponentWallet);
@@ -2848,6 +2850,12 @@ function sanitizeDisplayName(name: string | undefined): string | undefined {
   const sanitized = name.trim().slice(0, 20);
   
   return sanitized || undefined;
+}
+
+/** Normalize winner field for storage so profile earnings query works regardless of URL casing. */
+function normalizeWinnerWallet(w: string): string {
+  if (w === 'forfeit' || w === 'tie' || w === 'cancelled') return w;
+  return w.toLowerCase();
 }
 
 export interface PlayerStats {
@@ -3124,18 +3132,28 @@ async function updatePlayerStats(
 }
 
 /**
- * Get player stats by wallet address
+ * Get player stats by wallet address.
+ * Tries lowercase doc id if not found so profile works regardless of URL casing.
  */
 export async function getPlayerStats(wallet: string): Promise<PlayerStats | null> {
   try {
     const playerRef = doc(db, 'player_stats', wallet);
     const playerSnap = await getDoc(playerRef);
-    
-    if (!playerSnap.exists()) {
-      return null;
+
+    if (playerSnap.exists()) {
+      return playerSnap.data() as PlayerStats;
     }
-    
-    return playerSnap.data() as PlayerStats;
+
+    const walletLower = wallet.toLowerCase();
+    if (walletLower !== wallet) {
+      const fallbackRef = doc(db, 'player_stats', walletLower);
+      const fallbackSnap = await getDoc(fallbackRef);
+      if (fallbackSnap.exists()) {
+        return fallbackSnap.data() as PlayerStats;
+      }
+    }
+
+    return null;
   } catch (error) {
     console.error('❌ Error fetching player stats:', error);
     return null;
@@ -3154,32 +3172,43 @@ export interface PlayerEarningByChallenge {
 /**
  * Fetch challenges where the player won, for "earnings per challenge" on profile.
  * Returns completed challenges only, sorted by completion time (newest first).
+ * Queries both wallet and wallet.toLowerCase() so profile works regardless of URL casing.
  */
 export async function getPlayerEarningsByChallenge(wallet: string, limitCount: number = 50): Promise<PlayerEarningByChallenge[]> {
   try {
     const challengesRef = collection(db, 'challenges');
-    const q = query(
-      challengesRef,
-      where('winner', '==', wallet),
-      limit(limitCount * 2)
-    );
-    const snap = await getDocs(q);
+    const walletLower = wallet.toLowerCase();
+    const seenIds = new Set<string>();
     const items: PlayerEarningByChallenge[] = [];
-    snap.forEach((d) => {
-      const data = d.data() as ChallengeData;
-      if (data.status !== 'completed') return;
-      const amount = data.prizePool ?? 0;
-      const ts = data.payoutTimestamp ?? (data as { updatedAt?: Timestamp }).updatedAt ?? data.createdAt;
-      const completedAt = ts?.toMillis?.() ? new Date(ts.toMillis()) : new Date(0);
-      items.push({
-        challengeId: d.id,
-        title: data.title,
-        game: data.game,
-        amount,
-        completedAt,
-        format: data.format,
+
+    const addFromSnap = (snap: { forEach: (fn: (d: { id: string; data: () => unknown }) => void) => void }) => {
+      snap.forEach((d) => {
+        if (seenIds.has(d.id)) return;
+        const data = d.data() as ChallengeData;
+        if (data.status !== 'completed') return;
+        const amount = data.prizePool ?? 0;
+        const ts = data.payoutTimestamp ?? (data as { updatedAt?: Timestamp }).updatedAt ?? data.createdAt;
+        const completedAt = ts?.toMillis?.() ? new Date(ts.toMillis()) : new Date(0);
+        seenIds.add(d.id);
+        items.push({
+          challengeId: d.id,
+          title: data.title,
+          game: data.game,
+          amount,
+          completedAt,
+          format: data.format,
+        });
       });
-    });
+    };
+
+    const q1 = query(challengesRef, where('winner', '==', wallet), limit(limitCount * 2));
+    addFromSnap(await getDocs(q1));
+
+    if (walletLower !== wallet) {
+      const q2 = query(challengesRef, where('winner', '==', walletLower), limit(limitCount * 2));
+      addFromSnap(await getDocs(q2));
+    }
+
     items.sort((a, b) => b.completedAt.getTime() - a.completedAt.getTime());
     return items.slice(0, limitCount);
   } catch (error) {
@@ -3388,46 +3417,39 @@ export async function upsertLockNotification({
   }
 }
 
-export function listenToLockNotifications(
-  wallet: string,
-  callback: (notifications: LockNotification[]) => void
-): () => void {
-  if (!wallet) {
-    return () => undefined;
+/**
+ * One-time fetch of lock notifications for a wallet (no listener).
+ * Use for manual refresh or when leaderboard/friendly section is open.
+ */
+export async function getLockNotificationsForWallet(wallet: string): Promise<LockNotification[]> {
+  if (!wallet) return [];
+  try {
+    const walletLower = wallet.toLowerCase();
+    const q = query(
+      lockNotificationsCollection,
+      where('participants', 'array-contains', walletLower)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((docSnap) => {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        matchId: data.matchId,
+        initiator: data.initiator,
+        target: data.target,
+        initiatorDisplayName: data.initiatorDisplayName,
+        targetDisplayName: data.targetDisplayName,
+        participants: data.participants,
+        status: data.status,
+        lastActionBy: data.lastActionBy,
+        createdAt: data.createdAt ?? null,
+        updatedAt: data.updatedAt ?? null,
+      };
+    });
+  } catch (error) {
+    console.error('❌ Error fetching lock notifications:', error);
+    return [];
   }
-
-  const walletLower = wallet.toLowerCase();
-  const notificationsQuery = query(
-    lockNotificationsCollection,
-    where('participants', 'array-contains', walletLower)
-  );
-
-  return onSnapshot(
-    notificationsQuery,
-    (snapshot) => {
-      const notifications: LockNotification[] = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          matchId: data.matchId,
-          initiator: data.initiator,
-          target: data.target,
-          initiatorDisplayName: data.initiatorDisplayName,
-          targetDisplayName: data.targetDisplayName,
-          participants: data.participants,
-          status: data.status,
-          lastActionBy: data.lastActionBy,
-          createdAt: data.createdAt ?? null,
-          updatedAt: data.updatedAt ?? null,
-        };
-      });
-
-      callback(notifications);
-    },
-    (error) => {
-      console.error('❌ Error listening to lock notifications:', error);
-    }
-  );
 }
 
 /**
@@ -3505,51 +3527,9 @@ export async function upsertChallengeNotification({
 }
 
 /**
- * Listen to challenge notifications for a specific player
+ * REMOVED: listenToChallengeNotifications (realtime listener for UI only).
+ * Users see new challenges via listenToChallenges; use "Check your challenges" / refresh instead.
  */
-export function listenToChallengeNotifications(
-  wallet: string,
-  callback: (notifications: ChallengeNotification[]) => void
-): () => void {
-  if (!wallet) {
-    return () => undefined;
-  }
-
-  const walletLower = wallet.toLowerCase();
-  const notificationsQuery = query(
-    collection(db, 'challenge_notifications'),
-    where('targetPlayer', '==', walletLower),
-    where('status', '==', 'pending_waiting_for_opponent')
-  );
-
-  return onSnapshot(
-    notificationsQuery,
-    (snapshot) => {
-      const notifications: ChallengeNotification[] = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          challengeId: data.challengeId,
-          creator: data.creator,
-          targetPlayer: data.targetPlayer,
-          creatorDisplayName: data.creatorDisplayName,
-          targetDisplayName: data.targetDisplayName,
-          challengeTitle: data.challengeTitle,
-          entryFee: data.entryFee,
-          prizePool: data.prizePool,
-          status: data.status,
-          createdAt: data.createdAt ?? null,
-          updatedAt: data.updatedAt ?? null,
-        };
-      });
-
-      callback(notifications);
-    },
-    (error) => {
-      console.error('❌ Error listening to challenge notifications:', error);
-    }
-  );
-}
 
 /**
  * Clear the lock state for two users after a friendly match resolves.
@@ -3582,25 +3562,10 @@ export async function clearMutualLock(userA: string, userB: string): Promise<voi
 }
 
 /**
- * Listen to all lobby locks so the client can react to mutual lock pairs.
+ * REMOVED: listenToAllUserLocks (full users collection listener — too expensive).
+ * Lock state is now derived from lock_notifications via getLockNotificationsForWallet
+ * when needed (e.g. on mount or manual refresh). See getLockNotificationsForWallet.
  */
-export function listenToAllUserLocks(
-  callback: (locks: Record<string, string | null>) => void
-): () => void {
-  return onSnapshot(usersCollection, (snapshot) => {
-    const locks: Record<string, string | null> = {};
-
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      const rawLock = (data?.currentLock ?? null) as string | null;
-      locks[docSnap.id] = rawLock ? rawLock.toLowerCase() : null;
-    });
-
-    callback(locks);
-  }, (error) => {
-    console.error('❌ Error listening to user locks:', error);
-  });
-}
 
 /**
  * Record a friendly match submission. Stores each player's self-reported outcome.
@@ -4709,6 +4674,35 @@ export async function claimChallengePrize(
   }
 }
 
+/**
+ * Record that a user saw the Founder Tournament "no action required" message.
+ * Hides the Claim button for that user.
+ */
+export async function acknowledgeFounderTournamentPayout(
+  challengeId: string,
+  wallet: string
+): Promise<void> {
+  const challengeRef = doc(db, 'challenges', challengeId);
+  const normalized = wallet.toLowerCase();
+  await updateDoc(challengeRef, {
+    founderPayoutAcknowledgedBy: arrayUnion(normalized),
+    updatedAt: serverTimestamp()
+  });
+}
+
+/**
+ * Mark that the founder has sent the airdrop for this Founder Tournament.
+ * Hides the Claim button for all participants and removes from unclaimed list.
+ */
+export async function markFounderPayoutSent(challengeId: string): Promise<void> {
+  const challengeRef = doc(db, 'challenges', challengeId);
+  await updateDoc(challengeRef, {
+    founderPayoutSentAt: serverTimestamp(),
+    payoutTriggered: true,
+    updatedAt: serverTimestamp()
+  });
+}
+
 // ============================================
 // FREE USDFG CLAIM SYSTEM - REMOVED
 // ============================================
@@ -4828,7 +4822,7 @@ export const resolveAdminChallenge = async (
     // Update challenge
     await updateDoc(challengeRef, {
       status: 'completed',
-      winner: winnerWallet,
+      winner: normalizeWinnerWallet(winnerWallet),
       resolvedBy: adminUid,
       resolvedAt: Timestamp.now(),
       adminResolutionTx: onChainTx || null,
@@ -4840,7 +4834,7 @@ export const resolveAdminChallenge = async (
       adminUid,
       adminEmail,
       challengeId,
-      winner: winnerWallet,
+      winner: normalizeWinnerWallet(winnerWallet),
       action: 'resolve_dispute',
       timestamp: Timestamp.now(),
       onChainTx: onChainTx || null,

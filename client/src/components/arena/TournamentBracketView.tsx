@@ -305,10 +305,12 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
     });
   }
   
-  // Check if reward can be claimed
+  // Check if reward can be claimed (base; founder logic applied after isFounderTournament)
   const canClaim = challenge?.canClaim || challenge?.rawData?.canClaim;
-  const prizeClaimed = challenge?.prizeClaimed || challenge?.rawData?.prizeClaimed || challenge?.rawData?.prizeClaimedAt || challenge?.payoutTriggered;
-  const canClaimPrize = isChampion && isCompleted && canClaim && !prizeClaimed;
+  const prizeClaimedBase = challenge?.prizeClaimed || challenge?.rawData?.prizeClaimed || challenge?.rawData?.prizeClaimedAt || challenge?.payoutTriggered;
+  const founderPayoutSentAt = challenge?.founderPayoutSentAt ?? challenge?.rawData?.founderPayoutSentAt;
+  const founderPayoutAcknowledgedBy = challenge?.founderPayoutAcknowledgedBy ?? challenge?.rawData?.founderPayoutAcknowledgedBy ?? [];
+  const userAcknowledgedFounder = Array.isArray(founderPayoutAcknowledgedBy) && currentWallet && founderPayoutAcknowledgedBy.some((w: string) => w.toLowerCase() === currentWallet.toLowerCase());
 
   const creatorWallet = challenge?.creator || challenge?.rawData?.creator || '';
   const entryFee = Number(challenge?.entryFee ?? challenge?.rawData?.entryFee ?? 0);
@@ -325,6 +327,10 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
     isAdminCreator &&
     (entryFee === 0 || entryFee < 0.000000001) &&
     (founderParticipantReward > 0 || founderWinnerBonus > 0);
+  // For Founder Tournaments: hide Claim if user acknowledged or founder sent airdrop
+  const prizeClaimed = prizeClaimedBase || !!founderPayoutSentAt || (isFounderTournament && userAcknowledgedFounder);
+  const canClaimPrize = isChampion && isCompleted && canClaim && !prizeClaimed;
+  const founderPayoutAlreadySent = !!founderPayoutSentAt;
   const isAdminViewer =
     currentWallet &&
     currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
@@ -370,14 +376,14 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 lg:space-y-4">
       {isCompleted && champion && (
-        <div className="rounded-xl border border-amber-400/50 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 p-6 text-center">
-          <div className="text-4xl mb-2">🏆</div>
-          <div className="text-lg font-bold text-amber-200 mb-1">
+        <div className="rounded-xl border border-amber-400/50 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 p-4 lg:p-5 text-center">
+          <div className="text-3xl lg:text-4xl mb-1.5">🏆</div>
+          <div className="text-base lg:text-lg font-bold text-amber-200 mb-1">
             Tournament Complete!
           </div>
-          <div className="text-sm text-amber-100/90 mb-3">
+          <div className="text-xs lg:text-sm text-amber-100/90 mb-2 lg:mb-3">
             Champion:{" "}
             <span 
               className={cn(
@@ -420,6 +426,14 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
                     {isClaiming ? 'Claiming...' : '🏆 Claim Reward'}
                   </button>
                 </div>
+              ) : founderPayoutAlreadySent ? (
+                <div className="text-xs text-emerald-100/80">
+                  ✅ Reward distributed! Check your wallet for USDFG.
+                </div>
+              ) : isFounderTournament && userAcknowledgedFounder ? (
+                <div className="text-xs text-emerald-100/80">
+                  🏆 Founder Tournament. Rewards will be sent by the platform. No action required.
+                </div>
               ) : prizeClaimed ? (
                 <div className="text-xs text-emerald-100/80">
                   ✅ Reward claimed! Check your wallet for the USDFG reward.
@@ -435,11 +449,11 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
       )}
 
       {isCompleted && isFounderTournament && isAdminViewer && (
-        <div className="rounded-xl border border-purple-400/40 bg-purple-500/10 p-4 text-sm text-purple-100">
-          <div className="text-xs uppercase tracking-widest text-purple-300">
+        <div className="rounded-xl border border-purple-400/40 bg-purple-500/10 p-3 lg:p-4 text-xs lg:text-sm text-purple-100">
+          <div className="text-[10px] lg:text-xs uppercase tracking-widest text-purple-300">
             Founder Tournament Payouts
           </div>
-          <div className="mt-2 text-xs text-purple-100/80">
+          <div className="mt-1.5 lg:mt-2 text-[10px] lg:text-xs text-purple-100/80">
             Participants: {uniqueParticipants.length} · Participant Reward: {founderParticipantReward} USDFG · Winner Bonus: {founderWinnerBonus} USDFG
           </div>
           <FounderPayoutButtons
@@ -581,20 +595,19 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
         </div>
       )}
 
-      <div className="flex flex-col gap-4 lg:flex-row">
-        <div className="flex-1 overflow-x-auto min-w-0">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
+        <div className="flex-1 w-full min-w-0">
           <div
-            className="grid gap-4"
+            className="grid w-full gap-3 lg:gap-4"
             style={{
-              gridTemplateColumns: `repeat(${bracket.length}, minmax(250px, 1fr))`,
-              minWidth: `${bracket.length * 250}px`,
+              gridTemplateColumns: `repeat(${bracket.length}, minmax(0, 1fr))`,
             }}
           >
         {bracket.map((round) => (
-          <div key={round.roundNumber} className="space-y-4">
+          <div key={round.roundNumber} className="space-y-2 lg:space-y-3 min-w-0">
             <div
               className={cn(
-                "text-center text-xs font-semibold uppercase tracking-widest",
+                "text-center text-[10px] lg:text-xs font-semibold uppercase tracking-widest",
                 round.roundNumber === currentRound
                   ? "text-amber-300"
                   : "text-gray-400"
@@ -605,7 +618,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
                 : `Round ${round.roundNumber}`}
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               {round.matches.map((match) => {
                 const youAreInMatch =
                   (currentWallet &&
@@ -627,7 +640,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
                 const renderSlot = (slot?: string) => {
                   if (!slot) {
                     return (
-                      <div className="flex h-8 items-center justify-between rounded-lg border border-dashed border-white/10 px-3 text-xs text-gray-400">
+                      <div className="flex h-7 lg:h-8 items-center justify-between rounded-md border border-dashed border-white/10 px-2.5 lg:px-3 text-[10px] lg:text-xs text-gray-400">
                         <span>Waiting...</span>
                       </div>
                     );
@@ -639,7 +652,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
                   return (
                     <div
                       className={cn(
-                        "flex h-8 items-center justify-between rounded-lg border px-3 text-xs font-semibold",
+                        "flex h-7 lg:h-8 items-center justify-between rounded-md border px-2.5 lg:px-3 text-[10px] lg:text-xs font-semibold",
                         isCurrent
                           ? "border-amber-400/50 bg-amber-400/10 text-amber-200"
                           : "border-white/10 bg-white/5 text-white",
@@ -668,17 +681,17 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
                   <div
                     key={match.id}
                     className={cn(
-                      "rounded-xl border bg-black/40 p-3 backdrop-blur-sm",
+                      "rounded-lg lg:rounded-xl border bg-black/40 p-2.5 lg:p-3 backdrop-blur-sm",
                       youAreInMatch ? "border-amber-400/40" : "border-white/5"
                     )}
                   >
-                    <div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-wide text-gray-400">
+                    <div className="mb-2 flex items-center justify-between text-[9px] lg:text-[10px] uppercase tracking-wide text-gray-400">
                       <span>
                         Match {match.id.replace("r", "").replace("-", "")}
                       </span>
                       <span
                         className={cn(
-                          "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                          "rounded-full px-1.5 py-0.5 text-[9px] lg:text-[10px] font-semibold",
                           match.status === "completed"
                             ? "bg-emerald-500/15 text-emerald-300 border border-emerald-400/30"
                             : match.status === "in-progress"
@@ -690,7 +703,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
                       </span>
                     </div>
 
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       {renderSlot(match.player1)}
                       {renderSlot(match.player2)}
                     </div>
@@ -698,7 +711,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
                     {match.winner && (
                       <div 
                         className={cn(
-                          "mt-3 rounded-lg bg-emerald-500/10 px-2 py-1 text-[11px] text-emerald-300",
+                          "mt-2 rounded-md bg-emerald-500/10 px-2 py-1 text-[10px] lg:text-[11px] text-emerald-300",
                           onPlayerClick && "cursor-pointer hover:bg-emerald-500/20 transition-colors"
                         )}
                         onClick={() => {
@@ -717,7 +730,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
                     )}
 
                     {isChampionMatch && (
-                      <div className="mt-2 rounded-lg border border-amber-400/40 bg-amber-500/10 px-2 py-1 text-center text-[11px] font-semibold text-amber-200">
+                      <div className="mt-1.5 rounded-md border border-amber-400/40 bg-amber-500/10 px-2 py-0.5 text-center text-[10px] lg:text-[11px] font-semibold text-amber-200">
                         🏆 Champion
                       </div>
                     )}
@@ -730,7 +743,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
       </div>
         </div>
 
-        <div className="w-full lg:max-w-xs space-y-3">
+        <div className="w-full lg:w-64 xl:w-72 flex-shrink-0 space-y-3">
           <div className="rounded-xl border border-white/10 bg-black/40 p-3 backdrop-blur-sm">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-300">
               Voice Room
