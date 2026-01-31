@@ -402,12 +402,12 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
 
   function slotLabel(wallet?: string) {
     if (!wallet) return "Open";
+    if (wallet.length <= 12) return wallet;
     return `${wallet.slice(0, 4)}...${wallet.slice(-4)}`;
   }
   function slotInitials(wallet: string) {
     return (wallet || "??").slice(0, 2).toUpperCase();
   }
-
   return (
     <div className="min-h-screen bg-[#070a0f] text-white">
       <div className="relative overflow-hidden">
@@ -643,113 +643,97 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
         </div>
       )}
 
-      {/* Live bracket stage: round columns + USDFG FINAL pennant */}
+      {/* Bracket: same logic as old lobby — one column per round, Round 1 / Final labels. Design only: arena panel + thin slots. */}
       <div className="mt-5 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
         <div className="p-4 sm:p-6">
-          <div className="relative grid w-full gap-3 lg:gap-4" style={{ gridTemplateColumns: `repeat(${bracket.length}, minmax(0, 1fr)) 200px` }}>
-            {bracket.map((round) => {
-              const isFinal = round.roundNumber === bracket.length;
-              const tone = round.roundNumber === 1 ? "opacity-70" : round.roundNumber === bracket.length - 1 ? "opacity-90" : "opacity-85";
-              return (
-                <div key={round.roundNumber} className={cn("relative", tone)}>
-                  <div className={cn(
-                    "mb-2 text-center text-[11px] tracking-widest",
+          <div
+            className="grid w-full gap-3 lg:gap-4"
+            style={{ gridTemplateColumns: `repeat(${bracket.length}, minmax(0, 1fr))` }}
+          >
+            {bracket.map((round) => (
+              <div key={round.roundNumber} className="space-y-2 lg:space-y-3 min-w-0">
+                <div
+                  className={cn(
+                    "text-center text-[10px] lg:text-[11px] font-semibold uppercase tracking-widest",
                     round.roundNumber === currentRound ? "text-amber-300" : "text-white/55"
-                  )}>
-                    {isFinal ? "FINAL" : `R${round.roundNumber}`}
-                  </div>
-                  <div className="space-y-2">
-                    {round.matches.map((match) => {
-                      const youAreInMatch = currentWallet && (
-                        match.player1?.toLowerCase() === currentWallet.toLowerCase() ||
-                        match.player2?.toLowerCase() === currentWallet.toLowerCase()
-                      );
-                      const matchStatus = match.status === "completed" ? "Completed" : match.status === "in-progress" ? "In progress" : match.status === "ready" ? "Ready" : "Open";
-                      const active = selectedMatchId === match.id;
-                      return (
-                        <button
-                          key={match.id}
-                          type="button"
-                          onClick={() => setSelectedMatchId(match.id)}
-                          className={cn(
-                            "group w-full rounded-xl border text-left transition-all duration-200",
-                            active
-                              ? "border-cyan-300/50 bg-white/12 shadow-[0_0_0_1px_rgba(34,211,238,0.25)]"
-                              : youAreInMatch ? "border-amber-400/40 bg-amber-400/5" : "border-white/10 bg-white/6 hover:bg-white/10"
-                          )}
-                        >
-                          <div className="flex items-center justify-between px-2.5 py-2">
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                              <div className={cn(
-                                "h-7 w-7 rounded-full border flex items-center justify-center shrink-0 text-[10px] font-bold",
-                                active ? "border-cyan-300/50 bg-white/10 text-cyan-200" : "border-white/10 bg-white/6 text-white/70"
-                              )}>
-                                {match.player1 ? slotInitials(match.player1) : "—"}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="text-[11px] font-semibold text-white/80 truncate">{slotLabel(match.player1)}</div>
-                                <div className="text-[10px] text-white/40">{match.player1 ? "v" : "Tap to claim"}</div>
-                              </div>
+                  )}
+                >
+                  {round.roundNumber === bracket.length ? "Final" : `Round ${round.roundNumber}`}
+                </div>
+                <div className="space-y-2">
+                  {round.matches.map((match) => {
+                    const youAreInMatch = currentWallet && (
+                      (match.player1?.toLowerCase() === currentWallet.toLowerCase() ||
+                        match.player2?.toLowerCase() === currentWallet.toLowerCase())
+                    );
+                    const matchStatus = match.status === "completed" ? "Completed" : match.status === "in-progress" ? "In progress" : match.status === "ready" ? "Ready" : "Waiting";
+                    const active = selectedMatchId === match.id;
+                    const isChampionMatch = round.roundNumber === bracket.length && match.status === "completed" && match.winner;
+                    return (
+                      <button
+                        key={match.id}
+                        type="button"
+                        onClick={() => setSelectedMatchId(match.id)}
+                        className={cn(
+                          "w-full rounded-xl border text-left transition-all duration-200",
+                          active ? "border-cyan-300/50 bg-white/12 shadow-[0_0_0_1px_rgba(34,211,238,0.25)]" : youAreInMatch ? "border-amber-400/40 bg-amber-400/5" : "border-white/10 bg-white/6 hover:bg-white/10"
+                        )}
+                      >
+                        <div className="mb-1.5 flex items-center justify-between px-2 text-[9px] uppercase tracking-wide text-white/45">
+                          <span>Match {match.id.replace("r", "").replace("-", "")}</span>
+                          <span
+                            className={cn(
+                              "rounded-full px-1.5 py-0.5 font-semibold",
+                              match.status === "completed" ? "bg-emerald-500/15 text-emerald-300 border border-emerald-400/30" : match.status === "in-progress" ? "bg-amber-500/15 text-amber-300 border border-amber-400/30" : "bg-white/5 text-white/60 border border-white/10"
+                            )}
+                          >
+                            {matchStatus}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-white/5">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <div className={cn("h-7 w-7 rounded-full border flex items-center justify-center shrink-0 text-[10px] font-bold", active ? "border-cyan-300/50 text-cyan-200" : "border-white/10 bg-white/6 text-white/70")}>
+                              {match.player1 ? slotInitials(match.player1) : "—"}
                             </div>
-                            <span className="text-[10px] text-white/35 shrink-0">{matchStatus}</span>
-                          </div>
-                          <div className="flex items-center justify-between px-2.5 pb-2 pt-0 gap-2">
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                              <div className={cn(
-                                "h-7 w-7 rounded-full border flex items-center justify-center shrink-0 text-[10px] font-bold",
-                                active ? "border-cyan-300/50 bg-white/10 text-cyan-200" : "border-white/10 bg-white/6 text-white/70"
-                              )}>
-                                {match.player2 ? slotInitials(match.player2) : "—"}
-                              </div>
-                              <div className="min-w-0">
-                                <div className="text-[11px] font-semibold text-white/80 truncate">{slotLabel(match.player2)}</div>
-                                <div className="text-[10px] text-white/40">{match.player2 ? "Participant" : "Open"}</div>
-                              </div>
+                            <div className="min-w-0">
+                              <div className="text-[11px] font-semibold text-white/80 truncate">{slotLabel(match.player1)}</div>
+                              <div className="text-[10px] text-white/40">{match.player1 ? "Participant" : "Waiting…"}</div>
                             </div>
                           </div>
-                          {match.winner && (
-                            <div
-                              className={cn(
-                                "mx-2 mb-2 rounded-md bg-emerald-500/10 px-2 py-1 text-[10px] text-emerald-300",
-                                onPlayerClick && "cursor-pointer hover:bg-emerald-500/20"
-                              )}
-                              onClick={(e) => { e.stopPropagation(); if (onPlayerClick) onPlayerClick(match.winner!); }}
-                            >
-                              Winner: {slotLabel(match.winner)}
+                        </div>
+                        <div className="flex items-center justify-between px-2.5 py-1.5">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <div className={cn("h-7 w-7 rounded-full border flex items-center justify-center shrink-0 text-[10px] font-bold", active ? "border-cyan-300/50 text-cyan-200" : "border-white/10 bg-white/6 text-white/70")}>
+                              {match.player2 ? slotInitials(match.player2) : "—"}
                             </div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                            <div className="min-w-0">
+                              <div className="text-[11px] font-semibold text-white/80 truncate">{slotLabel(match.player2)}</div>
+                              <div className="text-[10px] text-white/40">{match.player2 ? "Participant" : "Open"}</div>
+                            </div>
+                          </div>
+                        </div>
+                        {match.winner && (
+                          <div
+                            className={cn("mx-2 mb-2 rounded-md bg-emerald-500/10 px-2 py-1 text-[10px] text-emerald-300", onPlayerClick && "cursor-pointer hover:bg-emerald-500/20")}
+                            onClick={(e) => { e.stopPropagation(); if (onPlayerClick) onPlayerClick(match.winner!); }}
+                          >
+                            Winner: {slotLabel(match.winner)}
+                          </div>
+                        )}
+                        {isChampionMatch && (
+                          <div className="mx-2 mb-2 rounded-md border border-amber-400/40 bg-amber-500/10 px-2 py-0.5 text-center text-[10px] font-semibold text-amber-200">
+                            🏆 Champion
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
-              );
-            })}
-            {/* USDFG FINAL pennant */}
-            <div className="relative">
-              <div className="mb-2 text-center text-[11px] tracking-widest text-white/55">USDFG</div>
-              <div className="absolute left-1/2 top-10 -translate-x-1/2 h-[320px] w-[200px] rounded-[36px] bg-[radial-gradient(60%_55%_at_50%_20%,rgba(34,211,238,0.20),rgba(255,255,255,0.06),transparent)] blur-[2px]" />
-              <div className="relative mx-auto w-[200px] rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.06))] shadow-[0_18px_55px_rgba(0,0,0,0.45)]">
-                <div className="px-4 pt-5 pb-4 text-center">
-                  <div className="text-lg font-semibold text-white/90">{challengeTitle}</div>
-                  <div className="mt-1 text-xs text-white/55">USDFG Arena · Cup window</div>
-                  <div className="mt-1 text-base font-semibold text-cyan-200">
-                    {stage === "round_in_progress" ? "Live" : stage.replace(/_/g, " ")}
-                  </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    <div className="h-8 rounded-lg border border-white/10 bg-white/6 flex items-center justify-center text-[10px] text-white/60">{maxPlayers} players</div>
-                    <div className="h-8 rounded-lg border border-white/10 bg-white/6 flex items-center justify-center text-[10px] text-white/60">Single elim</div>
-                  </div>
-                  <div className="mt-4 flex justify-center">
-                    <div className="h-12 w-12 rounded-xl border border-white/10 bg-white/6 flex items-center justify-center text-2xl">🏆</div>
-                  </div>
-                </div>
-                <div className="h-6" />
               </div>
-            </div>
+            ))}
           </div>
 
-          {/* Selected matchup strip */}
+          {/* Selected match strip (design only) */}
           <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-white/10 bg-white/5 p-3">
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center">
@@ -759,7 +743,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
                 <div className="text-sm text-white/80">Selected Match</div>
                 <div className="text-base font-semibold">
                   {selectedMatch
-                    ? `${selectedMatch.round.roundNumber === bracket.length ? "FINAL" : `R${selectedMatch.round.roundNumber}`}-${selectedMatch.match.id.replace("r", "").replace("-", "")}`
+                    ? `${selectedMatch.round.roundNumber === bracket.length ? "Final" : `Round ${selectedMatch.round.roundNumber}`}-${(selectedMatch.round.matches.findIndex(m => m.id === selectedMatch.match.id) + 1) || selectedMatch.match.id.replace("r", "").replace("-", "")}`
                     : "—"}
                 </div>
               </div>
@@ -772,12 +756,6 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
               <div className="rounded-xl border border-white/10 bg-white/6 px-3 py-2">
                 <div className="text-[10px] uppercase tracking-widest text-white/45">Platform</div>
                 <div className="text-xs font-semibold text-white/80">{challengePlatform}</div>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/6 px-3 py-2">
-                <div className="text-[10px] uppercase tracking-widest text-white/45">Stage</div>
-                <div className="text-xs font-semibold text-white/80">
-                  {stage === "round_in_progress" ? (currentRound === bracket.length ? "Final" : `Round ${currentRound}`) : stage.replace(/_/g, " ")}
-                </div>
               </div>
             </div>
           </div>
@@ -841,6 +819,10 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
             <div className="mt-2 rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="text-sm font-semibold text-white/85">Match Info</div>
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-white/10 bg-[#070a0f]/35 px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-widest text-white/45">Size</div>
+                  <div className="text-sm font-semibold text-white/80">{maxPlayers} players</div>
+                </div>
                 <div className="rounded-xl border border-white/10 bg-[#070a0f]/35 px-3 py-2">
                   <div className="text-[10px] uppercase tracking-widest text-white/45">Game</div>
                   <div className="text-sm font-semibold text-white/80">{challengeGame}</div>
