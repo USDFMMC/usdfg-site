@@ -409,7 +409,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
         mode: isTournamentSelected ? 'Tournament (Bracket Mode)' : formData.mode, // Set mode for tournaments
         maxPlayers: resolvedMaxPlayers,
         format: isTournamentSelected ? 'tournament' : 'standard',
-        founderChallengeCount: formData.founderChallengeCount,
+        founderChallengeCount: Math.min(25, Math.max(1, Number(formData.founderChallengeCount) || 1)),
         tournament: isTournamentSelected
           ? {
               format: 'tournament',
@@ -808,11 +808,14 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                       type="number"
                       min={1}
                       max={25}
-                      value={formData.founderChallengeCount ?? 1}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        const parsed = value === '' ? 1 : Math.floor(Number(value));
-                        handleInputChange('founderChallengeCount', Number.isFinite(parsed) ? Math.max(1, parsed) : 1);
+                      placeholder="1"
+                      value={typeof formData.founderChallengeCount === 'string' ? formData.founderChallengeCount : String(formData.founderChallengeCount ?? 1)}
+                      onChange={(e) => handleInputChange('founderChallengeCount', e.target.value)}
+                      onBlur={(e) => {
+                        const v = e.target.value.trim();
+                        const n = v === '' ? 1 : Math.floor(Number(v));
+                        const clamped = Number.isFinite(n) ? Math.min(25, Math.max(1, n)) : 1;
+                        if (String(clamped) !== v) handleInputChange('founderChallengeCount', clamped);
                       }}
                       className="w-full px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white placeholder-zinc-500 focus:border-amber-400/50 focus:outline-none transition-all"
                     />

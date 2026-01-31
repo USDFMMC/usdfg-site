@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import type { TournamentState } from "@/lib/firebase/firestore";
 import { cn } from "@/lib/utils";
 import { VoiceChat } from "./VoiceChat";
@@ -142,8 +142,16 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
 
   if (!tournament || !tournament.bracket?.length) {
     return (
-      <div className="w-full rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-gray-400">
-        Bracket will populate once players join.
+      <div className="min-h-screen bg-[#070a0f] text-white">
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(80%_65%_at_50%_35%,rgba(36,64,92,0.55),rgba(7,10,15,1)_60%)]" />
+          <div className="relative mx-auto max-w-6xl px-4 pt-6 pb-4">
+            <div className="text-center text-sm tracking-wide text-white/70">USDFG Tournament · Tournament Tree</div>
+            <div className="mt-5 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md p-6 text-center text-sm text-gray-400">
+              Bracket will populate once players join.
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -357,6 +365,23 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
     return Array.from(map.values());
   })();
 
+  const [opsTab, setOpsTab] = useState<"chat" | "info" | "proof">("chat");
+  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+
+  const challengeTitle = challenge?.title || challenge?.rawData?.title || "USDFG Tournament";
+  const challengeGame = challenge?.game || challenge?.rawData?.game || "—";
+  const challengePlatform = challenge?.platform || challenge?.rawData?.platform || "Any";
+
+  // Find selected match for strip
+  const selectedMatch = (() => {
+    if (!selectedMatchId) return null;
+    for (const round of bracket) {
+      const m = round.matches.find((mm) => mm.id === selectedMatchId);
+      if (m) return { round, match: m };
+    }
+    return null;
+  })();
+
   // Debug: Log Founder Tournament payout UI visibility (moved after all variable declarations)
   if (isCompleted && isFounderTournament) {
     console.log('🔍 Founder Tournament Payout UI Check:', {
@@ -375,8 +400,31 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
     });
   }
 
+  function slotLabel(wallet?: string) {
+    if (!wallet) return "Open";
+    return `${wallet.slice(0, 4)}...${wallet.slice(-4)}`;
+  }
+  function slotInitials(wallet: string) {
+    return (wallet || "??").slice(0, 2).toUpperCase();
+  }
+
   return (
-    <div className="space-y-3 lg:space-y-4">
+    <div className="min-h-screen bg-[#070a0f] text-white">
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0">
+          <div className="absolute inset-0 bg-[radial-gradient(80%_65%_at_50%_35%,rgba(36,64,92,0.55),rgba(7,10,15,1)_60%)]" />
+          <div className="absolute -top-24 left-0 h-64 w-1/2 rotate-[-10deg] bg-[linear-gradient(90deg,transparent,rgba(0,224,255,0.10),transparent)] blur-2xl" />
+          <div className="absolute -top-10 right-0 h-64 w-1/2 rotate-[12deg] bg-[linear-gradient(90deg,transparent,rgba(120,80,255,0.10),transparent)] blur-2xl" />
+          <div className="absolute inset-0 bg-[radial-gradient(55%_35%_at_50%_85%,rgba(0,0,0,0),rgba(0,0,0,0.65))]" />
+        </div>
+        <div className="relative mx-auto max-w-6xl px-4 pt-6 pb-4 space-y-4">
+          <div className="flex items-center justify-center">
+            <div className="text-center">
+              <div className="text-sm tracking-wide text-white/70">USDFG Tournament · Tournament Tree</div>
+              <div className="mt-1 h-[1px] w-40 bg-white/10 mx-auto" />
+            </div>
+          </div>
+
       {isCompleted && champion && (
         <div className="rounded-xl border border-amber-400/50 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 p-4 lg:p-5 text-center">
           <div className="text-3xl lg:text-4xl mb-1.5">🏆</div>
@@ -595,194 +643,272 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
         </div>
       )}
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
-        <div className="flex-1 w-full min-w-0">
-          <div
-            className="grid w-full gap-3 lg:gap-4"
-            style={{
-              gridTemplateColumns: `repeat(${bracket.length}, minmax(0, 1fr))`,
-            }}
-          >
-        {bracket.map((round) => (
-          <div key={round.roundNumber} className="space-y-2 lg:space-y-3 min-w-0">
-            <div
-              className={cn(
-                "text-center text-[10px] lg:text-xs font-semibold uppercase tracking-widest",
-                round.roundNumber === currentRound
-                  ? "text-amber-300"
-                  : "text-gray-400"
-              )}
-            >
-              {round.roundNumber === bracket.length
-                ? "Final"
-                : `Round ${round.roundNumber}`}
-            </div>
-
-            <div className="space-y-2">
-              {round.matches.map((match) => {
-                const youAreInMatch =
-                  (currentWallet &&
-                    (match.player1?.toLowerCase() ===
-                      currentWallet.toLowerCase() ||
-                      match.player2?.toLowerCase() ===
-                        currentWallet.toLowerCase())) ||
-                  false;
-
-                const matchStatus =
-                  match.status === "completed"
-                    ? "Completed"
-                    : match.status === "in-progress"
-                    ? "In progress"
-                    : match.status === "ready"
-                    ? "Ready"
-                    : "Waiting";
-
-                const renderSlot = (slot?: string) => {
-                  if (!slot) {
-                    return (
-                      <div className="flex h-7 lg:h-8 items-center justify-between rounded-md border border-dashed border-white/10 px-2.5 lg:px-3 text-[10px] lg:text-xs text-gray-400">
-                        <span>Waiting...</span>
-                      </div>
-                    );
-                  }
-
-                  const isCurrent = currentWallet
-                    ? slot.toLowerCase() === currentWallet.toLowerCase()
-                    : false;
-                  return (
-                    <div
-                      className={cn(
-                        "flex h-7 lg:h-8 items-center justify-between rounded-md border px-2.5 lg:px-3 text-[10px] lg:text-xs font-semibold",
-                        isCurrent
-                          ? "border-amber-400/50 bg-amber-400/10 text-amber-200"
-                          : "border-white/10 bg-white/5 text-white",
-                        onPlayerClick && "cursor-pointer hover:bg-white/10 transition-colors"
-                      )}
-                      onClick={() => {
-                        if (onPlayerClick) {
-                          onPlayerClick(slot);
-                        }
-                      }}
-                    >
-                      <span className="truncate">{`${slot.slice(
-                        0,
-                        4
-                      )}...${slot.slice(-4)}`}</span>
-                    </div>
-                  );
-                };
-
-                const isChampionMatch =
-                  round.roundNumber === bracket.length &&
-                  match.status === "completed" &&
-                  match.winner;
-
-                return (
-                  <div
-                    key={match.id}
-                    className={cn(
-                      "rounded-lg lg:rounded-xl border bg-black/40 p-2.5 lg:p-3 backdrop-blur-sm",
-                      youAreInMatch ? "border-amber-400/40" : "border-white/5"
-                    )}
-                  >
-                    <div className="mb-2 flex items-center justify-between text-[9px] lg:text-[10px] uppercase tracking-wide text-gray-400">
-                      <span>
-                        Match {match.id.replace("r", "").replace("-", "")}
-                      </span>
-                      <span
-                        className={cn(
-                          "rounded-full px-1.5 py-0.5 text-[9px] lg:text-[10px] font-semibold",
-                          match.status === "completed"
-                            ? "bg-emerald-500/15 text-emerald-300 border border-emerald-400/30"
-                            : match.status === "in-progress"
-                            ? "bg-amber-500/15 text-amber-300 border border-amber-400/30"
-                            : "bg-white/5 text-gray-300 border border-white/10"
-                        )}
-                      >
-                        {matchStatus}
-                      </span>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      {renderSlot(match.player1)}
-                      {renderSlot(match.player2)}
-                    </div>
-
-                    {match.winner && (
-                      <div 
-                        className={cn(
-                          "mt-2 rounded-md bg-emerald-500/10 px-2 py-1 text-[10px] lg:text-[11px] text-emerald-300",
-                          onPlayerClick && "cursor-pointer hover:bg-emerald-500/20 transition-colors"
-                        )}
-                        onClick={() => {
-                          if (onPlayerClick) {
-                            onPlayerClick(match.winner!);
-                          }
-                        }}
-                      >
-                        Winner:{" "}
-                        <span className="font-semibold">
-                          {`${match.winner.slice(0, 4)}...${match.winner.slice(
-                            -4
-                          )}`}
-                        </span>
-                      </div>
-                    )}
-
-                    {isChampionMatch && (
-                      <div className="mt-1.5 rounded-md border border-amber-400/40 bg-amber-500/10 px-2 py-0.5 text-center text-[10px] lg:text-[11px] font-semibold text-amber-200">
-                        🏆 Champion
-                      </div>
-                    )}
+      {/* Live bracket stage: round columns + USDFG FINAL pennant */}
+      <div className="mt-5 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
+        <div className="p-4 sm:p-6">
+          <div className="relative grid w-full gap-3 lg:gap-4" style={{ gridTemplateColumns: `repeat(${bracket.length}, minmax(0, 1fr)) 200px` }}>
+            {bracket.map((round) => {
+              const isFinal = round.roundNumber === bracket.length;
+              const tone = round.roundNumber === 1 ? "opacity-70" : round.roundNumber === bracket.length - 1 ? "opacity-90" : "opacity-85";
+              return (
+                <div key={round.roundNumber} className={cn("relative", tone)}>
+                  <div className={cn(
+                    "mb-2 text-center text-[11px] tracking-widest",
+                    round.roundNumber === currentRound ? "text-amber-300" : "text-white/55"
+                  )}>
+                    {isFinal ? "FINAL" : `R${round.roundNumber}`}
                   </div>
-                );
-              })}
+                  <div className="space-y-2">
+                    {round.matches.map((match) => {
+                      const youAreInMatch = currentWallet && (
+                        match.player1?.toLowerCase() === currentWallet.toLowerCase() ||
+                        match.player2?.toLowerCase() === currentWallet.toLowerCase()
+                      );
+                      const matchStatus = match.status === "completed" ? "Completed" : match.status === "in-progress" ? "In progress" : match.status === "ready" ? "Ready" : "Open";
+                      const active = selectedMatchId === match.id;
+                      return (
+                        <button
+                          key={match.id}
+                          type="button"
+                          onClick={() => setSelectedMatchId(match.id)}
+                          className={cn(
+                            "group w-full rounded-xl border text-left transition-all duration-200",
+                            active
+                              ? "border-cyan-300/50 bg-white/12 shadow-[0_0_0_1px_rgba(34,211,238,0.25)]"
+                              : youAreInMatch ? "border-amber-400/40 bg-amber-400/5" : "border-white/10 bg-white/6 hover:bg-white/10"
+                          )}
+                        >
+                          <div className="flex items-center justify-between px-2.5 py-2">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <div className={cn(
+                                "h-7 w-7 rounded-full border flex items-center justify-center shrink-0 text-[10px] font-bold",
+                                active ? "border-cyan-300/50 bg-white/10 text-cyan-200" : "border-white/10 bg-white/6 text-white/70"
+                              )}>
+                                {match.player1 ? slotInitials(match.player1) : "—"}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-[11px] font-semibold text-white/80 truncate">{slotLabel(match.player1)}</div>
+                                <div className="text-[10px] text-white/40">{match.player1 ? "v" : "Tap to claim"}</div>
+                              </div>
+                            </div>
+                            <span className="text-[10px] text-white/35 shrink-0">{matchStatus}</span>
+                          </div>
+                          <div className="flex items-center justify-between px-2.5 pb-2 pt-0 gap-2">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <div className={cn(
+                                "h-7 w-7 rounded-full border flex items-center justify-center shrink-0 text-[10px] font-bold",
+                                active ? "border-cyan-300/50 bg-white/10 text-cyan-200" : "border-white/10 bg-white/6 text-white/70"
+                              )}>
+                                {match.player2 ? slotInitials(match.player2) : "—"}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-[11px] font-semibold text-white/80 truncate">{slotLabel(match.player2)}</div>
+                                <div className="text-[10px] text-white/40">{match.player2 ? "Participant" : "Open"}</div>
+                              </div>
+                            </div>
+                          </div>
+                          {match.winner && (
+                            <div
+                              className={cn(
+                                "mx-2 mb-2 rounded-md bg-emerald-500/10 px-2 py-1 text-[10px] text-emerald-300",
+                                onPlayerClick && "cursor-pointer hover:bg-emerald-500/20"
+                              )}
+                              onClick={(e) => { e.stopPropagation(); if (onPlayerClick) onPlayerClick(match.winner!); }}
+                            >
+                              Winner: {slotLabel(match.winner)}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+            {/* USDFG FINAL pennant */}
+            <div className="relative">
+              <div className="mb-2 text-center text-[11px] tracking-widest text-white/55">USDFG</div>
+              <div className="absolute left-1/2 top-10 -translate-x-1/2 h-[320px] w-[200px] rounded-[36px] bg-[radial-gradient(60%_55%_at_50%_20%,rgba(34,211,238,0.20),rgba(255,255,255,0.06),transparent)] blur-[2px]" />
+              <div className="relative mx-auto w-[200px] rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.16),rgba(255,255,255,0.06))] shadow-[0_18px_55px_rgba(0,0,0,0.45)]">
+                <div className="px-4 pt-5 pb-4 text-center">
+                  <div className="text-lg font-semibold text-white/90">{challengeTitle}</div>
+                  <div className="mt-1 text-xs text-white/55">USDFG Arena · Cup window</div>
+                  <div className="mt-1 text-base font-semibold text-cyan-200">
+                    {stage === "round_in_progress" ? "Live" : stage.replace(/_/g, " ")}
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <div className="h-8 rounded-lg border border-white/10 bg-white/6 flex items-center justify-center text-[10px] text-white/60">{maxPlayers} players</div>
+                    <div className="h-8 rounded-lg border border-white/10 bg-white/6 flex items-center justify-center text-[10px] text-white/60">Single elim</div>
+                  </div>
+                  <div className="mt-4 flex justify-center">
+                    <div className="h-12 w-12 rounded-xl border border-white/10 bg-white/6 flex items-center justify-center text-2xl">🏆</div>
+                  </div>
+                </div>
+                <div className="h-6" />
+              </div>
             </div>
           </div>
-        ))}
-      </div>
-        </div>
 
-        <div className="w-full lg:w-64 xl:w-72 flex-shrink-0 space-y-3">
-          <div className="rounded-xl border border-white/10 bg-black/40 p-3 backdrop-blur-sm">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-300">
-              Voice Room
+          {/* Selected matchup strip */}
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-white/10 bg-white/5 p-3">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center">
+                <div className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_18px_rgba(34,211,238,0.75)]" />
+              </div>
+              <div>
+                <div className="text-sm text-white/80">Selected Match</div>
+                <div className="text-base font-semibold">
+                  {selectedMatch
+                    ? `${selectedMatch.round.roundNumber === bracket.length ? "FINAL" : `R${selectedMatch.round.roundNumber}`}-${selectedMatch.match.id.replace("r", "").replace("-", "")}`
+                    : "—"}
+                </div>
+              </div>
             </div>
-            <VoiceChat challengeId={challengeId} currentWallet={currentWallet || ""} />
-          </div>
-          <div className="rounded-xl border border-white/10 bg-black/40 p-3 backdrop-blur-sm">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-300">
-              Match Chat
+            <div className="flex flex-wrap gap-2">
+              <div className="rounded-xl border border-white/10 bg-white/6 px-3 py-2">
+                <div className="text-[10px] uppercase tracking-widest text-white/45">Status</div>
+                <div className="text-xs font-semibold text-white/80">{selectedMatch ? (selectedMatch.match.status === "completed" ? "Completed" : selectedMatch.match.status === "in-progress" ? "In progress" : "Open") : "—"}</div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/6 px-3 py-2">
+                <div className="text-[10px] uppercase tracking-widest text-white/45">Platform</div>
+                <div className="text-xs font-semibold text-white/80">{challengePlatform}</div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/6 px-3 py-2">
+                <div className="text-[10px] uppercase tracking-widest text-white/45">Stage</div>
+                <div className="text-xs font-semibold text-white/80">
+                  {stage === "round_in_progress" ? (currentRound === bracket.length ? "Final" : `Round ${currentRound}`) : stage.replace(/_/g, " ")}
+                </div>
+              </div>
             </div>
-            <ChatBox 
-              challengeId={challengeId} 
-              currentWallet={currentWallet || ""} 
-              status={stage === 'round_in_progress' ? 'active' : undefined}
-              playersCount={players.length}
-            />
           </div>
         </div>
       </div>
 
-      <div className="text-xs text-gray-400">
+      {/* Ops panel: Lobby Chat | Match Info | Proof & Results */}
+      <div className="mt-5 rounded-3xl border border-white/10 bg-[#0b1220]/70 backdrop-blur-md shadow-[0_20px_60px_rgba(0,0,0,0.45)]">
+        <div className="flex flex-wrap gap-2 p-2">
+          <button
+            type="button"
+            onClick={() => setOpsTab("chat")}
+            className={cn(
+              "flex-1 min-w-[100px] rounded-2xl px-4 py-3 text-sm transition-all",
+              opsTab === "chat"
+                ? "bg-white/10 border border-white/15 text-cyan-200 shadow-[0_0_0_1px_rgba(34,211,238,0.12)]"
+                : "bg-white/5 border border-white/10 text-white/65 hover:bg-white/8"
+            )}
+          >
+            Lobby Chat
+          </button>
+          <button
+            type="button"
+            onClick={() => setOpsTab("info")}
+            className={cn(
+              "flex-1 min-w-[100px] rounded-2xl px-4 py-3 text-sm transition-all",
+              opsTab === "info"
+                ? "bg-white/10 border border-white/15 text-cyan-200 shadow-[0_0_0_1px_rgba(34,211,238,0.12)]"
+                : "bg-white/5 border border-white/10 text-white/65 hover:bg-white/8"
+            )}
+          >
+            Match Info
+          </button>
+          <button
+            type="button"
+            onClick={() => setOpsTab("proof")}
+            className={cn(
+              "flex-1 min-w-[100px] rounded-2xl px-4 py-3 text-sm transition-all",
+              opsTab === "proof"
+                ? "bg-white/10 border border-white/15 text-cyan-200 shadow-[0_0_0_1px_rgba(34,211,238,0.12)]"
+                : "bg-white/5 border border-white/10 text-white/65 hover:bg-white/8"
+            )}
+          >
+            Proof & Results
+          </button>
+        </div>
+        <div className="px-4 pb-4">
+          {opsTab === "chat" && (
+            <div className="mt-2 space-y-3">
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-300">Voice Room</div>
+                <VoiceChat challengeId={challengeId} currentWallet={currentWallet || ""} />
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-300">Tournament Chat</div>
+                <ChatBox challengeId={challengeId} currentWallet={currentWallet || ""} status={stage === "round_in_progress" ? "active" : undefined} playersCount={players.length} />
+              </div>
+            </div>
+          )}
+          {opsTab === "info" && (
+            <div className="mt-2 rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="text-sm font-semibold text-white/85">Match Info</div>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-white/10 bg-[#070a0f]/35 px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-widest text-white/45">Game</div>
+                  <div className="text-sm font-semibold text-white/80">{challengeGame}</div>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-[#070a0f]/35 px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-widest text-white/45">Format</div>
+                  <div className="text-sm font-semibold text-white/80">Single elimination</div>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-[#070a0f]/35 px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-widest text-white/45">Platform</div>
+                  <div className="text-sm font-semibold text-white/80">{challengePlatform}</div>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-[#070a0f]/35 px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-widest text-white/45">Stage</div>
+                  <div className="text-sm font-semibold text-white/80">{stage.replace(/_/g, " ")}</div>
+                </div>
+              </div>
+              <div className="mt-4 text-xs text-white/50">
+                USDFG is a skill-based competition system. Rewards are released after match results are verified.
+              </div>
+            </div>
+          )}
+          {opsTab === "proof" && (
+            <div className="mt-2 rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="text-sm font-semibold text-white/85">Proof & Results</div>
+              {playerMatch && playerMatch.match.status !== "completed" && (playerMatch.match.status === "in-progress" || playerMatch.match.status === "ready") && opponentWallet && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-sm text-white/55">Submit your result for this match. Winner advances automatically.</p>
+                  {onOpenSubmitResult && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenSubmitResult(playerMatch.match.id, opponentWallet)}
+                      className="w-full rounded-lg bg-amber-400/20 px-4 py-2 text-sm font-semibold text-amber-200 border border-amber-400/40 hover:bg-amber-400/30"
+                    >
+                      {playerMatch.round.roundNumber === bracket.length ? "🏆 Submit Final Result" : "Submit Result"}
+                    </button>
+                  )}
+                </div>
+              )}
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-white/10 bg-[#070a0f]/35 p-3">
+                  <div className="text-xs font-semibold text-white/80">Pending</div>
+                  <div className="mt-1 text-xs text-white/50">Waiting for completion</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-[#070a0f]/35 p-3">
+                  <div className="text-xs font-semibold text-white/80">Under review</div>
+                  <div className="mt-1 text-xs text-white/50">Proof being checked</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-[#070a0f]/35 p-3">
+                  <div className="text-xs font-semibold text-white/80">Released</div>
+                  <div className="mt-1 text-xs text-white/50">Reward sent</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4 pb-4 text-center text-xs text-white/40">
         Stage:{" "}
         <span className="font-semibold text-white">
           {stage === "round_in_progress"
-            ? (() => {
-                // Check if we're in the final round by comparing currentRound to bracket length
-                // For 4 players: Round 1 (roundNumber=1), Final (roundNumber=2), bracket.length=2
-                const isFinalRound = currentRound === bracket.length;
-                // Also check if any match in the last round is active
-                const finalRound = bracket[bracket.length - 1];
-                const hasActiveFinalMatch = finalRound?.matches.some(m => 
-                  m.status === 'in-progress' || m.status === 'ready'
-                );
-                return isFinalRound || hasActiveFinalMatch
-                  ? "Final running"
-                  : `Round ${currentRound} running`;
-              })()
+            ? (currentRound === bracket.length ? "Final running" : `Round ${currentRound} running`)
             : stage.replace(/_/g, " ")}
         </span>
+        {" · "}USDFG Arena
+      </div>
+        </div>
       </div>
     </div>
   );
