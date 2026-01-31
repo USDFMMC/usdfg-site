@@ -12,14 +12,15 @@ export function useUSDFGWallet() {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         await wallet.select(adapterName);
-        await wait(150 + attempt * 150);
-        if (wallet.wallet) {
+        // Wait for adapter + React context to update (context can lag behind connect event)
+        await wait(400 + attempt * 200);
+        if (wallet.wallet || wallet.connected || wallet.publicKey) {
           return;
         }
       } catch (error: any) {
         lastError = error;
       }
-      await wait(250 + attempt * 150);
+      await wait(300 + attempt * 150);
     }
 
     if (lastError) {
@@ -92,8 +93,8 @@ export function useUSDFGWallet() {
         console.log("🔍 Selecting Phantom wallet...");
         try {
           await selectWalletWithRetry(phantomWallet.adapter.name, 2);
-          // Verify selection worked
-          if (!wallet.wallet) {
+          // Verify selection worked (wallet context may update after connect event)
+          if (!wallet.wallet && !wallet.connected && !wallet.publicKey) {
             const errorMsg = "Failed to select Phantom wallet. Please wait a moment and try again.";
             console.error("❌", errorMsg);
             throw new Error(errorMsg);
