@@ -5019,7 +5019,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         <meta name="description" content="Enter the USDFG Arena - Compete in skill-based challenges, earn USDFG, and prove your gaming prowess." />
       </Helmet>
 
-      <div className="relative min-h-screen w-full bg-[#040507] text-zinc-100 overflow-hidden">
+      <div className="relative min-h-screen w-full bg-[#040507] text-zinc-100 overflow-x-hidden">
         {/* Ambient Background Glow */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] pointer-events-none" />
         <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-transparent via-amber-300/50 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
