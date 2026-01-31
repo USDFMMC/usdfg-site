@@ -3684,7 +3684,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
   const handleFounderTournamentAirdrop = useCallback(async (
     recipients: { wallet: string; amount: number }[],
-    challenge: any
+    challenge: any,
+    skipConfirm?: boolean
   ) => {
     if (isAirdropping) {
       return;
@@ -3723,11 +3724,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
 
     const totalAmount = uniqueRecipients.reduce((sum, entry) => sum + entry.amount, 0);
-    const confirmed = window.confirm(
-      `Send ${totalAmount} USDFG to ${uniqueRecipients.length} wallets?`
-    );
-    if (!confirmed) {
-      return;
+    if (!skipConfirm) {
+      const confirmed = window.confirm(
+        `Send ${totalAmount} USDFG to ${uniqueRecipients.length} wallets?`
+      );
+      if (!confirmed) {
+        return;
+      }
     }
 
     setIsAirdropping(true);
@@ -3859,6 +3862,69 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       setIsAirdropping(false);
     }
   }, [isAirdropping, publicKey, connection, signTransaction, signAllTransactions]);
+
+  /** Build payout recipients for a Founder Tournament (same logic as TournamentBracketView). */
+  const getFounderTournamentRecipients = useCallback((challenge: any): { wallet: string; amount: number }[] => {
+    const raw = challenge.rawData || challenge;
+    const tournament = raw.tournament || challenge.tournament;
+    let players: string[] = raw.players || challenge.players || [];
+    if (players.length === 0 && tournament?.bracket) {
+      const set = new Set<string>();
+      (tournament.bracket || []).forEach((round: any) => {
+        (round.matches || []).forEach((m: any) => {
+          if (m.player1) set.add(m.player1);
+          if (m.player2) set.add(m.player2);
+        });
+      });
+      players = Array.from(set);
+    }
+    const unique = Array.from(new Map(players.filter(Boolean).map((p: string) => [p.toLowerCase(), p])).values()) as string[];
+    const champion = ((tournament?.champion ?? '') as string).toLowerCase();
+    const founderPart = Number(raw.founderParticipantReward ?? 0);
+    const founderWin = Number(raw.founderWinnerBonus ?? 0);
+    return unique.map((wallet: string) => {
+      let amount = founderPart > 0 ? founderPart : 0;
+      if (champion && wallet.toLowerCase() === champion) amount += founderWin > 0 ? founderWin : 0;
+      return { wallet, amount };
+    }).filter((entry: { wallet: string; amount: number }) => entry.amount > 0);
+  }, []);
+
+  /** Send airdrop for all completed Founder Tournaments that need payout (one-time batch). */
+  const handleBatchFounderAirdrop = useCallback(async () => {
+    if (!publicKey || publicKey.toString().toLowerCase() !== ADMIN_WALLET.toString().toLowerCase()) return;
+    const needing = filteredChallenges.filter((c: any) => {
+      const fmt = c.format || c.rawData?.format;
+      const isTournament = fmt === 'tournament' || !!c.tournament || !!c.rawData?.tournament;
+      const creator = (c.creator ?? c.rawData?.creator) ?? '';
+      const fee = c.entryFee ?? c.rawData?.entryFee ?? 0;
+      const founderPart = c.founderParticipantReward ?? c.rawData?.founderParticipantReward ?? 0;
+      const founderWin = c.founderWinnerBonus ?? c.rawData?.founderWinnerBonus ?? 0;
+      const stage = c.tournament?.stage ?? c.rawData?.tournament?.stage;
+      const status = c.status || c.rawData?.status;
+      const paid = !!(c.founderPayoutSentAt ?? c.rawData?.founderPayoutSentAt);
+      return isTournament && creator?.toLowerCase() === ADMIN_WALLET.toString().toLowerCase() &&
+        (fee === 0 || fee < 1e-9) && (founderPart > 0 || founderWin > 0) &&
+        (status === 'completed' || status === 'disputed') && stage === 'completed' && !paid;
+    });
+    if (needing.length === 0) {
+      alert('No Founder Tournaments need payout right now.');
+      return;
+    }
+    const confirmed = window.confirm(
+      `Send airdrops for ${needing.length} Founder Tournament${needing.length === 1 ? '' : 's'}? This will send payouts one by one.`
+    );
+    if (!confirmed) return;
+    for (let i = 0; i < needing.length; i++) {
+      const challenge = needing[i];
+      const recipients = getFounderTournamentRecipients(challenge);
+      if (recipients.length === 0) {
+        console.warn('No recipients for Founder Tournament:', challenge.id);
+        continue;
+      }
+      await handleFounderTournamentAirdrop(recipients, challenge, true);
+    }
+    alert(`✅ Batch complete: sent airdrops for ${needing.length} tournament${needing.length === 1 ? '' : 's'}.`);
+  }, [publicKey, filteredChallenges, getFounderTournamentRecipients, handleFounderTournamentAirdrop]);
 
   // Handle marking Founder Challenge reward as transferred (admin only)
   const handleMarkPrizeTransferred = async (challenge: any) => {
@@ -5212,6 +5278,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                   (fee === 0 || fee < 1e-9) && (founderPart > 0 || founderWin > 0) &&
                   (status === 'completed' || status === 'disputed') && stage === 'completed';
               }) : [];
+              const completedFounderNeedingPayout = completedFounderForPayout.filter(
+                (c: any) => !(c.founderPayoutSentAt ?? c.rawData?.founderPayoutSentAt)
+              );
 
               const openChallengeLobby = (challenge: any) => {
                 const merged = mergeChallengeDataForModal(challenge, challenge.rawData ?? challenge);
@@ -5490,13 +5559,33 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               // Render Founder Payout row for admin (so completed Founder Tournament is always clickable)
               return (
                 <>
+                  {completedFounderNeedingPayout.length > 0 && (
+                    <section className="mb-4">
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-4 md:px-0">
+                        <h2 className="text-sm font-semibold tracking-wide text-amber-400">
+                          Batch Founder Payout
+                        </h2>
+                        <button
+                          type="button"
+                          onClick={handleBatchFounderAirdrop}
+                          disabled={isAirdropping}
+                          className="rounded-lg border border-amber-400/50 bg-amber-500/20 px-3 py-2 text-xs font-semibold text-amber-200 hover:bg-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isAirdropping ? 'Sending…' : `Send airdrop for all (${completedFounderNeedingPayout.length} tournament${completedFounderNeedingPayout.length === 1 ? '' : 's'})`}
+                        </button>
+                      </div>
+                      <p className="mb-2 px-4 md:px-0 text-xs text-white/50">
+                        One-time airdrop for all completed Founder Tournaments that need payout.
+                      </p>
+                    </section>
+                  )}
                   {completedFounderForPayout.length > 0 && (
                     <section className="mb-6">
                       <div className="mb-2 flex items-center justify-between px-4 md:px-0">
                         <h2 className="text-sm font-semibold tracking-wide text-purple-400">
                           Founder Payout
                         </h2>
-                        <span className="text-xs text-white/45">Tap to open & send airdrop</span>
+                        <span className="text-xs text-white/45">Tap to open & send airdrop per tournament</span>
                       </div>
                       <div
                         className="flex gap-3 overflow-x-auto pb-4 px-4 md:px-0 md:pb-2"
