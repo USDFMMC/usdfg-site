@@ -3889,9 +3889,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }).filter((entry: { wallet: string; amount: number }) => entry.amount > 0);
   }, []);
 
-  /** Send airdrop for all completed Founder Tournaments that need payout (one-time batch). */
+  /** Send ONE combined airdrop for all completed Founder Tournaments needing payout (one SOL fee). */
   const handleBatchFounderAirdrop = useCallback(async () => {
     if (!publicKey || publicKey.toString().toLowerCase() !== ADMIN_WALLET.toString().toLowerCase()) return;
+    if (isAirdropping) return;
+    if (!connection || (!signTransaction && !signAllTransactions)) {
+      alert('Wallet and connection required.');
+      return;
+    }
     const needing = filteredChallenges.filter((c: any) => {
       const fmt = c.format || c.rawData?.format;
       const isTournament = fmt === 'tournament' || !!c.tournament || !!c.rawData?.tournament;
@@ -3910,21 +3915,103 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       alert('No Founder Tournaments need payout right now.');
       return;
     }
+    const recipientMap = new Map<string, { wallet: string; amount: number }>();
+    needing.forEach((challenge: any) => {
+      getFounderTournamentRecipients(challenge).forEach((entry: { wallet: string; amount: number }) => {
+        if (!entry.wallet || entry.amount <= 0) return;
+        const key = entry.wallet.toLowerCase();
+        const existing = recipientMap.get(key);
+        if (existing) {
+          existing.amount += entry.amount;
+        } else {
+          recipientMap.set(key, { wallet: entry.wallet, amount: entry.amount });
+        }
+      });
+    });
+    const uniqueRecipients = Array.from(recipientMap.values());
+    if (uniqueRecipients.length === 0) {
+      alert('No payout recipients across these tournaments.');
+      return;
+    }
+    const totalAmount = uniqueRecipients.reduce((sum, e) => sum + e.amount, 0);
     const confirmed = window.confirm(
-      `Send airdrops for ${needing.length} Founder Tournament${needing.length === 1 ? '' : 's'}? This will send payouts one by one.`
+      `Send ${totalAmount.toFixed(1)} USDFG to ${uniqueRecipients.length} wallet(s) for ${needing.length} tournament(s) in one go (one SOL fee)?`
     );
     if (!confirmed) return;
-    for (let i = 0; i < needing.length; i++) {
-      const challenge = needing[i];
-      const recipients = getFounderTournamentRecipients(challenge);
-      if (recipients.length === 0) {
-        console.warn('No recipients for Founder Tournament:', challenge.id);
-        continue;
+    setIsAirdropping(true);
+    try {
+      const payer = publicKey;
+      const payerAta = await getAssociatedTokenAddress(USDFG_MINT, payer);
+      const payerAccount = await getAccount(connection, payerAta);
+      const totalLamports = uniqueRecipients.reduce(
+        (sum, e) => sum + Math.floor(e.amount * 1e9),
+        0
+      );
+      if (Number(payerAccount.amount) < totalLamports) {
+        throw new Error('Insufficient USDFG balance for this airdrop.');
       }
-      await handleFounderTournamentAirdrop(recipients, challenge, true);
+      const missingAccounts: string[] = [];
+      const transferTargets: { wallet: string; ata: PublicKey; amountLamports: number }[] = [];
+      for (const entry of uniqueRecipients) {
+        const amountLamports = Math.floor(entry.amount * 1e9);
+        if (amountLamports <= 0) continue;
+        const recipientPubkey = new PublicKey(entry.wallet);
+        const recipientAta = await getAssociatedTokenAddress(USDFG_MINT, recipientPubkey);
+        try {
+          await getAccount(connection, recipientAta);
+          transferTargets.push({ wallet: entry.wallet, ata: recipientAta, amountLamports });
+        } catch {
+          missingAccounts.push(entry.wallet);
+        }
+      }
+      if (transferTargets.length === 0) {
+        throw new Error('No recipients have a USDFG token account.');
+      }
+      const batchSize = 8;
+      const transactions: Transaction[] = [];
+      for (let i = 0; i < transferTargets.length; i += batchSize) {
+        const batch = transferTargets.slice(i, i + batchSize);
+        const tx = new Transaction();
+        batch.forEach((t) => tx.add(createTransferInstruction(payerAta, t.ata, payer, t.amountLamports)));
+        const { blockhash } = await connection.getLatestBlockhash('finalized');
+        tx.recentBlockhash = blockhash;
+        tx.feePayer = payer;
+        transactions.push(tx);
+      }
+      const signedTxs = signAllTransactions
+        ? await signAllTransactions(transactions)
+        : await Promise.all(transactions.map((tx) => signTransaction!(tx)));
+      const signatures: string[] = [];
+      for (let i = 0; i < signedTxs.length; i++) {
+        const sig = await connection.sendRawTransaction(signedTxs[i].serialize(), { skipPreflight: false, maxRetries: 3 });
+        signatures.push(sig);
+        await Promise.race([
+          connection.confirmTransaction(sig, 'confirmed'),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout')), 30000))
+        ]);
+      }
+      const sentTotal = transferTargets.reduce((s, t) => s + t.amountLamports, 0) / 1e9;
+      const { markFounderPayoutSent, postChallengeSystemMessage } = await import('@/lib/firebase/firestore');
+      const explorerUrl = getExplorerTxUrl(signatures[signatures.length - 1]);
+      for (const challenge of needing) {
+        await markFounderPayoutSent(challenge.id);
+        await postChallengeSystemMessage(
+          challenge.id,
+          `🚀 Founder airdrop sent (batch): ${transferTargets.length} wallets · ${sentTotal.toFixed(1)} USDFG · ${explorerUrl}`
+        );
+      }
+      let msg = `✅ Sent ${sentTotal.toFixed(1)} USDFG to ${transferTargets.length} wallet(s) for ${needing.length} tournament(s) — one SOL fee.`;
+      if (missingAccounts.length > 0) msg += `\n\nSkipped ${missingAccounts.length} wallet(s) without USDFG accounts.`;
+      alert(msg);
+    } catch (err: any) {
+      console.error('❌ Batch airdrop failed:', err);
+      alert(err?.message?.includes('already been processed') || err?.message?.includes('already processed')
+        ? 'Transaction may have succeeded. Check your wallet.'
+        : `Airdrop failed: ${err?.message ?? 'Unknown error'}`);
+    } finally {
+      setIsAirdropping(false);
     }
-    alert(`✅ Batch complete: sent airdrops for ${needing.length} tournament${needing.length === 1 ? '' : 's'}.`);
-  }, [publicKey, filteredChallenges, getFounderTournamentRecipients, handleFounderTournamentAirdrop]);
+  }, [publicKey, connection, signTransaction, signAllTransactions, isAirdropping, filteredChallenges, getFounderTournamentRecipients]);
 
   // Handle marking Founder Challenge reward as transferred (admin only)
   const handleMarkPrizeTransferred = async (challenge: any) => {
@@ -5571,11 +5658,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           disabled={isAirdropping}
                           className="rounded-lg border border-amber-400/50 bg-amber-500/20 px-3 py-2 text-xs font-semibold text-amber-200 hover:bg-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {isAirdropping ? 'Sending…' : `Send airdrop for all (${completedFounderNeedingPayout.length} tournament${completedFounderNeedingPayout.length === 1 ? '' : 's'})`}
+                          {isAirdropping ? 'Sending…' : `Send all in one (${completedFounderNeedingPayout.length} tournament${completedFounderNeedingPayout.length === 1 ? '' : 's'}) — one SOL fee`}
                         </button>
                       </div>
                       <p className="mb-2 px-4 md:px-0 text-xs text-white/50">
-                        One-time airdrop for all completed Founder Tournaments that need payout.
+                        One combined airdrop for all tournaments above — pay SOL fee once.
                       </p>
                     </section>
                   )}
