@@ -29,9 +29,9 @@ const PasswordForm: React.FC<PasswordFormProps> = ({ onSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen text-text-primary flex flex-col items-center justify-center relative overflow-hidden">
+    <div className="min-h-screen text-text-primary flex flex-col items-center justify-center relative overflow-hidden bg-[#040507]">
       {/* LetterGlitch Background */}
-      <div className="absolute inset-0 w-full h-full">
+      <div className="absolute inset-0 w-full h-full bg-[#040507]">
         <LetterGlitch
           glitchSpeed={50}
           centerVignette={true}

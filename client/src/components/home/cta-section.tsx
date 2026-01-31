@@ -15,7 +15,8 @@ const CTASection: React.FC = () => {
                   alt="USDFG Mascot Entering the Challenge Arena"
                   className="w-full max-w-2xl rounded-xl"
                   style={{ display: 'block', margin: '0 auto' }}
-                  loading="lazy" decoding="async"
+                  loading="lazy"
+                  decoding="async"
                 />
               </div>
             </div>

@@ -43,9 +43,13 @@ export default function ArenaRoute() {
     }
   }, [location.search]);
   
-  // Don't render anything until we've checked access
+  // Show dark loading screen (matches arena bg) so mobile doesn't show blue/blank
   if (loading) {
-    return null;
+    return (
+      <div className="min-h-screen w-full bg-[#040507] flex items-center justify-center">
+        <div className="text-white/60 text-sm">Loading…</div>
+      </div>
+    );
   }
 
   // Show password gate if no access
