@@ -139,6 +139,8 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   isAirdropping = false,
   onPlayerClick,
 }: TournamentBracketViewProps) => {
+  // Ensure players is always an array (parent may pass number or malformed data)
+  const playersList = Array.isArray(players) ? players : [];
 
   if (!tournament || !tournament.bracket?.length) {
     return (
@@ -257,8 +259,8 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   const opponentSubmitted = opponentResult !== undefined;
   const canEditResult = currentPlayerResult !== undefined && !opponentSubmitted;
 
-  const maxPlayers = tournament.maxPlayers || players.length;
-  const currentPlayers = players.length;
+  const maxPlayers = tournament.maxPlayers || playersList.length;
+  const currentPlayers = playersList.length;
   const isWaitingForPlayers = stage === 'waiting_for_players';
   const isCompleted = stage === 'completed';
   const champion = tournament.champion;
@@ -346,7 +348,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
     currentWallet &&
     creatorWallet &&
     currentWallet.toLowerCase() === creatorWallet.toLowerCase();
-  const nonCreatorPlayers = players.filter((wallet) => {
+  const nonCreatorPlayers = playersList.filter((wallet) => {
     if (!wallet || !creatorWallet) return Boolean(wallet);
     return wallet.toLowerCase() !== creatorWallet.toLowerCase();
   });
@@ -355,7 +357,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
 
   const uniqueParticipants = (() => {
     const map = new Map<string, string>();
-    players.forEach((wallet) => {
+    playersList.forEach((wallet) => {
       if (!wallet) return;
       const key = wallet.toLowerCase();
       if (!map.has(key)) {
@@ -527,7 +529,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
           <p className="mt-1 text-xs text-blue-100/80">
             The tournament will start automatically when all {maxPlayers} players join. Share the challenge link to invite others!
           </p>
-          {onJoinTournament && currentWallet && currentPlayers < maxPlayers && !players.some(p => p && p.toLowerCase() === currentWallet.toLowerCase()) && (
+          {onJoinTournament && currentWallet && currentPlayers < maxPlayers && !playersList.some(p => p && p.toLowerCase() === currentWallet.toLowerCase()) && (
             <button
               onClick={async () => {
                 try {
@@ -811,7 +813,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
               </div>
               <div className="rounded-xl border border-white/10 bg-white/5 p-3">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-300">Tournament Chat</div>
-                <ChatBox challengeId={challengeId} currentWallet={currentWallet || ""} status={stage === "round_in_progress" ? "active" : undefined} playersCount={players.length} />
+                <ChatBox challengeId={challengeId} currentWallet={currentWallet || ""} status={stage === "round_in_progress" ? "active" : undefined} playersCount={playersList.length} />
               </div>
             </div>
           )}

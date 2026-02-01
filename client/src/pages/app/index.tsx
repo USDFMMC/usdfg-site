@@ -1461,9 +1461,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const format = challenge.format || (challenge.tournament ? 'tournament' : 'standard');
       if (format !== 'tournament') return false;
       
-      const players = challenge.players || [];
+      const playersRaw = challenge.players;
+      const players = Array.isArray(playersRaw) ? playersRaw : [];
       const isParticipant = players.some((player: string) => 
-        player.toLowerCase() === currentWallet
+        player && player.toLowerCase() === currentWallet
       );
       
       return isParticipant;
@@ -1556,8 +1557,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         };
 
         const maxPlayers = updatedChallenge.maxPlayers || getMaxPlayers(mode);
-        const currentPlayersCount = updatedChallenge.players?.length || (updatedChallenge.challenger ? 2 : 1);
-        const playersArray = updatedChallenge.players || []; // Preserve actual players array
+        const playersForMerge = Array.isArray(updatedChallenge.players) ? updatedChallenge.players : [];
+        const currentPlayersCount = playersForMerge.length || (updatedChallenge.challenger ? 2 : 1);
+        const playersArray = playersForMerge;
 
         const merged = {
           ...selectedChallenge,
@@ -1597,9 +1599,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     // Find challenges where user is a participant and status is active/funded
     const myActiveChallenges = firestoreChallenges.filter((challenge: any) => {
       // Check players array (actual participant list) or creator
-      const playersArray = challenge.players || [];
+      const playersRaw = challenge.players;
+      const playersArray = Array.isArray(playersRaw) ? playersRaw : [];
       const isParticipant = playersArray.some((player: string) => 
-        player.toLowerCase() === currentWallet
+        player && player.toLowerCase() === currentWallet
       ) || challenge.creator?.toLowerCase() === currentWallet;
       
       const status = challenge.status || challenge.rawData?.status;
@@ -1627,9 +1630,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       if (challenge.status !== 'active') return false;
       
-      const players = challenge.players || [];
+      const playersRaw = challenge.players;
+      const players = Array.isArray(playersRaw) ? playersRaw : [];
       const isParticipant = players.some((player: string) => 
-        player.toLowerCase() === currentWallet
+        player && player.toLowerCase() === currentWallet
       );
       
       return isParticipant;
@@ -1647,8 +1651,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       }
       
       // Check if opponent already submitted a loss (making current player auto-winner)
-      const players = challenge.players || [];
-      const opponentWallet = players.find((p: string) => p.toLowerCase() !== currentWallet);
+      const playersForResult = Array.isArray(challenge.players) ? challenge.players : [];
+      const opponentWallet = playersForResult.find((p: string) => p && p.toLowerCase() !== currentWallet);
       const opponentResult = opponentWallet && results[opponentWallet];
       
       if (opponentResult && opponentResult.didWin === false) {
@@ -1933,7 +1937,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         const isCreator = c.creator === currentWallet;
         const isParticipant = firestoreChallenges.some(fc => 
           fc.id === c.id && 
-          fc.players?.includes(currentWallet)
+          Array.isArray(fc.players) && fc.players.includes(currentWallet)
         );
         return isCreator || isParticipant;
       });
@@ -1942,7 +1946,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       const existingActive = firestoreChallenges.find((fc: any) => {
         const isCreator = fc.creator === currentWallet;
-        const isParticipant = fc.players?.includes(currentWallet);
+        const isParticipant = Array.isArray(fc.players) && fc.players.includes(currentWallet);
         
         // Get status from Firestore data directly (most reliable)
         const status = fc.status || fc.rawData?.status || 'unknown';
@@ -3983,10 +3987,23 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   const extractGameFromTitleMemo = useCallback((title: string) => extractGameFromTitle(title), []);
 
   // Memoize filtered challenges to prevent unnecessary re-renders
+  // Wrapped in try/catch so malformed challenge data (e.g. players not an array) never crashes the page for any wallet
   const filteredChallenges = useMemo(() => {
     const now = Date.now();
-    
+    const currentWalletLower = (publicKey?.toString() || '').toLowerCase();
+    // Always return a real array so .some() never runs on a number or object (Firestore can store players as count)
+    const getPlayerList = (c: any): string[] => {
+      const raw = c?.players ?? c?.rawData?.players;
+      return Array.isArray(raw) ? raw : [];
+    };
+    const playerListIncludes = (c: any, walletLower: string): boolean => {
+      const arr = getPlayerList(c);
+      if (!Array.isArray(arr)) return false;
+      return arr.some((p: string) => (p || '').toLowerCase() === walletLower);
+    };
+
     return challenges.filter(challenge => {
+      try {
       // Filter by category
       const categoryMatch = filterCategory === 'All' || challenge.category === filterCategory;
       // Filter by game
@@ -3994,9 +4011,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Filter by "My Challenges" toggle (creator OR challenger OR in players so loser can see their challenges)
       const cw = (challenge.creator ?? challenge.rawData?.creator ?? '').toLowerCase();
       const ch = (challenge.challenger ?? challenge.rawData?.challenger ?? '').toLowerCase();
-      const pl = challenge.players ?? challenge.rawData?.players ?? [];
-      const currentWalletLower = (publicKey?.toString() || '').toLowerCase();
-      const myChallengesMatch = !showMyChallenges || cw === currentWalletLower || ch === currentWalletLower || pl.some((p: string) => (p || '').toLowerCase() === currentWalletLower);
+      const myChallengesMatch = !showMyChallenges || cw === currentWalletLower || ch === currentWalletLower || playerListIncludes(challenge, currentWalletLower);
       
       // Check if challenge is expired (these will be deleted automatically)
       const isExpired = challenge.status === 'cancelled' || 
@@ -4035,11 +4050,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Show completed/disputed challenges to participants so they can re-open lobby (chat/mic)
       const currentWalletStr = publicKey?.toString()?.toLowerCase() || '';
       const challengerWallet = (challenge.challenger ?? challenge.rawData?.challenger ?? '').toLowerCase();
-      const players = challenge.players ?? challenge.rawData?.players ?? [];
       const isParticipant = currentWalletStr && (
         (creatorWallet?.toLowerCase() === currentWalletStr) ||
         challengerWallet === currentWalletStr ||
-        players.some((p: string) => (p || '').toLowerCase() === currentWalletStr)
+        playerListIncludes(challenge, currentWalletStr)
       );
       const participantSeesCompleted = isParticipant && isCompleted && categoryMatch && gameMatch;
       
@@ -4068,12 +4082,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // If showing "My Challenges", show all their challenges regardless of status
       // OR if admin viewing completed Founder Tournament
       // OR if user is participant in completed challenge (so they can re-open lobby to chat/mic)
-      // Otherwise, only show joinable challenges
+      // Otherwise show joinable OR completed (so completed challenges don't "disappear" from the list)
       const shouldShow = showMyChallenges 
         ? (categoryMatch && gameMatch && myChallengesMatch) 
-        : (categoryMatch && gameMatch && (isJoinable || adminShouldSeeCompletedFounderTournament || participantSeesCompleted));
+        : (categoryMatch && gameMatch && (isJoinable || isCompleted || adminShouldSeeCompletedFounderTournament || participantSeesCompleted));
       
       return shouldShow;
+      } catch (err) {
+        console.warn('Filter challenge skip (malformed data):', challenge?.id, err);
+        return false;
+      }
     });
   }, [challenges, filterCategory, filterGame, showMyChallenges, publicKey]);
 
@@ -4081,7 +4099,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   const getFounderTournamentRecipients = useCallback((challenge: any): { wallet: string; amount: number }[] => {
     const raw = challenge.rawData || challenge;
     const tournament = raw.tournament || challenge.tournament;
-    let players: string[] = raw.players || challenge.players || [];
+    const playersRaw = raw.players || challenge.players;
+    let players: string[] = Array.isArray(playersRaw) ? playersRaw : [];
     if (players.length === 0 && tournament?.bracket) {
       const set = new Set<string>();
       (tournament.bracket || []).forEach((round: any) => {
@@ -4292,7 +4311,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     const isCreator = fc.creator === currentWallet;
     
     // Check if user is a participant in this challenge
-    const isParticipant = fc.players?.includes(currentWallet);
+    const isParticipant = Array.isArray(fc.players) && fc.players.includes(currentWallet);
     
     if (!isCreator && !isParticipant) return false; // Not relevant to this user
     
@@ -5885,8 +5904,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                               const matchesName = team.name.toLowerCase().includes(normalizedTerm);
                               const matchesKey = team.teamKey.toLowerCase().includes(normalizedTerm);
                               const matchesId = (team.teamId || '').toLowerCase().includes(normalizedTerm);
-                              const matchesMember = team.members.some((member) =>
-                                member.toLowerCase().includes(normalizedTerm)
+                              const membersArr = Array.isArray(team.members) ? team.members : [];
+                              const matchesMember = membersArr.some((member) =>
+                                member && typeof member === 'string' && member.toLowerCase().includes(normalizedTerm)
                               );
                               return matchesName || matchesKey || matchesId || matchesMember;
                             });
