@@ -5819,8 +5819,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                     (fee === 0 || fee < 1e-9) &&
                                     (founderPart > 0 || founderWin > 0);
                                   if (isCompletedOrDisputed || payoutTriggered) {
-                                    // Allow participants to open completed challenges (view result, claim, chat); allow admin to open Founder Tournament for payout
-                                    if (!isParticipant && !(isAdmin && isFounderTournament)) return;
+                                    // Allow participants to open (view result, claim, chat); allow admin to open any completed/disputed (payout or dispute resolution)
+                                    if (!isParticipant && !isAdmin) return;
                                   }
 
                                   // Check if this is a team challenge with teamOnly restriction
