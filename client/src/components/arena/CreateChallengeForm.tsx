@@ -319,13 +319,11 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
         // Valid - no error for Founder Challenges
       }
 
-      const founderChallengeCount = Number(formData.founderChallengeCount || 1);
-      if (isAdmin && entryFee === 0) {
-        if (!Number.isFinite(founderChallengeCount) || founderChallengeCount < 1) {
-          errors.push('Founder challenge count must be at least 1');
-        } else if (founderChallengeCount > 25) {
-          errors.push('Founder challenge count cannot exceed 25');
-        }
+      const challengeCount = Number(formData.founderChallengeCount || 1);
+      if (!Number.isFinite(challengeCount) || challengeCount < 1) {
+        errors.push('Number of challenges must be at least 1');
+      } else if (challengeCount > 25) {
+        errors.push('Number of challenges cannot exceed 25');
       }
 
       if (isAdmin && entryFee === 0 && isTournamentMode) {
@@ -793,38 +791,40 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                 })()}
               </div>
 
-              {(() => {
-                const isAdmin = currentWallet && currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
-                const entryFee = typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) || 0 : formData.entryFee || 0;
-                if (!isAdmin || entryFee !== 0) {
-                  return null;
-                }
-                return (
-                  <div className="mt-2">
-                    <label className="block text-xs font-medium text-gray-300 mb-1.5">
-                      Number of Founder Challenges
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={25}
-                      placeholder="1"
-                      value={typeof formData.founderChallengeCount === 'string' ? formData.founderChallengeCount : String(formData.founderChallengeCount ?? 1)}
-                      onChange={(e) => handleInputChange('founderChallengeCount', e.target.value)}
-                      onBlur={(e) => {
-                        const v = e.target.value.trim();
-                        const n = v === '' ? 1 : Math.floor(Number(v));
-                        const clamped = Number.isFinite(n) ? Math.min(25, Math.max(1, n)) : 1;
-                        if (String(clamped) !== v) handleInputChange('founderChallengeCount', clamped);
-                      }}
-                      className="w-full px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white placeholder-zinc-500 focus:border-amber-400/50 focus:outline-none transition-all"
-                    />
-                    <p className="text-xs text-purple-300/80 mt-1">
-                      Creates multiple identical Founder Challenges at once.
-                    </p>
-                  </div>
-                );
-              })()}
+              {/* Number of challenges - shown for all users (Founder label for admin + 0 entry) */}
+              <div className="mt-2">
+                <label className="block text-xs font-medium text-gray-300 mb-1.5">
+                  {(() => {
+                    const isAdmin = currentWallet && currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+                    const entryFee = typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) || 0 : formData.entryFee || 0;
+                    return isAdmin && entryFee === 0 ? 'Number of Founder Challenges' : 'Number of challenges';
+                  })()}
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={25}
+                  placeholder="1"
+                  value={typeof formData.founderChallengeCount === 'string' ? formData.founderChallengeCount : String(formData.founderChallengeCount ?? 1)}
+                  onChange={(e) => handleInputChange('founderChallengeCount', e.target.value)}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim();
+                    const n = v === '' ? 1 : Math.floor(Number(v));
+                    const clamped = Number.isFinite(n) ? Math.min(25, Math.max(1, n)) : 1;
+                    if (String(clamped) !== v) handleInputChange('founderChallengeCount', clamped);
+                  }}
+                  className="w-full px-3 py-2 bg-zinc-800/60 border border-zinc-700/50 rounded-lg text-sm text-white placeholder-zinc-500 focus:border-amber-400/50 focus:outline-none transition-all"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  {(() => {
+                    const isAdmin = currentWallet && currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+                    const entryFee = typeof formData.entryFee === 'string' ? parseFloat(formData.entryFee) || 0 : formData.entryFee || 0;
+                    return isAdmin && entryFee === 0
+                      ? 'Creates multiple identical Founder Challenges at once.'
+                      : 'Creates multiple identical challenges at once (1–25).';
+                  })()}
+                </p>
+              </div>
 
               {(() => {
                 const isAdmin = currentWallet && currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();

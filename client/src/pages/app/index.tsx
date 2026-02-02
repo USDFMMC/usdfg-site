@@ -1918,9 +1918,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         : challengeData.entryFee || 0;
       const isAdmin = currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
       const isFounderChallenge = isAdmin && (entryFeeValue === 0 || entryFeeValue < 0.000000001);
-      const founderChallengeCount = isFounderChallenge
-        ? Math.min(25, Math.max(1, Math.floor(Number(challengeData.founderChallengeCount || 1))))
-        : 1;
+      const founderChallengeCount = Math.min(25, Math.max(1, Math.floor(Number(challengeData.founderChallengeCount || 1))));
       const isTournament = challengeData.format === 'tournament' || challengeData.tournament;
       const founderParticipantReward = isFounderChallenge && isTournament
         ? Math.max(0, Number(challengeData.founderParticipantReward || 0))
@@ -2112,7 +2110,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         throw new Error("Status is required");
       }
       
-      const totalChallengesToCreate = isFounderChallenge ? founderChallengeCount : 1;
+      const totalChallengesToCreate = founderChallengeCount;
       const createdChallengeIds: string[] = [];
       for (let i = 1; i <= totalChallengesToCreate; i++) {
         const titleSuffix = totalChallengesToCreate > 1 ? ` #${i}` : '';
@@ -2129,7 +2127,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       setShowCreateModal(false);
 
       if (totalChallengesToCreate > 1) {
-        alert(`✅ Created ${totalChallengesToCreate} Founder Challenges`);
+        alert(`✅ Created ${totalChallengesToCreate} challenge${totalChallengesToCreate > 1 ? 's' : ''}`);
       }
       
       // No balance refresh needed - no USDFG was moved (challenge creation is free)
@@ -5096,22 +5094,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             
             <button
               onClick={() => {
-                if (hasActiveChallenge) {
-                  alert("You already have an active challenge (created or joined). Complete it before creating a new one.");
-                  return;
-                }
-                if (isCreatingChallenge) {
-                  return;
-                }
+                if (isCreatingChallenge) return;
                 setShowCreateModal(true);
               }}
-              disabled={hasActiveChallenge || isCreatingChallenge}
+              disabled={isCreatingChallenge}
               className="flex items-center justify-center gap-2 px-4 py-2 h-10 bg-zinc-800/50 hover:bg-zinc-700/50 rounded-xl border border-zinc-700 hover:border-amber-300/50 transition-all text-white text-sm font-semibold"
-              title={hasActiveChallenge ? "You have an active challenge (created or joined)" : isCreatingChallenge ? "Creating challenge..." : "Create a new challenge"}
+              title={isCreatingChallenge ? "Creating challenge..." : "Create a new challenge"}
             >
               <span className="text-amber-300">⚡</span>
               <span className="text-white">
-                {hasActiveChallenge ? "In Challenge" : isCreatingChallenge ? "Creating..." : "Start Match"}
+                {isCreatingChallenge ? "Creating..." : "Start Match"}
               </span>
             </button>
             
@@ -5244,10 +5236,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           </div>
         </div>
 
-        {/* Main Content */}
-        <div className="container mx-auto px-2 py-1 sm:py-2 w-full">
-          {/* Hero Section */}
-          <div className="text-center neocore-section">
+        {/* Main Content - constrained width on desktop for better density */}
+        <div className="container mx-auto px-2 py-1 sm:py-2 w-full max-w-6xl">
+          {/* Hero Section - tighter on desktop */}
+          <div className="text-center neocore-section md:mb-2">
             {/* USDFG Price Ticker */}
             <div className="inline-flex items-center bg-[#07080C]/95 border border-amber-500/30 rounded-full px-2 py-1 mb-2 backdrop-blur-sm shadow-[0_0_20px_rgba(255,215,130,0.15)] hover:shadow-[0_0_30px_rgba(255,215,130,0.25)] transition-all">
               <div className="w-2 h-2 bg-amber-400 rounded-full mr-2 animate-pulse"></div>
@@ -5326,8 +5318,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             )}
           </div>
 
-          {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-4">
+          {/* Quick Stats - compact on desktop */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3 md:mb-4">
             <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
               <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
@@ -5369,10 +5361,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           </div>
 
           {/* Live Challenges Discovery Section - Category-based horizontal scrolling */}
-          <div className="relative mb-6">
-            {/* Header */}
-            <div className="mb-5 px-4 md:px-0">
-              <h1 className="text-lg md:text-2xl font-semibold text-white mb-1">Live Challenges</h1>
+          <div className="relative mb-4 md:mb-6">
+            {/* Header - tighter gap on desktop */}
+            <div className="mb-2 md:mb-3 px-4 md:px-0">
+              <h1 className="text-lg md:text-2xl font-semibold text-white mb-0.5">Live Challenges</h1>
               <p className="text-sm text-white/55">Browse by category. Swipe left or right inside each section.</p>
                 </div>
                 
@@ -5810,8 +5802,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                         })()}
           </div>
 
-          {/* Live Challenges Grid - Mobile First (iPhone 13 Pro optimized) */}
-          <div className="mb-6 md:hidden">
+          {/* Live Challenges Grid - Browse by category (visible on mobile and desktop) */}
+          <div className="mb-4 md:mb-6">
             <LiveChallengesGrid challenges={challenges} />
           </div>
 
@@ -6864,19 +6856,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         {/* Mobile FAB - Create Challenge - Smaller and positioned to not block content */}
         <button
           onClick={() => {
-            if (hasActiveChallenge) {
-              alert("You already have an active challenge (created or joined). Complete it before creating a new one.");
-              return;
-            }
+            if (isCreatingChallenge) return;
             setShowCreateModal(true);
           }}
-          disabled={hasActiveChallenge || isCreatingChallenge}
+          disabled={isCreatingChallenge}
           className={`fixed bottom-20 right-4 md:hidden ${
-            hasActiveChallenge || isCreatingChallenge 
+            isCreatingChallenge 
               ? 'bg-gray-600/50 cursor-not-allowed' 
               : 'bg-gradient-to-r from-amber-400 to-orange-500 hover:brightness-110'
           } text-white p-3 rounded-full shadow-[0_0_20px_rgba(255,215,130,0.5)] transition-all z-30 flex items-center justify-center w-12 h-12`}
-          title={hasActiveChallenge ? "You have an active challenge" : "Start Match"}
+          title="Start Match"
         >
           <span className="text-xl font-bold">+</span>
         </button>

@@ -76,44 +76,21 @@ const LiveChallengesGrid: React.FC<LiveChallengesGridProps> = ({ challenges = []
     navigate(`/app/category/${categoryKey.toLowerCase()}`);
   };
 
-  // Calculate exact card dimensions for iPhone 13 Pro (390px width)
-  // Screen width: 390px
-  // Horizontal padding: 14px × 2 = 28px
-  // Grid gap: 10px × 1 = 10px (between 2 columns for 6 items)
-  // Available width: 390 - 28 - 10 = 352px
-  // Card width: 352 / 2 = 176px (2 columns × 3 rows = 6 categories)
-  // Card height: 122px (slightly taller than wide)
-  const cardWidth = 176;
-  const cardHeight = 122;
-
   return (
     <div 
-      className="w-full" 
-      style={{ 
-        maxWidth: '390px', 
-        margin: '0 auto',
-        // Respect safe areas on mobile
-        paddingLeft: 'env(safe-area-inset-left, 0)',
-        paddingRight: 'env(safe-area-inset-right, 0)',
+      className="w-full max-w-[390px] md:max-w-none mx-auto px-[14px] md:px-0"
+      style={{
+        paddingLeft: 'max(14px, env(safe-area-inset-left, 0))',
+        paddingRight: 'max(14px, env(safe-area-inset-right, 0))',
       }}
     >
-      {/* Header */}
-      <div className="px-[14px] pt-[12px] pb-2">
-        <h1 className="text-white text-xl font-bold tracking-wide uppercase">
+      <div className="pt-3 pb-2 md:pt-0 md:pb-3">
+        <h1 className="text-white text-xl md:text-lg font-bold tracking-wide uppercase">
           BROWSE BY CATEGORY
         </h1>
         <p className="text-gray-400 text-xs mt-0.5">Find your battleground</p>
       </div>
-
-      {/* Grid Container - 2 columns × 3 rows for 6 categories */}
-      <div 
-        className="grid grid-cols-2 gap-[10px] px-[14px] pb-[12px]"
-        style={{
-          width: '100%',
-          maxWidth: '390px',
-          margin: '0 auto',
-        }}
-      >
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3 pb-4">
         {CATEGORIES.map((category) => {
           const liveCount = categoryCounts[category.key] || 0;
           const isActive = liveCount > 0;
@@ -123,34 +100,23 @@ const LiveChallengesGrid: React.FC<LiveChallengesGridProps> = ({ challenges = []
               key={category.key}
               onClick={() => handleCategoryTap(category.key)}
               className={`
-                relative
-                rounded-lg
-                border
-                transition-all
-                duration-300
-                overflow-hidden
-                active:scale-[0.98]
+                relative w-full rounded-lg border transition-all duration-300 overflow-hidden
+                active:scale-[0.98] hover:border-amber-400/40
+                aspect-[176/122] min-h-[100px] md:min-h-[110px]
                 ${isActive 
                   ? 'border-amber-400/60 shadow-[0_0_8px_rgba(255,215,130,0.3)]' 
                   : 'border-gray-600/40'
                 }
               `}
               style={{
-                width: `${cardWidth}px`,
-                height: `${cardHeight}px`,
                 backgroundColor: '#0B0E13',
-                // Subtle inner gradient/noise effect
                 backgroundImage: 'radial-gradient(circle at 30% 30%, rgba(255,255,255,0.02), transparent 60%)',
               }}
             >
-              {/* Live Indicator - Small dot/pill in top-right */}
               {liveCount > 0 && (
                 <div className="absolute top-1.5 right-1.5 z-10">
                   <div 
-                    className={`
-                      w-1.5 h-1.5 rounded-full
-                      ${isActive ? 'bg-green-400' : 'bg-gray-500'}
-                    `}
+                    className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-green-400' : 'bg-gray-500'}`}
                     style={{
                       boxShadow: isActive ? '0 0 6px rgba(74, 222, 128, 0.8)' : 'none',
                       animation: isActive ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none',
@@ -158,51 +124,19 @@ const LiveChallengesGrid: React.FC<LiveChallengesGridProps> = ({ challenges = []
                   />
                 </div>
               )}
-
-              {/* Icon Container (centered, ~55-60% of card height) */}
-              <div 
-                className="absolute inset-0 flex items-center justify-center"
-                style={{
-                  paddingTop: '8px',
-                  paddingBottom: '28px', // Space for label
-                }}
-              >
-                <div 
-                  className="flex items-center justify-center"
-                  style={{
-                    fontSize: '48px',
-                    lineHeight: '1',
-                    height: `${Math.floor(cardHeight * 0.58)}px`, // ~58% of card height
-                    width: '100%',
-                  }}
-                >
-                  {category.icon}
-                </div>
+              <div className="absolute inset-0 flex items-center justify-center pt-2 pb-8">
+                <span className="text-3xl md:text-4xl lg:text-5xl leading-none">{category.icon}</span>
               </div>
-
-              {/* Label (bottom-left aligned, uppercase, one word) */}
               <div className="absolute bottom-2 left-2">
                 <span 
-                  className={`
-                    text-[10px] font-semibold uppercase tracking-wide
-                    ${isActive ? 'text-amber-300' : 'text-gray-400'}
-                  `}
-                  style={{
-                    letterSpacing: '0.5px',
-                  }}
+                  className={`text-[10px] md:text-xs font-semibold uppercase tracking-wide ${isActive ? 'text-amber-300' : 'text-gray-400'}`}
+                  style={{ letterSpacing: '0.5px' }}
                 >
                   {category.label}
                 </span>
               </div>
-
-              {/* Active Glow Overlay - subtle inner glow when active */}
               {isActive && (
-                <div 
-                  className="absolute inset-0 pointer-events-none rounded-lg"
-                  style={{
-                    boxShadow: 'inset 0 0 20px rgba(255,215,130,0.1)',
-                  }}
-                />
+                <div className="absolute inset-0 pointer-events-none rounded-lg" style={{ boxShadow: 'inset 0 0 20px rgba(255,215,130,0.1)' }} />
               )}
             </button>
           );
