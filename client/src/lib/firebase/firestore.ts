@@ -2075,14 +2075,9 @@ export async function cleanupCompletedChallenge(id: string) {
       const isFounderTournamentOrChallenge = isFounderTournament || isFounderChallenge;
       
       if (isFounderTournamentOrChallenge) {
-        // Only delete Founder Tournaments/Challenges when admin has airdropped AND match has ended.
-        const founderPayoutSentAt = data.founderPayoutSentAt;
-        const matchEnded = data.status === 'completed' || (isTournament && data.tournament?.stage === 'completed');
-        if (!founderPayoutSentAt || !matchEnded) {
-          console.log(`⚠️ Skipping cleanup of Founder Tournament/Challenge (delete only after admin airdrop + match ended):`, id);
-          return; // Never delete until admin airdropped and match/tournament ended
-        }
-        console.log(`✅ Founder Tournament/Challenge: airdrop sent and match ended, proceeding with cleanup:`, id);
+        // Never auto-delete Founder Tournaments/Challenges; admin deletes manually.
+        console.log('⚠️ Skipping auto-delete of Founder Tournament/Challenge (admin deletes manually):', id);
+        return;
       }
     }
     
@@ -2156,14 +2151,9 @@ export async function cleanupExpiredChallenge(id: string) {
       const isFounderTournamentOrChallenge = isFounderTournament || isFounderChallenge;
       
       if (isFounderTournamentOrChallenge) {
-        // Only delete Founder Tournaments/Challenges when admin has airdropped AND match/tournament has ended.
-        const founderPayoutSentAt = data.founderPayoutSentAt;
-        const matchEnded = data.status === 'completed' || (isTournament && data.tournament?.stage === 'completed');
-        if (!founderPayoutSentAt || !matchEnded) {
-          console.log(`⚠️ Skipping cleanup of expired Founder Tournament/Challenge (delete only after admin airdrop + match ended):`, id);
-          return; // Never delete until admin airdropped and match/tournament ended
-        }
-        console.log(`✅ Expired Founder Tournament/Challenge: airdrop sent and match ended, proceeding with cleanup:`, id);
+        // Never auto-delete Founder Tournaments/Challenges; admin deletes manually (even if no one joined).
+        console.log('⚠️ Skipping auto-delete of expired Founder Tournament/Challenge (admin deletes manually):', id);
+        return;
       }
     }
     

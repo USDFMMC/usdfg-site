@@ -129,14 +129,16 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
     setIsDragging(false);
   };
 
-  // Touch events for drag
+  // Touch events for drag - only from drag-handle so Close/Minimize buttons get taps
   useEffect(() => {
     if (!isOpen || isMinimized) return;
 
     const handleTouchStart = (e: TouchEvent) => {
       const target = e.target as HTMLElement;
-      // Only start drag from header or drag handle
-      if (target.closest('.drag-handle') || target.closest('.panel-header')) {
+      // Don't start drag on buttons (so Close/Minimize work on mobile)
+      if (target.closest('button')) return;
+      // Only start drag from the drag-handle strip, not the whole header
+      if (target.closest('.drag-handle')) {
         handleDragStart(e.touches[0].clientY);
       }
     };
@@ -330,8 +332,20 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
             </div>
           </div>
 
-          {/* RIGHT: signal bars */}
-          <div className="flex items-center gap-3">
+          {/* RIGHT: close button + signal bars - close without expanding on mobile */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              onTouchStart={(e) => e.stopPropagation()}
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-white/15 hover:bg-white/25 active:bg-white/30 transition-colors touch-manipulation flex-shrink-0"
+              aria-label="Close lobby"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
             <div className="flex items-end gap-1">
               {[0, 0.15, 0.3].map((delay, i) => (
                 <motion.span
@@ -395,45 +409,32 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
           <div className="w-12 h-1 bg-white/30 rounded-full" />
         </div>
 
-        {/* Header with minimize button */}
+        {/* Header with minimize and close - large touch targets for mobile */}
         {title && (
-          <div 
-            className="panel-header px-4 py-3 border-b border-amber-400/20 bg-gray-900/98 backdrop-blur-sm z-10 flex-shrink-0"
-            onTouchStart={(e) => {
-              e.stopPropagation();
-              handleDragStart(e.touches[0].clientY);
-            }}
-            onTouchMove={(e) => {
-              if (isDragging) {
-                e.preventDefault();
-                handleDragMove(e.touches[0].clientY);
-              }
-            }}
-            onTouchEnd={() => {
-              if (isDragging) {
-                handleDragEnd();
-              }
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent">
+          <div className="panel-header px-4 py-3 border-b border-amber-400/20 bg-gray-900/98 backdrop-blur-sm z-10 flex-shrink-0">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-bold bg-gradient-to-r from-amber-400 to-amber-600 bg-clip-text text-transparent truncate min-w-0 flex-1">
                 {title}
               </h2>
-              <div className="flex items-center gap-2">
-                {/* Minimize button - allows users to minimize to pill */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {/* Minimize - 44px touch target for mobile */}
                 <button
+                  type="button"
                   onClick={() => setIsMinimized(true)}
-                  className="p-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors duration-300"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 active:bg-zinc-600/50 transition-colors duration-200 touch-manipulation"
                   aria-label="Minimize lobby to pill"
                 >
-                  <ChevronUp className="w-4 h-4 text-gray-400 rotate-180" />
+                  <ChevronUp className="w-5 h-5 text-gray-300 rotate-180" />
                 </button>
-              <button
-                onClick={onClose}
-                className="p-1.5 rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors duration-300"
-              >
-                <X className="w-4 h-4 text-gray-400" />
-              </button>
+                {/* Close - 44px touch target for mobile */}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-zinc-800/50 hover:bg-zinc-700/50 active:bg-zinc-600/50 transition-colors duration-200 touch-manipulation"
+                  aria-label="Close lobby"
+                >
+                  <X className="w-5 h-5 text-gray-300" />
+                </button>
               </div>
             </div>
           </div>

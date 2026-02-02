@@ -43,6 +43,19 @@ export function useChallengeExpiry(challenges: any[]) {
         const expMs = challenge.expiresAt.toMillis ? challenge.expiresAt.toMillis() : challenge.expiresAt;
         const isExpired = expMs < now;
 
+        // Founder Tournaments (admin-created, free entry, founder rewards): never auto-expire or auto-delete; admin deletes manually
+        let isFounderTournament = false;
+        try {
+          const { ADMIN_WALLET } = await import("../lib/chain/config");
+          const creator = (challenge.creator || challenge.rawData?.creator || '').toString().toLowerCase();
+          const isAdmin = creator === ADMIN_WALLET.toString().toLowerCase();
+          const isTournament = challenge.format === 'tournament' || !!challenge.tournament || !!challenge.rawData?.tournament;
+          const isFree = (challenge.entryFee ?? challenge.rawData?.entryFee ?? 0) === 0 || (challenge.entryFee ?? 0) < 0.000000001;
+          const hasFounderRewards = (challenge.founderParticipantReward ?? challenge.rawData?.founderParticipantReward ?? 0) > 0 || (challenge.founderWinnerBonus ?? challenge.rawData?.founderWinnerBonus ?? 0) > 0;
+          isFounderTournament = isTournament && isAdmin && isFree && hasFounderRewards;
+        } catch (_) {}
+        if (isFounderTournament) continue; // Skip all auto-expire and auto-cleanup for Founder Tournaments
+
         // Handle challenges that need to be marked as expired
         if (isExpired && (challenge.status === "active" || challenge.status === "pending")) {
           // Skip if already being processed

@@ -4269,6 +4269,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         return;
       }
       
+      // Founder Tournaments (admin-created, free entry, founder rewards): never auto-delete; admin deletes manually
+      const creatorWallet = (challenge.creator ?? challenge.rawData?.creator ?? '').toString().toLowerCase();
+      const isAdminCreator = creatorWallet === ADMIN_WALLET.toString().toLowerCase();
+      const isFree = (challenge.entryFee ?? challenge.rawData?.entryFee ?? 0) === 0 || (challenge.entryFee ?? 0) < 0.000000001;
+      const hasFounderRewards = (challenge.founderParticipantReward ?? challenge.rawData?.founderParticipantReward ?? 0) > 0 || (challenge.founderWinnerBonus ?? challenge.rawData?.founderWinnerBonus ?? 0) > 0;
+      const isFounderTournament = isTournament && isAdminCreator && isFree && hasFounderRewards;
+      if (isFounderTournament) return;
+      
       // Only delete if expired AND not active
       const isExpired = challenge.status === 'cancelled' || 
         (challenge.expiresAt && challenge.expiresAt < now) ||
