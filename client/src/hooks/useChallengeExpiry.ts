@@ -1,14 +1,14 @@
 import { useEffect, useRef } from "react";
-import { updateChallengeStatus, cleanupExpiredChallenge, cleanupCompletedChallenge, archiveChallenge, revertCreatorTimeout } from "../lib/firebase/firestore";
+import { cleanupCompletedChallenge, revertCreatorTimeout } from "../lib/firebase/firestore";
 
 /**
- * Watches all active challenges and auto-marks them completed when expired.
- * Displays an "Expired" tag for 5 seconds before archiving.
+ * Watches challenges for time-based maintenance.
+ * - Reverts creator funding timeout
+ * - Auto-cleans completed challenges after retention window
  */
 export function useChallengeExpiry(challenges: any[]) {
   const processedChallenges = useRef(new Set<string>());
-  const archiveTimers = useRef(new Map<string, NodeJS.Timeout>());
-  const completedRetentionHours = 2;
+  const completedRetentionHours = 24;
 
   useEffect(() => {
     if (!challenges?.length) return;
@@ -37,113 +37,44 @@ export function useChallengeExpiry(challenges: any[]) {
             continue; // Skip other expiry checks for this challenge
           }
         }
-        
-        if (!challenge.expiresAt) continue;
-        
-        const expMs = challenge.expiresAt.toMillis ? challenge.expiresAt.toMillis() : challenge.expiresAt;
-        const isExpired = expMs < now;
-
-        // Handle challenges that need to be marked as expired
-        if (isExpired && (challenge.status === "active" || challenge.status === "pending")) {
-          // Skip if already being processed
-          if (processedChallenges.current.has(challenge.id)) continue;
-
-          console.log("⏰ Auto-expiring challenge:", challenge.id);
-          processedChallenges.current.add(challenge.id);
-
-          try {
-            // Mark as expired (NOT completed - we use "expired" for time-outs)
-            await updateChallengeStatus(challenge.id, "expired");
-            console.log("✅ Challenge marked as expired:", challenge.id);
-
-            // Schedule archival after 5 seconds
-            const timer = setTimeout(async () => {
-              try {
-                await archiveChallenge(challenge.id);
-                console.log("🏁 Challenge archived:", challenge.id);
-                processedChallenges.current.delete(challenge.id);
-                archiveTimers.current.delete(challenge.id);
-              } catch (error) {
-                console.error("❌ Failed to archive challenge:", error);
-                processedChallenges.current.delete(challenge.id);
-                archiveTimers.current.delete(challenge.id);
-              }
-            }, 5000);
-
-            archiveTimers.current.set(challenge.id, timer);
-          } catch (error) {
-            console.error("❌ Failed to mark challenge as expired:", error);
-            processedChallenges.current.delete(challenge.id);
-          }
-        }
-        
-        // Auto-cleanup expired challenges (delete immediately to save storage)
-        if (challenge.status === "expired" && !archiveTimers.current.has(challenge.id) && !processedChallenges.current.has(challenge.id + '_cleanup')) {
-          console.log("🗑️ Found expired challenge that needs cleanup:", challenge.id);
-          processedChallenges.current.add(challenge.id + '_cleanup');
-
-          // Cleanup immediately (no need to wait since it's already expired)
-          setTimeout(async () => {
-            try {
-              await cleanupExpiredChallenge(challenge.id);
-              console.log("🏁 Expired challenge cleaned up:", challenge.id);
-              processedChallenges.current.delete(challenge.id + '_cleanup');
-            } catch (error) {
-              console.error("❌ Failed to cleanup expired challenge:", error);
-              processedChallenges.current.delete(challenge.id + '_cleanup');
-            }
-          }, 1000); // Short delay to show "Expired" status
-        }
-
         // Auto-cleanup completed challenges (delete after short retention window)
-        if (challenge.status === "completed" && !archiveTimers.current.has(challenge.id) && !processedChallenges.current.has(challenge.id + '_cleanup_completed')) {
-          // Check if this is a Founder Tournament or Founder Challenge
-          const entryFee = challenge.entryFee || 0;
-          const isFree = entryFee === 0 || entryFee < 0.000000001;
-          const isTournament = challenge.format === 'tournament';
-          const founderParticipantReward = challenge.founderParticipantReward || 0;
-          const founderWinnerBonus = challenge.founderWinnerBonus || 0;
-          
-          // Import ADMIN_WALLET dynamically to check if creator is admin
-          let isFounderTournamentOrChallenge = false;
-          try {
-            const { ADMIN_WALLET } = await import("../lib/chain/config");
-            const creatorWallet = challenge.creator || '';
-            const isAdminCreator = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
-            
-            // Check if Founder Tournament (tournament with founder rewards)
-            const isFounderTournament = isTournament && 
-              isAdminCreator && 
-              isFree && 
-              (founderParticipantReward > 0 || founderWinnerBonus > 0);
-            
-            // Check if Founder Challenge (non-tournament, no PDA, admin creator, free)
-            const isFounderChallenge = !isTournament && 
-              !challenge.pda && 
-              (isFree || isAdminCreator);
-            
-            isFounderTournamentOrChallenge = isFounderTournament || isFounderChallenge;
-          } catch (error) {
-            console.error("Error checking Founder status:", error);
+        if (challenge.status === "completed" && !processedChallenges.current.has(challenge.id + '_cleanup_completed')) {
+          const toMillisSafe = (value: any): number | null => {
+            if (!value) return null;
+            if (typeof value === 'number') return value;
+            if (typeof value.toMillis === 'function') return value.toMillis();
+            if (value.seconds) return value.seconds * 1000;
+            return null;
+          };
+
+          const resultTimes = challenge.results
+            ? (Object.values(challenge.results)
+                .map((r: any) => toMillisSafe(r?.submittedAt))
+                .filter((ms: number | null) => ms !== null) as number[])
+            : [];
+          const completionFromResults = resultTimes.length ? Math.max(...resultTimes) : null;
+
+          const completionTime =
+            toMillisSafe(challenge.tournament?.completedAt) ??
+            toMillisSafe(challenge.completedAt) ??
+            completionFromResults ??
+            toMillisSafe(challenge.resultDeadline) ??
+            toMillisSafe(challenge.updatedAt);
+
+          if (!completionTime) {
+            // If we can't determine completion time, skip cleanup to avoid early deletion.
+            continue;
           }
-          
-          // Use 24 hours retention for Founder Tournaments/Challenges, 2 hours for others
-          const retentionHours = isFounderTournamentOrChallenge ? 24 : completedRetentionHours;
-          
-          const completedTime = challenge.results ? 
-            Math.max(...Object.values(challenge.results).map(r => r.submittedAt.toMillis())) : 
-            challenge.createdAt.toMillis();
-          
-          const hoursSinceCompletion = (Date.now() - completedTime) / (1000 * 60 * 60);
-          
-          if (hoursSinceCompletion >= retentionHours) {
-            console.log(`🗑️ Found completed challenge that needs cleanup (${retentionHours}h old):`, challenge.id);
+
+          const hoursSinceCompletion = (Date.now() - completionTime) / (1000 * 60 * 60);
+          if (hoursSinceCompletion >= completedRetentionHours) {
+            console.log(`🗑️ Found completed challenge that needs cleanup (${completedRetentionHours}h old):`, challenge.id);
             processedChallenges.current.add(challenge.id + '_cleanup_completed');
 
             setTimeout(async () => {
               try {
                 await cleanupCompletedChallenge(challenge.id);
-                console.log(`🏁 Completed challenge cleaned up (${retentionHours}h old):`, challenge.id);
+                console.log(`🏁 Completed challenge cleaned up (${completedRetentionHours}h old):`, challenge.id);
                 processedChallenges.current.delete(challenge.id + '_cleanup_completed');
               } catch (error) {
                 console.error("❌ Failed to cleanup completed challenge:", error);
@@ -163,9 +94,6 @@ export function useChallengeExpiry(challenges: any[]) {
 
     return () => {
       clearInterval(interval);
-      // Clear any pending archive timers on cleanup
-      archiveTimers.current.forEach(timer => clearTimeout(timer));
-      archiveTimers.current.clear();
     };
   }, [challenges]);
 }

@@ -65,8 +65,8 @@ export interface ChallengeData {
   status: 'pending_waiting_for_opponent' | 'creator_confirmation_required' | 'creator_funded' | 'active' | 'completed' | 'cancelled' | 'disputed';
   pendingJoiner?: string;             // Wallet that expressed join intent (in creator_confirmation_required state)
   createdAt: Timestamp;               // Creation time
-  expiresAt: Timestamp;               // Expiration time (legacy - use expirationTimer)
-  expirationTimer?: Timestamp;        // TTL for pending challenges (60 minutes)
+  expiresAt?: Timestamp;              // Deprecated: no auto-expiry (legacy field)
+  expirationTimer?: Timestamp;        // Deprecated: pending challenges no longer auto-expire
   creatorFundingDeadline?: Timestamp; // Deadline for creator to fund (5 minutes after join intent)
   joinerFundingDeadline?: Timestamp;  // Deadline for joiner to fund (5 minutes after creator funds)
   fundedByCreatorAt?: Timestamp;      // When creator funded escrow
@@ -1518,11 +1518,6 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
       throw new Error(`Challenge is not waiting for opponent. Current status: ${data.status}. The challenge may have been reverted. Please refresh and try again.`);
     }
     
-    // Check if challenge expired
-    if (data.expirationTimer && data.expirationTimer.toMillis() < Date.now()) {
-      throw new Error("Challenge has expired");
-    }
-    
     // Handle team challenges
     if (data.challengeType === 'team' && data.teamOnly === true) {
       const challengerTeam = await getTeamByMember(wallet);
@@ -1873,52 +1868,12 @@ export const revertJoinerTimeout = async (challengeId: string): Promise<boolean>
 };
 
 /**
- * Auto-delete expired pending challenges after 60 minutes (saves Firebase storage)
+ * Deprecated: pending challenges no longer auto-expire.
+ * Challenges remain open until joined/completed or manually deleted by admin/creator.
  */
 export const expirePendingChallenge = async (challengeId: string): Promise<boolean> => {
-  try {
-    const challengeRef = doc(db, "challenges", challengeId);
-    const snap = await getDoc(challengeRef);
-      
-    if (!snap.exists()) {
-      return false;
-    }
-
-    const data = snap.data() as ChallengeData;
-    
-    // Only delete if in pending_waiting_for_opponent state
-    if (data.status !== 'pending_waiting_for_opponent') {
-      return false;
-    }
-    
-    if (!data.expirationTimer || data.expirationTimer.toMillis() > Date.now()) {
-      return false; // Not expired yet
-    }
-    
-    // Never auto-delete Founder Tournaments (admin-created). Only manual or after airdrop + match ended.
-    const isTournament = data.format === 'tournament' || !!data.tournament;
-    const entryFee = data.entryFee || 0;
-    const isFree = entryFee === 0 || entryFee < 0.000000001;
-    const founderParticipantReward = (data.founderParticipantReward ?? 0) as number;
-    const founderWinnerBonus = (data.founderWinnerBonus ?? 0) as number;
-    const { ADMIN_WALLET } = await import('../chain/config');
-    const creatorWallet = (data.creator || '').toLowerCase();
-    const isAdminCreator = creatorWallet === ADMIN_WALLET.toString().toLowerCase();
-    const isFounderTournament = isTournament && isAdminCreator && isFree && (founderParticipantReward > 0 || founderWinnerBonus > 0);
-    if (isFounderTournament) {
-      console.log('⚠️ Skipping auto-delete of Founder Tournament (pending expired):', challengeId);
-      return false;
-    }
-    
-    // Delete expired challenge immediately to save Firebase storage
-    await cleanupExpiredChallenge(challengeId);
-    
-    console.log('✅ Pending challenge expired and deleted:', challengeId);
-    return true;
-  } catch (error) {
-    console.error('❌ Error deleting expired pending challenge:', error);
-    return false;
-  }
+  console.log('⚠️ Pending challenge expiration disabled. Challenge remains open:', challengeId);
+  return false;
 };
 
 /**

@@ -44,7 +44,7 @@ function testStateMachine() {
     { from: 'creator_funded', to: 'active', action: 'joinerFund' },
     { from: 'creator_confirmation_required', to: 'pending_waiting_for_opponent', action: 'revertCreatorTimeout' },
     { from: 'creator_funded', to: 'pending_waiting_for_opponent', action: 'revertJoinerTimeout' },
-    { from: 'pending_waiting_for_opponent', to: 'cancelled', action: 'expirePendingChallenge' },
+    { from: 'pending_waiting_for_opponent', to: 'cancelled', action: 'deleteChallenge' },
   ];
   
   validTransitions.forEach(transition => {
@@ -84,9 +84,9 @@ async function testFirestoreFunctions() {
   });
   
   logResult({
-    name: 'expressJoinIntent: Validates expiration',
+    name: 'expressJoinIntent: No pending expiration',
     passed: true,
-    details: 'Checks expirationTimer before allowing intent'
+    details: 'Pending challenges remain joinable until manually deleted'
   });
   
   logResult({
@@ -221,9 +221,9 @@ function testTimeoutLogic() {
   });
   
   logResult({
-    name: 'Pending Expiration: 24 hours after creation',
+    name: 'Pending Expiration: Disabled',
     passed: true,
-    details: 'expirationTimer = now + 24 hours'
+    details: 'Pending challenges stay open until joined or manually deleted'
   });
   
   logResult({

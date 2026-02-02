@@ -124,7 +124,7 @@ The challenge state machine has been successfully refactored to an intent-first 
 - [ ] Log when `expressJoinIntent` is called (wallet, challengeId, timestamp)
 - [ ] Log when `creatorFund` is called (wallet, challengeId, timestamp)
 - [ ] Log when `joinerFund` is called (wallet, challengeId, timestamp)
-- [ ] Log timeout reversions: `revertCreatorTimeout`, `revertJoinerTimeout`, `expirePendingChallenge`
+- [ ] Log timeout reversions: `revertCreatorTimeout`, `revertJoinerTimeout` (pending expiration disabled)
   - [ ] Include: challengeId, previous state, new state, reason, timestamp
 
 #### Contract Events (if supported)
