@@ -15,8 +15,18 @@ export function useChallengeExpiry(challenges: any[]) {
 
     const checkExpired = async () => {
       const now = Date.now();
+      let adminWalletLower = '';
+      try {
+        const { ADMIN_WALLET } = await import("../lib/chain/config");
+        adminWalletLower = ADMIN_WALLET.toString().toLowerCase();
+      } catch (error) {
+        console.error("Error loading ADMIN_WALLET:", error);
+      }
 
       for (const challenge of challenges) {
+        const creatorWallet = (challenge.creator || '').toLowerCase();
+        const isAdminCreator = adminWalletLower && creatorWallet === adminWalletLower;
+        
         // Check creator funding deadline expiry (auto-revert if deadline passed)
         if (challenge.status === "creator_confirmation_required" && challenge.creatorFundingDeadline) {
           const deadlineMs = challenge.creatorFundingDeadline.toMillis ? challenge.creatorFundingDeadline.toMillis() : challenge.creatorFundingDeadline;
@@ -44,7 +54,7 @@ export function useChallengeExpiry(challenges: any[]) {
         const isExpired = expMs < now;
 
         // Handle challenges that need to be marked as expired
-        if (isExpired && (challenge.status === "active" || challenge.status === "pending")) {
+        if (!isAdminCreator && isExpired && (challenge.status === "active" || challenge.status === "pending")) {
           // Skip if already being processed
           if (processedChallenges.current.has(challenge.id)) continue;
 
@@ -78,7 +88,7 @@ export function useChallengeExpiry(challenges: any[]) {
         }
         
         // Auto-cleanup expired challenges (delete immediately to save storage)
-        if (challenge.status === "expired" && !archiveTimers.current.has(challenge.id) && !processedChallenges.current.has(challenge.id + '_cleanup')) {
+        if (!isAdminCreator && challenge.status === "expired" && !archiveTimers.current.has(challenge.id) && !processedChallenges.current.has(challenge.id + '_cleanup')) {
           console.log("🗑️ Found expired challenge that needs cleanup:", challenge.id);
           processedChallenges.current.add(challenge.id + '_cleanup');
 
