@@ -17,7 +17,7 @@
      - `creator`: Creator's wallet address
      - `entryFee`: Challenge amount (USDFG)
      - `status`: `pending_waiting_for_opponent`
-     - `expirationTimer`: 60 minutes TTL
+    - No pending expiration (remains open until joined/completed or manually deleted)
      - `players`: `[creator]` (creator is first player)
 
 **Result:** Challenge appears in lobby, waiting for opponent

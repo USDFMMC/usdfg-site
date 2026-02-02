@@ -91,8 +91,6 @@ function generateMockChallenge(category, gameIndex, challengeIndex) {
   const platform = platforms[challengeIndex % platforms.length];
   
   const now = Date.now();
-  const expirationTimer = Timestamp.fromDate(new Date(now + (24 * 60 * 60 * 1000))); // 24 hours
-  const expiresAt = Timestamp.fromDate(new Date(now + (2 * 60 * 60 * 1000))); // 2 hours
   const createdAt = Timestamp.fromDate(new Date(now - (challengeIndex * 30 * 60 * 1000))); // Stagger creation times
   
   const title = `${game} - ${mode}`;
@@ -102,8 +100,7 @@ function generateMockChallenge(category, gameIndex, challengeIndex) {
     entryFee: entryFee,
     status: 'pending_waiting_for_opponent',
     createdAt: createdAt,
-    expiresAt: expiresAt,
-    expirationTimer: expirationTimer,
+    // No pending expiration - challenges remain open until joined/completed or manual delete
     players: [creator],
     maxPlayers: 2, // Standard 1v1
     format: 'standard',

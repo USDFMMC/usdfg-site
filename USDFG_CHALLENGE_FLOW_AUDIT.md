@@ -362,7 +362,7 @@ completed
 - ✅ Challenge status must be `pending_waiting_for_opponent` OR `creator_confirmation_required` (with expired deadline)
 - ✅ User must not be creator (unless deadline expired)
 - ✅ User must not already be participant (`pendingJoiner` or `challenger` check)
-- ✅ Challenge must not be expired (`expirationTimer` check)
+- ✅ Pending challenges do not auto-expire (manual delete only)
 - ✅ For team challenges: User must be part of team (and team key holder if `teamOnly: true`)
 - ✅ If deadline expired and user is NOT the pending joiner, block join attempt
 
