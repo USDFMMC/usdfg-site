@@ -2152,7 +2152,6 @@ export async function cleanupExpiredChallenge(id: string) {
       
       if (isFounderTournamentOrChallenge) {
         // Never auto-delete Founder Tournaments/Challenges; admin deletes manually (even if no one joined).
-        console.log('⚠️ Skipping auto-delete of expired Founder Tournament/Challenge (admin deletes manually):', id);
         return;
       }
     }

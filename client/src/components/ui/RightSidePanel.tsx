@@ -254,15 +254,16 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
           damping: 25,
           stiffness: 300,
         }}
-        className="fixed bottom-0 left-0 right-0 z-50 px-4 pb-4"
+        className="fixed bottom-0 left-0 right-0 z-50 px-3 pb-3"
         style={{
           pointerEvents: 'auto',
         }}
       >
         <motion.div
-          className="relative w-full h-[72px] px-6 flex items-center justify-between rounded-full
+          className="relative w-full h-[52px] px-4 flex items-center justify-between rounded-full
             bg-gradient-to-r from-pink-500 via-purple-600 to-blue-500
-            shadow-[0_0_22px_rgba(122,92,255,.6),0_0_44px_rgba(77,163,255,.35)]
+            shadow-[0_0_20px_rgba(122,92,255,.5),0_0_36px_rgba(77,163,255,.25)]
+            border border-white/20
             cursor-grab active:cursor-grabbing select-none"
           onClick={(e) => {
             // Only expand on click if not dragging
@@ -292,8 +293,8 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
           }}
         >
           {/* LEFT: avatars + text */}
-          <div className="flex items-center gap-4 min-w-0">
-            <div className="flex items-center -space-x-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center -space-x-1.5">
               {safePlayers.slice(0, 2).map((player, idx) => {
                 const stats = playerData[player.wallet.toLowerCase()] || {};
                 const displayName = stats.displayName || player.displayName || player.wallet.slice(0, 4);
@@ -301,7 +302,7 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
                 return (
                   <div
                     key={player.wallet}
-                    className="w-10 h-10 rounded-full bg-white/15 ring-2 ring-white/15 flex items-center justify-center overflow-hidden"
+                    className="w-8 h-8 rounded-full bg-white/20 ring-2 ring-white/30 flex items-center justify-center overflow-hidden"
                     style={{ zIndex: 2 - idx }}
                   >
                     {profileImage ? (
@@ -311,29 +312,28 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
                         className="w-full h-full object-cover" 
                       />
                     ) : (
-                      <span className="font-bold text-white text-sm">
+                      <span className="font-semibold text-white/90 text-xs">
                         {displayName.charAt(0).toUpperCase()}
                       </span>
                     )}
                   </div>
                 );
               })}
-              {/* Show placeholder for second player if only 1 player */}
               {safePlayers.length === 1 && (
-                <div className="w-10 h-10 rounded-full bg-white/10 ring-2 ring-white/10 flex items-center justify-center">
-                  <span className="text-white/70 text-sm">+</span>
+                <div className="w-8 h-8 rounded-full bg-white/15 ring-2 ring-white/20 flex items-center justify-center">
+                  <span className="text-white/80 text-xs">+</span>
                 </div>
               )}
             </div>
 
             <div className="flex flex-col leading-tight text-white min-w-0">
-              <span className="text-[16px] font-bold truncate">{gameName || 'Challenge'}</span>
-              <span className="text-[13px] opacity-85 truncate">{getStatusText()}</span>
+              <span className="text-[13px] font-bold truncate drop-shadow-sm">{gameName || 'Challenge'}</span>
+              <span className="text-[11px] text-white/90 truncate">{getStatusText()}</span>
             </div>
           </div>
 
-          {/* RIGHT: close button + signal bars - close without expanding on mobile */}
-          <div className="flex items-center gap-2">
+          {/* RIGHT: close button + subtle signal */}
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={(e) => {
@@ -341,25 +341,25 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
                 onClose();
               }}
               onTouchStart={(e) => e.stopPropagation()}
-              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-white/15 hover:bg-white/25 active:bg-white/30 transition-colors touch-manipulation flex-shrink-0"
+              className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 active:bg-white/40 transition-colors touch-manipulation flex-shrink-0"
               aria-label="Close lobby"
             >
-              <X className="w-5 h-5 text-white" />
+              <X className="w-4 h-4 text-white" />
             </button>
-            <div className="flex items-end gap-1">
+            <div className="flex items-end gap-0.5">
               {[0, 0.15, 0.3].map((delay, i) => (
                 <motion.span
                   key={i}
-                  className="w-[3px] bg-white/90 rounded"
+                  className="w-[2px] bg-white/90 rounded"
                   initial={false}
-                  animate={{ height: [8, 18, 8], opacity: [0.55, 1, 0.55] }}
+                  animate={{ height: [6, 12, 6], opacity: [0.7, 1, 0.7] }}
                   transition={{
                     duration: 1.15,
                     repeat: Infinity,
                     ease: "easeInOut",
                     delay
                   }}
-                  style={{ height: 8 }}
+                  style={{ height: 6 }}
                 />
               ))}
             </div>

@@ -1,10 +1,13 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { ChatBox } from "./ChatBox";
 import { VoiceChat } from "./VoiceChat";
 import { Camera, Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
-import { getPlayerStats, fetchChallengeById } from "@/lib/firebase/firestore";
+import { getPlayerStats, fetchChallengeById, resolveAdminChallenge } from "@/lib/firebase/firestore";
 import { collection, doc, setDoc, deleteDoc, updateDoc, onSnapshot, query, where, serverTimestamp, Timestamp, getDocs, getDoc, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
+import { ADMIN_WALLET } from "@/lib/chain/config";
+import { resolveAdminChallengeOnChain } from "@/lib/chain/contract";
 import { 
   getChallengeStatus, 
   getChallengePendingJoiner,
@@ -191,6 +194,11 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const [playerData, setPlayerData] = useState<Record<string, { displayName?: string; profileImage?: string }>>({});
   const [spectatorCount, setSpectatorCount] = useState<number>(0);
   const [spectators, setSpectators] = useState<string[]>([]);
+  const [resolvingWinner, setResolvingWinner] = useState<string | null>(null);
+
+  const { connection } = useConnection();
+  const wallet = useWallet();
+  const isAdmin = currentWallet && currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
   
   // Real-time challenge data - ensures button visibility updates immediately
   const [liveChallenge, setLiveChallenge] = useState<any>(challenge);
@@ -389,7 +397,35 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     }
   };
 
-  
+  const handleResolveDispute = async (winnerWallet: string) => {
+    if (!isAdmin || !currentWallet || !wallet.connected || !wallet.publicKey) {
+      alert(wallet.connected ? "Only the admin wallet can resolve disputes." : "Connect your wallet to resolve.");
+      return;
+    }
+    if (resolvingWinner) return;
+    setResolvingWinner(winnerWallet);
+    try {
+      const txSignature = await resolveAdminChallengeOnChain(
+        wallet as any,
+        connection,
+        activeChallenge.id,
+        winnerWallet
+      );
+      await resolveAdminChallenge(
+        activeChallenge.id,
+        winnerWallet,
+        "lobby",
+        "wallet:" + currentWallet,
+        txSignature
+      );
+    } catch (err: any) {
+      console.error("Error resolving dispute:", err);
+      alert(err.message || "Failed to resolve dispute. Try Admin Console if needed.");
+    } finally {
+      setResolvingWinner(null);
+    }
+  };
+
   const getStatusDisplay = () => {
     switch (status) {
       case 'pending_waiting_for_opponent':
@@ -1785,6 +1821,79 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           <p className="text-[10px] text-red-100/60">
             Lobby will remain open until admin resolves. You can continue chatting.
           </p>
+        </div>
+      )}
+
+      {/* Admin: Resolve dispute – show both submissions’ proof images, then pick winner */}
+      {status === 'disputed' && isAdmin && creatorWallet && (
+        <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-3">
+          <h3 className="text-sm font-bold text-amber-200 mb-2">Admin: Resolve dispute</h3>
+          <p className="text-[11px] text-amber-100/80 mb-3">
+            Review what each player submitted, then choose who won. On-chain + Firestore will be updated; winner can then claim.
+          </p>
+          {(() => {
+            const getResultForWallet = (wallet: string) => {
+              if (!results || typeof results !== 'object') return null;
+              const key = Object.keys(results).find((k) => k.toLowerCase() === wallet.toLowerCase());
+              return key ? results[key] : null;
+            };
+            const creatorResult = getResultForWallet(creatorWallet);
+            const challengerResult = challengerWallet ? getResultForWallet(challengerWallet) : null;
+            return (
+              <>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <div className="rounded-lg border border-white/20 bg-black/30 p-2">
+                    <div className="text-[10px] font-semibold text-emerald-300 mb-1">Creator’s submission</div>
+                    {creatorResult?.proofImageData ? (
+                      <img src={creatorResult.proofImageData} alt="Creator proof" className="w-full aspect-video object-contain rounded bg-black/50" />
+                    ) : (
+                      <div className="w-full aspect-video rounded bg-black/50 flex items-center justify-center text-[10px] text-white/50">No image</div>
+                    )}
+                    <div className="text-[10px] text-white/70 mt-1">{creatorResult?.didWin ? 'Claimed: I won' : 'Claimed: I lost'}</div>
+                  </div>
+                  <div className="rounded-lg border border-white/20 bg-black/30 p-2">
+                    <div className="text-[10px] font-semibold text-rose-300 mb-1">Challenger’s submission</div>
+                    {challengerResult?.proofImageData ? (
+                      <img src={challengerResult.proofImageData} alt="Challenger proof" className="w-full aspect-video object-contain rounded bg-black/50" />
+                    ) : (
+                      <div className="w-full aspect-video rounded bg-black/50 flex items-center justify-center text-[10px] text-white/50">No image</div>
+                    )}
+                    <div className="text-[10px] text-white/70 mt-1">{challengerResult ? (challengerResult.didWin ? 'Claimed: I won' : 'Claimed: I lost') : '—'}</div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {creatorWallet && (
+                    <button
+                      type="button"
+                      disabled={!!resolvingWinner}
+                      onClick={() => handleResolveDispute(creatorWallet)}
+                      className="px-3 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 text-xs font-semibold hover:bg-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {resolvingWinner === creatorWallet ? (
+                        <span className="inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Resolving…</span>
+                      ) : (
+                        <>Creator wins</>
+                      )}
+                    </button>
+                  )}
+                  {challengerWallet && (
+                    <button
+                      type="button"
+                      disabled={!!resolvingWinner}
+                      onClick={() => handleResolveDispute(challengerWallet)}
+                      className="px-3 py-2 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-200 text-xs font-semibold hover:bg-rose-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {resolvingWinner === challengerWallet ? (
+                        <span className="inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Resolving…</span>
+                      ) : (
+                        <>Challenger wins</>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
 

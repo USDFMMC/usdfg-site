@@ -4012,10 +4012,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const ch = (challenge.challenger ?? challenge.rawData?.challenger ?? '').toLowerCase();
       const myChallengesMatch = !showMyChallenges || cw === currentWalletLower || ch === currentWalletLower || playerListIncludes(challenge, currentWalletLower);
       
-      // Check if challenge is expired (these will be deleted automatically)
+      // Check if challenge is expired (normalize Timestamp to ms for comparison)
+      const expMs = challenge.expiresAt != null
+        ? (typeof challenge.expiresAt === 'number' ? challenge.expiresAt : (challenge.expiresAt?.toMillis?.() ?? challenge.expiresAt?.toDate?.()?.getTime?.()))
+        : null;
+      const timerMs = challenge.rawData?.expirationTimer != null
+        ? (typeof challenge.rawData.expirationTimer === 'number' ? challenge.rawData.expirationTimer : (challenge.rawData.expirationTimer?.toMillis?.() ?? challenge.rawData.expirationTimer?.toDate?.()?.getTime?.()))
+        : null;
       const isExpired = challenge.status === 'cancelled' || 
-        (challenge.expiresAt && challenge.expiresAt < now) ||
-        (challenge.rawData?.expirationTimer && challenge.rawData.expirationTimer.toMillis() < now);
+        (expMs != null && expMs < now) ||
+        (timerMs != null && timerMs < now);
       
       // Also exclude completed and disputed challenges from joinable list
       const isCompleted = challenge.status === 'completed' || challenge.status === 'disputed';
@@ -4043,8 +4049,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         (entryFee === 0 || entryFee < 0.000000001) &&
         (founderParticipantReward > 0 || founderWinnerBonus > 0);
       
+      const isFounderChallenge = !isTournamentFormat && 
+        !(challenge.pda ?? challenge.rawData?.pda) &&
+        creatorWallet?.toLowerCase() === ADMIN_WALLET.toString().toLowerCase() &&
+        (entryFee === 0 || entryFee < 0.000000001);
+      
+      const isFounderTournamentOrChallenge = isFounderTournament || isFounderChallenge;
       const isCompletedFounderTournament = isCompleted && isFounderTournament && tournamentStage === 'completed';
       const adminShouldSeeCompletedFounderTournament = isAdmin && isCompletedFounderTournament;
+      // Show expired Founder Tournaments/Challenges to admin so they can open and delete/manage manually
+      const adminSeesExpiredFounder = isAdmin && isFounderTournamentOrChallenge && isExpired;
       
       // Show completed/disputed challenges to participants so they can re-open lobby (chat/mic)
       const currentWalletStr = publicKey?.toString()?.toLowerCase() || '';
@@ -4080,11 +4094,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       // If showing "My Challenges", show all their challenges regardless of status
       // OR if admin viewing completed Founder Tournament
+      // OR if admin viewing expired Founder Tournament/Challenge (so they can open and delete manually; show even when category/game filter applied)
       // OR if user is participant in completed challenge (so they can re-open lobby to chat/mic)
       // Otherwise show joinable OR completed (so completed challenges don't "disappear" from the list)
       const shouldShow = showMyChallenges 
         ? (categoryMatch && gameMatch && myChallengesMatch) 
-        : (categoryMatch && gameMatch && (isJoinable || isCompleted || adminShouldSeeCompletedFounderTournament || participantSeesCompleted));
+        : (adminSeesExpiredFounder || (categoryMatch && gameMatch && (isJoinable || isCompleted || adminShouldSeeCompletedFounderTournament || participantSeesCompleted)));
       
       return shouldShow;
       } catch (err) {
@@ -5361,8 +5376,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             <AdRotationBox />
           </div>
 
-          {/* Live Challenges Discovery Section - Category-based horizontal scrolling */}
-          <div className="relative mb-4 md:mb-6">
+          {/* Live Challenges Discovery Section - Category-based horizontal scrolling (id for #challenges anchor on mobile) */}
+          <div id="challenges" className="relative mb-4 md:mb-6 scroll-mt-4">
             {/* Header - tighter gap on desktop */}
             <div className="mb-2 md:mb-3 px-4 md:px-0 flex flex-wrap items-center gap-2">
               <h1 className="text-lg md:text-2xl font-semibold text-white mb-0.5">Live Challenges</h1>
@@ -5411,9 +5426,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 }
               };
 
-              // Group challenges by discovery category (Sports, Fighting, FPS, Racing, Strategy, Tournaments)
-              type DiscoveryCategory = 'Sports' | 'Fighting' | 'FPS' | 'Racing' | 'Strategy' | 'Tournaments';
-              const categorizeChallenge = (challenge: any): DiscoveryCategory | null => {
+              // Group challenges by discovery category (Sports, Fighting, FPS, Racing, Strategy, Tournaments, Other)
+              type DiscoveryCategory = 'Sports' | 'Fighting' | 'FPS' | 'Racing' | 'Strategy' | 'Tournaments' | 'Other';
+              const categorizeChallenge = (challenge: any): DiscoveryCategory => {
                 const category = challenge.category?.toUpperCase() || '';
                 const game = challenge.game?.toLowerCase() || '';
                 const isTournament = challenge.format === 'tournament' || challenge.tournament || challenge.rawData?.tournament;
@@ -5435,7 +5450,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 }
                 if (category.includes('RACING')) return 'Racing';
                 if (category.includes('STRATEGY') || category.includes('BOARDGAMES')) return 'Strategy';
-                return null;
+                return 'Other';
               };
 
               const categoryGroups: Record<string, any[]> = {
@@ -5444,12 +5459,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 FPS: [],
                 Racing: [],
                 Strategy: [],
-                Tournaments: []
+                Tournaments: [],
+                Other: []
               };
 
               filteredChallenges.forEach(challenge => {
                 const category = categorizeChallenge(challenge);
-                if (category && categoryGroups[category]) {
+                if (categoryGroups[category]) {
                   categoryGroups[category].push(challenge);
                 }
               });
@@ -5467,6 +5483,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 if (title === 'Racing') return 'text-amber-400';
                 if (title === 'Strategy') return 'text-cyan-400';
                 if (title === 'Tournaments') return 'text-purple-400';
+                if (title === 'Other') return 'text-white/80';
                 return 'text-white';
               };
 
@@ -5625,7 +5642,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           <StatusPill 
                             status={status} 
                             isOwner={isOwner} 
-                            players={challenge.players || 0} 
+                            players={Array.isArray(challenge.players) ? challenge.players.length : (typeof challenge.players === 'number' ? challenge.players : 0)} 
                             capacity={challenge.capacity || 2} 
                           />
                           {/* Share button - positioned below status */}
@@ -5764,14 +5781,33 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                               <DiscoveryCard 
                                 challenge={challenge}
                                 onSelect={async () => {
-                                  const isExpired = challenge.status === 'cancelled' || 
-                                    (challenge.expiresAt && challenge.expiresAt < Date.now()) ||
-                                    (challenge.rawData?.expirationTimer && challenge.rawData.expirationTimer.toMillis() < Date.now());
+                                  const now = Date.now();
+                                  const expMs = (() => {
+                                    const fromExpiresAt = challenge.expiresAt != null
+                                      ? (typeof challenge.expiresAt === 'number'
+                                        ? challenge.expiresAt
+                                        : (challenge.expiresAt?.toMillis?.() ?? challenge.expiresAt?.toDate?.()?.getTime?.()))
+                                      : null;
+                                    const timer = challenge.rawData?.expirationTimer;
+                                    const fromTimer = timer != null
+                                      ? (typeof timer === 'number' ? timer : (timer?.toMillis?.() ?? timer?.toDate?.()?.getTime?.()))
+                                      : null;
+                                    return fromExpiresAt ?? fromTimer ?? null;
+                                  })();
+                                  const isExpired = challenge.status === 'cancelled' || (expMs != null && expMs < now);
                                   if (isExpired) return;
 
                                   const isCompletedOrDisputed = challenge.status === "completed" || challenge.status === "disputed";
                                   const payoutTriggered = !!challenge.rawData?.payoutTriggered;
                                   const creator = (challenge.creator ?? challenge.rawData?.creator) ?? '';
+                                  const challenger = (challenge.challenger ?? challenge.rawData?.challenger) ?? '';
+                                  const currentWalletLower = (publicKey?.toString() ?? '').toLowerCase();
+                                  const playersList = Array.isArray(challenge.players) ? challenge.players : (Array.isArray(challenge.rawData?.players) ? challenge.rawData.players : []);
+                                  const isParticipant = currentWalletLower && (
+                                    creator?.toLowerCase() === currentWalletLower ||
+                                    challenger?.toLowerCase() === currentWalletLower ||
+                                    playersList.some((p: string) => (p || '').toLowerCase() === currentWalletLower)
+                                  );
                                   const isAdmin = !!publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
                                   const fmt = challenge.format || challenge.rawData?.format;
                                   const isTournament = fmt === 'tournament' || !!challenge.tournament || !!challenge.rawData?.tournament;
@@ -5783,8 +5819,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                     (fee === 0 || fee < 1e-9) &&
                                     (founderPart > 0 || founderWin > 0);
                                   if (isCompletedOrDisputed || payoutTriggered) {
-                                    // Block non-admin from opening completed challenges; allow admin to open Founder Tournament for payout
-                                    if (!(isAdmin && isFounderTournament)) return;
+                                    // Allow participants to open completed challenges (view result, claim, chat); allow admin to open Founder Tournament for payout
+                                    if (!isParticipant && !(isAdmin && isFounderTournament)) return;
                                   }
 
                                   // Check if this is a team challenge with teamOnly restriction
