@@ -10,6 +10,10 @@ interface CategoryCard {
 
 interface LiveChallengesGridProps {
   challenges?: any[]; // Array of challenge data to count live challenges per category
+  /** When set, clicking a category filters the Live Challenges section above (no navigation) */
+  onCategorySelect?: (categoryKey: string) => void;
+  /** Currently selected category key (e.g. 'SPORTS') for highlight */
+  selectedCategoryKey?: string | null;
 }
 
 // Define the 6 categories (removed CASUAL, OPEN, FEATURED)
@@ -22,7 +26,7 @@ const CATEGORIES: CategoryCard[] = [
   { key: 'TOURNAMENTS', label: 'TOURNAMENTS', icon: '🏆' },
 ];
 
-const LiveChallengesGrid: React.FC<LiveChallengesGridProps> = ({ challenges = [] }) => {
+const LiveChallengesGrid: React.FC<LiveChallengesGridProps> = ({ challenges = [], onCategorySelect, selectedCategoryKey = null }) => {
   const navigate = useNavigate();
 
   // Count live challenges per category
@@ -72,7 +76,10 @@ const LiveChallengesGrid: React.FC<LiveChallengesGridProps> = ({ challenges = []
   }, [challenges]);
 
   const handleCategoryTap = (categoryKey: string) => {
-    // Navigate to category detail screen
+    if (onCategorySelect) {
+      onCategorySelect(categoryKey);
+      return;
+    }
     navigate(`/app/category/${categoryKey.toLowerCase()}`);
   };
 
@@ -95,6 +102,7 @@ const LiveChallengesGrid: React.FC<LiveChallengesGridProps> = ({ challenges = []
           const liveCount = categoryCounts[category.key] || 0;
           const isActive = liveCount > 0;
 
+          const isSelected = selectedCategoryKey === category.key;
           return (
             <button
               key={category.key}
@@ -103,6 +111,7 @@ const LiveChallengesGrid: React.FC<LiveChallengesGridProps> = ({ challenges = []
                 relative w-full rounded-lg border transition-all duration-300 overflow-hidden
                 active:scale-[0.98] hover:border-amber-400/40
                 aspect-[176/122] min-h-[100px] md:min-h-[110px]
+                ${isSelected ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-[#040507]' : ''}
                 ${isActive 
                   ? 'border-amber-400/60 shadow-[0_0_8px_rgba(255,215,130,0.3)]' 
                   : 'border-gray-600/40'

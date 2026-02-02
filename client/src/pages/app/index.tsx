@@ -614,6 +614,7 @@ const ArenaHome: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState<string>('All');
   const [filterGame, setFilterGame] = useState<string>('All');
   const [showMyChallenges, setShowMyChallenges] = useState<boolean>(false);
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | null>(null);
   const [claimingPrize, setClaimingPrize] = useState<string | null>(null);
   const [isAirdropping, setIsAirdropping] = useState(false);
   const [markingPrizeTransferred, setMarkingPrizeTransferred] = useState<string | null>(null);
@@ -5363,9 +5364,18 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           {/* Live Challenges Discovery Section - Category-based horizontal scrolling */}
           <div className="relative mb-4 md:mb-6">
             {/* Header - tighter gap on desktop */}
-            <div className="mb-2 md:mb-3 px-4 md:px-0">
+            <div className="mb-2 md:mb-3 px-4 md:px-0 flex flex-wrap items-center gap-2">
               <h1 className="text-lg md:text-2xl font-semibold text-white mb-0.5">Live Challenges</h1>
-              <p className="text-sm text-white/55">Browse by category. Swipe left or right inside each section.</p>
+              {selectedCategoryFilter && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategoryFilter(null)}
+                  className="text-xs px-2 py-1 rounded-md bg-amber-500/20 text-amber-300 border border-amber-400/40 hover:bg-amber-500/30"
+                >
+                  Show all
+                </button>
+              )}
+              <p className="text-sm text-white/55 w-full">Browse by category. Swipe left or right inside each section.</p>
                 </div>
                 
             {/* Helper function to map challenge categories to discovery categories */}
@@ -5401,18 +5411,18 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 }
               };
 
-              // Group challenges by discovery category (Sports, Fighting, FPS, Racing)
-              const categorizeChallenge = (challenge: any): 'Sports' | 'Fighting' | 'FPS' | 'Racing' | null => {
+              // Group challenges by discovery category (Sports, Fighting, FPS, Racing, Strategy, Tournaments)
+              type DiscoveryCategory = 'Sports' | 'Fighting' | 'FPS' | 'Racing' | 'Strategy' | 'Tournaments';
+              const categorizeChallenge = (challenge: any): DiscoveryCategory | null => {
                 const category = challenge.category?.toUpperCase() || '';
                 const game = challenge.game?.toLowerCase() || '';
-                
-                // Map to discovery categories
+                const isTournament = challenge.format === 'tournament' || challenge.tournament || challenge.rawData?.tournament;
+                if (isTournament) return 'Tournaments';
                 if (category.includes('SPORTS') || category.includes('BASKETBALL') || 
                     category.includes('SOCCER') || category.includes('FOOTBALL') || 
                     category.includes('BASEBALL') || category.includes('GOLF')) {
                   return 'Sports';
                 }
-                // UFC should map to Fighting category for discovery
                 if (category.includes('UFC') || category.includes('FIGHTING') || category.includes('BOXING') ||
                     game.includes('ufc') || game.includes('ea sports ufc')) {
                   return 'Fighting';
@@ -5422,18 +5432,19 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     game.includes('valorant') || game.includes('cs') || 
                     game.includes('battlefield')) {
                   return 'FPS';
-                          }
-                if (category.includes('RACING')) {
-                  return 'Racing';
                 }
-                return null; // Exclude uncategorized
+                if (category.includes('RACING')) return 'Racing';
+                if (category.includes('STRATEGY') || category.includes('BOARDGAMES')) return 'Strategy';
+                return null;
               };
 
               const categoryGroups: Record<string, any[]> = {
                 Sports: [],
                 Fighting: [],
                 FPS: [],
-                Racing: []
+                Racing: [],
+                Strategy: [],
+                Tournaments: []
               };
 
               filteredChallenges.forEach(challenge => {
@@ -5443,12 +5454,19 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 }
               });
 
-              // Category title colors matching prototype
+              const gridKeyToDiscovery: Record<string, string> = { SPORTS: 'Sports', FIGHTING: 'Fighting', FPS: 'FPS', RACING: 'Racing', STRATEGY: 'Strategy', TOURNAMENTS: 'Tournaments' };
+              const discoveryToGridKey: Record<string, string> = { Sports: 'SPORTS', Fighting: 'FIGHTING', FPS: 'FPS', Racing: 'RACING', Strategy: 'STRATEGY', Tournaments: 'TOURNAMENTS' };
+              const sectionsToShow = selectedCategoryFilter
+                ? [[selectedCategoryFilter, categoryGroups[selectedCategoryFilter] || []] as [string, any[]]
+                : (Object.entries(categoryGroups) as Array<[string, any[]]>);
+
               const categoryTitleClass = (title: string) => {
                 if (title === 'Sports') return 'text-emerald-400';
                 if (title === 'Fighting') return 'text-rose-400';
                 if (title === 'FPS') return 'text-indigo-400';
                 if (title === 'Racing') return 'text-amber-400';
+                if (title === 'Strategy') return 'text-cyan-400';
+                if (title === 'Tournaments') return 'text-purple-400';
                 return 'text-white';
               };
 
@@ -5708,7 +5726,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                       </div>
                     </section>
                   )}
-                  {(Object.entries(categoryGroups) as Array<[string, any[]]>).map(([categoryTitle, items]) => {
+                  {sectionsToShow.map(([categoryTitle, items]) => {
+                    if (items.length === 0 && !selectedCategoryFilter) return null;
+                    if (items.length === 0 && selectedCategoryFilter === categoryTitle) {
+                      return (
+                        <section key={categoryTitle} className="mb-6">
+                          <h2 className={`text-sm font-semibold tracking-wide mb-3 px-4 md:px-0 ${categoryTitleClass(categoryTitle)}`}>{categoryTitle}</h2>
+                          <p className="text-sm text-white/50 px-4 md:px-0">No challenges in this category yet.</p>
+                        </section>
+                      );
+                    }
                     if (items.length === 0) return null;
                     
                                 return (
@@ -5802,9 +5829,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                         })()}
           </div>
 
-          {/* Live Challenges Grid - Browse by category (visible on mobile and desktop) */}
+          {/* Live Challenges Grid - filters Live Challenges section above (no navigation) */}
           <div className="mb-4 md:mb-6">
-            <LiveChallengesGrid challenges={challenges} />
+            <LiveChallengesGrid
+              challenges={challenges}
+              selectedCategoryKey={selectedCategoryFilter ? { Sports: 'SPORTS', Fighting: 'FIGHTING', FPS: 'FPS', Racing: 'RACING', Strategy: 'STRATEGY', Tournaments: 'TOURNAMENTS' }[selectedCategoryFilter] : null}
+              onCategorySelect={(key) => setSelectedCategoryFilter(prev => {
+                const discovery = { SPORTS: 'Sports', FIGHTING: 'Fighting', FPS: 'FPS', RACING: 'Racing', STRATEGY: 'Strategy', TOURNAMENTS: 'Tournaments' }[key];
+                return prev === discovery ? null : discovery;
+              })}
+            />
           </div>
 
           {/* Arena Leaders Section */}
