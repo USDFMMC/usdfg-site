@@ -5456,9 +5456,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
               const gridKeyToDiscovery: Record<string, string> = { SPORTS: 'Sports', FIGHTING: 'Fighting', FPS: 'FPS', RACING: 'Racing', STRATEGY: 'Strategy', TOURNAMENTS: 'Tournaments' };
               const discoveryToGridKey: Record<string, string> = { Sports: 'SPORTS', Fighting: 'FIGHTING', FPS: 'FPS', Racing: 'RACING', Strategy: 'STRATEGY', Tournaments: 'TOURNAMENTS' };
-              const sectionsToShow = selectedCategoryFilter
-                ? [[selectedCategoryFilter, categoryGroups[selectedCategoryFilter] || []] as [string, any[]]
-                : (Object.entries(categoryGroups) as Array<[string, any[]]>);
+              const sectionsToShow: [string, any[]][] = selectedCategoryFilter
+                ? [[selectedCategoryFilter, categoryGroups[selectedCategoryFilter] || []]]
+                : Object.entries(categoryGroups);
 
               const categoryTitleClass = (title: string) => {
                 if (title === 'Sports') return 'text-emerald-400';
