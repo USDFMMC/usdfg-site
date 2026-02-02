@@ -1518,9 +1518,14 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
       throw new Error(`Challenge is not waiting for opponent. Current status: ${data.status}. The challenge may have been reverted. Please refresh and try again.`);
     }
     
-    // Check if challenge expired
+    // Check if challenge expired (allow admin-created challenges to stay open)
     if (data.expirationTimer && data.expirationTimer.toMillis() < Date.now()) {
-      throw new Error("Challenge has expired");
+      const { ADMIN_WALLET } = await import('../chain/config');
+      const creatorWallet = (data.creator || '').toLowerCase();
+      const isAdminCreator = creatorWallet === ADMIN_WALLET.toString().toLowerCase();
+      if (!isAdminCreator) {
+        throw new Error("Challenge has expired");
+      }
     }
     
     // Handle team challenges
@@ -1895,7 +1900,7 @@ export const expirePendingChallenge = async (challengeId: string): Promise<boole
       return false; // Not expired yet
     }
     
-    // Never auto-delete Founder Tournaments (admin-created). Only manual or after airdrop + match ended.
+    // Never auto-delete admin-created challenges (founder tournaments/challenges included).
     const isTournament = data.format === 'tournament' || !!data.tournament;
     const entryFee = data.entryFee || 0;
     const isFree = entryFee === 0 || entryFee < 0.000000001;
@@ -1904,6 +1909,10 @@ export const expirePendingChallenge = async (challengeId: string): Promise<boole
     const { ADMIN_WALLET } = await import('../chain/config');
     const creatorWallet = (data.creator || '').toLowerCase();
     const isAdminCreator = creatorWallet === ADMIN_WALLET.toString().toLowerCase();
+    if (isAdminCreator) {
+      console.log('⚠️ Skipping auto-delete of admin-created challenge (pending expired):', challengeId);
+      return false;
+    }
     const isFounderTournament = isTournament && isAdminCreator && isFree && (founderParticipantReward > 0 || founderWinnerBonus > 0);
     if (isFounderTournament) {
       console.log('⚠️ Skipping auto-delete of Founder Tournament (pending expired):', challengeId);
@@ -2060,6 +2069,10 @@ export async function cleanupCompletedChallenge(id: string) {
       const { ADMIN_WALLET } = await import('../chain/config');
       const creatorWallet = data.creator || '';
       const isAdminCreator = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+      if (isAdminCreator) {
+        console.log('⚠️ Skipping cleanup of admin-created challenge (expired):', id);
+        return; // Keep admin-created challenges visible until manual cleanup
+      }
       
       // Check if Founder Tournament (tournament with founder rewards)
       const isFounderTournament = isTournament && 

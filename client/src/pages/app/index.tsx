@@ -1164,6 +1164,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       for (const challenge of firestoreChallenges) {
         const status = challenge.status || challenge.rawData?.status;
         const challengeId = challenge.id;
+        const isAdminChallenge = isAdminCreatedChallenge(challenge);
 
         if (!challengeId) continue;
 
@@ -1185,7 +1186,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           }
 
           // Check pending expiration (pending_waiting_for_opponent state)
-          if (status === 'pending_waiting_for_opponent') {
+          if (status === 'pending_waiting_for_opponent' && !isAdminChallenge) {
             const expirationTimer = challenge.rawData?.expirationTimer;
             if (expirationTimer && expirationTimer.toMillis() < Date.now()) {
               await expirePendingChallenge(challengeId);
@@ -3960,6 +3961,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
   };
 
+  const adminWalletLower = ADMIN_WALLET.toString().toLowerCase();
+
   const isChallengeOwner = (challenge: any) => {
     const currentWallet = publicKey?.toString()?.toLowerCase() || null;
     const challengeCreator = challenge.creator?.toString()?.toLowerCase() || null;
@@ -3972,11 +3975,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     return currentWallet === challengeCreator;
   };
 
+  const isAdminCreatedChallenge = (challenge: any) => {
+    const creatorWallet = (challenge.creator ?? challenge.rawData?.creator ?? '').toLowerCase();
+    return !!creatorWallet && creatorWallet === adminWalletLower;
+  };
+
   // Check if a challenge is a Founder Challenge (admin-created with 0 entry fee)
   const isFounderChallenge = (challenge: any) => {
     const creatorWallet = challenge.creator || challenge.rawData?.creator || '';
     const entryFee = challenge.entryFee || challenge.rawData?.entryFee || 0;
-    const isAdmin = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+    const isAdmin = creatorWallet.toLowerCase() === adminWalletLower;
     const isFree = entryFee === 0 || entryFee < 0.000000001;
     return isAdmin && isFree;
   };
@@ -4013,10 +4021,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const ch = (challenge.challenger ?? challenge.rawData?.challenger ?? '').toLowerCase();
       const myChallengesMatch = !showMyChallenges || cw === currentWalletLower || ch === currentWalletLower || playerListIncludes(challenge, currentWalletLower);
       
+      const isAdminChallenge = isAdminCreatedChallenge(challenge);
+      
       // Check if challenge is expired (these will be deleted automatically)
-      const isExpired = challenge.status === 'cancelled' || 
+      const isExpired = !isAdminChallenge && (challenge.status === 'cancelled' || 
         (challenge.expiresAt && challenge.expiresAt < now) ||
-        (challenge.rawData?.expirationTimer && challenge.rawData.expirationTimer.toMillis() < now);
+        (challenge.rawData?.expirationTimer && challenge.rawData.expirationTimer.toMillis() < now));
       
       // Also exclude completed and disputed challenges from joinable list
       const isCompleted = challenge.status === 'completed' || challenge.status === 'disputed';
@@ -4266,6 +4276,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       // Skip active tournaments and active challenges - never delete them
       if (isActiveTournament || isActiveChallenge) {
+        return;
+      }
+      
+      const isAdminChallenge = isAdminCreatedChallenge(challenge);
+      if (isAdminChallenge) {
         return;
       }
       
@@ -4578,6 +4593,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
     // Calculate expiration time
     const getExpiresText = () => {
+      if (isAdminCreatedChallenge(challenge)) {
+        return 'No expiry';
+      }
       if (challenge.expiresAt && challenge.expiresAt > Date.now()) {
         const minutes = Math.max(0, Math.floor((challenge.expiresAt - Date.now()) / (1000 * 60)));
         if (minutes < 60) return `${minutes}m`;
@@ -4791,6 +4809,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             {/* Show expired challenge message (60-minute expiration) */}
             {isOwner && status === 'pending_waiting_for_opponent' && (() => {
               const expirationTimer = challenge.rawData?.expirationTimer || challenge.expirationTimer;
+              const isAdminChallenge = isAdminCreatedChallenge(challenge);
+              if (isAdminChallenge) return false;
               const isExpired = expirationTimer && expirationTimer.toMillis() < Date.now();
               const hasPendingJoiner = challenge.rawData?.pendingJoiner || challenge.pendingJoiner;
               return isExpired && !hasPendingJoiner; // Only show if expired and no one joined
@@ -4952,6 +4972,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             {/* Show Delete button for expired challenges (60-minute expiration) - MOBILE ONLY */}
             {isOwner && status === 'pending_waiting_for_opponent' && (() => {
               const expirationTimer = challenge.rawData?.expirationTimer || challenge.expirationTimer;
+              const isAdminChallenge = isAdminCreatedChallenge(challenge);
+              if (isAdminChallenge) return false;
               const isExpired = expirationTimer && expirationTimer.toMillis() < Date.now();
               const hasPendingJoiner = challenge.rawData?.pendingJoiner || challenge.pendingJoiner;
               return isExpired && !hasPendingJoiner;
@@ -5737,9 +5759,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                               <DiscoveryCard 
                                 challenge={challenge}
                                 onSelect={async () => {
-                                  const isExpired = challenge.status === 'cancelled' || 
+                                  const isAdminChallenge = isAdminCreatedChallenge(challenge);
+                                  const isExpired = !isAdminChallenge && (challenge.status === 'cancelled' || 
                                     (challenge.expiresAt && challenge.expiresAt < Date.now()) ||
-                                    (challenge.rawData?.expirationTimer && challenge.rawData.expirationTimer.toMillis() < Date.now());
+                                    (challenge.rawData?.expirationTimer && challenge.rawData.expirationTimer.toMillis() < Date.now()));
                                   if (isExpired) return;
 
                                   const isCompletedOrDisputed = challenge.status === "completed" || challenge.status === "disputed";
