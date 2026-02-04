@@ -78,21 +78,16 @@ const GameCategories: React.FC = () => {
           className="mx-auto mb-6 h-0.5 rounded-full bg-gradient-to-r from-amber-400/80 via-orange-500/80 to-amber-400/80 animate-pulse shadow-[0_0_20px_rgba(251,191,36,0.4)]"
         />
 
-        {/* Elite/Premium Intro Paragraph */}
+        {/* Intro Paragraph */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.5 }}
           className="neocore-panel relative max-w-2xl mx-auto mb-6 px-4 py-3 rounded-lg text-center"
         >
-          <p className="text-base md:text-lg font-extrabold text-white mb-2 drop-shadow-glow">
-            The Arena Is Open. Any Game. No Excuses.
-          </p>
           <p className="text-sm md:text-base text-amber-100 leading-relaxed font-medium">
-            Dominate in the games you know. Rise through the ones they don't expect.<br />
-            USDFG supports verified competitive play across all major genres — sports, fighting, racing, and more.<br />
-            If it can be played with skill, it can be challenged.<br />
-            <span className="text-amber-300 font-semibold">Custom rules. Public results. Smart contract enforcement.</span>
+            USDFG supports competitive play across major genres and platforms. If it can be played with skill, it can be challenged.<br />
+            <span className="text-amber-300 font-semibold">Custom rules. Public results. Enforced outcomes.</span>
           </p>
         </motion.div>
 

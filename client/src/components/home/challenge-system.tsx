@@ -166,16 +166,6 @@ const ChallengeSystem: React.FC = () => {
                 Challenge Rules & Result Verification
               </motion.h3>
 
-              <motion.p
-                initial={{ opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: 0.1 }}
-                className="neocore-body text-amber-300 mb-4 text-center font-medium"
-              >
-                This system protects fairness by locking funds and verifying outcomes through player consensus.
-              </motion.p>
-
               <motion.ul
                 initial="hidden"
                 whileInView="visible"
@@ -185,42 +175,27 @@ const ChallengeSystem: React.FC = () => {
               >
                 <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
                   <FaCheckCircle className="text-green-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
-                  <span>
-                    <span className="font-bold text-white">If both players confirm the result</span>, rewards are released automatically —{" "}
-                    <span className="text-amber-300 font-semibold">no uploads needed</span>.
-                  </span>
+                  <span>If both players confirm the result, rewards release automatically.</span>
                 </motion.li>
 
                 <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
                   <FaLock className="text-amber-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
-                  <span>
-                    <span className="font-bold text-white">Funds stay locked</span> until both players confirm or a dispute is reviewed.
-                  </span>
+                  <span>Funds remain locked until confirmation or dispute review.</span>
                 </motion.li>
 
                 <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
                   <FaExclamationTriangle className="text-amber-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
-                  <span>
-                    <span className="font-bold text-white">If there's a dispute</span>, players must provide{" "}
-                    <span className="text-amber-300 font-semibold">video or screenshot proof</span> for review.
-                  </span>
+                  <span>If disputed, players submit video or screenshot proof.</span>
                 </motion.li>
 
                 <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
                   <FaGavel className="text-amber-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
-                  <span>
-                    <span className="font-bold text-white">The founder reviews disputes and makes the final call.</span> Verified winners receive the reward.
-                  </span>
+                  <span>Founder reviews disputes and makes the final decision.</span>
                 </motion.li>
 
                 <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
                   <FaUserShield className="text-amber-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
-                  <span>
-                    <span className="font-bold text-white">Attempts to falsify results</span> may lead to{" "}
-                    <span className="text-amber-300 font-bold">deactivation</span>.
-                    <br />
-                    <span className="text-xs text-neutral-500">USDFG does not disclose penalty thresholds.</span>
-                  </span>
+                  <span>Attempts to falsify results can lead to deactivation.</span>
                 </motion.li>
               </motion.ul>
             </div>

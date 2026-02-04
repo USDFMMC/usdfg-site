@@ -62,15 +62,10 @@ const Tokenomics: React.FC = () => {
 
   return (
     <section id="tokenomics" className="py-12 text-center relative" ref={sectionRef}>
-      {/* Why Tokenomics Matters Intro */}
-      <div className="neocore-panel max-w-2xl mx-auto mb-6 px-4 py-3 rounded-xl animate-fade-in" style={{ textAlign: 'center' }}>
-          <p className="text-base md:text-lg font-bold text-amber-300 mb-2 drop-shadow-glow">Why Tokenomics Matters</p>
-        <p className="text-sm md:text-base text-white/90 font-medium">Transparent tokenomics ensures every USDFG token is allocated for platform access and utility, with no hidden distributions. Our structure is designed for platform integrity and fair access—so you always know exactly how tokens are used within the ecosystem.</p>
-      </div>
       <h2 className="text-2xl md:text-3xl font-bold mb-4 text-white" style={{ textShadow: '0 0 20px rgba(251, 191, 36, 0.5)' }}>
         TOKENOMICS
       </h2>
-      <p className="text-sm md:text-base text-neutral-400 mb-8 max-w-xl mx-auto">
+      <p className="text-sm md:text-base text-neutral-400 mb-6 max-w-xl mx-auto">
         USDFG Token allocation structure for platform access and utility.
       </p>
 
@@ -100,11 +95,12 @@ const Tokenomics: React.FC = () => {
           <p className="text-base font-bold text-white/90">Player Rewards & Challenges</p>
         </div>
       </div>
-      <div className="text-center mt-6">
-        <p className="text-gray-400 text-sm">USDFG has a fixed supply of 21,000,000 tokens. No inflation. No dilution. No burning. Just hard supply — like it should be.</p>
-        <p className="text-gray-400 text-sm mt-2">The percentages shown reflect platform utility allocation only. These are not financial indicators or investment guidance.</p>
-        <p className="text-gray-400 text-sm mt-2">USDFG is used strictly for access, skill-based gameplay, and challenge participation within the platform.</p>
-        <p className="text-gray-400 text-sm mt-2">No income, interest, or financial benefit is promised or implied. USDFG is not a security.</p>
+      <div className="text-center mt-6 max-w-2xl mx-auto">
+        <h3 className="text-lg font-bold text-amber-300 mb-3">Token Utility and Supply</h3>
+        <p className="text-gray-400 text-sm">USDFG has a fixed supply of 21,000,000 tokens. No inflation. No dilution. No burning.</p>
+        <p className="text-gray-400 text-sm mt-2">USDFG is used for access, skill based gameplay, and challenge participation inside the platform.</p>
+        <p className="text-gray-400 text-sm mt-2">USDFG is not a gambling product. No randomness. No house. No custodial accounts. Just your wallet and your verified results.</p>
+        <p className="text-gray-400 text-sm mt-2">No income, interest, or financial benefit is promised or implied. This is not financial advice.</p>
       </div>
       <style>{`
         @keyframes floatSoft {

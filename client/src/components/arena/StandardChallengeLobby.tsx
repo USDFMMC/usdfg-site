@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { ChatBox } from "./ChatBox";
 import { VoiceChat } from "./VoiceChat";
 import { Camera, Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
@@ -7,7 +6,6 @@ import { getPlayerStats, fetchChallengeById, resolveAdminChallenge } from "@/lib
 import { collection, doc, setDoc, deleteDoc, updateDoc, onSnapshot, query, where, serverTimestamp, Timestamp, getDocs, getDoc, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import { ADMIN_WALLET } from "@/lib/chain/config";
-import { resolveAdminChallengeOnChain } from "@/lib/chain/contract";
 import { 
   getChallengeStatus, 
   getChallengePendingJoiner,
@@ -195,9 +193,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const [spectatorCount, setSpectatorCount] = useState<number>(0);
   const [spectators, setSpectators] = useState<string[]>([]);
   const [resolvingWinner, setResolvingWinner] = useState<string | null>(null);
+  const [showIntegrityConfirm, setShowIntegrityConfirm] = useState(false);
 
-  const { connection } = useConnection();
-  const wallet = useWallet();
   const isAdmin = currentWallet && currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
   
   // Real-time challenge data - ensures button visibility updates immediately
@@ -373,22 +370,16 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     }
   };
 
-  const handleSubmit = async () => {
-    if (selectedResult === null) return;
-    
-    // Prevent double submission - check if already submitted or currently loading
-    if (isLoading || hasAlreadySubmitted) {
-      return;
-    }
-    
+  const doSubmitResult = async () => {
+    if (selectedResult === null || isLoading || hasAlreadySubmitted) return;
     setIsLoading(true);
     try {
       await onSubmitResult(selectedResult, proofFile);
-      // Reset form after successful submission
       setShowSubmitForm(false);
       setSelectedResult(null);
       setProofImage(null);
       setProofFile(null);
+      setShowIntegrityConfirm(false);
     } catch (error: any) {
       console.error("Error submitting result:", error);
       alert(error.message || "Failed to submit result. Please try again.");
@@ -397,26 +388,39 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     }
   };
 
+  const handleSubmit = async () => {
+    if (selectedResult === null || isLoading || hasAlreadySubmitted) return;
+
+    // If user is about to claim "I won" and opponent already claimed "I won", show integrity warning
+    if (selectedResult === true && results && typeof results === 'object' && creatorWallet && challengerWallet && currentWallet) {
+      const opponentWallet = currentWallet.toLowerCase() === creatorWallet.toLowerCase() ? challengerWallet : creatorWallet;
+      const resultKey = Object.keys(results).find((k) => k.toLowerCase() === opponentWallet?.toLowerCase());
+      const opponentResult = resultKey ? results[resultKey] : null;
+      if (opponentResult && opponentResult.didWin === true) {
+        setShowIntegrityConfirm(true);
+        return;
+      }
+    }
+
+    await doSubmitResult();
+  };
+
   const handleResolveDispute = async (winnerWallet: string) => {
-    if (!isAdmin || !currentWallet || !wallet.connected || !wallet.publicKey) {
-      alert(wallet.connected ? "Only the admin wallet can resolve disputes." : "Connect your wallet to resolve.");
+    if (!isAdmin || !currentWallet) {
+      alert("Only the admin wallet can resolve disputes.");
       return;
     }
     if (resolvingWinner) return;
     setResolvingWinner(winnerWallet);
     try {
-      const txSignature = await resolveAdminChallengeOnChain(
-        wallet as any,
-        connection,
-        activeChallenge.id,
-        winnerWallet
-      );
+      // Admin only updates Firestore (designates winner). No on-chain tx = no SOL fee for admin.
+      // The winner will claim their reward themselves (they pay gas when they click Claim).
       await resolveAdminChallenge(
         activeChallenge.id,
         winnerWallet,
         "lobby",
         "wallet:" + currentWallet,
-        txSignature
+        undefined
       );
     } catch (err: any) {
       console.error("Error resolving dispute:", err);
@@ -792,8 +796,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
             hasJoined = true;
           });
         } else {
-          // Limit reached - user cannot join as spectator
-          console.log(`⚠️ Spectator limit reached (${MAX_SPECTATORS}). Cannot join as spectator.`);
+          // Limit reached - user cannot join as spectator (UI shows warning in lobby)
         }
       }).catch(() => {
         // If getDoc fails, try to create spectator doc and increment anyway (optimistic - limit will be enforced by listener)
@@ -1729,10 +1732,42 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
             </p>
           </div>
 
+          {/* Double-claim integrity warning – give player a chance to correct before creating a dispute */}
+          {showIntegrityConfirm && (
+            <div className="rounded-lg border border-amber-400/50 bg-amber-500/15 p-3 space-y-3">
+              <p className="text-xs font-semibold text-amber-200 text-center">
+                ⚠️ Please double-check your result
+              </p>
+              <p className="text-[11px] text-amber-100/90 text-center">
+                The system detected that both players may have claimed the same outcome. Please make sure you are submitting the correct result to keep the integrity of the platform. Incorrect submissions can lead to disputes and delays.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowIntegrityConfirm(false)}
+                  className="flex-1 py-2 rounded-md border border-white/20 bg-white/10 text-white text-xs font-semibold hover:bg-white/15"
+                >
+                  Go back
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowIntegrityConfirm(false);
+                    doSubmitResult();
+                  }}
+                  disabled={isLoading}
+                  className="flex-1 py-2 rounded-md border border-amber-400/50 bg-amber-500/30 text-amber-100 text-xs font-semibold hover:bg-amber-500/40 disabled:opacity-50"
+                >
+                  {isLoading ? 'Submitting…' : 'I confirm, submit'}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Submit Button */}
           <button
             onClick={handleSubmit}
-            disabled={selectedResult === null || isLoading || isSubmitting || hasAlreadySubmitted}
+            disabled={selectedResult === null || isLoading || isSubmitting || hasAlreadySubmitted || showIntegrityConfirm}
             className={`
               w-full py-1.5 rounded-md font-semibold text-xs transition-all duration-200 border
               disabled:opacity-50 disabled:cursor-not-allowed
@@ -1829,7 +1864,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-3">
           <h3 className="text-sm font-bold text-amber-200 mb-2">Admin: Resolve dispute</h3>
           <p className="text-[11px] text-amber-100/80 mb-3">
-            Review what each player submitted, then choose who won. On-chain + Firestore will be updated; winner can then claim.
+            Review what each player submitted, then choose who won. You only correct the outcome here (no SOL fee). The winner will claim their reward themselves and pay the network fee.
           </p>
           {(() => {
             const getResultForWallet = (wallet: string) => {

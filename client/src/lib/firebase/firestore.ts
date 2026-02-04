@@ -4571,19 +4571,23 @@ export async function claimChallengePrize(
       throw new Error('❌ Challenge has no on-chain PDA. This challenge was created before the PDA field was added. Please create a new challenge to use the claim reward functionality.');
     }
     
-    if (!data.canClaim) {
-      throw new Error('❌ Challenge is not ready for claim yet');
-    }
-    
-    // Validate caller is the winner
     if (!winnerWallet || !winnerWallet.publicKey) {
       throw new Error('❌ Wallet not connected');
     }
     
     const callerAddress = winnerWallet.publicKey.toString();
-    // Firestore stores winner as lowercase (normalizeWinnerWallet); compare case-insensitively
     if (!data.winner || callerAddress.toLowerCase() !== data.winner.toLowerCase()) {
       throw new Error('❌ Only the winner can claim the reward');
+    }
+    
+    // Allow claim if: canClaim is set, admin-resolved (resolvedBy), or challenge is completed with a winner (covers legacy/race cases)
+    const isAdminResolved = !!(data as any).resolvedBy;
+    const claimable =
+      data.canClaim === true ||
+      (isAdminResolved && data.status === 'completed') ||
+      (data.status === 'completed' && data.winner && data.winner !== 'forfeit' && data.winner !== 'tie');
+    if (!claimable) {
+      throw new Error('❌ Challenge is not ready for claim yet');
     }
     
     // Prevent duplicate claims
@@ -4602,17 +4606,43 @@ export async function claimChallengePrize(
     // the winner should be able to claim their reward whenever they want.
     // The dispute_timer only prevents joining expired challenges, not claiming rewards.
     
-    // Import the resolveChallenge function
+    // Admin-resolved dispute: on-chain state is still "both claimed win". Use resolve_admin with winner as signer (winner pays gas).
+    // Normal completion: use resolve_challenge with winner as signer (winner pays gas).
+    const isAdminResolvedDispute = !!(data as any).resolvedBy;
+    const winnerCanonical = callerAddress;
+
+    if (isAdminResolvedDispute) {
+      const { resolveAdminChallengeOnChain } = await import('../chain/contract');
+      console.log('🚀 Winner claiming after admin resolution (winner pays gas)...');
+      try {
+        const signature = await resolveAdminChallengeOnChain(
+          winnerWallet,
+          connection,
+          challengeId,
+          data.winner!
+        );
+        await updateDoc(challengeRef, {
+          payoutTriggered: true,
+          prizeClaimedAt: Timestamp.now(),
+          adminResolutionTx: signature,
+          payoutSignature: signature,
+          payoutTimestamp: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        });
+        const explorerUrl = getExplorerTxUrl(signature);
+        if (explorerUrl) {
+          await postChallengeSystemMessage(challengeId, `🏆 Reward claimed on-chain: ${explorerUrl}`);
+        }
+        console.log('✅ REWARD CLAIMED (admin-resolved dispute)!');
+        return;
+      } catch (contractError: any) {
+        throw contractError;
+      }
+    }
+
     const { resolveChallenge } = await import('../chain/contract');
-    
-    // Call smart contract (winner pays gas!)
     console.log('🚀 Winner calling smart contract to release escrow...');
     console.log('   Note: Reward claims have NO expiration - winners can claim anytime!');
-    
-    // Pass caller (winner) in canonical form: wallet.publicKey.toString().
-    // Firestore stores winner lowercase; base58 is case-sensitive, so data.winner would
-    // decode to different bytes than on-chain creator/challenger and cause InvalidWinner.
-    const winnerCanonical = callerAddress;
     try {
       const signature = await resolveChallenge(
         winnerWallet,
@@ -4804,7 +4834,7 @@ export const resolveAdminChallenge = async (
       throw new Error('Winner must be one of the challenge participants');
     }
     
-    // Update challenge
+    // Update challenge (include canClaim in first write so winner can claim even if stats update fails)
     await updateDoc(challengeRef, {
       status: 'completed',
       winner: normalizeWinnerWallet(winnerWallet),
@@ -4812,19 +4842,25 @@ export const resolveAdminChallenge = async (
       resolvedAt: Timestamp.now(),
       adminResolutionTx: onChainTx || null,
       updatedAt: Timestamp.now(),
+      needsPayout: true,
+      payoutTriggered: false,
+      canClaim: true,
     });
-    
-    // Create audit log entry
-    await addDoc(collection(db, 'admin_audit_log'), {
-      adminUid,
-      adminEmail,
-      challengeId,
-      winner: normalizeWinnerWallet(winnerWallet),
-      action: 'resolve_dispute',
-      timestamp: Timestamp.now(),
-      onChainTx: onChainTx || null,
-      notes: notes || null,
-    });
+
+    // Audit log requires Firebase Auth admin (DisputeConsole). Skip when resolving from lobby (Solana wallet only).
+    const isLobbyResolve = adminUid === 'lobby' || (typeof adminEmail === 'string' && adminEmail.startsWith('wallet:'));
+    if (!isLobbyResolve) {
+      await addDoc(collection(db, 'admin_audit_log'), {
+        adminUid,
+        adminEmail,
+        challengeId,
+        winner: normalizeWinnerWallet(winnerWallet),
+        action: 'resolve_dispute',
+        timestamp: Timestamp.now(),
+        onChainTx: onChainTx || null,
+        notes: notes || null,
+      });
+    }
     
     // Update player stats (same logic as determineWinner)
     const isTeamChallenge = challengeData.challengeType === 'team';
@@ -4843,13 +4879,6 @@ export const resolveAdminChallenge = async (
         await updatePlayerStats(loser, 'loss', 0, challengeData.game || 'Unknown', challengeData.category || 'Sports');
       }
     }
-    
-    // Mark challenge as ready for winner to claim
-    await updateDoc(challengeRef, {
-      needsPayout: true,
-      payoutTriggered: false,
-      canClaim: true,
-    });
     
     console.log(`✅ Admin resolved dispute: Challenge ${challengeId}, Winner: ${winnerWallet}`);
   } catch (error) {

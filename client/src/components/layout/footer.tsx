@@ -100,7 +100,7 @@ const Footer: React.FC<FooterProps> = ({ isRevealed }) => {
         boxShadow: '0 -2px 8px rgba(0,0,0,0.15)'
       }}>
         <span style={{marginRight: 8, fontWeight: 700}} role="img" aria-label="lock">🔒</span>
-        USDFG is a skill-based competition platform. No gambling. No house. No custodial accounts. Just your wallet, and your skill.
+        USDFG is a skill-based competition platform. Your wallet, your verified results.
       </div>
     </>
   );

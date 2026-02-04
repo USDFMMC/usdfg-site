@@ -9,24 +9,24 @@ interface Feature {
 const PlatformFeatures: React.FC = () => {
   const features: Feature[] = [
     {
-      title: "Fuel Your Wallet with USDFG",
+      title: "Get USDFG Into Your Wallet",
       icon: "🪙",
-      description: "Buy, earn, or claim USDFG directly into your wallet. Use tokens to access challenges — not for speculation or staking."
+      description: "Buy, earn, or claim USDFG into your wallet. You use it to access challenges and participate in verified competition."
     },
     {
       title: "Create Skill Challenges",
       icon: "🎮",
-      description: "Choose your game. Set the rules. Launch challenges directly from your wallet — no middlemen."
+      description: "Choose your game, define the rules, and launch a challenge from your wallet. No accounts required."
     },
     {
-      title: "Earn Verified Results",
+      title: "Verified Results",
       icon: "🏆",
-      description: "USDFG is unlocked through verified results — not by chance, not by hype."
+      description: "Results are confirmed by players. When both sides agree, rewards release automatically."
     },
     {
-      title: "Track Wallet Stats",
+      title: "Wallet Based Stats",
       icon: "📊",
-      description: "See your performance in real time — verified wins, challenge history, and progression, all tied to your wallet, not an account."
+      description: "View verified wins, match history, and progression tied to your wallet activity."
     }
   ];
 

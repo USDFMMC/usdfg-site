@@ -9,16 +9,10 @@ const AboutSection: React.FC = () => {
             <h2 className="text-2xl md:text-3xl font-bold text-center mb-4">What is <span className="text-amber-400">USDFG?</span></h2>
             <div className="max-w-2xl mx-auto text-center">
               <p className="text-base md:text-lg text-center mb-4 font-bold">
-                USDFG is the access token for a decentralized competition platform—built for those who outperform, not those who get lucky.
+                USDFG is the access token for a skill based competition platform where players challenge each other directly, lock funds, play, verify results, and receive rewards through clear outcomes.
               </p>
-              <p className="text-sm md:text-base text-center mb-4">
-                <strong>No gambling. No randomness. Only verified performance.</strong>
-              </p>
-              <p className="text-sm md:text-base text-center mb-4">
-                This isn't a passive asset. It's a <strong>competitive layer for digital performance</strong>, tied to strategy, execution, and outcome.
-              </p>
-              <p className="text-sm md:text-base text-center mb-4">
-                <strong>Fixed supply.</strong> No inflation. No hidden mechanics. Just a clean contract and a clear goal.
+              <p className="text-sm md:text-base text-center text-amber-200/90">
+                Built for performance and execution, not luck.
               </p>
             </div>
           </div>
