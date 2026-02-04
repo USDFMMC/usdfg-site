@@ -190,7 +190,7 @@ const ChallengeSystem: React.FC = () => {
 
                 <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
                   <FaGavel className="text-amber-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
-                  <span>Founder reviews disputes and makes the final decision.</span>
+                  <span>Disputes are reviewed and resolved based on submitted proof.</span>
                 </motion.li>
 
                 <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
@@ -226,7 +226,7 @@ const ChallengeSystem: React.FC = () => {
             >
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-700/60 to-orange-700/60 border border-amber-400/20 shadow-[0_0_8px_rgba(255,215,130,0.08)] text-amber-100 text-sm font-semibold">
                 <FaUserShield className="text-amber-300 w-4 h-4 mr-1" />
-                Fair Play Guaranteed
+                Clear rules. Verified results.
               </div>
             </motion.div>
 

@@ -4070,28 +4070,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       );
       const participantSeesCompleted = isParticipant && isCompleted && categoryMatch && gameMatch;
       
-      // Debug logging for admin viewing challenges
-      if (isAdmin && isTournamentFormat) {
-        console.log('🔍 Admin viewing tournament:', {
-          challengeId: challenge.id,
-          status: challenge.status,
-          stage: tournamentStage,
-          isCompleted,
-          isFounderTournament,
-          isCompletedFounderTournament,
-          entryFee,
-          founderParticipantReward,
-          founderWinnerBonus,
-          creator: creatorWallet?.slice(0, 8),
-          adminWallet: ADMIN_WALLET.toString().slice(0, 8),
-          currentWallet: publicKey?.toString().slice(0, 8),
-          willShow: adminShouldSeeCompletedFounderTournament,
-          shouldShow: categoryMatch && gameMatch && (isJoinable || adminShouldSeeCompletedFounderTournament),
-          format: challengeFormat,
-          hasTournament: !!challenge.tournament || !!challenge.rawData?.tournament
-        });
-      }
-      
       // If showing "My Challenges", show all their challenges regardless of status
       // OR if admin viewing completed Founder Tournament
       // OR if admin viewing expired Founder Tournament/Challenge (so they can open and delete manually; show even when category/game filter applied)

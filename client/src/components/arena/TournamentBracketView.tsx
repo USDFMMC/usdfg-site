@@ -1,9 +1,18 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import type { TournamentState } from "@/lib/firebase/firestore";
+import { devFillTournamentWithTestPlayers, advanceBracketWinner } from "@/lib/firebase/firestore";
+import { Keypair } from "@solana/web3.js";
 import { cn } from "@/lib/utils";
 import { VoiceChat } from "./VoiceChat";
 import { ChatBox } from "./ChatBox";
 import { ADMIN_WALLET } from "@/lib/chain/config";
+
+const isDevTestEnv =
+  typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1" ||
+    (typeof import.meta !== "undefined" && (import.meta as any).env?.DEV === true) ||
+    new URLSearchParams(window.location.search).get("dev") === "1");
 
 /** Inner component for payout buttons to avoid TDZ / closure order issues in minified build */
 function FounderPayoutButtons({
@@ -163,75 +172,34 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   function findMatchForPlayer(wallet?: string | null) {
     if (!wallet) return null;
     const lower = wallet.toLowerCase();
-    
-    // Debug: Log bracket structure with full details
-    console.log('🔍 Searching for match:', {
-      wallet: wallet.slice(0, 8),
-      walletFull: wallet,
-      walletLower: lower,
-      currentRound,
-      bracketRounds: bracket.map(r => ({
-        roundNumber: r.roundNumber,
-        matches: r.matches.map(m => ({
-          id: m.id,
-          player1: m.player1,
-          player2: m.player2,
-          player1Lower: m.player1?.toLowerCase(),
-          player2Lower: m.player2?.toLowerCase(),
-          status: m.status,
-          player1Result: m.player1Result,
-          player2Result: m.player2Result,
-          winner: m.winner
-        }))
-      }))
-    });
-    
+
     // First, try to find match in the current round (active match)
     const currentRoundData = bracket.find(r => r.roundNumber === currentRound);
     if (currentRoundData) {
-      console.log(`🔍 Checking currentRound ${currentRound}:`, currentRoundData.matches.length, 'matches');
       for (const match of currentRoundData.matches) {
         const isPlayer1 = match.player1?.toLowerCase() === lower;
         const isPlayer2 = match.player2?.toLowerCase() === lower;
         if ((isPlayer1 || isPlayer2) && match.status !== 'completed') {
-          console.log('✅ Found match in currentRound:', match.id);
           return { round: currentRoundData, match };
         }
       }
     }
-    
+
     // If no active match in current round, find any non-completed match
-    console.log('🔍 Searching all rounds for match...');
     for (const round of bracket) {
       for (const match of round.matches) {
         const isPlayer1 = match.player1?.toLowerCase() === lower;
         const isPlayer2 = match.player2?.toLowerCase() === lower;
-        console.log(`  Checking round ${round.roundNumber} match ${match.id}:`, {
-          player1: match.player1?.slice(0, 8),
-          player2: match.player2?.slice(0, 8),
-          isPlayer1,
-          isPlayer2,
-          status: match.status,
-          matches: isPlayer1 || isPlayer2
-        });
-        // CRITICAL: Treat "ready" status as "in-progress" for final round matches with both players
-        // This allows submit button to show even if backend hasn't updated status yet
-        const effectiveStatus = (round.roundNumber === bracket.length && 
-                                 match.player1 && match.player2 && 
+        const effectiveStatus = (round.roundNumber === bracket.length &&
+                                 match.player1 && match.player2 &&
                                  match.status === 'ready') ? 'in-progress' : match.status;
-        
+
         if ((isPlayer1 || isPlayer2) && effectiveStatus !== 'completed') {
-          console.log(`✅ Found match in round ${round.roundNumber}:`, match.id, `(effective status: ${effectiveStatus})`);
-          // Return match with effective status for UI purposes
           return { round, match: { ...match, status: effectiveStatus as any } };
-        }
-        if (isPlayer1 || isPlayer2) {
-          console.log(`⚠️ Match found but status is 'completed':`, match.id, match.status);
         }
       }
     }
-    
-    console.log('❌ No match found for player');
+
     return null;
   }
 
@@ -259,62 +227,18 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   const opponentSubmitted = opponentResult !== undefined;
   const canEditResult = currentPlayerResult !== undefined && !opponentSubmitted;
 
-  const maxPlayers = tournament.maxPlayers || playersList.length;
+  const maxPlayers =
+    Number(
+      tournament.maxPlayers ||
+        (challenge?.maxPlayers ?? challenge?.capacity ?? challenge?.rawData?.maxPlayers ?? challenge?.rawData?.capacity)
+    ) || playersList.length;
   const currentPlayers = playersList.length;
   const isWaitingForPlayers = stage === 'waiting_for_players';
   const isCompleted = stage === 'completed';
   const champion = tournament.champion;
 
-  // Debug logging (after all variables are declared)
-  if (playerMatch) {
-    console.log('🔍 Tournament Match Debug:', {
-      roundNumber: playerMatch.round.roundNumber,
-      matchId: playerMatch.match.id,
-      status: playerMatch.match.status,
-      player1: playerMatch.match.player1,
-      player2: playerMatch.match.player2,
-      player1Result: playerMatch.match.player1Result,
-      player2Result: playerMatch.match.player2Result,
-      winner: playerMatch.match.winner,
-      currentWallet,
-      opponentWallet,
-      isFinal: playerMatch.round.roundNumber === bracket.length,
-      bracketLength: bracket.length,
-      currentRound,
-      currentPlayerResult,
-      opponentResult,
-      opponentSubmitted,
-      stage,
-      isCompleted,
-      champion,
-      canShowSubmitButton: playerMatch.match.status !== 'completed' && 
-                           (playerMatch.match.status === 'in-progress' || playerMatch.match.status === 'ready') &&
-                           opponentWallet
-    });
-  } else {
-    console.log('🔍 No active match found for player:', {
-      currentWallet,
-      currentRound,
-      bracketLength: bracket.length,
-      stage,
-      isCompleted,
-      champion
-    });
-  }
   const isChampion = currentWallet && champion && currentWallet.toLowerCase() === champion.toLowerCase();
-  
-  // Debug: Log tournament completion state
-  if (isCompleted || champion) {
-    console.log('🏆 Tournament completion state:', {
-      isCompleted,
-      champion: champion?.slice(0, 8),
-      currentWallet: currentWallet?.slice(0, 8),
-      isChampion,
-      stage,
-      canClaim: challenge?.canClaim || challenge?.rawData?.canClaim
-    });
-  }
-  
+
   // Check if reward can be claimed (base; founder logic applied after isFounderTournament)
   const canClaim = challenge?.canClaim || challenge?.rawData?.canClaim;
   const prizeClaimedBase = challenge?.prizeClaimed || challenge?.rawData?.prizeClaimed || challenge?.rawData?.prizeClaimedAt || challenge?.payoutTriggered;
@@ -369,6 +293,46 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
 
   const [opsTab, setOpsTab] = useState<"chat" | "info" | "proof">("chat");
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  const [devFillLoading, setDevFillLoading] = useState(false);
+  const [devSetWinnerLoading, setDevSetWinnerLoading] = useState<string | null>(null);
+  const autoFilledChallengeRef = useRef<string | null>(null);
+
+  // Auto-fill when only creator is in 4/8/16 tournament (creator opens lobby; once per challenge)
+  useEffect(() => {
+    if (
+      !isCreator ||
+      ![4, 8, 16].includes(maxPlayers) ||
+      currentPlayers > 1 ||
+      !creatorWallet ||
+      !isWaitingForPlayers ||
+      autoFilledChallengeRef.current === challengeId ||
+      devFillLoading
+    ) {
+      return;
+    }
+    autoFilledChallengeRef.current = challengeId;
+    setDevFillLoading(true);
+    const count = maxPlayers - 1;
+    const keypairs = Array.from({ length: count }, () => Keypair.generate());
+    const testAddresses = keypairs.map((kp) => kp.publicKey.toBase58());
+    devFillTournamentWithTestPlayers(challengeId, creatorWallet, testAddresses)
+      .then(() => {
+        setDevFillLoading(false);
+      })
+      .catch((err: unknown) => {
+        console.error("Auto-fill failed:", err);
+        autoFilledChallengeRef.current = null;
+        setDevFillLoading(false);
+      });
+  }, [
+    challengeId,
+    creatorWallet,
+    isCreator,
+    maxPlayers,
+    currentPlayers,
+    isWaitingForPlayers,
+    devFillLoading,
+  ]);
 
   const challengeTitle = challenge?.title || challenge?.rawData?.title || "USDFG Tournament";
   const challengeGame = challenge?.game || challenge?.rawData?.game || "—";
@@ -383,24 +347,6 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
     }
     return null;
   })();
-
-  // Debug: Log Founder Tournament payout UI visibility (moved after all variable declarations)
-  if (isCompleted && isFounderTournament) {
-    console.log('🔍 Founder Tournament Payout UI Check:', {
-      isCompleted,
-      isFounderTournament,
-      isAdminViewer,
-      stage,
-      champion: champion?.slice(0, 8),
-      founderParticipantReward,
-      founderWinnerBonus,
-      uniqueParticipantsCount: uniqueParticipants.length,
-      onAirdropPayouts: !!onAirdropPayouts,
-      currentWallet: currentWallet?.slice(0, 8),
-      adminWallet: ADMIN_WALLET.toString().slice(0, 8),
-      willShowPayoutUI: isCompleted && isFounderTournament && isAdminViewer
-    });
-  }
 
   function slotLabel(wallet?: string) {
     if (!wallet) return "Open";
@@ -560,6 +506,29 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
               🗑️ Delete Tournament
             </button>
           )}
+          {isCreator && [4, 8, 16].includes(maxPlayers) && currentPlayers <= 1 && creatorWallet && isWaitingForPlayers && (
+            <button
+              onClick={async () => {
+                setDevFillLoading(true);
+                try {
+                  const count = maxPlayers - 1;
+                  const keypairs = Array.from({ length: count }, () => Keypair.generate());
+                  const testAddresses = keypairs.map((kp) => kp.publicKey.toBase58());
+                  await devFillTournamentWithTestPlayers(challengeId, creatorWallet, testAddresses);
+                  alert(`Filled with ${maxPlayers} test players (you + ${count}). Refresh or wait for real-time update.`);
+                } catch (error: any) {
+                  console.error("Dev fill failed:", error);
+                  alert(error.message || "Failed to fill test players");
+                } finally {
+                  setDevFillLoading(false);
+                }
+              }}
+              disabled={devFillLoading}
+              className="mt-3 w-full rounded-lg bg-amber-600/20 px-4 py-2 text-sm font-semibold text-amber-200 transition-all hover:bg-amber-600/30 border border-amber-500/40 disabled:opacity-50"
+            >
+              {devFillLoading ? "Filling…" : `🧪 Fill with test players (${maxPlayers})`}
+            </button>
+          )}
         </div>
       )}
 
@@ -626,11 +595,6 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
               return (
                 <button
                   onClick={() => {
-                    console.log('🎯 Submit button clicked:', {
-                      matchId: playerMatch.match.id,
-                      opponentWallet,
-                      roundNumber: playerMatch.round.roundNumber
-                    });
                     onOpenSubmitResult(playerMatch.match.id, opponentWallet);
                   }}
                   className="mt-3 w-full rounded-lg bg-amber-400/20 px-4 py-2 text-sm font-semibold text-amber-200 transition-all hover:bg-amber-400/30 hover:shadow-[0_0_12px_rgba(255,215,130,0.3)] border border-amber-400/40"
@@ -760,6 +724,51 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
                 <div className="text-xs font-semibold text-white/80">{challengePlatform}</div>
               </div>
             </div>
+            {isDevTestEnv && (isCreator || isAdminViewer) && selectedMatch && selectedMatch.match.status !== "completed" && selectedMatch.match.player1 && selectedMatch.match.player2 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] uppercase text-white/50">Test:</span>
+                <button
+                  type="button"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    const { match } = selectedMatch;
+                    if (!match.player1) return;
+                    setDevSetWinnerLoading(match.id);
+                    try {
+                      await advanceBracketWinner(challengeId, match.id, match.player1);
+                    } catch (err: any) {
+                      alert(err.message || "Failed to set winner");
+                    } finally {
+                      setDevSetWinnerLoading(null);
+                    }
+                  }}
+                  disabled={devSetWinnerLoading === selectedMatch.match.id}
+                  className="rounded-lg border border-amber-500/40 bg-amber-500/20 px-3 py-1.5 text-xs font-semibold text-amber-200 hover:bg-amber-500/30 disabled:opacity-50"
+                >
+                  Set winner: {slotLabel(selectedMatch.match.player1)}
+                </button>
+                <button
+                  type="button"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    const { match } = selectedMatch;
+                    if (!match.player2) return;
+                    setDevSetWinnerLoading(match.id);
+                    try {
+                      await advanceBracketWinner(challengeId, match.id, match.player2);
+                    } catch (err: any) {
+                      alert(err.message || "Failed to set winner");
+                    } finally {
+                      setDevSetWinnerLoading(null);
+                    }
+                  }}
+                  disabled={devSetWinnerLoading === selectedMatch.match.id}
+                  className="rounded-lg border border-amber-500/40 bg-amber-500/20 px-3 py-1.5 text-xs font-semibold text-amber-200 hover:bg-amber-500/30 disabled:opacity-50"
+                >
+                  Set winner: {slotLabel(selectedMatch.match.player2)}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

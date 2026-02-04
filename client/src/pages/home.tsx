@@ -4,7 +4,6 @@ import LiveActivityTicker from "@/components/LiveActivityTicker";
 import Footer from "@/components/layout/footer";
 import HeroSection from "@/components/home/hero-section";
 import AboutSection from "@/components/home/development-banner";
-import HowUsdfgWorks from "@/components/home/how-usdfg-works";
 import PlatformFeatures from "@/components/home/platform-features";
 import ChallengeSystem from "@/components/home/challenge-system";
 import Tokenomics from "@/components/home/tokenomics";
@@ -117,9 +116,6 @@ const Home: React.FC = () => {
         >
           <section aria-label="About Section">
             <AboutSection />
-          </section>
-          <section aria-label="How USDFG Works">
-            <HowUsdfgWorks />
           </section>
           <section aria-label="Platform Features Section">
             <PlatformFeatures />

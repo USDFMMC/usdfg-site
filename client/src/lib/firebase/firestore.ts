@@ -868,9 +868,57 @@ export const joinTournament = async (
 };
 
 /**
+ * DEV/TEST ONLY: Fill a 16-player tournament bracket with the creator + 15 test wallet addresses.
+ * Use this to test the full bracket flow without 16 real players.
+ * Only the challenge creator should call this; typically gated by isCreator in the UI.
+ */
+export const devFillTournamentWithTestPlayers = async (
+  challengeId: string,
+  creatorWallet: string,
+  testPlayerAddresses: string[]
+): Promise<void> => {
+  const challengeRef = doc(db, 'challenges', challengeId);
+  const snap = await getDoc(challengeRef);
+  if (!snap.exists()) throw new Error('Challenge not found');
+
+  const data = snap.data() as ChallengeData;
+  const tournament = data.tournament;
+  const format = data.format || (data.tournament ? 'tournament' : 'standard');
+  if (format !== 'tournament' || !tournament?.bracket) {
+    throw new Error('This is not a tournament or bracket is missing');
+  }
+  if (tournament.stage !== 'waiting_for_players') {
+    throw new Error('Tournament is not in waiting_for_players stage');
+  }
+  const creator = (data.creator || '').toLowerCase();
+  if (creator !== creatorWallet.toLowerCase()) {
+    throw new Error('Only the challenge creator can fill test players');
+  }
+
+  const maxPlayers = tournament.maxPlayers || 16;
+  if (testPlayerAddresses.length !== maxPlayers - 1) {
+    throw new Error(`Provide exactly ${maxPlayers - 1} test addresses for a ${maxPlayers}-player tournament`);
+  }
+
+  const players = [creatorWallet, ...testPlayerAddresses];
+  const bracket = deepCloneBracket(tournament.bracket);
+  const seededBracket = seedPlayersIntoBracket(bracket, players);
+  const finalBracket = activateRoundMatches(seededBracket, 1);
+
+  await updateDoc(challengeRef, {
+    players,
+    'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket: finalBracket }).bracket,
+    'tournament.stage': 'round_in_progress',
+    status: 'active',
+    updatedAt: serverTimestamp(),
+  });
+  console.log(`✅ [DEV] Filled tournament with ${players.length} test players (creator + ${testPlayerAddresses.length} test)`);
+};
+
+/**
  * Advance a tournament bracket winner to the next round
  * Marks the current match as completed and moves the winner to the next round's match
- * @deprecated Use submitTournamentMatchResult instead
+ * @deprecated Use submitTournamentMatchResult instead. Exposed for dev/testing (Set winner without both submissions).
  */
 export const advanceBracketWinner = async (
   challengeId: string,
