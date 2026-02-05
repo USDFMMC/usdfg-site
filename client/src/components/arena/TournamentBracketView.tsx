@@ -818,7 +818,15 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
             <div className="mt-2 space-y-3">
               <div className="rounded-xl border border-white/10 bg-white/5 p-3">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-300">Voice Room</div>
-                <VoiceChat challengeId={challengeId} currentWallet={currentWallet || ""} />
+                <VoiceChat
+                  challengeId={challengeId}
+                  currentWallet={currentWallet || ""}
+                  challengeStatus={stage === "waiting_for_players" ? "pending_waiting_for_opponent" : stage === "round_in_progress" ? "active" : "completed"}
+                  isSpectator={Boolean(currentWallet && !playersList.some((p) => p && p.toLowerCase() === currentWallet.toLowerCase()))}
+                  isCreator={Boolean(isCreator)}
+                  participants={playersList.filter(Boolean)}
+                  spectators={[]}
+                />
               </div>
               <div className="rounded-xl border border-white/10 bg-white/5 p-3">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-300">Tournament Chat</div>

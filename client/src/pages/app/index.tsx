@@ -6760,6 +6760,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             
             // Render submit result modal for tournament matches - overlay on lobby
             if (showSubmitResultModal && tournamentMatchData) {
+              const tournamentParticipants = Array.isArray(selectedChallenge.rawData?.players) ? selectedChallenge.rawData.players : (Array.isArray(selectedChallenge.players) ? selectedChallenge.players : []);
+              const tournamentCreator = selectedChallenge.creator || selectedChallenge.rawData?.creator || "";
               return (
                 <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div></div>}>
                   <SubmitResultRoom
@@ -6774,6 +6776,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     challengeTitle={selectedChallenge.title || ""}
                     currentWallet={publicKey?.toString() || ""}
                     onSubmit={handleSubmitResult}
+                    challengeStatus="active"
+                    isSpectator={false}
+                    isCreator={Boolean(publicKey && tournamentCreator && publicKey.toString().toLowerCase() === tournamentCreator.toLowerCase())}
+                    participants={tournamentParticipants.filter(Boolean)}
+                    spectators={[]}
                   />
                 </Suspense>
               );

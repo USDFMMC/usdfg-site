@@ -12,6 +12,12 @@ interface SubmitResultRoomProps {
   currentWallet: string;
   onSubmit: (didWin: boolean, proofFile?: File | null) => Promise<void>;
   isSubmitting?: boolean;
+  /** VoiceChat: same as StandardChallengeLobby for consistency */
+  challengeStatus?: string;
+  isSpectator?: boolean;
+  isCreator?: boolean;
+  participants?: string[];
+  spectators?: string[];
 }
 
 const SubmitResultRoomComponent: React.FC<SubmitResultRoomProps> = ({
@@ -22,6 +28,11 @@ const SubmitResultRoomComponent: React.FC<SubmitResultRoomProps> = ({
   currentWallet,
   onSubmit,
   isSubmitting = false,
+  challengeStatus = "active",
+  isSpectator = false,
+  isCreator = false,
+  participants = [],
+  spectators = [],
 }) => {
   const [selectedResult, setSelectedResult] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -301,7 +312,15 @@ const SubmitResultRoomComponent: React.FC<SubmitResultRoomProps> = ({
 
                 {/* Voice Chat - Available to all players (up to 24) in Submit Result Room */}
                 {challengeId && challengeId.trim() !== '' && (
-                  <VoiceChat challengeId={challengeId} currentWallet={currentWallet} />
+                  <VoiceChat
+                    challengeId={challengeId}
+                    currentWallet={currentWallet}
+                    challengeStatus={challengeStatus}
+                    isSpectator={isSpectator}
+                    isCreator={isCreator}
+                    participants={participants}
+                    spectators={spectators}
+                  />
                 )}
 
                 {/* Text Chat - Available to all players (up to 24) in Submit Result Room */}

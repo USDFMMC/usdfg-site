@@ -68,54 +68,58 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 3;
   const unsubscribeSignalRef = useRef<(() => void) | null>(null);
+  const disconnectedSinceRef = useRef<number | null>(null);
+  const recoveryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recoveryAttemptedRef = useRef(false);
 
   // Use refs to track initialization and prevent unnecessary re-initialization
   const initializedRef = useRef(false);
   const currentChallengeIdRef = useRef<string>('');
   const initInProgressRef = useRef(false);
-  
+  const [reinitKey, setReinitKey] = useState(0);
+
   // Memoize challengeId to prevent unnecessary re-renders
   const memoizedChallengeId = useMemo(() => challengeId, [challengeId]);
 
-  // Initialize voice chat - only if challengeId is valid
+  // When user becomes listen-only: tear down connection immediately (do not delete signaling doc)
+  useEffect(() => {
+    if (!isListenOnly) return;
+    cleanup(false);
+    initializedRef.current = false;
+    currentChallengeIdRef.current = '';
+    setStatus("Voice disabled for spectators during active matches");
+    setConnected(false);
+    setPeerConnected(false);
+  }, [isListenOnly]);
+
+  // Initialize voice chat - only if challengeId is valid and not listen-only
   useEffect(() => {
     // Skip if already initialized for this challengeId or init in progress
     if ((initializedRef.current && currentChallengeIdRef.current === memoizedChallengeId) || initInProgressRef.current) {
       return;
     }
-    
-    // CRITICAL: Spectators cannot use voice during active matches
+
     if (isListenOnly || voiceDisabled || !memoizedChallengeId || memoizedChallengeId.trim() === '') {
-      if (isListenOnly) {
-        setStatus("Voice disabled for spectators during active matches");
-        setConnected(false);
-      }
       return;
     }
-    
-    // Mark as in progress to prevent duplicate initializations
+
     initInProgressRef.current = true;
-    
-    // Mark as initialized for this challenge
     initializedRef.current = true;
     currentChallengeIdRef.current = memoizedChallengeId;
-    
-    // Removed mount logging - excessive logging removed
+
     initVoiceChat().finally(() => {
       initInProgressRef.current = false;
     });
-    
+
     return () => {
-      // Only cleanup if challengeId actually changed
       if (currentChallengeIdRef.current !== memoizedChallengeId) {
-        // Removed cleanup logging - excessive logging removed
-      cleanup();
+        cleanup(true);
         initializedRef.current = false;
         currentChallengeIdRef.current = '';
         initInProgressRef.current = false;
       }
     };
-  }, [memoizedChallengeId, voiceDisabled, isListenOnly]); // Include isListenOnly to disable when match becomes active
+  }, [memoizedChallengeId, voiceDisabled, isListenOnly, reinitKey]);
 
   // Preserve audio connection when page visibility changes (backgrounding on mobile)
   useEffect(() => {
@@ -128,25 +132,24 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
         console.log("📱 Page visible - resuming audio if needed");
         // Resume audio playback if it was paused
         if (remoteAudioRef.current) {
-          remoteAudioRef.current.play().catch(err => {
-            console.log("Audio resume failed (may need user interaction):", err);
+          remoteAudioRef.current.play().catch((err) => {
+            console.warn("[Voice] audio.play() rejected (visibility):", err?.message ?? err);
           });
         }
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // Also handle page blur/focus events for additional reliability
+
     const handleBlur = () => {
       console.log("📱 Page blurred - keeping audio active");
     };
-    
+
     const handleFocus = () => {
       console.log("📱 Page focused - ensuring audio is active");
       if (remoteAudioRef.current) {
-        remoteAudioRef.current.play().catch(err => {
-          console.log("Audio resume on focus failed:", err);
+        remoteAudioRef.current.play().catch((err) => {
+          console.warn("[Voice] audio.play() rejected (focus):", err?.message ?? err);
         });
       }
     };
@@ -238,11 +241,16 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
         });
       }
 
-      // Handle incoming tracks
       pc.ontrack = (event) => {
-        if (remoteAudioRef.current && event.streams[0]) {
-          remoteAudioRef.current.srcObject = event.streams[0];
-          remoteAudioRef.current.play().catch(err => console.error("Audio play failed:", err));
+        const stream = event.streams?.[0];
+        if (stream) {
+          console.log("[Voice] remote track received", { streamId: stream.id, trackKind: event.track?.kind });
+          if (remoteAudioRef.current) {
+            remoteAudioRef.current.srcObject = stream;
+            remoteAudioRef.current.play().catch((err) => {
+              console.warn("[Voice] audio.play() rejected:", err?.message ?? err);
+            });
+          }
           setPeerConnected(true);
         }
       };
@@ -259,27 +267,49 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
         }
       };
 
-      // Monitor connection state
+      const DISCONNECTED_RECOVERY_MS = 8000;
+
       pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'connected') {
+        const state = pc.connectionState;
+        console.log("[Voice] connectionState:", state);
+
+        if (state === 'connected') {
+          disconnectedSinceRef.current = null;
+          if (recoveryTimeoutRef.current) {
+            clearTimeout(recoveryTimeoutRef.current);
+            recoveryTimeoutRef.current = null;
+          }
+          recoveryAttemptedRef.current = false;
           setPeerConnected(true);
           setStatus("Voice connected!");
-          reconnectAttempts.current = 0; // Reset on success
-        } else if (pc.connectionState === 'connecting') {
+          reconnectAttempts.current = 0;
+        } else if (state === 'connecting') {
           setStatus("Connecting to opponent...");
-        } else if (pc.connectionState === 'disconnected') {
+        } else if (state === 'disconnected' || state === 'failed') {
           setPeerConnected(false);
-          setStatus("Disconnected, reconnecting...");
-        } else if (pc.connectionState === 'failed') {
-          setPeerConnected(false);
-          if (reconnectAttempts.current < maxReconnectAttempts) {
-            reconnectAttempts.current++;
-            setStatus(`Connection failed, retry ${reconnectAttempts.current}/${maxReconnectAttempts}...`);
-            // Attempt to restart ICE
-            pc.restartIce();
-          } else {
-            setStatus("Connection failed (check network)");
-            console.error("❌ Voice chat connection failed after max retries");
+          if (state === 'disconnected') setStatus("Disconnected, reconnecting...");
+          if (state === 'failed') {
+            if (reconnectAttempts.current < maxReconnectAttempts) {
+              reconnectAttempts.current++;
+              setStatus(`Connection failed, retry ${reconnectAttempts.current}/${maxReconnectAttempts}...`);
+              pc.restartIce();
+            } else {
+              setStatus("Connection failed (check network)");
+            }
+          }
+          const now = Date.now();
+          if (disconnectedSinceRef.current === null) disconnectedSinceRef.current = now;
+          if (!recoveryTimeoutRef.current && !recoveryAttemptedRef.current) {
+            recoveryTimeoutRef.current = setTimeout(() => {
+              recoveryTimeoutRef.current = null;
+              if (pc.connectionState !== 'connected' && pc.connectionState !== 'connecting' && !recoveryAttemptedRef.current) {
+                recoveryAttemptedRef.current = true;
+                console.log("[Voice] recovery: tearing down and re-initing signaling after prolonged failure/disconnect");
+                cleanup(true);
+                initializedRef.current = false;
+                setReinitKey((k) => k + 1);
+              }
+            }, DISCONNECTED_RECOVERY_MS);
           }
         }
       };
@@ -335,7 +365,6 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
             }
           }
 
-          // Handle ICE candidates from other players
           Object.keys(data).forEach(async (key) => {
             if (key.startsWith('candidate_') && !key.includes(currentWallet)) {
               try {
@@ -343,7 +372,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
                   await pc.addIceCandidate(new RTCIceCandidate(data[key]));
                 }
               } catch (err) {
-                console.error("❌ Failed to add ICE candidate:", err);
+                console.warn("[Voice] addIceCandidate error:", err instanceof Error ? err.message : err);
               }
             }
           });
@@ -364,26 +393,32 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
       // Store unsubscribe function for cleanup
       unsubscribeSignalRef.current = unsubscribe;
 
-      // Small delay to let listener attach
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Check if we should create offer (first person in the room)
+      // Deterministic offerer: only the peer with lowest wallet (case-insensitive) creates the offer
+      const sortedWallets = [...participants].map((p) => p?.toLowerCase()).filter(Boolean).sort();
+      const amOfferer = sortedWallets.length === 0 || (currentWallet && currentWallet.toLowerCase() === sortedWallets[0]);
+
       const { getDoc } = await import("firebase/firestore");
       const signalSnap = await getDoc(signalRef);
       const signalData = signalSnap.data();
-      
+
       if (!signalData?.offer) {
-        console.log("📞 Creating offer (first person in room)...");
-        setStatus("Creating offer, waiting for opponent...");
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        await setDoc(signalRef, {
-          offer,
-          offerFrom: currentWallet,
-          timestamp: Date.now()
-        }, { merge: true });
+        if (amOfferer) {
+          console.log("[Voice] Creating offer (offerer by deterministic rule)");
+          setStatus("Creating offer, waiting for opponent...");
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          await setDoc(signalRef, {
+            offer,
+            offerFrom: currentWallet,
+            timestamp: Date.now()
+          }, { merge: true });
+        } else {
+          setStatus("Waiting for opponent to create offer...");
+        }
       } else if (signalData.offerFrom !== currentWallet) {
-        console.log("📞 Offer already exists from opponent, will answer when ready");
+        console.log("[Voice] Offer already exists from opponent, will answer when ready");
         setStatus("Found opponent, connecting...");
       }
 
@@ -429,27 +464,29 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
     }
   }, [isListenOnly, mutedByCreator]);
 
-  const cleanup = async () => {
-    // Unsubscribe from Firestore signals listener first
+  const cleanup = (deleteSignalsDoc: boolean) => {
+    if (recoveryTimeoutRef.current) {
+      clearTimeout(recoveryTimeoutRef.current);
+      recoveryTimeoutRef.current = null;
+    }
+    disconnectedSinceRef.current = null;
+
     if (unsubscribeSignalRef.current) {
       unsubscribeSignalRef.current();
       unsubscribeSignalRef.current = null;
     }
-    
-    // Clean up Firestore signals document only if we have a valid challengeId
+
     const validChallengeId = memoizedChallengeId || challengeId;
-    if (validChallengeId && validChallengeId.trim() !== '') {
-      try {
-        const { deleteDoc, doc } = await import("firebase/firestore");
-        await deleteDoc(doc(db, "voice_signals", validChallengeId));
-      } catch (error: any) {
-        // Ignore errors if document doesn't exist or is already deleted
-        if (error.code !== 'not-found' && !error.message?.includes('not found')) {
-          console.log("⚠️ Could not delete Firestore signals document (may already be cleaned up):", error);
-        }
-      }
+    if (deleteSignalsDoc && validChallengeId && validChallengeId.trim() !== '') {
+      import("firebase/firestore").then(({ deleteDoc, doc }) => {
+        deleteDoc(doc(db, "voice_signals", validChallengeId)).catch((error: any) => {
+          if (error.code !== 'not-found' && !error.message?.includes('not found')) {
+            console.log("⚠️ Could not delete Firestore signals document (may already be cleaned up):", error);
+          }
+        });
+      });
     }
-    
+
     // Stop all local tracks
     if (localStream.current) {
       localStream.current.getTracks().forEach((track) => {
