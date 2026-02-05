@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { ChatBox } from "./ChatBox";
 import { VoiceChat } from "./VoiceChat";
 import { Camera, Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
-import { getPlayerStats, fetchChallengeById, resolveAdminChallenge } from "@/lib/firebase/firestore";
+import { getPlayerStats, fetchChallengeById, resolveAdminChallenge, approveMicRequest, denyMicRequest, approveMicRequestReplace, MAX_VOICE_SPEAKERS } from "@/lib/firebase/firestore";
 import { collection, doc, setDoc, deleteDoc, updateDoc, onSnapshot, query, where, serverTimestamp, Timestamp, getDocs, getDoc, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import { ADMIN_WALLET } from "@/lib/chain/config";
@@ -192,6 +192,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const [playerData, setPlayerData] = useState<Record<string, { displayName?: string; profileImage?: string }>>({});
   const [spectatorCount, setSpectatorCount] = useState<number>(0);
   const [spectators, setSpectators] = useState<string[]>([]);
+  const [pendingMicRequests, setPendingMicRequests] = useState<{ wallet: string }[]>([]);
+  const [speakerWallets, setSpeakerWallets] = useState<string[]>([]);
   const [resolvingWinner, setResolvingWinner] = useState<string | null>(null);
   const [showIntegrityConfirm, setShowIntegrityConfirm] = useState(false);
 
@@ -990,6 +992,28 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       fetchPlayerData();
     }
   }, [participants, spectators]);
+
+  // Listen to pending mic requests (for creator)
+  useEffect(() => {
+    if (!challengeId) return;
+    const micRef = collection(db, 'challenge_lobbies', challengeId, 'mic_requests');
+    const q = query(micRef, where('status', '==', 'pending'));
+    const unsub = onSnapshot(q, (snap) => {
+      setPendingMicRequests(snap.docs.map((d) => ({ wallet: d.id })));
+    }, () => {});
+    return () => unsub();
+  }, [challengeId]);
+
+  // Listen to voice speaker list (max 2)
+  useEffect(() => {
+    if (!challengeId) return;
+    const stateRef = doc(db, 'challenge_lobbies', challengeId, 'voice_state', 'main');
+    const unsub = onSnapshot(stateRef, (snap) => {
+      const list = snap.exists() ? (snap.data()?.speakerWallets || []) : [];
+      setSpeakerWallets(Array.isArray(list) ? list : []);
+    }, () => {});
+    return () => unsub();
+  }, [challengeId]);
 
   return (
     <div className="space-y-2">
@@ -2009,6 +2033,82 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                 Creator Controls {isActiveMatch ? '(Active Match)' : '(Pre-Match Lobby)'}
               </div>
               <div className="space-y-1.5">
+                <div className="text-[10px] text-gray-400">
+                  Speaker slots: {speakerWallets.length}/{MAX_VOICE_SPEAKERS}
+                  {speakerWallets.length >= MAX_VOICE_SPEAKERS && (
+                    <span className="ml-1 text-amber-400">(full)</span>
+                  )}
+                </div>
+                {speakerWallets.length > 0 && (
+                  <div className="space-y-0.5">
+                    <div className="text-[10px] font-semibold text-amber-200/90">Active speakers</div>
+                    {speakerWallets.map((w) => {
+                      const data = playerData[w.toLowerCase()] || {};
+                      const displayName = data.displayName || `${w.slice(0, 4)}...${w.slice(-4)}`;
+                      return (
+                        <div key={w} className="flex items-center gap-2 py-0.5 px-2 rounded bg-white/5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                          <span className="text-xs text-white/90 truncate">{displayName}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {pendingMicRequests.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="text-[10px] font-semibold text-amber-200/90">Pending mic requests</div>
+                    {pendingMicRequests.map(({ wallet: requesterWallet }) => {
+                      const data = playerData[requesterWallet.toLowerCase()] || {};
+                      const displayName = data.displayName || `${requesterWallet.slice(0, 4)}...${requesterWallet.slice(-4)}`;
+                      const slotsFull = speakerWallets.length >= MAX_VOICE_SPEAKERS;
+                      return (
+                        <div key={requesterWallet} className="flex items-center justify-between gap-2 py-1 px-2 rounded bg-white/5 flex-wrap">
+                          <span className="text-xs text-white/90 truncate">{displayName}</span>
+                          <div className="flex gap-1 flex-shrink-0 flex-wrap">
+                            {slotsFull ? (
+                              <>
+                                {speakerWallets.map((replaceWallet) => {
+                                  const replaceData = playerData[replaceWallet.toLowerCase()] || {};
+                                  const replaceName = replaceData.displayName || `${replaceWallet.slice(0, 4)}...${replaceWallet.slice(-4)}`;
+                                  return (
+                                    <button
+                                      key={replaceWallet}
+                                      type="button"
+                                      onClick={async () => {
+                                        await approveMicRequestReplace(challengeId, requesterWallet, replaceWallet, currentWallet || '');
+                                      }}
+                                      className="px-2 py-0.5 rounded bg-green-600/30 hover:bg-green-600/50 text-green-200 text-[10px] font-medium"
+                                    >
+                                      Replace {replaceName}
+                                    </button>
+                                  );
+                                })}
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const ok = await approveMicRequest(challengeId, requesterWallet, currentWallet || '');
+                                  if (!ok) alert('Speaker slots full. Request not approved.');
+                                }}
+                                className="px-2 py-0.5 rounded bg-green-600/30 hover:bg-green-600/50 text-green-200 text-[10px] font-medium"
+                              >
+                                Approve
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => denyMicRequest(challengeId, requesterWallet, currentWallet || '')}
+                              className="px-2 py-0.5 rounded bg-red-600/30 hover:bg-red-600/50 text-red-200 text-[10px] font-medium"
+                            >
+                              Deny
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 {/* Mute All Spectators Button */}
                 {spectators.length > 0 && (
                   <MuteAllSpectatorsButton 

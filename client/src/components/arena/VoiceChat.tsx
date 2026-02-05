@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import { Mic, MicOff } from "lucide-react";
-import { doc, setDoc, onSnapshot, deleteDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, onSnapshot, deleteDoc, getDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "../../lib/firebase/config";
+import { createMicRequest, addSpeaker, removeSpeaker } from "../../lib/firebase/firestore";
 
 interface VoiceChatProps {
   challengeId: string;
@@ -29,18 +30,20 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
   const [status, setStatus] = useState<string>("Initializing...");
   const [voiceDisabled, setVoiceDisabled] = useState(false);
   const [mutedByCreator, setMutedByCreator] = useState(false);
-  
-  // Determine if voice is allowed based on status and role
+  const [micRequestStatus, setMicRequestStatus] = useState<'pending' | 'approved' | 'denied' | null>(null);
+  const [speakerWallets, setSpeakerWallets] = useState<string[]>([]);
+  const [requestingMic, setRequestingMic] = useState(false);
+
   const isActiveMatch = challengeStatus === 'active';
-  const allowVoice = !isActiveMatch || !isSpectator; // Spectators can't speak during active matches
-  const isListenOnly = isSpectator && isActiveMatch; // Spectators are listen-only during active matches
+  const inSpeakerList = speakerWallets.some((w) => w?.toLowerCase() === currentWallet?.toLowerCase());
+  const isApprovedSpeaker = isSpectator && inSpeakerList;
+  const isListenOnly = (isSpectator && isActiveMatch) || (isSpectator && !inSpeakerList);
+  const publishMic = inSpeakerList;
   
   // Listen to creator mute controls from Firestore
   useEffect(() => {
     if (!challengeId || !currentWallet) return;
-    
     const muteRef = doc(db, 'challenge_lobbies', challengeId, 'voice_controls', currentWallet);
-    
     const unsubscribe = onSnapshot(
       muteRef,
       (snapshot) => {
@@ -52,15 +55,43 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
         }
       },
       (error) => {
-        // Ignore permission errors
         if (error.code !== 'permission-denied' && error.code !== 'unavailable') {
           console.error('Error listening to mute status:', error);
         }
       }
     );
-    
     return () => unsubscribe();
   }, [challengeId, currentWallet]);
+
+  // Listen to my mic request status (spectators)
+  useEffect(() => {
+    if (!challengeId || !currentWallet) return;
+    const requestRef = doc(db, 'challenge_lobbies', challengeId, 'mic_requests', currentWallet.toLowerCase());
+    const unsub = onSnapshot(
+      requestRef,
+      (snap) => {
+        const s = snap.data()?.status;
+        setMicRequestStatus(s === 'pending' || s === 'approved' || s === 'denied' ? s : null);
+      },
+      () => {}
+    );
+    return () => unsub();
+  }, [challengeId, currentWallet]);
+
+  // Listen to speaker list (max 2) for approved-speaker state
+  useEffect(() => {
+    if (!challengeId) return;
+    const stateRef = doc(db, 'challenge_lobbies', challengeId, 'voice_state', 'main');
+    const unsub = onSnapshot(
+      stateRef,
+      (snap) => {
+        const list = snap.exists() ? (snap.data()?.speakerWallets || []) : [];
+        setSpeakerWallets(Array.isArray(list) ? list : []);
+      },
+      () => {}
+    );
+    return () => unsub();
+  }, [challengeId]);
   
   const localStream = useRef<MediaStream | null>(null);
   const peerConnection = useRef<RTCPeerConnection | null>(null);
@@ -81,45 +112,62 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
   // Memoize challengeId to prevent unnecessary re-renders
   const memoizedChallengeId = useMemo(() => challengeId, [challengeId]);
 
-  // When user becomes listen-only: tear down connection immediately (do not delete signaling doc)
+  const canConnect = !voiceDisabled && memoizedChallengeId && memoizedChallengeId.trim() !== '' &&
+    (inSpeakerList || !isSpectator || !isActiveMatch);
+
+  // When we're no longer in the speaker list (replaced or match went active): tear down mic only, keep receiving
+  useEffect(() => {
+    if (inSpeakerList) return;
+    if (!localStream.current) return;
+    const pc = peerConnection.current;
+    if (pc) {
+      pc.getSenders().forEach((sender) => {
+        if (sender.track?.kind === 'audio') pc.removeTrack(sender);
+      });
+    }
+    localStream.current.getTracks().forEach((t) => t.stop());
+    localStream.current = null;
+    setConnected(false);
+    setMuted(false);
+  }, [inSpeakerList]);
+
+  // When speaker becomes listen-only (e.g. match went active): full cleanup and remove from speakers
   useEffect(() => {
     if (!isListenOnly) return;
-    cleanup(false);
-    initializedRef.current = false;
-    currentChallengeIdRef.current = '';
+    if (localStream.current) {
+      removeSpeaker(memoizedChallengeId, currentWallet).catch(() => {});
+      cleanup(false);
+      initializedRef.current = false;
+      currentChallengeIdRef.current = '';
+    }
     setStatus("Voice disabled for spectators during active matches");
     setConnected(false);
     setPeerConnected(false);
   }, [isListenOnly]);
 
-  // Initialize voice chat - only if challengeId is valid and not listen-only
+  // Initialize voice chat when we can connect (participant, approved spectator, or pre-match spectator listening)
   useEffect(() => {
-    // Skip if already initialized for this challengeId or init in progress
-    if ((initializedRef.current && currentChallengeIdRef.current === memoizedChallengeId) || initInProgressRef.current) {
-      return;
-    }
-
-    if (isListenOnly || voiceDisabled || !memoizedChallengeId || memoizedChallengeId.trim() === '') {
-      return;
-    }
+    if ((initializedRef.current && currentChallengeIdRef.current === memoizedChallengeId) || initInProgressRef.current) return;
+    if (!canConnect) return;
 
     initInProgressRef.current = true;
     initializedRef.current = true;
     currentChallengeIdRef.current = memoizedChallengeId;
 
-    initVoiceChat().finally(() => {
+    initVoiceChat(publishMic).finally(() => {
       initInProgressRef.current = false;
     });
 
     return () => {
       if (currentChallengeIdRef.current !== memoizedChallengeId) {
+        removeSpeaker(memoizedChallengeId, currentWallet).catch(() => {});
         cleanup(true);
         initializedRef.current = false;
         currentChallengeIdRef.current = '';
         initInProgressRef.current = false;
       }
     };
-  }, [memoizedChallengeId, voiceDisabled, isListenOnly, reinitKey]);
+  }, [memoizedChallengeId, voiceDisabled, canConnect, publishMic, reinitKey]);
 
   // Preserve audio connection when page visibility changes (backgrounding on mobile)
   useEffect(() => {
@@ -164,47 +212,37 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
     };
   }, []);
 
-  const initVoiceChat = async () => {
-    // Use memoized challengeId
+  const initVoiceChat = async (publishMicNow: boolean) => {
     const validChallengeId = memoizedChallengeId;
     if (!validChallengeId || validChallengeId.trim() === '') {
-      console.error("❌ Invalid challengeId for voice chat:", validChallengeId);
       setStatus("Error: Invalid challenge ID");
       setConnected(false);
       initInProgressRef.current = false;
       return;
     }
 
-    // Removed initialization logging - excessive logging removed
     try {
-      // Check if we already have an active stream (prevents duplicate mic permission popups)
-      let stream = localStream.current;
-      
-      // Check if existing stream is still active
-      if (stream) {
-        const audioTracks = stream.getAudioTracks();
-        const hasActiveTrack = audioTracks.some(track => track.readyState === 'live');
-        
-        if (hasActiveTrack) {
-          console.log("✅ Reusing existing microphone stream (no permission popup needed)");
+      let stream: MediaStream | null = localStream.current;
+      if (publishMicNow) {
+        if (stream) {
+          const hasActiveTrack = stream.getAudioTracks().some((t) => t.readyState === 'live');
+          if (!hasActiveTrack) stream = null;
+        }
+        if (!stream) {
+          setStatus("Requesting mic permission...");
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          localStream.current = stream;
           setConnected(true);
           setStatus("Mic ready, waiting for opponent...");
         } else {
-          // Stream exists but tracks are not live, get new stream
-          stream = null;
+          setConnected(true);
+          setStatus("Mic ready, waiting for opponent...");
         }
-      }
-      
-      // Only request mic permission if we don't have an active stream
-      if (!stream) {
-        setStatus("Requesting mic permission...");
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        localStream.current = stream;
+      } else {
         setConnected(true);
-        setStatus("Mic ready, waiting for opponent...");
+        setStatus("Listening...");
       }
 
-      // Only create new peer connection if we don't have one or if challengeId changed
       let pc = peerConnection.current;
       if (!pc || pc.connectionState === 'closed' || pc.connectionState === 'failed') {
         // Create peer connection with optimized STUN and TURN servers
@@ -229,16 +267,12 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
         peerConnection.current = pc;
       }
 
-      // Add local stream to peer connection (only if not already added)
-      const existingSenders = pc.getSenders();
-      const hasAudioTrack = existingSenders.some(sender => 
-        sender.track && sender.track.kind === 'audio' && sender.track.readyState === 'live'
-      );
-      
-      if (!hasAudioTrack) {
-        stream.getTracks().forEach((track) => {
-          pc.addTrack(track, stream);
-        });
+      if (stream && publishMicNow) {
+        const existingSenders = pc.getSenders();
+        const hasAudioTrack = existingSenders.some((s) => s.track?.kind === 'audio' && s.track.readyState === 'live');
+        if (!hasAudioTrack) {
+          stream.getTracks().forEach((track) => pc.addTrack(track, stream!));
+        }
       }
 
       pc.ontrack = (event) => {
@@ -283,6 +317,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
           setPeerConnected(true);
           setStatus("Voice connected!");
           reconnectAttempts.current = 0;
+          addSpeaker(memoizedChallengeId, currentWallet).catch(() => {});
         } else if (state === 'connecting') {
           setStatus("Connecting to opponent...");
         } else if (state === 'disconnected' || state === 'failed') {
@@ -496,67 +531,136 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
       localStream.current = null;
     }
     
-    // Close peer connection
     if (peerConnection.current) {
       peerConnection.current.close();
       peerConnection.current = null;
     }
-    
-    // Reset connection states
+
+    removeSpeaker(memoizedChallengeId || challengeId, currentWallet).catch(() => {});
     setConnected(false);
     setPeerConnected(false);
     setMuted(false);
     setStatus("");
   };
 
-  // If voice is disabled or spectator during active match, show restricted UI
-  if (voiceDisabled || isListenOnly) {
+  // When we're added to the speaker list (approved spectator or participant after addSpeaker), add mic to existing connection
+  useEffect(() => {
+    if (!inSpeakerList || !challengeId || !currentWallet) return;
+    const pc = peerConnection.current;
+    if (!pc || pc.connectionState !== 'connected' || localStream.current) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        setStatus("Requesting mic permission...");
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        localStream.current = stream;
+        stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+        setConnected(true);
+        setMuted(false);
+        setStatus("Voice connected!");
+      } catch (e) {
+        if (!cancelled) setStatus("Error: Could not enable mic");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [inSpeakerList, challengeId, currentWallet]);
+
+  if (voiceDisabled) {
+    return (
+      <div className="p-3 rounded-lg border border-purple-700/50 bg-purple-900/20">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-purple-500" />
+          <span className="text-purple-300 text-sm font-semibold">Voice chat disabled</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (isSpectator && isActiveMatch) {
     return (
       <div className="p-3 rounded-lg border border-purple-700/50 bg-purple-900/20">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-purple-500" />
           <div className="flex-1">
-            <span className="text-purple-300 text-sm font-semibold">
-              {isListenOnly ? '🔇 Listen Only - Spectators cannot speak during active matches' : 'Voice chat disabled'}
-            </span>
-            {isListenOnly && (
-              <p className="text-[10px] text-purple-200/70 mt-0.5">
-                Spectators cannot influence match outcomes. Voice chat is available in pre-match lobby only.
-              </p>
-            )}
+            <span className="text-purple-300 text-sm font-semibold">🔇 Listen Only – Spectators cannot speak during active matches</span>
+            <p className="text-[10px] text-purple-200/70 mt-0.5">Voice chat is available in pre-match lobby only.</p>
           </div>
         </div>
       </div>
     );
   }
 
+  if (isSpectator && !isApprovedSpeaker) {
+    const handleRequestMic = async () => {
+      if (requestingMic || micRequestStatus === 'pending') return;
+      setRequestingMic(true);
+      try {
+        await createMicRequest(challengeId, currentWallet);
+        setMicRequestStatus('pending');
+      } catch (e) {
+        console.error('Request mic failed:', e);
+      } finally {
+        setRequestingMic(false);
+      }
+    };
+    return (
+      <div className="p-3 rounded-lg border border-purple-700/50 bg-purple-900/20">
+        <audio ref={remoteAudioRef} autoPlay />
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${peerConnected ? 'bg-green-500 animate-pulse' : 'bg-amber-500'}`} />
+            <div className="flex flex-col min-w-0">
+              <span className="text-purple-200 text-sm font-medium">
+                {micRequestStatus === 'pending' ? 'Mic requested' : micRequestStatus === 'denied' ? 'Request denied' : 'Listening'}
+              </span>
+              <span className="text-[10px] text-purple-300/80 truncate">
+                {peerConnected ? 'Hearing speakers' : 'Connecting...'}
+              </span>
+            </div>
+          </div>
+          {micRequestStatus !== 'pending' && micRequestStatus !== 'approved' && (
+            <button
+              type="button"
+              onClick={handleRequestMic}
+              disabled={requestingMic || isActiveMatch}
+              className="px-3 py-2 rounded-lg bg-amber-600/30 hover:bg-amber-600/50 border border-amber-500/40 text-amber-200 text-sm font-medium disabled:opacity-50 flex-shrink-0"
+            >
+              {requestingMic ? 'Requesting...' : 'Request Mic'}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const isPaused = muted || mutedByCreator;
+  const isBackgrounded = typeof document !== 'undefined' && document.hidden;
+
   return (
     <div className={`p-3 rounded-lg border ${
-      status.includes('Error') || status.includes('use by another') 
-        ? 'bg-red-900/20 border-red-500/30' 
+      status.includes('Error') || status.includes('use by another')
+        ? 'bg-red-900/20 border-red-500/30'
         : 'bg-gray-800 border-gray-700'
     }`}>
-      {/* Hidden audio element for remote stream */}
       <audio ref={remoteAudioRef} autoPlay />
-      
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2 flex-1">
-          {/* Status Indicator */}
           <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-            peerConnected ? 'bg-green-500 animate-pulse' : 
-            connected ? 'bg-yellow-500' : 
+            peerConnected ? 'bg-green-500 animate-pulse' :
+            connected ? 'bg-yellow-500' :
             'bg-red-500'
           }`} />
-          
-          {/* Status Text */}
           <div className="flex flex-col flex-1 min-w-0">
             <span className="text-white text-sm font-medium">
-              {peerConnected ? '🎙️ Voice Connected' : connected ? '🔌 Voice Chat' : '❌ Voice Unavailable'}
+              {peerConnected ? (isPaused ? 'Mic paused' : 'Speaking') : connected ? 'Voice Chat' : 'Voice Unavailable'}
             </span>
-            <span className={`text-xs truncate ${
-              status.includes('Error') ? 'text-red-400' : 'text-gray-400'
-            }`}>
-              {status}
+            <span className={`text-xs truncate ${status.includes('Error') ? 'text-red-400' : 'text-gray-400'}`}>
+              {isPaused && isBackgrounded ? 'Mic paused (backgrounded)' : status}
             </span>
             {status.includes('Error') && (
               <div className="flex items-center gap-2 mt-1">

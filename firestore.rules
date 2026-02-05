@@ -133,6 +133,20 @@ service cloud.firestore {
         allow update: if true; // Allow updates to mute status
         allow delete: if true; // Allow creators to unmute (by deleting the doc)
       }
+
+      // Mic requests - spectators request mic; creator approves/denies
+      match /mic_requests/{wallet} {
+        allow read: if true;
+        allow create: if true; // Spectator creates own request (doc id = wallet)
+        allow update: if true; // Creator sets approved/denied
+        allow delete: if true;
+      }
+
+      // Voice state - speaker list (max 2) for request-mic flow
+      match /voice_state/{docId} {
+        allow read: if true;
+        allow create, update, delete: if true;
+      }
       
       // Stats subcollection - spectator count tracking
       match /stats/{statId} {

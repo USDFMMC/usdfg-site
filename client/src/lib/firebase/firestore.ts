@@ -2423,7 +2423,16 @@ async function cleanupChallengeData(challengeId: string, isDispute: boolean = fa
         console.log('⚠️ Could not delete voice signals (may not exist):', error);
       }
     }
-    
+
+    // Delete voice_state and mic_requests for this lobby
+    try {
+      const voiceStateRef = doc(db, 'challenge_lobbies', challengeId, 'voice_state', 'main');
+      await deleteDoc(voiceStateRef).catch(() => {});
+      const micRequestsRef = collection(db, 'challenge_lobbies', challengeId, 'mic_requests');
+      const micSnap = await getDocs(micRequestsRef);
+      await Promise.all(micSnap.docs.map((d) => deleteDoc(d.ref))).catch(() => {});
+    } catch (_) {}
+
     // Only delete chat messages if NOT a dispute (need chat for dispute resolution)
     if (!isDispute) {
       const chatQuery = query(
@@ -4934,3 +4943,98 @@ export const resolveAdminChallenge = async (
     throw error;
   }
 };
+
+// --- Spectator mic request (zero-cost, browser-only) ---
+const MAX_VOICE_SPEAKERS = 2;
+
+/** Create or reset a spectator mic request (pending). */
+export async function createMicRequest(challengeId: string, wallet: string): Promise<void> {
+  if (!challengeId || !wallet) return;
+  const ref = doc(db, 'challenge_lobbies', challengeId, 'mic_requests', wallet.toLowerCase());
+  await setDoc(ref, {
+    status: 'pending',
+    requestedAt: serverTimestamp(),
+  });
+}
+
+/** Approve a spectator mic request; adds to speaker list only if fewer than MAX_VOICE_SPEAKERS. Returns true if added. */
+export async function approveMicRequest(
+  challengeId: string,
+  wallet: string,
+  respondedBy: string
+): Promise<boolean> {
+  if (!challengeId || !wallet) return false;
+  const stateRef = doc(db, 'challenge_lobbies', challengeId, 'voice_state', 'main');
+  const requestRef = doc(db, 'challenge_lobbies', challengeId, 'mic_requests', wallet.toLowerCase());
+  const snap = await getDoc(stateRef);
+  const list: string[] = snap.exists() ? (snap.data()?.speakerWallets || []) : [];
+  if (list.length >= MAX_VOICE_SPEAKERS) return false;
+  const lower = wallet.toLowerCase();
+  if (list.some((w: string) => w.toLowerCase() === lower)) {
+    await updateDoc(requestRef, { status: 'approved', respondedAt: serverTimestamp(), respondedBy });
+    return true;
+  }
+  await setDoc(stateRef, { speakerWallets: [...list, wallet] }, { merge: true });
+  await setDoc(requestRef, { status: 'approved', respondedAt: serverTimestamp(), respondedBy }, { merge: true });
+  return true;
+}
+
+/** Approve a spectator mic request by replacing an active speaker. Removed speaker loses mic (listen-only). */
+export async function approveMicRequestReplace(
+  challengeId: string,
+  requesterWallet: string,
+  replaceWallet: string,
+  respondedBy: string
+): Promise<void> {
+  if (!challengeId || !requesterWallet || !replaceWallet) return;
+  const stateRef = doc(db, 'challenge_lobbies', challengeId, 'voice_state', 'main');
+  const requestRef = doc(db, 'challenge_lobbies', challengeId, 'mic_requests', requesterWallet.toLowerCase());
+  const snap = await getDoc(stateRef);
+  const list: string[] = snap.exists() ? (snap.data()?.speakerWallets || []) : [];
+  const next = list.filter((w: string) => w.toLowerCase() !== replaceWallet.toLowerCase());
+  if (next.length === list.length) return;
+  const requesterLower = requesterWallet.toLowerCase();
+  if (next.some((w: string) => w.toLowerCase() === requesterLower)) {
+    await setDoc(requestRef, { status: 'approved', respondedAt: serverTimestamp(), respondedBy }, { merge: true });
+    return;
+  }
+  await setDoc(stateRef, { speakerWallets: [...next, requesterWallet] }, { merge: true });
+  await setDoc(requestRef, { status: 'approved', respondedAt: serverTimestamp(), respondedBy }, { merge: true });
+}
+
+/** Deny a spectator mic request. */
+export async function denyMicRequest(
+  challengeId: string,
+  wallet: string,
+  respondedBy: string
+): Promise<void> {
+  if (!challengeId || !wallet) return;
+  const requestRef = doc(db, 'challenge_lobbies', challengeId, 'mic_requests', wallet.toLowerCase());
+  await setDoc(requestRef, { status: 'denied', respondedAt: serverTimestamp(), respondedBy }, { merge: true });
+}
+
+/** Add wallet to speaker list if under cap. Call when participant or approved spectator connects. */
+export async function addSpeaker(challengeId: string, wallet: string): Promise<boolean> {
+  if (!challengeId || !wallet) return false;
+  const stateRef = doc(db, 'challenge_lobbies', challengeId, 'voice_state', 'main');
+  const snap = await getDoc(stateRef);
+  const list: string[] = snap.exists() ? (snap.data()?.speakerWallets || []) : [];
+  if (list.length >= MAX_VOICE_SPEAKERS) return false;
+  const lower = wallet.toLowerCase();
+  if (list.some((w: string) => w.toLowerCase() === lower)) return true;
+  await setDoc(stateRef, { speakerWallets: [...list, wallet] }, { merge: true });
+  return true;
+}
+
+/** Remove wallet from speaker list. Call when participant or approved spectator disconnects. */
+export async function removeSpeaker(challengeId: string, wallet: string): Promise<void> {
+  if (!challengeId || !wallet) return;
+  const stateRef = doc(db, 'challenge_lobbies', challengeId, 'voice_state', 'main');
+  const snap = await getDoc(stateRef);
+  const list: string[] = snap.exists() ? (snap.data()?.speakerWallets || []) : [];
+  const next = list.filter((w: string) => w.toLowerCase() !== wallet.toLowerCase());
+  if (next.length === 0) await deleteDoc(stateRef);
+  else await setDoc(stateRef, { speakerWallets: next }, { merge: true });
+}
+
+export { MAX_VOICE_SPEAKERS };
