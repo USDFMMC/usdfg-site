@@ -387,7 +387,9 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
 
         try {
           // Check for offer from other player (initial or renegotiation e.g. after approved spectator adds mic)
-          if (data.offer && data.offerFrom !== currentWallet) {
+          // Skip if we already answered this exact offer (prevents loop when our own write triggers onSnapshot)
+          const offerAlreadyProcessed = pc.currentRemoteDescription?.sdp === data.offer?.sdp;
+          if (data.offer && data.offerFrom !== currentWallet && !offerAlreadyProcessed) {
             const isRenegotiation = !!pc.currentRemoteDescription;
             if (isRenegotiation) console.log("📞 Renegotiation: received new offer, creating answer...");
             else console.log("📞 Received offer, creating answer...");
