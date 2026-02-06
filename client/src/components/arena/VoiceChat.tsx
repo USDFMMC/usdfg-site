@@ -39,7 +39,8 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
   const inSpeakerList = speakerWallets.some((w) => w?.toLowerCase() === currentWallet?.toLowerCase());
   const isApprovedSpeaker = isSpectator && inSpeakerList;
   const isListenOnly = (isSpectator && isActiveMatch) || (isSpectator && !inSpeakerList);
-  const publishMic = inSpeakerList;
+  // Participants (creator/challenger) always publish mic; spectators only when approved (inSpeakerList)
+  const publishMic = !isSpectator || inSpeakerList;
   
   // Listen to creator mute controls from Firestore
   useEffect(() => {
