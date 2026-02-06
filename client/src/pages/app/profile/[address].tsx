@@ -116,7 +116,7 @@ const PlayerProfile: React.FC = () => {
   return (
     <>
       <Helmet>
-        <title>{profile.displayName} - Player Profile | USDFG Arena</title>
+        <title>{profile.displayName} - Player Profile | USDFG.PRO</title>
         <meta name="description" content={`View ${profile.displayName}'s gaming stats and challenge history in the USDFG Arena.`} />
       </Helmet>
 

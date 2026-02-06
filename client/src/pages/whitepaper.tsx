@@ -143,7 +143,7 @@ const Whitepaper: React.FC = () => {
   return (
     <>
       <Helmet>
-        <title>Whitepaper | USDFGAMING – Skill-Based Crypto Gaming Platform</title>
+        <title>Whitepaper | USDFG.PRO – Skill-Based Crypto Gaming Platform</title>
         <meta name="description" content="Read the USDFGAMING Whitepaper. Discover the vision, tokenomics, and mechanics behind the elite, skill-based crypto gaming platform." />
         <meta name="keywords" content="USDFG, USDFG, whitepaper, crypto gaming whitepaper, skill-based gaming, tokenomics, non-custodial, USDFGAMING" />
         <link rel="canonical" href="https://usdfg.pro/whitepaper" />

@@ -9,7 +9,7 @@ const AppRedirect: React.FC = () => {
   return (
     <>
       <Helmet>
-        <title>USDFG Arena - Coming Soon | USDFGAMING</title>
+        <title>USDFG Arena - Coming Soon | USDFG.PRO</title>
         <meta name="description" content="The USDFG gaming platform is currently in development. Join our community to stay updated!" />
       </Helmet>
 

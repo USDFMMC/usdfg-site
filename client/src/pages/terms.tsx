@@ -12,7 +12,7 @@ const Terms: React.FC = () => {
   return (
     <>
       <Helmet>
-        <title>Terms of Service | USDFGAMING – Skill-Based Crypto Gaming Platform</title>
+        <title>Terms of Service | USDFG.PRO – Skill-Based Crypto Gaming Platform</title>
         <meta name="description" content="Read the Terms of Service for USDFGAMING, the elite, skill-based crypto gaming platform. Understand your rights, responsibilities, and our commitment to fair, on-chain competition." />
         <meta name="keywords" content="USDFG, USDFG, terms of service, crypto gaming terms, skill-based gaming, fair play, non-custodial, USDFGAMING" />
         <link rel="canonical" href="https://usdfg.pro/terms" />
@@ -301,7 +301,7 @@ const Terms: React.FC = () => {
                   <ul className="list-disc pl-5 space-y-2">
                     <li>X (Twitter): <a href="https://twitter.com/USDFGAMING" className="text-[#22d3ee] hover:underline">https://twitter.com/USDFGAMING</a></li>
                     <li>Email: <a href="mailto:founder@usdfg.pro" className="text-[#22d3ee] hover:underline">founder@usdfg.pro</a> or <a href="mailto:support@usdfg.pro" className="text-[#22d3ee] hover:underline">support@usdfg.pro</a></li>
-                    <li>Official Website: <a href="https://usdfg.pro" className="text-[#22d3ee] hover:underline">https://usdfg.pro</a></li>
+                    <li>Official Website: <a href="https://usdfg.pro" className="text-[#22d3ee] hover:underline">USDFG.PRO</a></li>
                   </ul>
                     </div>
                 </div>
@@ -860,7 +860,7 @@ const Terms: React.FC = () => {
       </div>
       <Footer />
       <p className="text-sm text-muted-foreground text-center mt-10 mb-4">
-        This platform is operated at <a href="https://usdfg.pro" className="underline">https://usdfg.pro</a> and governed by these Terms.
+        This platform is operated at <a href="https://usdfg.pro" className="underline">USDFG.PRO</a> and governed by these Terms.
       </p>
 
       {/* Back to Top Button */}

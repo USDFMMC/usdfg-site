@@ -25,7 +25,7 @@ const CreateChallenge: React.FC = () => {
   return (
     <>
       <Helmet>
-        <title>Start Match - USDFG Arena | USDFGAMING</title>
+        <title>Start Match - USDFG Arena | USDFG.PRO</title>
         <meta name="description" content="Create a new skill-based gaming challenge in the USDFG Arena." />
       </Helmet>
 

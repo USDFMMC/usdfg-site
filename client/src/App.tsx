@@ -376,7 +376,7 @@ function App() {
     <MWAProvider>
       <QueryClientProvider client={queryClient}>
         <Helmet>
-          <title>USDFGAMING – Skill-Based Crypto Gaming | Game. Earn. Conquer.</title>
+          <title>USDFG.PRO – Skill-Based Crypto Gaming | Game. Earn. Conquer.</title>
           <meta
             name="description"
             content="USDFGAMING is the elite, skill-based crypto gaming platform. Compete, verify results, and earn USDFG. No gambling. 100% on-chain."

@@ -5051,7 +5051,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   return (
     <>
       <Helmet>
-        <title>USDFG Arena - Gaming Platform | USDFGAMING</title>
+        <title>USDFG Arena | USDFG.PRO</title>
         <meta name="description" content="Enter the USDFG Arena - Compete in skill-based challenges, earn USDFG, and prove your gaming prowess." />
       </Helmet>
 

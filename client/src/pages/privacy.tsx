@@ -12,7 +12,7 @@ const Privacy: React.FC = () => {
   return (
     <>
       <Helmet>
-        <title>Privacy Policy | USDFGAMING – Skill-Based Crypto Gaming Platform</title>
+        <title>Privacy Policy | USDFG.PRO – Skill-Based Crypto Gaming Platform</title>
         <meta name="description" content="Read the Privacy Policy for USDFGAMING. Learn how we protect your data and privacy on the elite, skill-based crypto gaming platform." />
         <meta name="keywords" content="USDFG, USDFG, privacy policy, crypto gaming privacy, skill-based gaming, data protection, non-custodial, USDFGAMING" />
         <link rel="canonical" href="https://usdfg.pro/privacy" />

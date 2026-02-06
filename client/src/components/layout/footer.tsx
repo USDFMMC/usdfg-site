@@ -27,7 +27,7 @@ const Footer: React.FC<FooterProps> = ({ isRevealed }) => {
               loading="lazy" decoding="async"
             />
             <span className="text-sm text-amber-300 font-medium whitespace-nowrap">
-                USDFGaming — The Last Great Token for Gamers.
+                USDFG.PRO — The Last Great Token for Gamers.
               </span>
           </div>
 

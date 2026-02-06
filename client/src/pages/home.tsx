@@ -31,22 +31,22 @@ const Home: React.FC = () => {
   return (
     <>
       <Helmet>
-        <title>USDFGAMING – Skill-Based Crypto Gaming Platform | Game. Earn. Conquer.</title>
+        <title>USDFG.PRO – Skill-Based Crypto Gaming Platform | Game. Earn. Conquer.</title>
         <meta
           name="description"
-          content="USDFGAMING is the elite, skill-based crypto gaming platform. Compete in verified challenges, earn USDFG, and prove your skill. No gambling. No chance. 100% on-chain rewards."
+          content="USDFG.PRO is the elite, skill-based crypto gaming platform. Compete in verified challenges, earn USDFG, and prove your skill. No gambling. No chance. 100% on-chain rewards."
         />
         <meta
           name="keywords"
-          content="USDFG, USDFG, skill-based crypto gaming, earn from skill not luck, leaderboard, non-custodial, fair play, Game. Earn. Conquer., USDFGAMING, gaming token"
+          content="USDFG, USDFG.PRO, skill-based crypto gaming, earn from skill not luck, leaderboard, non-custodial, fair play, Game. Earn. Conquer., USDFGAMING, gaming token"
         />
         <link rel="canonical" href={canonical} />
 
         {/* Open Graph */}
         <meta property="og:type" content="website" />
-        <meta property="og:site_name" content="USDFGAMING" />
+        <meta property="og:site_name" content="USDFG.PRO" />
         <meta property="og:url" content={canonical} />
-        <meta property="og:title" content="USDFGAMING – Skill-Based Crypto Gaming Platform" />
+        <meta property="og:title" content="USDFG.PRO – Skill-Based Crypto Gaming Platform" />
         <meta property="og:description" content="Compete in verified challenges, earn USDFG, and prove your skill. No gambling, 100% on-chain." />
         <meta property="og:image" content={ogImage} />
         <meta property="og:image:type" content="image/webp" />
@@ -58,7 +58,7 @@ const Home: React.FC = () => {
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:site" content="@USDFGAMING" />
         <meta name="twitter:url" content={canonical} />
-        <meta name="twitter:title" content="USDFGAMING – Skill-Based Crypto Gaming Platform" />
+        <meta name="twitter:title" content="USDFG.PRO – Skill-Based Crypto Gaming Platform" />
         <meta name="twitter:description" content="Compete in verified challenges, earn USDFG, and prove your skill. No gambling, 100% on-chain." />
         <meta name="twitter:image" content={ogImage} />
 
@@ -69,7 +69,7 @@ const Home: React.FC = () => {
             "@graph": [
               {
                 "@type": "Organization",
-                "name": "USDFGAMING",
+                "name": "USDFG.PRO",
                 "url": "${canonical}",
                 "logo": "${ogImage}",
                 "sameAs": [
