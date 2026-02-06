@@ -998,9 +998,18 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     if (!challengeId) return;
     const micRef = collection(db, 'challenge_lobbies', challengeId, 'mic_requests');
     const q = query(micRef, where('status', '==', 'pending'));
-    const unsub = onSnapshot(q, (snap) => {
-      setPendingMicRequests(snap.docs.map((d) => ({ wallet: d.id })));
-    }, () => {});
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list = snap.docs.map((d) => ({ wallet: d.id }));
+        setPendingMicRequests(list);
+      },
+      (err) => {
+        if (err?.code !== 'permission-denied' && err?.code !== 'unavailable') {
+          console.error('[Lobby] Pending mic requests listener error:', err);
+        }
+      }
+    );
     return () => unsub();
   }, [challengeId]);
 
@@ -2054,10 +2063,12 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                     })}
                   </div>
                 )}
-                {pendingMicRequests.length > 0 && (
-                  <div className="space-y-1">
-                    <div className="text-[10px] font-semibold text-amber-200/90">Pending mic requests</div>
-                    {pendingMicRequests.map(({ wallet: requesterWallet }) => {
+                <div className="space-y-1">
+                  <div className="text-[10px] font-semibold text-amber-200/90">Mic requests</div>
+                  {pendingMicRequests.length === 0 ? (
+                    <div className="text-[10px] text-gray-500 py-0.5">No pending requests</div>
+                  ) : (
+                    pendingMicRequests.map(({ wallet: requesterWallet }) => {
                       const data = playerData[requesterWallet.toLowerCase()] || {};
                       const displayName = data.displayName || `${requesterWallet.slice(0, 4)}...${requesterWallet.slice(-4)}`;
                       const slotsFull = speakerWallets.length >= MAX_VOICE_SPEAKERS;
@@ -2106,9 +2117,9 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                           </div>
                         </div>
                       );
-                    })}
-                  </div>
-                )}
+                    })
+                  )}
+                </div>
                 {/* Mute All Spectators Button */}
                 {spectators.length > 0 && (
                   <MuteAllSpectatorsButton 

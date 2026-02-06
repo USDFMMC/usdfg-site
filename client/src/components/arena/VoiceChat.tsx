@@ -33,6 +33,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
   const [micRequestStatus, setMicRequestStatus] = useState<'pending' | 'approved' | 'denied' | null>(null);
   const [speakerWallets, setSpeakerWallets] = useState<string[]>([]);
   const [requestingMic, setRequestingMic] = useState(false);
+  const [requestMicError, setRequestMicError] = useState<string | null>(null);
 
   const isActiveMatch = challengeStatus === 'active';
   const inSpeakerList = speakerWallets.some((w) => w?.toLowerCase() === currentWallet?.toLowerCase());
@@ -102,6 +103,8 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
   const disconnectedSinceRef = useRef<number | null>(null);
   const recoveryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recoveryAttemptedRef = useRef(false);
+  const iceCandidatesAddedRef = useRef<Set<string>>(new Set());
+  const [needTapToHear, setNeedTapToHear] = useState(false);
 
   // Use refs to track initialization and prevent unnecessary re-initialization
   const initializedRef = useRef(false);
@@ -171,49 +174,41 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
 
   // Preserve audio connection when page visibility changes (backgrounding on mobile)
   useEffect(() => {
+    const isAutoplayRejection = (err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      return /aborted|interrupted|user.*request|play\(\)/i.test(msg);
+    };
+    const onPlayRejected = (context: string) => (err: unknown) => {
+      if (!isAutoplayRejection(err)) {
+        console.warn("[Voice] audio.play() rejected (" + context + "):", err instanceof Error ? err.message : err);
+      }
+    };
+
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        console.log("📱 Page hidden - preserving audio connection");
-        // Don't cleanup when page is hidden - keep connection alive
-        // The audio tracks will continue playing in background
-      } else {
-        console.log("📱 Page visible - resuming audio if needed");
-        // Resume audio playback if it was paused
-        if (remoteAudioRef.current) {
-          remoteAudioRef.current.play().catch((err) => {
-            console.warn("[Voice] audio.play() rejected (visibility):", err?.message ?? err);
-          });
-        }
+      if (!document.hidden && remoteAudioRef.current) {
+        remoteAudioRef.current.play().then(() => setNeedTapToHear(false)).catch(onPlayRejected("visibility"));
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    const handleBlur = () => {
-      console.log("📱 Page blurred - keeping audio active");
-    };
-
     const handleFocus = () => {
-      console.log("📱 Page focused - ensuring audio is active");
       if (remoteAudioRef.current) {
-        remoteAudioRef.current.play().catch((err) => {
-          console.warn("[Voice] audio.play() rejected (focus):", err?.message ?? err);
-        });
+        remoteAudioRef.current.play().then(() => setNeedTapToHear(false)).catch(onPlayRejected("focus"));
       }
     };
 
-    window.addEventListener('blur', handleBlur);
     window.addEventListener('focus', handleFocus);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleBlur);
       window.removeEventListener('focus', handleFocus);
     };
   }, []);
 
   const initVoiceChat = async (publishMicNow: boolean) => {
     const validChallengeId = memoizedChallengeId;
+    iceCandidatesAddedRef.current.clear();
     if (!validChallengeId || validChallengeId.trim() === '') {
       setStatus("Error: Invalid challenge ID");
       setConnected(false);
@@ -275,14 +270,23 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
         }
       }
 
+      const isAutoplayRejection = (err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        return /aborted|interrupted|user.*request|play\(\)/i.test(msg);
+      };
       pc.ontrack = (event) => {
         const stream = event.streams?.[0];
         if (stream) {
           console.log("[Voice] remote track received", { streamId: stream.id, trackKind: event.track?.kind });
           if (remoteAudioRef.current) {
             remoteAudioRef.current.srcObject = stream;
-            remoteAudioRef.current.play().catch((err) => {
-              console.warn("[Voice] audio.play() rejected:", err?.message ?? err);
+            remoteAudioRef.current.play().then(() => {
+              setNeedTapToHear(false);
+            }).catch((err) => {
+              if (!isAutoplayRejection(err)) {
+                console.warn("[Voice] audio.play() rejected:", err instanceof Error ? err.message : err);
+              }
+              setNeedTapToHear(true);
             });
           }
           setPeerConnected(true);
@@ -400,17 +404,26 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
             }
           }
 
-          Object.keys(data).forEach(async (key) => {
-            if (key.startsWith('candidate_') && !key.includes(currentWallet)) {
+          // Add ICE candidates from the other peer (skip own, avoid duplicates, process in order)
+          if (pc.remoteDescription) {
+            const candidateKeys = Object.keys(data)
+              .filter((k) => k.startsWith('candidate_') && !k.includes(currentWallet))
+              .sort();
+            for (const key of candidateKeys) {
+              if (iceCandidatesAddedRef.current.has(key)) continue;
               try {
-                if (pc.remoteDescription) {
-                  await pc.addIceCandidate(new RTCIceCandidate(data[key]));
+                const cand = data[key];
+                if (cand && typeof cand === 'object') {
+                  await pc.addIceCandidate(new RTCIceCandidate(cand));
+                  iceCandidatesAddedRef.current.add(key);
                 }
               } catch (err) {
-                console.warn("[Voice] addIceCandidate error:", err instanceof Error ? err.message : err);
+                if (err instanceof Error && !err.message?.includes('ignored')) {
+                  console.warn("[Voice] addIceCandidate error:", err.message);
+                }
               }
             }
-          });
+          }
         } catch (error) {
           console.error("❌ Error handling WebRTC signal:", error);
         }
@@ -541,6 +554,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
     setPeerConnected(false);
     setMuted(false);
     setStatus("");
+    iceCandidatesAddedRef.current.clear();
   };
 
   // When we're added to the speaker list (approved spectator or participant after addSpeaker), add mic to existing connection
@@ -599,18 +613,36 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
     const handleRequestMic = async () => {
       if (requestingMic || micRequestStatus === 'pending') return;
       setRequestingMic(true);
+      setRequestMicError(null);
       try {
+        if (!challengeId?.trim() || !currentWallet?.trim()) {
+          throw new Error('Missing challenge or wallet');
+        }
         await createMicRequest(challengeId, currentWallet);
         setMicRequestStatus('pending');
       } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
         console.error('Request mic failed:', e);
+        setRequestMicError(msg || 'Request failed. Try again.');
       } finally {
         setRequestingMic(false);
       }
     };
+    const handleTapToHearSpectator = () => {
+      remoteAudioRef.current?.play().then(() => setNeedTapToHear(false)).catch(() => {});
+    };
     return (
       <div className="p-3 rounded-lg border border-purple-700/50 bg-purple-900/20">
         <audio ref={remoteAudioRef} autoPlay />
+        {needTapToHear && peerConnected && (
+          <button
+            type="button"
+            onClick={handleTapToHearSpectator}
+            className="w-full mb-2 py-1.5 px-2 rounded bg-amber-600/40 border border-amber-500/50 text-amber-200 text-xs font-medium"
+          >
+            🔊 Tap to hear voice
+          </button>
+        )}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <div className={`w-2 h-2 rounded-full flex-shrink-0 ${peerConnected ? 'bg-green-500 animate-pulse' : 'bg-amber-500'}`} />
@@ -634,12 +666,21 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
             </button>
           )}
         </div>
+        {requestMicError && (
+          <p className="text-red-400 text-xs mt-1.5" role="alert">
+            {requestMicError}
+          </p>
+        )}
       </div>
     );
   }
 
   const isPaused = muted || mutedByCreator;
   const isBackgrounded = typeof document !== 'undefined' && document.hidden;
+
+  const handleTapToHear = () => {
+    remoteAudioRef.current?.play().then(() => setNeedTapToHear(false)).catch(() => {});
+  };
 
   return (
     <div className={`p-3 rounded-lg border ${
@@ -648,6 +689,15 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
         : 'bg-gray-800 border-gray-700'
     }`}>
       <audio ref={remoteAudioRef} autoPlay />
+      {needTapToHear && peerConnected && (
+        <button
+          type="button"
+          onClick={handleTapToHear}
+          className="w-full mb-2 py-1.5 px-2 rounded bg-amber-600/40 border border-amber-500/50 text-amber-200 text-xs font-medium"
+        >
+          🔊 Tap to hear voice
+        </button>
+      )}
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2 flex-1">
           <div className={`w-2 h-2 rounded-full flex-shrink-0 ${

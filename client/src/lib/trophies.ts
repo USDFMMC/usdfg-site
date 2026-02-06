@@ -23,7 +23,7 @@ export const USDFG_RELICS: Trophy[] = [
     description: 'Pioneer of the Arena. You joined when we were just getting started. Exclusive to the first 2,100 members - representing USDFG\'s 21M token supply.',
     requiredGames: 0, // Not games-based
     color: 'gold',
-    icon: '/assets/categories/usdfg-21k.png', // Updated to correct path
+    icon: '/assets/trophies/usdfg-21k.png',
     specialCondition: {
       type: 'totalUsers',
       maxUsers: 2100 // Unlock only if total unique users < 2100 (represents 21M token supply)

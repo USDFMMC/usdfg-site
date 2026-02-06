@@ -1559,7 +1559,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
         const maxPlayers = updatedChallenge.maxPlayers || getMaxPlayers(mode);
         const playersForMerge = Array.isArray(updatedChallenge.players) ? updatedChallenge.players : [];
-        const currentPlayersCount = playersForMerge.length || (updatedChallenge.challenger ? 2 : 1);
+        const creatorW = updatedChallenge.creator;
+        const challengerW = updatedChallenge.challenger;
+        const pendingJoinerW = updatedChallenge.pendingJoiner;
+        const mergeSet = new Set<string>();
+        if (creatorW) mergeSet.add(creatorW.toLowerCase());
+        if (challengerW) mergeSet.add(challengerW.toLowerCase());
+        if (pendingJoinerW) mergeSet.add(pendingJoinerW.toLowerCase());
+        playersForMerge.forEach((p: string) => p && mergeSet.add(p.toLowerCase()));
+        const currentPlayersCount = Math.min(mergeSet.size || 1, maxPlayers);
         const playersArray = playersForMerge;
 
         const merged = {
@@ -1739,8 +1747,17 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     };
 
     const maxPlayers = challenge.maxPlayers || getMaxPlayers(mode);
-    // Use players array if available, otherwise check challenger
-    const currentPlayers = challenge.players?.length || (challenge.challenger ? 2 : 1);
+    // Same logic as lobby: count creator + challenger + pendingJoiner + players (dedupe)
+    const creatorWallet = challenge.creator || challenge.rawData?.creator;
+    const challengerWallet = challenge.challenger || challenge.rawData?.challenger;
+    const pendingJoinerWallet = challenge.pendingJoiner || challenge.rawData?.pendingJoiner;
+    const playersArr = Array.isArray(challenge.players) ? challenge.players : (Array.isArray(challenge.rawData?.players) ? challenge.rawData.players : []);
+    const participantSet = new Set<string>();
+    if (creatorWallet) participantSet.add(creatorWallet.toLowerCase());
+    if (challengerWallet) participantSet.add(challengerWallet.toLowerCase());
+    if (pendingJoinerWallet) participantSet.add(pendingJoinerWallet.toLowerCase());
+    playersArr.forEach((p: string) => p && participantSet.add(p.toLowerCase()));
+    const currentPlayers = Math.min(participantSet.size || 1, maxPlayers);
 
     return {
       id: challenge.id,
@@ -5600,15 +5617,21 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                             <span className="text-[10px] text-white/60">👥</span>
                             <span className="text-[10px] font-semibold text-white/80">
                               {(() => {
-                                const rawPlayers = Array.isArray(challenge.players)
-                                  ? challenge.players
-                                  : (typeof challenge.players === 'number' ? [] : []);
-                                const creatorWallet = challenge.creator || challenge.rawData?.creator;
-                                const playersCount = rawPlayers.filter((player: string) =>
-                                  creatorWallet ? player?.toLowerCase() !== creatorWallet.toLowerCase() : true
-                                ).length;
                                 const maxPlayers = challenge.capacity || challenge.maxPlayers || 2;
-                                return `${playersCount}/${maxPlayers}`;
+                                if (typeof challenge.players === 'number') {
+                                  return `${Math.min(challenge.players, maxPlayers)}/${maxPlayers}`;
+                                }
+                                const rawPlayers = Array.isArray(challenge.players) ? challenge.players : [];
+                                const creatorWallet = challenge.creator || challenge.rawData?.creator;
+                                const challengerWallet = challenge.challenger || challenge.rawData?.challenger;
+                                const pendingJoiner = challenge.pendingJoiner || challenge.rawData?.pendingJoiner;
+                                const participantSet = new Set<string>();
+                                if (creatorWallet) participantSet.add(creatorWallet.toLowerCase());
+                                if (challengerWallet) participantSet.add(challengerWallet.toLowerCase());
+                                if (pendingJoiner) participantSet.add(pendingJoiner.toLowerCase());
+                                rawPlayers.forEach((p: string) => p && participantSet.add(p.toLowerCase()));
+                                const playersCount = participantSet.size || rawPlayers.length;
+                                return `${Math.min(playersCount, maxPlayers)}/${maxPlayers}`;
                               })()}
                             </span>
                             <span className="text-[9px] text-white/40">•</span>
