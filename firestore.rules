@@ -135,10 +135,11 @@ service cloud.firestore {
       }
 
       // Mic requests - spectators request mic; creator approves/denies
+      // No Firebase Auth: app uses Solana wallet; allow all so any client can create/read/update
       match /mic_requests/{wallet} {
-        allow read: if true;
-        allow create: if true; // Spectator creates own request (doc id = wallet)
-        allow update: if true; // Creator sets approved/denied
+        allow get, list: if true;
+        allow create: if true;
+        allow update: if true;
         allow delete: if true;
       }
 
