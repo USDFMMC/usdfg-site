@@ -34,6 +34,8 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
   const [speakerWallets, setSpeakerWallets] = useState<string[]>([]);
   const [requestingMic, setRequestingMic] = useState(false);
   const [requestMicError, setRequestMicError] = useState<string | null>(null);
+  /** True after user taps "Enable mic" and getUserMedia succeeds (user gesture required on iOS). */
+  const [micEnabledByGesture, setMicEnabledByGesture] = useState(false);
 
   const isActiveMatch = challengeStatus === 'active';
   const inSpeakerList = speakerWallets.some((w) => w?.toLowerCase() === currentWallet?.toLowerCase());
@@ -122,6 +124,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
   // When we're no longer in the speaker list (replaced or match went active): tear down mic only, keep receiving
   useEffect(() => {
     if (inSpeakerList) return;
+    setMicEnabledByGesture(false);
     if (!localStream.current) return;
     const pc = peerConnection.current;
     if (pc) {
@@ -218,21 +221,20 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
     }
 
     try {
+      // Do NOT call getUserMedia here – iOS Safari requires a user gesture. Mic is acquired via "Enable mic" button.
       let stream: MediaStream | null = localStream.current;
       if (publishMicNow) {
+        // Only use existing stream (e.g. from prior "Enable mic" tap); never auto-request mic
         if (stream) {
           const hasActiveTrack = stream.getAudioTracks().some((t) => t.readyState === 'live');
           if (!hasActiveTrack) stream = null;
         }
-        if (!stream) {
-          setStatus("Requesting mic permission...");
-          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          localStream.current = stream;
+        if (stream) {
           setConnected(true);
           setStatus("Mic ready, waiting for opponent...");
         } else {
-          setConnected(true);
-          setStatus("Mic ready, waiting for opponent...");
+          setConnected(false);
+          setStatus("Tap Enable mic to speak");
         }
       } else {
         setConnected(true);
@@ -384,9 +386,11 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
         if (!data) return;
 
         try {
-          // Check for offer from other player
-          if (data.offer && data.offerFrom !== currentWallet && !pc.currentRemoteDescription) {
-            console.log("📞 Received offer, creating answer...");
+          // Check for offer from other player (initial or renegotiation e.g. after approved spectator adds mic)
+          if (data.offer && data.offerFrom !== currentWallet) {
+            const isRenegotiation = !!pc.currentRemoteDescription;
+            if (isRenegotiation) console.log("📞 Renegotiation: received new offer, creating answer...");
+            else console.log("📞 Received offer, creating answer...");
             await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
@@ -395,12 +399,14 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
               answerFrom: currentWallet,
               timestamp: Date.now()
             }, { merge: true });
-          } 
+          }
           // Check for answer from other player (only if we created the offer)
           else if (data.answer && data.answerFrom !== currentWallet && data.offerFrom === currentWallet) {
-            // Only set if we're in the right state (waiting for answer)
             if (pc.signalingState === 'have-local-offer' && !pc.currentRemoteDescription) {
               console.log("✅ Received answer, setting remote description...");
+              await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+            } else if (pc.signalingState === 'have-local-offer') {
+              console.log("✅ Renegotiation: received answer, setting remote description...");
               await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
             }
           }
@@ -558,32 +564,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
     iceCandidatesAddedRef.current.clear();
   };
 
-  // When we're added to the speaker list (approved spectator or participant after addSpeaker), add mic to existing connection
-  useEffect(() => {
-    if (!inSpeakerList || !challengeId || !currentWallet) return;
-    const pc = peerConnection.current;
-    if (!pc || pc.connectionState !== 'connected' || localStream.current) return;
-
-    let cancelled = false;
-    (async () => {
-      try {
-        setStatus("Requesting mic permission...");
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        localStream.current = stream;
-        stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-        setConnected(true);
-        setMuted(false);
-        setStatus("Voice connected!");
-      } catch (e) {
-        if (!cancelled) setStatus("Error: Could not enable mic");
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [inSpeakerList, challengeId, currentWallet]);
+  // No auto getUserMedia from effects (iOS requires user gesture for mic). Approved speakers use "Enable mic" button.
 
   if (voiceDisabled) {
     return (
@@ -672,6 +653,61 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
             {requestMicError}
           </p>
         )}
+      </div>
+    );
+  }
+
+  // Approved speaker but mic not enabled yet (user gesture required on iOS – no getUserMedia from effects)
+  if (inSpeakerList && !micEnabledByGesture) {
+    const handleEnableMic = async () => {
+      try {
+        setStatus("Requesting mic...");
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        localStream.current = stream;
+        const pc = peerConnection.current;
+        if (pc) {
+          stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+          const signalRef = doc(db, "voice_signals", challengeId!);
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          await setDoc(signalRef, { offer, offerFrom: currentWallet, timestamp: Date.now() }, { merge: true });
+        }
+        setConnected(true);
+        setMuted(false);
+        setMicEnabledByGesture(true);
+        setStatus("Voice connected!");
+      } catch (e) {
+        setStatus("Error: Could not enable mic");
+      }
+    };
+    return (
+      <div className="p-3 rounded-lg border border-purple-700/50 bg-purple-900/20">
+        <audio ref={remoteAudioRef} autoPlay />
+        {needTapToHear && peerConnected && (
+          <button
+            type="button"
+            onClick={() => remoteAudioRef.current?.play().then(() => setNeedTapToHear(false)).catch(() => {})}
+            className="w-full mb-2 py-1.5 px-2 rounded bg-amber-600/40 border border-amber-500/50 text-amber-200 text-xs font-medium"
+          >
+            🔊 Tap to hear voice
+          </button>
+        )}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${peerConnected ? 'bg-green-500 animate-pulse' : 'bg-amber-500'}`} />
+            <div className="flex flex-col min-w-0">
+              <span className="text-purple-200 text-sm font-medium">Approved – listen only until you enable mic</span>
+              <span className="text-[10px] text-purple-300/80">Tap below to speak.</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleEnableMic}
+            className="px-3 py-2 rounded-lg bg-green-600/40 hover:bg-green-600/60 border border-green-500/50 text-green-200 text-sm font-medium flex-shrink-0"
+          >
+            Enable mic
+          </button>
+        </div>
       </div>
     );
   }
