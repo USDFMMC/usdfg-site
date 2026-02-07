@@ -105,8 +105,8 @@ const ChallengeSystem: React.FC = () => {
     return () => io.disconnect();
   }, []);
 
-  const imageSrcWebp = "/assets/usdfg-leaderboard-competition-mascot.webp";
-  const imageSrcPng = "/assets/usdfg-leaderboard-competition-mascot.png";
+  const imageSrcWebp = "/assets/usdfg-leaderboard-competition.webp";
+  const imageSrcPng = "/assets/usdfg-leaderboard-competition.png";
 
   // -----------------------------
   // Render
