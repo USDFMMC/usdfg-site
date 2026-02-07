@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Trophy, Copy, Crown } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { motion } from "framer-motion";
 import { getTopPlayers, PlayerStats, getTopTeams, TeamStats } from "@/lib/firebase/firestore";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+gsap.registerPlugin(ScrollTrigger);
 
 interface Player {
   rank: number;
@@ -68,6 +72,11 @@ function getTier(winRate: number, gamesPlayed: number): string {
 }
 
 const LeaderboardPreview: React.FC = () => {
+  const sectionRef = useRef<HTMLElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const subtitleRef = useRef<HTMLParagraphElement>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
+  
   const [activeTab, setActiveTab] = useState("total-gains");
   const [leaderboardType, setLeaderboardType] = useState<'solo' | 'team'>('solo');
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
@@ -147,22 +156,99 @@ const LeaderboardPreview: React.FC = () => {
     
     fetchLeaderboard();
   }, [activeTab, leaderboardType, isExpanded]);
+
+  // GSAP Animations
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      // Initial states
+      gsap.set(headingRef.current, { opacity: 0, y: 30 });
+      gsap.set(subtitleRef.current, { opacity: 0, y: 20 });
+      gsap.set(tableRef.current, { opacity: 0, y: 40 });
+
+      // Entrance timeline
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: sectionRef.current,
+          start: 'top 80%',
+          toggleActions: 'play none none none',
+        },
+      });
+
+      tl.to(headingRef.current, {
+        opacity: 1,
+        y: 0,
+        duration: 0.8,
+        ease: 'power3.out',
+      })
+        .to(
+          subtitleRef.current,
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.6,
+            ease: 'power3.out',
+          },
+          '-=0.5'
+        )
+        .to(
+          tableRef.current,
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.8,
+            ease: 'power3.out',
+          },
+          '-=0.4'
+        );
+    }, sectionRef);
+
+    return () => ctx.revert();
+  }, []);
   
   return (
-    <section className="py-12">
-      <div className="container mx-auto px-3">
-        <div className="text-center mb-6">
-          <h2 className="text-2xl md:text-3xl font-extrabold mb-3 drop-shadow-glow">
-            USDFG <span className="text-amber-300">LEADERBOARD</span>
+    <section ref={sectionRef} className="py-12 lg:py-16 relative overflow-hidden">
+      {/* Background Gradients */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/50" />
+        <div className="absolute inset-0 bg-purple-600/5" />
+      </div>
+
+      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
+        <div className="text-center mb-8 lg:mb-12">
+          <h2
+            ref={headingRef}
+            className="text-2xl md:text-3xl lg:text-4xl font-extrabold mb-3"
+            style={{
+              textShadow: "0 0 20px rgba(255, 255, 255, 0.3)",
+            }}
+          >
+            USDFG{' '}
+            <span
+              className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent"
+              style={{
+                textShadow: "0 0 20px rgba(251, 191, 36, 0.4)",
+                filter: "drop-shadow(0 0 8px rgba(251, 191, 36, 0.3))",
+              }}
+            >
+              LEADERBOARD
+            </span>
           </h2>
           {/* Neon-glow underline/divider */}
-          <div className="mx-auto mb-4 h-0.5 w-40 rounded-full bg-gradient-to-r from-amber-400/80 via-orange-500/80 to-amber-400/80 animate-pulse shadow-[0_0_20px_rgba(251,191,36,0.4)] shimmer-underline" />
-          <p className="text-amber-200 max-w-2xl mx-auto text-base md:text-lg font-semibold mb-2">
+          <div
+            className="mx-auto mb-4 h-0.5 w-40 rounded-full bg-gradient-to-r from-amber-400/80 via-orange-500/80 to-amber-400/80 animate-pulse"
+            style={{
+              boxShadow: "0 0 20px rgba(251,191,36,0.4)",
+            }}
+          />
+          <p
+            ref={subtitleRef}
+            className="text-white/80 max-w-2xl mx-auto text-base md:text-lg font-semibold mb-2 leading-relaxed"
+          >
             No usernames. No profiles. Just your wallet, your skill, your record.
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="ml-1.5 cursor-pointer text-amber-400">ⓘ</span>
+                  <span className="ml-1.5 cursor-pointer text-amber-400" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.5))" }}>ⓘ</span>
                 </TooltipTrigger>
                 <TooltipContent className="bg-black/80 text-amber-100 border-amber-400/40">
                   Your wallet is your identity. No personal data, no registration, no tracking.
@@ -170,20 +256,20 @@ const LeaderboardPreview: React.FC = () => {
               </Tooltip>
             </TooltipProvider>
           </p>
-          <p className="text-amber-300 max-w-2xl mx-auto text-sm md:text-base font-medium">
+          <p className="text-white/70 max-w-2xl mx-auto text-sm md:text-base font-medium">
             Only skill matters. No bots. No aliases. Every win is on-chain.
           </p>
         </div>
 
-        <div className="max-w-5xl mx-auto relative">
+        <div ref={tableRef} className="max-w-5xl mx-auto relative">
           {/* Solo / Team Toggle */}
           <div className="flex justify-center gap-2 mb-4">
             <Button
               variant={leaderboardType === 'solo' ? "default" : "ghost"}
-              className={`px-4 py-1.5 text-xs font-semibold ${
+              className={`px-4 py-1.5 text-xs font-semibold transition-all ${
                 leaderboardType === 'solo'
-                  ? "bg-gradient-to-r from-amber-400/90 to-orange-500/90 text-black shadow-[0_0_12px_rgba(255,215,130,0.2)] border border-amber-400/30"
-                  : "text-amber-300 hover:text-white"
+                  ? "bg-gradient-to-r from-purple-600 to-amber-500 text-white shadow-[0_0_15px_rgba(147,51,234,0.3)] border border-purple-500/50 hover:from-purple-500 hover:to-amber-400"
+                  : "text-white/70 hover:text-white border border-purple-500/30 hover:border-purple-500/50 hover:bg-purple-500/10"
               }`}
               onClick={() => setLeaderboardType('solo')}
             >
@@ -191,10 +277,10 @@ const LeaderboardPreview: React.FC = () => {
             </Button>
             <Button
               variant={leaderboardType === 'team' ? "default" : "ghost"}
-              className={`px-4 py-1.5 text-xs font-semibold ${
+              className={`px-4 py-1.5 text-xs font-semibold transition-all ${
                 leaderboardType === 'team'
-                  ? "bg-gradient-to-r from-amber-400/90 to-orange-500/90 text-black shadow-[0_0_12px_rgba(255,215,130,0.2)] border border-amber-400/30"
-                  : "text-amber-300 hover:text-white"
+                  ? "bg-gradient-to-r from-purple-600 to-amber-500 text-white shadow-[0_0_15px_rgba(147,51,234,0.3)] border border-purple-500/50 hover:from-purple-500 hover:to-amber-400"
+                  : "text-white/70 hover:text-white border border-purple-500/30 hover:border-purple-500/50 hover:bg-purple-500/10"
               }`}
               onClick={() => setLeaderboardType('team')}
             >
@@ -203,15 +289,15 @@ const LeaderboardPreview: React.FC = () => {
           </div>
 
           {/* Leaderboard Tabs */}
-          <div className="flex flex-wrap justify-center mb-4 border-b border-amber-800/40">
+          <div className="flex flex-wrap justify-center mb-4 border-b border-purple-500/30">
             {tabs.map((tab) => (
               <Button
                 key={tab.id}
                 variant={activeTab === tab.id ? "default" : "ghost"}
-                className={`rounded-none rounded-t-md font-bold tracking-wide px-4 py-1.5 text-sm ${
+                className={`rounded-none rounded-t-md font-bold tracking-wide px-4 py-1.5 text-sm transition-all ${
                   activeTab === tab.id 
-                    ? "bg-gradient-to-r from-amber-400/90 to-orange-500/90 text-black shadow-[0_0_12px_rgba(255,215,130,0.2)] border border-amber-400/30" 
-                    : "text-amber-300 hover:text-white"
+                    ? "bg-gradient-to-r from-purple-600 to-amber-500 text-white shadow-[0_0_15px_rgba(147,51,234,0.3)] border border-purple-500/50 hover:from-purple-500 hover:to-amber-400" 
+                    : "text-white/70 hover:text-white border border-transparent hover:border-purple-500/30"
                 }`}
                 onClick={() => setActiveTab(tab.id)}
               >
@@ -221,7 +307,7 @@ const LeaderboardPreview: React.FC = () => {
           </div>
 
           {/* Leaderboard Table */}
-          <div className="neocore-panel overflow-x-auto rounded-lg p-2 relative neon-outline">
+          <div className="bg-black/40 backdrop-blur-sm border border-purple-500/20 rounded-lg p-2 lg:p-4 relative overflow-x-auto hover:shadow-[0_0_40px_rgba(147,51,234,0.2)] hover:border-purple-500/50 transition-all duration-300">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -397,10 +483,10 @@ const LeaderboardPreview: React.FC = () => {
 
           {/* Expand/Collapse Button */}
           {!loading && ((leaderboardType === 'solo' && players.length > 0) || (leaderboardType === 'team' && teams.length > 0)) && (
-            <div className="flex justify-center mt-4">
+            <div className="flex justify-center mt-6">
               <Button
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="px-6 py-2 bg-gradient-to-r from-amber-400/90 to-orange-500/90 text-black font-semibold shadow-[0_0_12px_rgba(255,215,130,0.2)] border border-amber-400/30 hover:brightness-110 transition-all"
+                className="px-6 py-2 bg-gradient-to-r from-purple-600 to-amber-500 text-white font-semibold shadow-[0_0_15px_rgba(147,51,234,0.3)] border border-purple-500/50 hover:from-purple-500 hover:to-amber-400 transition-all"
               >
                 {isExpanded ? '▼ Show Less' : '▲ Show More'}
               </Button>
@@ -408,6 +494,10 @@ const LeaderboardPreview: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Floating Orbs */}
+      <div className="absolute top-1/4 left-1/4 w-48 h-48 bg-purple-600/10 rounded-full blur-[80px] animate-pulse" />
+      <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-amber-500/5 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
     </section>
   );
 };

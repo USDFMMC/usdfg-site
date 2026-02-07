@@ -5,6 +5,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { FaBalanceScale, FaLock, FaGavel, FaExclamationTriangle, FaUserShield, FaCheckCircle } from "react-icons/fa";
 import { motion } from "framer-motion";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+gsap.registerPlugin(ScrollTrigger);
 
 /**
  * ChallengeSystem
@@ -109,32 +113,120 @@ const ChallengeSystem: React.FC = () => {
   const imageSrcPng = "/assets/usdfg-leaderboard-competition.png";
 
   // -----------------------------
+  // GSAP Animations
+  // -----------------------------
+  const sectionRef = useRef<HTMLElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const subtitleRef = useRef<HTMLParagraphElement>(null);
+  const imageRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      // Initial states
+      gsap.set(headingRef.current, { opacity: 0, y: 30 });
+      gsap.set(subtitleRef.current, { opacity: 0, y: 20 });
+      gsap.set(imageRef.current, { opacity: 0, y: 40 });
+      gsap.set(cardRef.current, { opacity: 0, y: 30 });
+
+      // Entrance timeline
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: sectionRef.current,
+          start: 'top 80%',
+          toggleActions: 'play none none none',
+        },
+      });
+
+      tl.to(headingRef.current, {
+        opacity: 1,
+        y: 0,
+        duration: 0.8,
+        ease: 'power3.out',
+      })
+        .to(
+          subtitleRef.current,
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.6,
+            ease: 'power3.out',
+          },
+          '-=0.5'
+        )
+        .to(
+          imageRef.current,
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.8,
+            ease: 'power3.out',
+          },
+          '-=0.4'
+        )
+        .to(
+          cardRef.current,
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.8,
+            ease: 'power3.out',
+          },
+          '-=0.6'
+        );
+    }, sectionRef);
+
+    return () => ctx.revert();
+  }, []);
+
+  // -----------------------------
   // Render
   // -----------------------------
   return (
-    <section className="py-12 relative">
-      <div className="container mx-auto px-3">
+    <section ref={sectionRef} className="py-12 lg:py-16 relative overflow-hidden">
+      {/* Background Gradients */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/50" />
+        <div className="absolute inset-0 bg-purple-600/5" />
+      </div>
+
+      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
         {/* Heading */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-8 lg:mb-12">
           <h2
-            className="neocore-h2 mb-3 shimmer text-center"
+            ref={headingRef}
+            className="neocore-h2 mb-3 text-center text-3xl md:text-4xl lg:text-5xl font-bold"
             style={{
-              background: "linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%)",
+              background: "linear-gradient(90deg, #fbbf24 0%, #f59e0b 50%, #fbbf24 100%)",
+              backgroundSize: "200% auto",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               textShadow: "0 0 24px rgba(251, 191, 36, 0.4), 0 2px 6px #000",
+              filter: "drop-shadow(0 0 8px rgba(251, 191, 36, 0.3))",
             }}
           >
             Create a Challenge. Prove it.
           </h2>
-          <p className="neocore-body max-w-2xl mx-auto text-sm md:text-base">
+          <p
+            ref={subtitleRef}
+            className="neocore-body max-w-2xl mx-auto text-base md:text-lg text-white/70 leading-relaxed"
+          >
             Real challenges. Real outcomes. Verified by players, enforced by smart contracts.
           </p>
         </div>
 
         {/* Leaderboard + mascot visual (now visible) */}
-        <section className="flex justify-center py-6">
-          <div ref={visualRef} className="relative opacity-0 translate-y-3 transition-all duration-700" id="challenge-leaderboard-visual">
+        <section className="flex justify-center py-6 lg:py-8">
+          <div
+            ref={(el) => {
+              if (el) {
+                visualRef.current = el;
+                imageRef.current = el;
+              }
+            }}
+            className="relative"
+            id="challenge-leaderboard-visual"
+          >
             <img
               src={imageSrcWebp}
               onError={(e) => {
@@ -146,23 +238,39 @@ const ChallengeSystem: React.FC = () => {
               }}
               loading="lazy"
               alt="USDFG mascot in front of glowing leaderboard - skill gaming competition"
-              className="w-full max-w-xl rounded-lg relative z-10 select-none"
+              className="w-full max-w-xl rounded-lg relative z-10 select-none shadow-[0_0_40px_rgba(147,51,234,0.2)]"
             />
           </div>
         </section>
 
         {/* Rules / Explainer */}
-        <Card className="neocore-panel relative max-w-4xl mx-auto transition-all duration-300 hover:scale-[1.01] hover:shadow-[0_0_30px_rgba(255,215,130,0.12)]">
-          <CardContent className="relative z-10 p-3 md:p-4">
+        <Card
+          ref={cardRef}
+          className="relative max-w-4xl mx-auto bg-black/40 backdrop-blur-sm border border-purple-500/20 rounded-lg transition-all duration-300 hover:scale-[1.01] hover:shadow-[0_0_40px_rgba(147,51,234,0.3)] hover:border-purple-500/50 hover:bg-black/60"
+        >
+          {/* Gradient glow on hover */}
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 via-purple-600/10 to-purple-600/0 opacity-0 hover:opacity-100 transition-opacity duration-300 rounded-lg" />
+          <CardContent className="relative z-10 p-4 md:p-6 lg:p-8">
             <div className="mb-6">
               <motion.h3
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.6 }}
-                className="neocore-h2 mb-3 flex items-center justify-center text-white drop-shadow-glow tracking-wide"
+                className="neocore-h2 mb-3 flex items-center justify-center text-white tracking-wide"
+                style={{
+                  textShadow: "0 0 20px rgba(255, 255, 255, 0.3)",
+                  filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.3))",
+                }}
               >
-                <span className="mr-3 text-amber-300"><FaBalanceScale className="inline-block w-5 h-5 md:w-6 md:h-6" /></span>
+                <span
+                  className="mr-3"
+                  style={{
+                    filter: "drop-shadow(0 0 8px rgba(251, 191, 36, 0.5))",
+                  }}
+                >
+                  <FaBalanceScale className="inline-block w-5 h-5 md:w-6 md:h-6 text-amber-300" />
+                </span>
                 Challenge Rules & Result Verification
               </motion.h3>
 
@@ -208,8 +316,8 @@ const ChallengeSystem: React.FC = () => {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="mb-4"
             >
-              <div className="neocore-panel bg-gradient-to-br from-amber-900/20 to-orange-900/10 p-3 text-sm text-center shadow-[0_0_10px_rgba(255,215,130,0.08)] backdrop-blur-md flex items-center justify-center gap-2">
-                <FaExclamationTriangle className="text-amber-300 w-4 h-4" />
+              <div className="bg-gradient-to-br from-amber-900/30 to-orange-900/20 border border-amber-500/30 p-3 text-sm text-center shadow-[0_0_20px_rgba(251,191,36,0.15)] backdrop-blur-md rounded-lg flex items-center justify-center gap-2">
+                <FaExclamationTriangle className="text-amber-300 w-4 h-4" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.5))" }} />
                 <span className="font-semibold text-amber-100">
                   Make sure your challenge description clearly defines all win conditions and game settings.
                 </span>
@@ -224,8 +332,8 @@ const ChallengeSystem: React.FC = () => {
               transition={{ duration: 0.5, delay: 0.3 }}
               className="flex justify-center mt-4"
             >
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-700/60 to-orange-700/60 border border-amber-400/20 shadow-[0_0_8px_rgba(255,215,130,0.08)] text-amber-100 text-sm font-semibold">
-                <FaUserShield className="text-amber-300 w-4 h-4 mr-1" />
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-600/40 to-amber-600/40 border border-purple-500/30 shadow-[0_0_15px_rgba(147,51,234,0.2)] text-white text-sm font-semibold">
+                <FaUserShield className="text-amber-300 w-4 h-4 mr-1" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.5))" }} />
                 Clear rules. Verified results.
               </div>
             </motion.div>
@@ -233,7 +341,12 @@ const ChallengeSystem: React.FC = () => {
             {/* --- Challenge creator (mock) --- */}
             <div className="space-y-3 mt-6">
               <div className="text-center mb-6">
-                <h3 className="neocore-h2 text-white tracking-wide underline decoration-amber-400 underline-offset-2">
+                <h3
+                  className="neocore-h2 text-white tracking-wide underline decoration-amber-400 underline-offset-2"
+                  style={{
+                    textShadow: "0 0 15px rgba(251, 191, 36, 0.3)",
+                  }}
+                >
                   Ready to walk away with the token?
                 </h3>
               </div>
@@ -410,7 +523,7 @@ Unclear or unfair custom rules may be rejected.`}
               {/* CTA (disabled placeholder) */}
               <div className="text-center">
                 <a
-                  className="elite-btn neocore-button inline-block px-5 py-2 text-amber-300 hover:text-amber-200 flex items-center gap-2 transition-all duration-200 text-sm"
+                  className="inline-block px-6 py-3 bg-gradient-to-r from-purple-600/60 to-amber-500/60 border border-purple-500/30 rounded-lg text-white hover:from-purple-500/60 hover:to-amber-400/60 flex items-center gap-2 transition-all duration-200 text-sm font-semibold mx-auto"
                   title="Launch real challenges from the full platform"
                   style={{ pointerEvents: "none", opacity: 0.6, cursor: "not-allowed" }}
                 >
@@ -421,6 +534,10 @@ Unclear or unfair custom rules may be rejected.`}
           </CardContent>
         </Card>
       </div>
+
+      {/* Floating Orbs */}
+      <div className="absolute top-1/4 left-1/4 w-48 h-48 bg-purple-600/10 rounded-full blur-[80px] animate-pulse" />
+      <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-amber-500/5 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
 
       {/* Local styles just for this component */}
       <style>{`
