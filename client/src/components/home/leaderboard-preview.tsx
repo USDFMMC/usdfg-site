@@ -77,11 +77,13 @@ const LeaderboardPreview: React.FC = () => {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const subtitleRef = useRef<HTMLParagraphElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
+  const cardsRef = useRef<HTMLDivElement>(null);
   const top3SectionRef = useRef<HTMLDivElement>(null);
   const player1Ref = useRef<HTMLDivElement>(null);
   const player2Ref = useRef<HTMLDivElement>(null);
   const player3Ref = useRef<HTMLDivElement>(null);
   const eliteRankingsRef = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   
   const [activeTab, setActiveTab] = useState("total-gains");
   const [leaderboardType, setLeaderboardType] = useState<'solo' | 'team'>('solo');
@@ -99,7 +101,9 @@ const LeaderboardPreview: React.FC = () => {
   
   useEffect(() => {
     setCopiedIdx(null);
-  }, [leaderboardType]);
+    // Reset card refs when data changes
+    cardRefs.current = [];
+  }, [leaderboardType, activeTab, players, teams]);
 
   // Fetch real player/team data from Firestore
   useEffect(() => {
@@ -177,8 +181,15 @@ const LeaderboardPreview: React.FC = () => {
         gsap.set(player3Ref.current, { opacity: 0, x: 100, scale: 0.8 });
       }
 
-      // Initial states for table section
+      // Initial states for table section (desktop)
       gsap.set(tableRef.current, { opacity: 0, y: 16 });
+      
+      // Initial states for mobile cards - Kimi exact: translateY 6-10px, opacity fade, no scale
+      cardRefs.current.forEach((cardRef) => {
+        if (cardRef) {
+          gsap.set(cardRef, { opacity: 0, y: 8 });
+        }
+      });
 
       // Top 3 Players Animation Timeline
       if (top3SectionRef.current && players.length >= 3 && leaderboardType === 'solo' && activeTab === 'total-gains') {
@@ -264,13 +275,36 @@ const LeaderboardPreview: React.FC = () => {
         duration: 0.8,
         ease: 'power3.out',
       });
+      
+      // Mobile cards animation - Kimi exact: small translateY (6-10px), opacity fade, no scale
+      if (cardsRef.current) {
+        const cardsTl = gsap.timeline({
+          scrollTrigger: {
+            trigger: cardsRef.current,
+            start: 'top 85%',
+            toggleActions: 'play none none none',
+          },
+        });
+        
+        cardRefs.current.forEach((cardRef, index) => {
+          if (cardRef) {
+            cardsTl.to(cardRef, {
+              opacity: 1,
+              y: 0,
+              duration: 0.6,
+              ease: 'power2.out',
+            }, index * 0.05);
+          }
+        });
+      }
     }, sectionRef);
 
     return () => ctx.revert();
-  }, [players, leaderboardType, activeTab]);
+  }, [players, teams, leaderboardType, activeTab]);
   
   return (
     <section ref={sectionRef} className="py-12 lg:py-16 relative overflow-hidden">
+      {/* No background resets - inherits global Kimi background */}
 
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
 
@@ -527,8 +561,180 @@ const LeaderboardPreview: React.FC = () => {
             ))}
           </div>
 
-          {/* Leaderboard Table - Bottom Emissive Neon */}
-          <div className="kimi-glass rounded-xl p-4 lg:p-6 relative overflow-x-auto transition-all duration-300 kimi-bottom-neon" style={{ 
+          {/* Mobile Cards - Kimi Exact Structure: Single-column, full-width, bottom-emissive neon */}
+          <div ref={cardsRef} className="lg:hidden space-y-4">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400"></div>
+                <p className="text-amber-300 text-sm mt-4">Loading leaderboard...</p>
+              </div>
+            ) : leaderboardType === 'solo' ? (
+              players.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Trophy className="w-12 h-12 text-amber-400/50" />
+                  <p className="text-amber-300 text-sm font-semibold mt-4">No players yet!</p>
+                  <p className="text-gray-400 text-xs mt-2">Be the first to complete a challenge and claim the top spot.</p>
+                </div>
+              ) : (
+                players.map((player, i) => {
+                  const masked = `${player.wallet.slice(0, 6)}...${player.wallet.slice(-4)}`;
+                  const tierTooltip = tierTooltips[player.rankTitle] || player.rankTitle;
+                  return (
+                    <div
+                      key={player.wallet}
+                      ref={(el) => { 
+                        if (el) cardRefs.current[i] = el;
+                      }}
+                      className="kimi-glass rounded-xl p-5 relative kimi-bottom-neon"
+                      style={{ 
+                        '--neon-color': 'rgba(168, 85, 247, 0.3)',
+                        '--neon-hover-color': 'rgba(168, 85, 247, 0.5)',
+                        background: 'linear-gradient(to bottom, rgba(20, 5, 33, 0.8), rgba(10, 2, 20, 0.9))',
+                      } as React.CSSProperties}
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600/40 to-purple-800/40 flex items-center justify-center border border-purple-500/30">
+                            <span className="kimi-font-body font-black text-white text-lg">{player.rank}</span>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="kimi-font-body font-semibold text-white text-base">{masked}</span>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Copy className="w-4 h-4 cursor-pointer text-white/60 hover:text-amber-400 transition-colors" onClick={() => {navigator.clipboard.writeText(player.wallet); setCopiedIdx(i); setTimeout(() => setCopiedIdx(null), 1200);}} />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="bg-black/80 text-amber-100 border-amber-400/40">
+                                    {copiedIdx === i ? "Copied!" : "Copy wallet address"}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs mt-1 ${
+                                    player.rankTitle === "Gold"
+                                      ? "bg-gradient-to-r from-yellow-400/90 to-yellow-600/90 text-yellow-900"
+                                      : player.rankTitle === "Silver"
+                                      ? "bg-gradient-to-r from-gray-300/90 to-gray-500/90 text-gray-900"
+                                      : player.rankTitle === "Bronze"
+                                      ? "bg-gradient-to-r from-amber-700/90 to-yellow-500/90 text-yellow-100"
+                                      : "bg-gradient-to-r from-amber-400/90 to-yellow-600/90 text-yellow-900"
+                                  }`}>
+                                    {player.rankTitle}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <span className="text-sm">{tierTooltip}</span>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="kimi-font-body font-black text-amber-300 text-lg">{formatUSDFG(player.gains)}</p>
+                          <p className="kimi-font-body text-white/50 text-xs uppercase tracking-wider">USDFG</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <p className="kimi-font-body text-white/60 text-xs mb-1">Wins</p>
+                          <p className="kimi-font-body text-white font-semibold">{player.wins}</p>
+                        </div>
+                        <div>
+                          <p className="kimi-font-body text-white/60 text-xs mb-1">Losses</p>
+                          <p className="kimi-font-body text-white font-semibold">{player.losses}</p>
+                        </div>
+                        <div>
+                          <p className="kimi-font-body text-white/60 text-xs mb-1">Win Rate</p>
+                          <p className="kimi-font-body text-white font-semibold">{player.winRate}</p>
+                        </div>
+                        <div>
+                          <p className="kimi-font-body text-white/60 text-xs mb-1">Streak</p>
+                          <p className="kimi-font-body text-white font-semibold">{player.winStreak}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )
+            ) : teams.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Trophy className="w-12 h-12 text-amber-400/50" />
+                <p className="text-amber-300 text-sm font-semibold mt-4">No teams yet!</p>
+                <p className="text-gray-400 text-xs mt-2">Create a team to climb the leaderboard.</p>
+              </div>
+            ) : (
+              teams.map((team, i) => {
+                const masked = `${team.teamKey.slice(0, 6)}...${team.teamKey.slice(-4)}`;
+                return (
+                  <div
+                    key={team.teamKey}
+                    ref={(el) => { 
+                      if (el) cardRefs.current[i] = el;
+                    }}
+                    className="kimi-glass rounded-xl p-5 relative kimi-bottom-neon"
+                    style={{ 
+                      '--neon-color': 'rgba(168, 85, 247, 0.3)',
+                      '--neon-hover-color': 'rgba(168, 85, 247, 0.5)',
+                      background: 'linear-gradient(to bottom, rgba(20, 5, 33, 0.8), rgba(10, 2, 20, 0.9))',
+                    } as React.CSSProperties}
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600/40 to-purple-800/40 flex items-center justify-center border border-purple-500/30">
+                          <span className="kimi-font-body font-black text-white text-lg">{team.rank}</span>
+                        </div>
+                        <div>
+                          <p className="kimi-font-body font-semibold text-white text-base">{team.teamName}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="kimi-font-body text-white/60 text-xs font-mono">{masked}</span>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Copy className="w-3 h-3 cursor-pointer text-white/60 hover:text-amber-400 transition-colors" onClick={() => {navigator.clipboard.writeText(team.teamKey); setCopiedIdx(i); setTimeout(() => setCopiedIdx(null), 1200);}} />
+                                </TooltipTrigger>
+                                <TooltipContent className="bg-black/80 text-amber-100 border-amber-400/40">
+                                  {copiedIdx === i ? "Copied!" : "Copy team key"}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="kimi-font-body font-black text-amber-300 text-lg">{formatUSDFG(team.gains)}</p>
+                        <p className="kimi-font-body text-white/50 text-xs uppercase tracking-wider">USDFG</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="kimi-font-body text-white/60 text-xs mb-1">Members</p>
+                        <p className="kimi-font-body text-white font-semibold">{team.members}</p>
+                      </div>
+                      <div>
+                        <p className="kimi-font-body text-white/60 text-xs mb-1">Win Rate</p>
+                        <p className="kimi-font-body text-white font-semibold">{team.winRate}</p>
+                      </div>
+                      <div>
+                        <p className="kimi-font-body text-white/60 text-xs mb-1">Wins</p>
+                        <p className="kimi-font-body text-white font-semibold">{team.wins}</p>
+                      </div>
+                      <div>
+                        <p className="kimi-font-body text-white/60 text-xs mb-1">Trust</p>
+                        <p className="kimi-font-body text-white font-semibold">{team.trustScore.toFixed(1)}/10</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Desktop Table - Bottom Emissive Neon */}
+          <div className="hidden lg:block kimi-glass rounded-xl p-4 lg:p-6 relative overflow-x-auto transition-all duration-300 kimi-bottom-neon" style={{ 
             '--neon-color': 'rgba(168, 85, 247, 0.3)',
             '--neon-hover-color': 'rgba(168, 85, 247, 0.5)',
           } as React.CSSProperties}>
