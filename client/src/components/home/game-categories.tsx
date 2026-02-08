@@ -226,28 +226,6 @@ const GameCategories: React.FC = () => {
           </div>
         </div>
 
-        {/* Stats Bar - Kimi Exact Structure */}
-        <div className="w-full px-4 sm:px-6 lg:px-12 xl:px-20 mt-16">
-          <div className="kimi-glass border border-purple-500/20 rounded-2xl p-6 lg:p-8">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-              {[
-                { label: 'Active Competitors', value: '50K+' },
-                { label: 'Challenges Completed', value: '1M+' },
-                { label: 'Skill-Based Rewards', value: '100%' },
-                { label: 'Player-Hosted Events', value: '10K+' },
-              ].map((stat, index) => (
-                <div key={index} className="text-center">
-                  <div className="kimi-font-display font-bold text-2xl lg:text-3xl bg-gradient-to-r from-purple-400 to-orange-400 bg-clip-text text-transparent mb-1">
-                    {stat.value}
-                  </div>
-                  <div className="kimi-font-body text-sm text-white/50">
-                    {stat.label}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
       </div>
     </section>
   );

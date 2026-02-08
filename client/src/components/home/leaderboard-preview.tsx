@@ -250,9 +250,10 @@ const LeaderboardPreview: React.FC = () => {
 
   // Get top 3 players for podium
   const top3Players = players.slice(0, 3);
-  const otherPlayers = players.slice(3);
+  // Show all players in table (including top 3) for complete stats visibility
+  const allPlayersForTable = players;
   const top3Teams = teams.slice(0, 3);
-  const otherTeams = teams.slice(3);
+  const allTeamsForTable = teams;
 
   return (
     <section
@@ -324,7 +325,7 @@ const LeaderboardPreview: React.FC = () => {
             Elite Rankings
           </span>
           <h2 className="kimi-font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white mb-6">
-            LEGENDS <span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent">BOARD</span>
+            USDFG <span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent">BOARD</span>
           </h2>
           <p className="kimi-font-body text-lg text-white/60 max-w-2xl mx-auto">
             Compete to claim your place among the legends. No usernames. No profiles. Just your wallet, your skill, your record.
@@ -436,8 +437,8 @@ const LeaderboardPreview: React.FC = () => {
               </div>
             )}
 
-            {/* Other Players List - Kimi Exact Structure */}
-            {otherPlayers.length > 0 && (
+            {/* All Players List - Shows complete stats including top 3 */}
+            {allPlayersForTable.length > 0 && (
               <div ref={listRef} className="max-w-4xl mx-auto">
                 <div className="kimi-glass border border-purple-500/20 rounded-2xl overflow-hidden">
                   {/* Header - USDFG Original Stats */}
@@ -468,9 +469,9 @@ const LeaderboardPreview: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* List - Kimi Exact */}
+                  {/* List - Shows all players including top 3 */}
                   <div className="divide-y divide-purple-500/10">
-                    {otherPlayers.map((player) => {
+                    {allPlayersForTable.map((player) => {
                       const masked = `${player.wallet.slice(0, 6)}...${player.wallet.slice(-4)}`;
                       return (
                         <div
@@ -565,8 +566,8 @@ const LeaderboardPreview: React.FC = () => {
                   </div>
                 </div>
 
-                {/* View Full Leaderboard - Kimi Exact */}
-                {!isExpanded && players.length > 3 && (
+                {/* View Full Leaderboard */}
+                {!isExpanded && players.length > 5 && (
                   <div className="mt-6 text-center">
                     <button 
                       onClick={() => setIsExpanded(true)}
@@ -665,8 +666,8 @@ const LeaderboardPreview: React.FC = () => {
               </div>
             )}
 
-            {/* Teams List */}
-            {otherTeams.length > 0 && (
+            {/* Teams List - Shows all teams including top 3 */}
+            {allTeamsForTable.length > 0 && (
               <div ref={listRef} className="max-w-4xl mx-auto">
                 <div className="kimi-glass border border-purple-500/20 rounded-2xl overflow-hidden">
                   <div className="flex items-center px-4 sm:px-6 py-4 border-b border-purple-500/10 bg-purple-600/5">
@@ -677,7 +678,7 @@ const LeaderboardPreview: React.FC = () => {
                     <div className="w-24 text-right kimi-font-body text-xs text-white/50 uppercase">USDFG</div>
                   </div>
                   <div className="divide-y divide-purple-500/10">
-                    {otherTeams.map((team) => {
+                    {allTeamsForTable.map((team) => {
                       const masked = `${team.teamKey.slice(0, 6)}...${team.teamKey.slice(-4)}`;
                       return (
                         <div
@@ -723,7 +724,7 @@ const LeaderboardPreview: React.FC = () => {
                     })}
                   </div>
                 </div>
-                {!isExpanded && teams.length > 3 && (
+                {!isExpanded && teams.length > 5 && (
                   <div className="mt-6 text-center">
                     <button 
                       onClick={() => setIsExpanded(true)}
