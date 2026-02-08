@@ -440,7 +440,7 @@ const LeaderboardPreview: React.FC = () => {
             {otherPlayers.length > 0 && (
               <div ref={listRef} className="max-w-4xl mx-auto">
                 <div className="kimi-glass border border-purple-500/20 rounded-2xl overflow-hidden">
-                  {/* Header - Kimi Exact */}
+                  {/* Header - USDFG Original Stats */}
                   <div className="flex items-center px-4 sm:px-6 py-4 border-b border-purple-500/10 bg-purple-600/5">
                     <div className="w-12 sm:w-16 kimi-font-body text-xs text-white/50 uppercase">
                       Rank
@@ -448,14 +448,23 @@ const LeaderboardPreview: React.FC = () => {
                     <div className="flex-1 kimi-font-body text-xs text-white/50 uppercase">
                       Wallet
                     </div>
+                    <div className="hidden md:block w-20 text-right kimi-font-body text-xs text-white/50 uppercase">
+                      Wins
+                    </div>
+                    <div className="hidden md:block w-20 text-right kimi-font-body text-xs text-white/50 uppercase">
+                      Losses
+                    </div>
                     <div className="hidden sm:block w-24 text-right kimi-font-body text-xs text-white/50 uppercase">
                       Win Rate
                     </div>
-                    <div className="hidden sm:block w-24 text-right kimi-font-body text-xs text-white/50 uppercase">
-                      Wins
+                    <div className="hidden lg:block w-20 text-right kimi-font-body text-xs text-white/50 uppercase">
+                      Streak
                     </div>
                     <div className="w-24 text-right kimi-font-body text-xs text-white/50 uppercase">
                       USDFG
+                    </div>
+                    <div className="hidden lg:block w-24 text-center kimi-font-body text-xs text-white/50 uppercase">
+                      Tier
                     </div>
                   </div>
 
@@ -498,6 +507,16 @@ const LeaderboardPreview: React.FC = () => {
                               </TooltipProvider>
                             </div>
                           </div>
+                          <div className="hidden md:block w-20 text-right">
+                            <span className="kimi-font-body text-sm text-white/70">
+                              {player.wins}
+                            </span>
+                          </div>
+                          <div className="hidden md:block w-20 text-right">
+                            <span className="kimi-font-body text-sm text-white/70">
+                              {player.losses}
+                            </span>
+                          </div>
                           <div className="hidden sm:block w-24 text-right">
                             <div className="flex items-center justify-end gap-1">
                               <TrendingUp className="w-3 h-3 text-green-500" />
@@ -506,15 +525,39 @@ const LeaderboardPreview: React.FC = () => {
                               </span>
                             </div>
                           </div>
-                          <div className="hidden sm:block w-24 text-right">
+                          <div className="hidden lg:block w-20 text-right">
                             <span className="kimi-font-body text-sm text-white/70">
-                              {player.wins}
+                              {player.winStreak}
                             </span>
                           </div>
                           <div className="w-24 text-right">
                             <span className="kimi-font-display font-semibold text-sm sm:text-base bg-gradient-to-r from-purple-400 to-orange-400 bg-clip-text text-transparent">
                               {formatUSDFG(player.gains)}
                             </span>
+                          </div>
+                          <div className="hidden lg:block w-24 text-center">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${
+                                    player.rankTitle === "Gold"
+                                      ? "bg-gradient-to-r from-yellow-400/90 to-yellow-600/90 text-yellow-900"
+                                      : player.rankTitle === "Silver"
+                                      ? "bg-gradient-to-r from-gray-300/90 to-gray-500/90 text-gray-900"
+                                      : player.rankTitle === "Bronze"
+                                      ? "bg-gradient-to-r from-amber-700/90 to-yellow-500/90 text-yellow-100"
+                                      : player.rankTitle === "Platinum"
+                                      ? "bg-gradient-to-r from-amber-400/90 to-yellow-600/90 text-yellow-900"
+                                      : "bg-gradient-to-r from-purple-400/90 to-indigo-900/90 text-white"
+                                  }`}>
+                                    {player.rankTitle}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <span className="text-sm">{tierTooltips[player.rankTitle] || player.rankTitle}</span>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
                         </div>
                       );

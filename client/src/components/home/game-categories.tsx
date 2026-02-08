@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
-import { motion } from 'framer-motion';
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { Trophy, Gamepad2, Gem, Award, ChevronLeft, ChevronRight } from "lucide-react";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -12,12 +12,15 @@ interface Game {
   alt: string;
   icon: string;
   metric: string;
+  iconComponent: typeof Trophy;
+  color: string;
 }
 
 const GameCategories: React.FC = () => {
   const sectionRef = useRef<HTMLElement>(null);
-  const headingRef = useRef<HTMLHeadingElement>(null);
-  const introRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLDivElement>(null);
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const games: Game[] = [
     {
@@ -26,7 +29,9 @@ const GameCategories: React.FC = () => {
       challenges: "Compete across major sports genres. Outplay the competition. Only the best walk away.",
       alt: "USDFG sports game competition - dominate head-to-head matches",
       icon: "🏀",
-      metric: "50K+"
+      metric: "50K+",
+      iconComponent: Trophy,
+      color: "from-yellow-400 to-amber-600",
     },
     {
       image: "/assets/usdfg-fighting-game-tournament.png",
@@ -34,7 +39,9 @@ const GameCategories: React.FC = () => {
       challenges: "Every move counts. No gimmicks, no RNG — just pure skill.",
       alt: "USDFG fighting game tournament - master combos and counters",
       icon: "🥋",
-      metric: "10K+"
+      metric: "10K+",
+      iconComponent: Gamepad2,
+      color: "from-purple-500 to-purple-600",
     },
     {
       image: "/assets/usdfg-racing-game-challenge.png",
@@ -42,7 +49,9 @@ const GameCategories: React.FC = () => {
       challenges: "Time is your enemy. Every millisecond earned, not given.",
       alt: "USDFG racing game challenge - test your precision and speed",
       icon: "🏎️",
-      metric: "1M+"
+      metric: "1M+",
+      iconComponent: Gem,
+      color: "from-pink-400 to-rose-600",
     },
     {
       image: "/assets/usdfg-shooting-game-battle.png",
@@ -50,181 +59,196 @@ const GameCategories: React.FC = () => {
       challenges: "Clutch moments. Custom chaos. Only your aim decides the outcome.",
       alt: "USDFG shooting game battle - prove your aim and reflexes",
       icon: "🔫",
-      metric: "100+"
+      metric: "100+",
+      iconComponent: Award,
+      color: "from-cyan-400 to-blue-600",
     }
   ];
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.2
-      }
-    }
-  };
-
-  const cardVariants = {
-    hidden: { opacity: 0, y: 6 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.5,
-        ease: "easeOut"
-      }
-    }
-  };
-
-  // GSAP Animations
   useEffect(() => {
     const ctx = gsap.context(() => {
-      // Initial states
-      gsap.set(headingRef.current, { opacity: 0, y: 12 });
-      gsap.set(introRef.current, { opacity: 0, y: 8 });
+      // Title animation - Kimi Exact
+      gsap.fromTo(
+        titleRef.current,
+        { opacity: 0, y: 50 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.8,
+          ease: 'power3.out',
+          scrollTrigger: {
+            trigger: titleRef.current,
+            start: 'top 80%',
+            toggleActions: 'play none none reverse',
+          },
+        }
+      );
 
-      // Entrance timeline
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: 'top 80%',
-          toggleActions: 'play none none none',
-        },
-      });
-
-      tl.to(headingRef.current, {
-        opacity: 1,
-        y: 0,
-        duration: 0.8,
-        ease: 'power3.out',
-      })
-        .to(
-          introRef.current,
+      // Cards animation - Kimi Exact
+      const cards = carouselRef.current?.querySelectorAll('.prize-card');
+      if (cards) {
+        gsap.fromTo(
+          cards,
+          { opacity: 0, y: 60, scale: 0.9 },
           {
             opacity: 1,
             y: 0,
+            scale: 1,
             duration: 0.6,
+            stagger: 0.15,
             ease: 'power3.out',
-          },
-          '-=0.5'
+            scrollTrigger: {
+              trigger: carouselRef.current,
+              start: 'top 80%',
+              toggleActions: 'play none none reverse',
+            },
+          }
         );
+      }
     }, sectionRef);
 
     return () => ctx.revert();
   }, []);
 
+  const scroll = (direction: 'left' | 'right') => {
+    if (scrollContainerRef.current) {
+      const scrollAmount = 400;
+      scrollContainerRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth',
+      });
+    }
+  };
+
   return (
     <section
       ref={sectionRef}
-      className="relative py-20 px-4 sm:px-6 lg:px-12 xl:px-20 text-white overflow-hidden"
+      id="supported-games"
+      className="relative py-24 lg:py-32 w-full overflow-hidden"
     >
+      {/* Background - Kimi Exact */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black via-black/95 to-black" />
 
-      <div className="relative z-10 max-w-7xl mx-auto">
-        {/* Heading - using Kimi exact design */}
-        <motion.h2
-          ref={headingRef}
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-4"
-        >
-          <h2 className="kimi-font-display font-bold text-3xl sm:text-4xl md:text-5xl lg:text-6xl text-white leading-tight">
-            <span className="block">SUPPORTED</span>
-            <span className="block text-gradient-kimi mt-1">GAMES</span>
-          </h2>
-        </motion.h2>
-
-        {/* Intro Paragraph - using Kimi exact design */}
-        <motion.div
-          ref={introRef}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.5 }}
-          className="text-center mb-12 max-w-2xl mx-auto"
-        >
-          <p className="kimi-font-body text-white/80 text-base md:text-lg">
-            USDFG supports competitive play across major genres and platforms. If it can be played with skill, it can be challenged.
-          </p>
-        </motion.div>
-
-        {/* Kimi-style horizontal card layout - exact sizing */}
-        <motion.div 
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6"
-        >
-          {games.map((game, index) => {
-            // Different neon colors per card - bottom-emissive only
-            const neonColors = [
-              { color: 'rgba(34, 197, 94, 0.4)', hoverColor: 'rgba(34, 197, 94, 0.6)' }, // Green
-              { color: 'rgba(168, 85, 247, 0.4)', hoverColor: 'rgba(168, 85, 247, 0.6)' }, // Purple
-              { color: 'rgba(244, 114, 182, 0.4)', hoverColor: 'rgba(244, 114, 182, 0.6)' }, // Pink
-              { color: 'rgba(245, 158, 11, 0.4)', hoverColor: 'rgba(245, 158, 11, 0.6)' }, // Gold/Amber
-            ];
-            const neon = neonColors[index % neonColors.length];
-            
-            return (
-            <motion.div
-              key={index}
-              variants={cardVariants}
-              className="group relative h-full"
-            >
-              <div 
-                className="relative h-full flex flex-col rounded-xl overflow-hidden kimi-glass transition-all duration-300 kimi-bottom-neon"
-                style={{ 
-                  minHeight: '400px',
-                  '--neon-color': neon.color,
-                  '--neon-hover-color': neon.hoverColor,
-                } as React.CSSProperties}
+      <div className="relative z-10">
+        {/* Section Header - Kimi Exact Structure */}
+        <div ref={titleRef} className="w-full px-4 sm:px-6 lg:px-12 xl:px-20 mb-12 lg:mb-16">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <span className="inline-flex items-center gap-2 kimi-font-body text-sm text-amber-400 uppercase tracking-[0.3em] mb-4">
+                <Gem className="w-4 h-4" />
+                Supported Genres
+              </span>
+              <h2 className="kimi-font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white">
+                SUPPORTED <span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent">GAMES</span>
+              </h2>
+            </div>
+            <div className="mt-4 lg:mt-0 flex items-center gap-3">
+              <button
+                onClick={() => scroll('left')}
+                className="w-12 h-12 flex items-center justify-center kimi-glass border border-purple-500/30 rounded-full hover:border-purple-500/60 transition-colors"
               >
-                
-                <div className="relative z-10 flex flex-col h-full">
-                  {/* Image - Kimi style: full card image with overlay elements */}
-                  <div className="relative w-full h-64 lg:h-72 overflow-hidden flex-shrink-0">
-                    {/* Icon - top left corner (Kimi style) */}
-                    <div className="absolute top-3 left-3 z-20 w-10 h-10 rounded-full border-2 border-white/30 bg-black/40 backdrop-blur-sm flex items-center justify-center text-2xl">
-                      {game.icon}
+                <ChevronLeft className="w-5 h-5 text-white" />
+              </button>
+              <button
+                onClick={() => scroll('right')}
+                className="w-12 h-12 flex items-center justify-center kimi-glass border border-purple-500/30 rounded-full hover:border-purple-500/60 transition-colors"
+              >
+                <ChevronRight className="w-5 h-5 text-white" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Carousel - Kimi Exact Structure */}
+        <div ref={carouselRef} className="relative">
+          <div
+            ref={scrollContainerRef}
+            className="flex gap-6 overflow-x-auto scrollbar-hide px-4 sm:px-6 lg:px-12 xl:px-20 pb-4"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            {games.map((game, index) => {
+              const IconComponent = game.iconComponent;
+              return (
+                <div
+                  key={index}
+                  className="prize-card flex-shrink-0 w-80 sm:w-96 group"
+                >
+                  <div className="relative h-full kimi-glass border border-purple-500/20 rounded-2xl overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(168,85,247,0.3)]">
+                    {/* Image - Kimi Exact */}
+                    <div className="relative h-48 overflow-hidden">
+                      <img
+                        src={game.image.replace('.png', '.webp')}
+                        alt={game.alt}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+                      
+                      {/* Shine Effect - Kimi Exact */}
+                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                      </div>
+
+                      {/* Icon Badge - Kimi Exact */}
+                      <div
+                        className={`absolute top-4 left-4 w-12 h-12 flex items-center justify-center bg-gradient-to-br ${game.color} rounded-xl shadow-lg`}
+                      >
+                        <IconComponent className="w-6 h-6 text-white" />
+                      </div>
+
+                      {/* Value Badge - Kimi Exact */}
+                      <div className="absolute top-4 right-4 px-4 py-2 kimi-glass rounded-full">
+                        <span className="kimi-font-display font-bold text-sm bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent">
+                          {game.metric}
+                        </span>
+                      </div>
                     </div>
-                    
-                    {/* Metric - top right corner (Kimi style) */}
-                    <div className="absolute top-3 right-3 z-20 kimi-font-body text-white font-bold text-sm lg:text-base px-2 py-1 bg-black/40 backdrop-blur-sm rounded">
-                      {game.metric}
+
+                    {/* Content - Kimi Exact */}
+                    <div className="p-6">
+                      <h3 className="kimi-font-display font-bold text-xl text-white mb-2 group-hover:bg-gradient-to-r group-hover:from-purple-400 group-hover:to-orange-400 group-hover:bg-clip-text group-hover:text-transparent transition-all">
+                        {game.title}
+                      </h3>
+                      <p className="kimi-font-body text-white/60 text-sm leading-relaxed">
+                        {game.challenges}
+                      </p>
                     </div>
-                    
-                    <img
-                      src={game.image.replace('.png', '.webp')}
-                      alt={game.alt}
-                      className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
-                      loading="lazy"
-                      decoding="async"
+
+                    {/* Bottom Gradient - Kimi Exact */}
+                    <div
+                      className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${game.color}`}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                  </div>
-                  
-                  {/* Content - using Kimi exact design */}
-                  <div className="flex flex-col flex-1 p-4 lg:p-6 min-h-[120px]">
-                    <h3 className="kimi-font-display text-lg lg:text-xl font-bold text-white mb-2 group-hover:text-gradient-kimi transition-colors">
-                      {game.title}
-                    </h3>
-                    <p className="kimi-font-body text-white/70 text-sm lg:text-base leading-relaxed">
-                      {game.challenges}
-                    </p>
                   </div>
                 </div>
-              </div>
-            </motion.div>
-            );
-          })}
-        </motion.div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Stats Bar - Kimi Exact Structure */}
+        <div className="w-full px-4 sm:px-6 lg:px-12 xl:px-20 mt-16">
+          <div className="kimi-glass border border-purple-500/20 rounded-2xl p-6 lg:p-8">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
+              {[
+                { label: 'Active Competitors', value: '50K+' },
+                { label: 'Challenges Completed', value: '1M+' },
+                { label: 'Skill-Based Rewards', value: '100%' },
+                { label: 'Player-Hosted Events', value: '10K+' },
+              ].map((stat, index) => (
+                <div key={index} className="text-center">
+                  <div className="kimi-font-display font-bold text-2xl lg:text-3xl bg-gradient-to-r from-purple-400 to-orange-400 bg-clip-text text-transparent mb-1">
+                    {stat.value}
+                  </div>
+                  <div className="kimi-font-body text-sm text-white/50">
+                    {stat.label}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
-      
-      {/* Neon lights at bottom - matching Kimi style exactly */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black to-transparent z-[5]" />
-      <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-purple-600/30 via-purple-500/15 to-transparent z-[4]" style={{ 
-        boxShadow: "0 -15px 50px rgba(147, 51, 234, 0.4), 0 -5px 20px rgba(168, 85, 247, 0.3)",
-      }} />
     </section>
   );
 };

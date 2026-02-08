@@ -83,6 +83,16 @@
   animation: spin-slow 20s linear infinite;
 }
 
+/* Scrollbar hide utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Arena page border pulse animation */
 @keyframes borderPulse {
   0%, 100% { opacity: 0.4; }
