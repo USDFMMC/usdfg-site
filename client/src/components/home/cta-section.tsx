@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
+import { Sparkles } from "lucide-react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
@@ -7,76 +8,30 @@ gsap.registerPlugin(ScrollTrigger);
 
 const CTASection: React.FC = () => {
   const sectionRef = useRef<HTMLElement>(null);
-  const imageRef = useRef<HTMLDivElement>(null);
   const taglineRef = useRef<HTMLParagraphElement>(null);
-  const headingRef = useRef<HTMLParagraphElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const buttonRef = useRef<HTMLDivElement>(null);
   const quoteRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      // Initial states
-      gsap.set(imageRef.current, { opacity: 0, scale: 0.95 });
-      gsap.set(taglineRef.current, { opacity: 0, y: 20 });
-      gsap.set(headingRef.current, { opacity: 0, y: 20 });
-      gsap.set(buttonRef.current, { opacity: 0, y: 20 });
-      gsap.set(quoteRef.current, { opacity: 0, y: 20 });
+      gsap.set(taglineRef.current, { opacity: 0, y: 12 });
+      gsap.set(headingRef.current, { opacity: 0, y: 12 });
+      gsap.set(buttonRef.current, { opacity: 0, y: 8, scale: 0.98 });
+      gsap.set(quoteRef.current, { opacity: 0, y: 12, scale: 0.99 });
 
-      // Entrance timeline
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: sectionRef.current,
-          start: 'top 80%',
+          start: 'top 75%',
           toggleActions: 'play none none none',
         },
       });
 
-      tl.to(imageRef.current, {
-        opacity: 1,
-        scale: 1,
-        duration: 1,
-        ease: 'power3.out',
-      })
-        .to(
-          taglineRef.current,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.6,
-            ease: 'power3.out',
-          },
-          '-=0.5'
-        )
-        .to(
-          headingRef.current,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.6,
-            ease: 'power3.out',
-          },
-          '-=0.4'
-        )
-        .to(
-          buttonRef.current,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.6,
-            ease: 'back.out(1.7)',
-          },
-          '-=0.4'
-        )
-        .to(
-          quoteRef.current,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.6,
-            ease: 'power3.out',
-          },
-          '-=0.3'
-        );
+      tl.to(taglineRef.current, { opacity: 1, y: 0, duration: 0.8, ease: 'power2.out' })
+        .to(headingRef.current, { opacity: 1, y: 0, duration: 0.8, ease: 'power2.out' }, '-=0.6')
+        .to(buttonRef.current, { opacity: 1, y: 0, scale: 1, duration: 0.7, ease: 'back.out(1.7)' }, '-=0.5')
+        .to(quoteRef.current, { opacity: 1, y: 0, scale: 1, duration: 0.9, ease: 'power2.out' }, '-=0.4');
     }, sectionRef);
 
     return () => ctx.revert();
@@ -85,68 +40,84 @@ const CTASection: React.FC = () => {
   return (
     <section
       ref={sectionRef}
-      className="py-12 lg:py-16 relative overflow-hidden"
+      className="relative min-h-[80vh] flex flex-col items-center justify-center overflow-hidden py-20"
     >
-      {/* Background Gradients */}
-      <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/50" />
-        <div className="absolute inset-0 bg-purple-600/5" />
-      </div>
 
-      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
+      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20" style={{ willChange: "transform" }}>
         <div className="max-w-4xl mx-auto text-center">
-          {/* Enter the Challenge Image - Pro-level polish */}
-          <section className="flex flex-col items-center py-8 lg:py-12">
-            <div
-              ref={imageRef}
-              className="flex justify-center mb-4 relative w-full"
-              style={{ alignItems: 'center', minHeight: '280px' }}
-            >
-              <div className="relative rounded-xl overflow-hidden flex items-center justify-center shadow-[0_0_40px_rgba(147,51,234,0.2)]" style={{ minHeight: '260px' }}>
-                <img
-                  src="/assets/usdfg-enter-the-challenge-arcade.webp"
-                  alt="USDFG Mascot Entering the Challenge Arena"
-                  className="w-full max-w-2xl rounded-xl"
-                  style={{ display: 'block', margin: '0 auto' }}
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
-            </div>
-            <p
-              ref={taglineRef}
-              className="text-center text-sm md:text-base lg:text-lg text-white/70 mt-2 italic leading-relaxed"
-              style={{
-                textShadow: "0 0 10px rgba(255, 255, 255, 0.2)",
-              }}
-            >
-              Step in. Only the skilled walk out.
-            </p>
-          </section>
-          <p
-            ref={headingRef}
-            className="text-center text-base md:text-lg lg:text-xl text-white font-semibold mt-8 lg:mt-12"
-            style={{
-              textShadow: "0 0 15px rgba(255, 255, 255, 0.3)",
-            }}
+          {/* Kimi badge: glass pill with icon + text */}
+          <div
+            ref={taglineRef}
+            className="inline-flex items-center gap-2 px-4 py-2 mb-6 kimi-glass rounded-full border border-purple-500/30"
           >
-            Ready to enter the arena?
+            <Sparkles className="w-4 h-4 shrink-0 text-amber-400" aria-hidden />
+            <span className="kimi-font-body text-sm text-white/80">Your Journey Begins Now</span>
+          </div>
+
+          {/* Kimi headline: font-display, gradient on second line */}
+          <h2
+            ref={headingRef}
+            className="kimi-font-display font-bold text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl text-white leading-tight mb-6"
+          >
+            <span className="block">Ready to enter</span>
+            <span className="block mt-1" style={{ 
+              background: "linear-gradient(135deg, #fbbf24, #f59e0b, #fbbf24)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+              textShadow: "0 0 20px rgba(251, 191, 36, 0.4)",
+              filter: "drop-shadow(0 0 8px rgba(251, 191, 36, 0.3))"
+            }}>the arena?</span>
+          </h2>
+
+          {/* Kimi supporting copy */}
+          <p className="kimi-font-body text-white/80 text-lg mb-8 max-w-2xl mx-auto">
+            Join elite gamers competing for glory and fortune. The arena is waiting for your arrival.
           </p>
-          <div ref={buttonRef} className="flex justify-center mt-6">
+
+          {/* Kimi CTAs: Enter the Arena (gradient) + Learn More (outline) */}
+          <div ref={buttonRef} className="flex flex-wrap items-center justify-center gap-4 mb-8">
             <Link to="/app" className="inline-block">
-              <button className="relative font-semibold text-base px-8 py-6 bg-gradient-to-r from-purple-600 to-amber-500 hover:from-purple-400 hover:to-amber-400 text-white border-0 overflow-hidden group rounded-lg transition-all">
+              <button className="relative font-semibold text-base uppercase tracking-wide px-8 py-4 bg-gradient-to-r from-purple-500 to-orange-500 hover:from-purple-400 hover:to-orange-400 text-white border-0 overflow-hidden group rounded-lg transition-all kimi-font-body">
                 <span className="relative z-10 flex items-center gap-2">
                   Enter the Arena
-                  <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                  </svg>
+                  <span className="group-hover:translate-x-0.5 transition-transform" aria-hidden>→</span>
                 </span>
                 <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
               </button>
             </Link>
+            <Link to="/whitepaper">
+              <button type="button" className="kimi-font-body font-semibold text-base uppercase tracking-wide px-8 py-4 rounded-lg border border-white/30 text-white bg-transparent hover:bg-white/10 transition-all">
+                Learn More
+              </button>
+            </Link>
           </div>
-          <div ref={quoteRef} className="flex justify-center mt-8 lg:mt-12">
-            <div className="relative max-w-2xl w-full bg-black/40 backdrop-blur-sm border border-purple-500/20 rounded-lg px-6 lg:px-8 py-6 lg:py-8 hover:shadow-[0_0_30px_rgba(147,51,234,0.2)] hover:border-purple-500/50 transition-all duration-300">
+
+          {/* Kimi feature bullets: green dots */}
+          <div className="kimi-font-body flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-sm text-white/80 mb-12">
+            <span className="inline-flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" aria-hidden />
+              Free to Join
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" aria-hidden />
+              Instant Rewards
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" aria-hidden />
+              24/7 Support
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Quote card below Kimi block */}
+      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
+        <div ref={quoteRef} className="flex justify-center max-w-4xl mx-auto">
+            <div className="relative max-w-2xl w-full bg-black/40 backdrop-blur-sm rounded-lg px-6 lg:px-8 py-6 lg:py-8 transition-all duration-300 kimi-bottom-neon" style={{ 
+              '--neon-color': 'rgba(168, 85, 247, 0.3)',
+              '--neon-hover-color': 'rgba(168, 85, 247, 0.5)',
+            } as React.CSSProperties}>
               {/* Gradient glow on hover */}
               <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 via-purple-600/10 to-purple-600/0 opacity-0 hover:opacity-100 transition-opacity duration-300 rounded-lg" />
               <blockquote className="relative z-10 text-center text-white/80 italic font-medium text-base lg:text-lg leading-relaxed">
@@ -156,12 +127,7 @@ const CTASection: React.FC = () => {
               </blockquote>
             </div>
           </div>
-        </div>
       </div>
-
-      {/* Floating Orbs */}
-      <div className="absolute top-1/4 left-1/4 w-48 h-48 bg-purple-600/10 rounded-full blur-[80px] animate-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-amber-500/5 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
     </section>
   );
 };

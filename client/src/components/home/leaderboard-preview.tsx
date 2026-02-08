@@ -19,6 +19,7 @@ interface Player {
   winStreak: number;
   gains: number;
   rankTitle: string;
+  profileImage?: string; // User profile image URL
 }
 
 interface TeamLeaderboardEntry {
@@ -76,6 +77,11 @@ const LeaderboardPreview: React.FC = () => {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const subtitleRef = useRef<HTMLParagraphElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
+  const top3SectionRef = useRef<HTMLDivElement>(null);
+  const player1Ref = useRef<HTMLDivElement>(null);
+  const player2Ref = useRef<HTMLDivElement>(null);
+  const player3Ref = useRef<HTMLDivElement>(null);
+  const eliteRankingsRef = useRef<HTMLDivElement>(null);
   
   const [activeTab, setActiveTab] = useState("total-gains");
   const [leaderboardType, setLeaderboardType] = useState<'solo' | 'team'>('solo');
@@ -138,7 +144,8 @@ const LeaderboardPreview: React.FC = () => {
             winRate: `${p.winRate.toFixed(1)}%`,
             winStreak: 0, // TODO: Add streak tracking
             gains: p.totalEarned,
-            rankTitle: getTier(p.winRate, p.gamesPlayed)
+            rankTitle: getTier(p.winRate, p.gamesPlayed),
+            profileImage: p.profileImage // Include profile image
           }));
 
           setPlayers(transformedPlayers);
@@ -157,16 +164,93 @@ const LeaderboardPreview: React.FC = () => {
     fetchLeaderboard();
   }, [activeTab, leaderboardType, isExpanded]);
 
-  // GSAP Animations
+  // GSAP Animations - Keep existing animations, will be enhanced later
   useEffect(() => {
     const ctx = gsap.context(() => {
-      // Initial states
-      gsap.set(headingRef.current, { opacity: 0, y: 30 });
-      gsap.set(subtitleRef.current, { opacity: 0, y: 20 });
-      gsap.set(tableRef.current, { opacity: 0, y: 40 });
+      // Initial states for top 3 section
+      if (top3SectionRef.current) {
+        gsap.set(eliteRankingsRef.current, { opacity: 0, y: -12 });
+        gsap.set(headingRef.current, { opacity: 0, y: 12, scale: 0.98 });
+        gsap.set(subtitleRef.current, { opacity: 0, y: 8 });
+        gsap.set(player2Ref.current, { opacity: 0, x: -100, scale: 0.8 });
+        gsap.set(player1Ref.current, { opacity: 0, y: -50, scale: 0.8 });
+        gsap.set(player3Ref.current, { opacity: 0, x: 100, scale: 0.8 });
+      }
 
-      // Entrance timeline
-      const tl = gsap.timeline({
+      // Initial states for table section
+      gsap.set(tableRef.current, { opacity: 0, y: 16 });
+
+      // Top 3 Players Animation Timeline
+      if (top3SectionRef.current && players.length >= 3 && leaderboardType === 'solo' && activeTab === 'total-gains') {
+        const top3Tl = gsap.timeline({
+          scrollTrigger: {
+            trigger: top3SectionRef.current,
+            start: 'top 85%',
+            toggleActions: 'play none none none',
+          },
+        });
+
+        top3Tl
+          .to(eliteRankingsRef.current, {
+            opacity: 1,
+            y: 0,
+            duration: 0.6,
+            ease: 'power2.out',
+          })
+          .to(headingRef.current, {
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            duration: 0.8,
+            ease: 'back.out(1.2)',
+          }, '-=0.3')
+          .to(subtitleRef.current, {
+            opacity: 1,
+            y: 0,
+            duration: 0.6,
+            ease: 'power2.out',
+          }, '-=0.4')
+          .to(player2Ref.current, {
+            opacity: 1,
+            x: 0,
+            scale: 1,
+            duration: 0.8,
+            ease: 'back.out(1.4)',
+          }, '-=0.2')
+          .to(player1Ref.current, {
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            duration: 1,
+            ease: 'back.out(1.2)',
+          }, '-=0.6')
+          .to(player3Ref.current, {
+            opacity: 1,
+            x: 0,
+            scale: 1,
+            duration: 0.8,
+            ease: 'back.out(1.4)',
+          }, '-=0.8');
+
+        // Animate progress bars
+        setTimeout(() => {
+          const progressBars = top3SectionRef.current?.querySelectorAll('.progress-bar-fill');
+          progressBars?.forEach((bar, index) => {
+            const progressBar = bar as HTMLElement;
+            const targetWidth = progressBar.getAttribute('data-width') || '0%';
+            gsap.set(progressBar, { width: '0%' });
+            gsap.to(progressBar, {
+              width: targetWidth,
+              duration: 1.5,
+              delay: 1.2 + index * 0.15,
+              ease: 'power2.out',
+            });
+          });
+        }, 100);
+      }
+
+      // Table Animation Timeline
+      const tableTl = gsap.timeline({
         scrollTrigger: {
           trigger: sectionRef.current,
           start: 'top 80%',
@@ -174,102 +258,239 @@ const LeaderboardPreview: React.FC = () => {
         },
       });
 
-      tl.to(headingRef.current, {
+      tableTl.to(tableRef.current, {
         opacity: 1,
         y: 0,
         duration: 0.8,
         ease: 'power3.out',
-      })
-        .to(
-          subtitleRef.current,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.6,
-            ease: 'power3.out',
-          },
-          '-=0.5'
-        )
-        .to(
-          tableRef.current,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.8,
-            ease: 'power3.out',
-          },
-          '-=0.4'
-        );
+      });
     }, sectionRef);
 
     return () => ctx.revert();
-  }, []);
+  }, [players, leaderboardType, activeTab]);
   
   return (
     <section ref={sectionRef} className="py-12 lg:py-16 relative overflow-hidden">
-      {/* Background Gradients */}
-      <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/50" />
-        <div className="absolute inset-0 bg-purple-600/5" />
-      </div>
 
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
-        <div className="text-center mb-8 lg:mb-12">
-          <h2
-            ref={headingRef}
-            className="text-2xl md:text-3xl lg:text-4xl font-extrabold mb-3"
-            style={{
-              textShadow: "0 0 20px rgba(255, 255, 255, 0.3)",
-            }}
-          >
-            USDFG{' '}
-            <span
-              className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent"
-              style={{
-                textShadow: "0 0 20px rgba(251, 191, 36, 0.4)",
-                filter: "drop-shadow(0 0 8px rgba(251, 191, 36, 0.3))",
-              }}
-            >
-              LEADERBOARD
-            </span>
-          </h2>
-          {/* Neon-glow underline/divider */}
-          <div
-            className="mx-auto mb-4 h-0.5 w-40 rounded-full bg-gradient-to-r from-amber-400/80 via-orange-500/80 to-amber-400/80 animate-pulse"
-            style={{
-              boxShadow: "0 0 20px rgba(251,191,36,0.4)",
-            }}
-          />
-          <p
-            ref={subtitleRef}
-            className="text-white/80 max-w-2xl mx-auto text-base md:text-lg font-semibold mb-2 leading-relaxed"
-          >
-            No usernames. No profiles. Just your wallet, your skill, your record.
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="ml-1.5 cursor-pointer text-amber-400" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.5))" }}>ⓘ</span>
-                </TooltipTrigger>
-                <TooltipContent className="bg-black/80 text-amber-100 border-amber-400/40">
-                  Your wallet is your identity. No personal data, no registration, no tracking.
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </p>
-          <p className="text-white/70 max-w-2xl mx-auto text-sm md:text-base font-medium">
-            Only skill matters. No bots. No aliases. Every win is on-chain.
-          </p>
-        </div>
+
+        {/* Kimi Top 3 Players Section - EXACT KIMI CODE */}
+        {!loading && leaderboardType === 'solo' && activeTab === 'total-gains' && players.length >= 3 && (
+          <div ref={top3SectionRef} className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20 mb-16">
+            {/* Elite Rankings Label - Kimi Exact */}
+            <div ref={eliteRankingsRef} className="text-center mb-6">
+              <div className="inline-flex items-center gap-2 mb-3">
+                <Crown className="w-4 h-4 text-amber-400" style={{ filter: "drop-shadow(0 0 8px rgba(251, 191, 36, 0.5))" }} />
+                <span className="kimi-font-body text-xs uppercase tracking-[0.15em] text-white/50 font-medium">Elite Rankings</span>
+              </div>
+              <h3 
+                ref={headingRef}
+                className="kimi-font-display font-bold text-5xl sm:text-6xl md:text-7xl lg:text-8xl mb-6 leading-[1.1]"
+              >
+                <span className="text-white">LEGENDS</span>{' '}
+                <span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent" style={{ 
+                  textShadow: "0 0 30px rgba(251, 191, 36, 0.5)",
+                  filter: "drop-shadow(0 0 10px rgba(251, 191, 36, 0.4))"
+                }}>BOARD</span>
+              </h3>
+              <p 
+                ref={subtitleRef}
+                className="kimi-font-body text-white/70 text-base md:text-lg max-w-2xl mx-auto mb-4 leading-relaxed"
+              >
+                Compete to claim your place among the legends.
+              </p>
+              <p className="kimi-font-body text-white/80 text-sm md:text-base max-w-2xl mx-auto font-semibold mb-3 leading-relaxed">
+                No usernames. No profiles. Just your wallet, your skill, your record.
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="ml-1.5 cursor-pointer text-amber-400 inline-block" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.5))" }}>ⓘ</span>
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-black/80 text-amber-100 border-amber-400/40">
+                      Your wallet is your identity. No personal data, no registration, no tracking.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </p>
+              <p className="kimi-font-body text-white/70 text-sm md:text-base max-w-2xl mx-auto font-medium">
+                Only your skill matters. Every win is recorded on-chain.
+              </p>
+            </div>
+
+            {/* Top 3 Players - Kimi Exact Layout */}
+            <div className="flex flex-col sm:flex-row items-end justify-center gap-6 sm:gap-8 lg:gap-12 mt-12 max-w-6xl mx-auto">
+              {/* 2nd Place (Left) - Kimi Exact */}
+              {players[1] && (
+                <div ref={player2Ref} className="flex flex-col items-center order-2 sm:order-1 group">
+                  <div className="relative mb-5">
+                    {/* Rank Badge - Kimi Exact Position */}
+                    <div className="absolute -bottom-1 -right-1 w-10 h-10 bg-gradient-to-br from-gray-500 to-gray-700 rounded-full flex items-center justify-center border-2 border-gray-400 z-20 shadow-lg">
+                      <span className="kimi-font-body font-black text-white text-base">2</span>
+                    </div>
+                    {/* Circular Avatar - Kimi Exact Size */}
+                    <div className="w-32 h-32 sm:w-36 sm:h-36 lg:w-40 lg:h-40 rounded-full bg-gradient-to-br from-gray-600/40 to-gray-800/40 border-[3px] border-gray-500/60 overflow-hidden relative shadow-[0_0_30px_rgba(107,114,128,0.3)]">
+                      {players[1].profileImage ? (
+                        <img 
+                          src={players[1].profileImage} 
+                          alt={`${players[1].wallet.slice(0, 6)}...${players[1].wallet.slice(-4)}`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            if (!target.src.includes('avatar-2.png')) {
+                              target.src = "/_kimi/avatar-2.png";
+                            }
+                          }}
+                        />
+                      ) : (
+                        <img 
+                          src="/_kimi/avatar-2.png" 
+                          alt="Player 2"
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-br from-gray-500/30 via-transparent to-transparent" />
+                    </div>
+                  </div>
+                  <div className="text-center w-full">
+                    <p className="kimi-font-body font-bold text-white text-base sm:text-lg mb-2 tracking-wide">
+                      {players[1].wallet.slice(0, 6)}...{players[1].wallet.slice(-4)}
+                    </p>
+                    <p className="kimi-font-body font-black text-purple-400 text-xl sm:text-2xl mb-1">
+                      {formatUSDFG(players[1].gains)}
+                    </p>
+                    <p className="kimi-font-body text-white/50 text-xs mb-4 uppercase tracking-wider">PTS</p>
+                    {/* Progress Bar - Kimi Exact */}
+                    <div className="w-40 sm:w-44 h-3 bg-gray-900/60 rounded-full overflow-hidden border border-gray-700/50">
+                      <div 
+                        className="progress-bar-fill h-full bg-gradient-to-r from-gray-500 to-gray-600 rounded-full"
+                        data-width={`${Math.min((players[1].gains / players[0].gains) * 100, 100)}%`}
+                        style={{ width: '0%' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 1st Place (Center) - Kimi Exact */}
+              {players[0] && (
+                <div ref={player1Ref} className="flex flex-col items-center order-1 sm:order-2 group">
+                  <div className="relative mb-5">
+                    {/* Crown Icon - Kimi Exact Position */}
+                    <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 z-30">
+                      <Crown className="w-7 h-7 sm:w-8 sm:h-8 lg:w-9 lg:h-9 text-amber-400 animate-pulse" style={{ filter: "drop-shadow(0 0 15px rgba(251, 191, 36, 0.9))" }} />
+                    </div>
+                    {/* Rank Badge - Kimi Exact Position */}
+                    <div className="absolute -bottom-1 -right-1 w-12 h-12 bg-gradient-to-br from-amber-400 to-yellow-600 rounded-full flex items-center justify-center border-[3px] border-amber-300 z-20 shadow-[0_0_20px_rgba(251,191,36,0.5)]">
+                      <span className="kimi-font-body font-black text-white text-lg">1</span>
+                    </div>
+                    {/* Circular Avatar - Kimi Exact Larger Size */}
+                    <div className="w-40 h-40 sm:w-44 sm:h-44 lg:w-48 lg:h-48 rounded-full bg-gradient-to-br from-amber-500/40 to-yellow-600/40 border-[3px] border-amber-400/70 overflow-hidden relative shadow-[0_0_40px_rgba(251,191,36,0.4)]">
+                      {players[0].profileImage ? (
+                        <img 
+                          src={players[0].profileImage} 
+                          alt={`${players[0].wallet.slice(0, 6)}...${players[0].wallet.slice(-4)}`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            if (!target.src.includes('avatar-1.png')) {
+                              target.src = "/_kimi/avatar-1.png";
+                            }
+                          }}
+                        />
+                      ) : (
+                        <img 
+                          src="/_kimi/avatar-1.png" 
+                          alt="Player 1"
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-br from-amber-400/30 via-transparent to-transparent" />
+                    </div>
+                  </div>
+                  <div className="text-center w-full">
+                    <p className="kimi-font-body font-black text-white text-lg sm:text-xl mb-2 tracking-wide">
+                      {players[0].wallet.slice(0, 6)}...{players[0].wallet.slice(-4)}
+                    </p>
+                    <p className="kimi-font-body font-black text-purple-400 text-2xl sm:text-3xl mb-1">
+                      {formatUSDFG(players[0].gains)}
+                    </p>
+                    <p className="kimi-font-body text-white/50 text-xs mb-4 uppercase tracking-wider">PTS</p>
+                    {/* Progress Bar - Kimi Exact Full */}
+                    <div className="w-48 sm:w-52 h-3 bg-gray-900/60 rounded-full overflow-hidden border border-amber-700/50">
+                      <div 
+                        className="progress-bar-fill h-full bg-gradient-to-r from-amber-400 to-yellow-500 rounded-full"
+                        data-width="100%"
+                        style={{ width: '0%' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 3rd Place (Right) - Kimi Exact */}
+              {players[2] && (
+                <div ref={player3Ref} className="flex flex-col items-center order-3 sm:order-3 group">
+                  <div className="relative mb-5">
+                    {/* Rank Badge - Kimi Exact Position */}
+                    <div className="absolute -bottom-1 -right-1 w-10 h-10 bg-gradient-to-br from-amber-700 to-yellow-700 rounded-full flex items-center justify-center border-2 border-amber-600 z-20 shadow-lg">
+                      <span className="kimi-font-body font-black text-white text-base">3</span>
+                    </div>
+                    {/* Circular Avatar - Kimi Exact Size */}
+                    <div className="w-32 h-32 sm:w-36 sm:h-36 lg:w-40 lg:h-40 rounded-full bg-gradient-to-br from-amber-700/40 to-yellow-700/40 border-[3px] border-amber-600/60 overflow-hidden relative shadow-[0_0_30px_rgba(217,119,6,0.3)]">
+                      {players[2].profileImage ? (
+                        <img 
+                          src={players[2].profileImage} 
+                          alt={`${players[2].wallet.slice(0, 6)}...${players[2].wallet.slice(-4)}`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            if (!target.src.includes('avatar-3.png')) {
+                              target.src = "/_kimi/avatar-3.png";
+                            }
+                          }}
+                        />
+                      ) : (
+                        <img 
+                          src="/_kimi/avatar-3.png" 
+                          alt="Player 3"
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-br from-amber-600/30 via-transparent to-transparent" />
+                    </div>
+                  </div>
+                  <div className="text-center w-full">
+                    <p className="kimi-font-body font-bold text-white text-base sm:text-lg mb-2 tracking-wide">
+                      {players[2].wallet.slice(0, 6)}...{players[2].wallet.slice(-4)}
+                    </p>
+                    <p className="kimi-font-body font-black text-purple-400 text-xl sm:text-2xl mb-1">
+                      {formatUSDFG(players[2].gains)}
+                    </p>
+                    <p className="kimi-font-body text-white/50 text-xs mb-4 uppercase tracking-wider">PTS</p>
+                    {/* Progress Bar - Kimi Exact */}
+                    <div className="w-40 sm:w-44 h-3 bg-gray-900/60 rounded-full overflow-hidden border border-amber-800/50">
+                      <div 
+                        className="progress-bar-fill h-full bg-gradient-to-r from-amber-700 to-yellow-600 rounded-full"
+                        data-width={`${Math.min((players[2].gains / players[0].gains) * 100, 100)}%`}
+                        style={{ width: '0%' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div ref={tableRef} className="max-w-5xl mx-auto relative">
-          {/* Solo / Team Toggle */}
+          {/* Solo / Team Toggle - Kimi Style */}
           <div className="flex justify-center gap-2 mb-4">
             <Button
               variant={leaderboardType === 'solo' ? "default" : "ghost"}
-              className={`px-4 py-1.5 text-xs font-semibold transition-all ${
+              className={`kimi-font-body px-4 py-2 text-xs font-semibold uppercase tracking-wide rounded-lg transition-all ${
                 leaderboardType === 'solo'
-                  ? "bg-gradient-to-r from-purple-600 to-amber-500 text-white shadow-[0_0_15px_rgba(147,51,234,0.3)] border border-purple-500/50 hover:from-purple-500 hover:to-amber-400"
-                  : "text-white/70 hover:text-white border border-purple-500/30 hover:border-purple-500/50 hover:bg-purple-500/10"
+                  ? "bg-gradient-to-r from-purple-500 to-orange-500 text-white border-0 shadow-[0_0_15px_rgba(126,67,255,0.3)] hover:from-purple-400 hover:to-orange-400"
+                  : "text-white/70 hover:text-white border border-purple-500/30 hover:border-purple-500/50 hover:bg-purple-500/10 bg-transparent"
               }`}
               onClick={() => setLeaderboardType('solo')}
             >
@@ -277,10 +498,10 @@ const LeaderboardPreview: React.FC = () => {
             </Button>
             <Button
               variant={leaderboardType === 'team' ? "default" : "ghost"}
-              className={`px-4 py-1.5 text-xs font-semibold transition-all ${
+              className={`kimi-font-body px-4 py-2 text-xs font-semibold uppercase tracking-wide rounded-lg transition-all ${
                 leaderboardType === 'team'
-                  ? "bg-gradient-to-r from-purple-600 to-amber-500 text-white shadow-[0_0_15px_rgba(147,51,234,0.3)] border border-purple-500/50 hover:from-purple-500 hover:to-amber-400"
-                  : "text-white/70 hover:text-white border border-purple-500/30 hover:border-purple-500/50 hover:bg-purple-500/10"
+                  ? "bg-gradient-to-r from-purple-500 to-orange-500 text-white border-0 shadow-[0_0_15px_rgba(126,67,255,0.3)] hover:from-purple-400 hover:to-orange-400"
+                  : "text-white/70 hover:text-white border border-purple-500/30 hover:border-purple-500/50 hover:bg-purple-500/10 bg-transparent"
               }`}
               onClick={() => setLeaderboardType('team')}
             >
@@ -288,16 +509,16 @@ const LeaderboardPreview: React.FC = () => {
             </Button>
           </div>
 
-          {/* Leaderboard Tabs */}
+          {/* Leaderboard Tabs - Kimi Style */}
           <div className="flex flex-wrap justify-center mb-4 border-b border-purple-500/30">
             {tabs.map((tab) => (
               <Button
                 key={tab.id}
                 variant={activeTab === tab.id ? "default" : "ghost"}
-                className={`rounded-none rounded-t-md font-bold tracking-wide px-4 py-1.5 text-sm transition-all ${
+                className={`kimi-font-body rounded-none rounded-t-md font-semibold uppercase tracking-wide px-4 py-2 text-sm transition-all ${
                   activeTab === tab.id 
-                    ? "bg-gradient-to-r from-purple-600 to-amber-500 text-white shadow-[0_0_15px_rgba(147,51,234,0.3)] border border-purple-500/50 hover:from-purple-500 hover:to-amber-400" 
-                    : "text-white/70 hover:text-white border border-transparent hover:border-purple-500/30"
+                    ? "bg-gradient-to-r from-purple-500 to-orange-500 text-white border-0 shadow-[0_0_15px_rgba(126,67,255,0.3)] hover:from-purple-400 hover:to-orange-400" 
+                    : "text-white/70 hover:text-white border border-transparent hover:border-purple-500/30 bg-transparent"
                 }`}
                 onClick={() => setActiveTab(tab.id)}
               >
@@ -306,39 +527,42 @@ const LeaderboardPreview: React.FC = () => {
             ))}
           </div>
 
-          {/* Leaderboard Table */}
-          <div className="bg-black/40 backdrop-blur-sm border border-purple-500/20 rounded-lg p-2 lg:p-4 relative overflow-x-auto hover:shadow-[0_0_40px_rgba(147,51,234,0.2)] hover:border-purple-500/50 transition-all duration-300">
+          {/* Leaderboard Table - Bottom Emissive Neon */}
+          <div className="kimi-glass rounded-xl p-4 lg:p-6 relative overflow-x-auto transition-all duration-300 kimi-bottom-neon" style={{ 
+            '--neon-color': 'rgba(168, 85, 247, 0.3)',
+            '--neon-hover-color': 'rgba(168, 85, 247, 0.5)',
+          } as React.CSSProperties}>
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12 text-center text-sm">Rank</TableHead>
+                <TableRow className="border-purple-500/20">
+                  <TableHead className="w-12 text-center text-sm kimi-font-body text-white/80 font-semibold">Rank</TableHead>
                   {leaderboardType === 'solo' ? (
                     <>
-                      <TableHead className="text-left text-sm">Wallet</TableHead>
-                      <TableHead className="text-center text-sm">Wins</TableHead>
-                      <TableHead className="text-center text-sm">Losses</TableHead>
-                      <TableHead className="text-center text-sm">Win Rate</TableHead>
-                      <TableHead className="text-center text-sm">Streak</TableHead>
-                      <TableHead className="w-36 text-center text-sm" style={{ overflow: 'visible', position: 'relative' }}>
+                      <TableHead className="text-left text-sm kimi-font-body text-white/80 font-semibold">Wallet</TableHead>
+                      <TableHead className="text-center text-sm kimi-font-body text-white/80 font-semibold">Wins</TableHead>
+                      <TableHead className="text-center text-sm kimi-font-body text-white/80 font-semibold">Losses</TableHead>
+                      <TableHead className="text-center text-sm kimi-font-body text-white/80 font-semibold">Win Rate</TableHead>
+                      <TableHead className="text-center text-sm kimi-font-body text-white/80 font-semibold">Streak</TableHead>
+                      <TableHead className="w-36 text-center text-sm kimi-font-body text-white/80 font-semibold" style={{ overflow: 'visible', position: 'relative' }}>
                         <div className="flex items-center justify-center gap-1 relative">
                           Skill Rewards (USDFG)
                         </div>
                       </TableHead>
-                      <TableHead className="w-24 text-center text-sm">Tier</TableHead>
+                      <TableHead className="w-24 text-center text-sm kimi-font-body text-white/80 font-semibold">Tier</TableHead>
                     </>
                   ) : (
                     <>
-                      <TableHead className="text-left text-sm">Team</TableHead>
-                      <TableHead className="text-center text-sm">Members</TableHead>
-                      <TableHead className="text-center text-sm">Wins</TableHead>
-                      <TableHead className="text-center text-sm">Losses</TableHead>
-                      <TableHead className="text-center text-sm">Win Rate</TableHead>
-                      <TableHead className="w-36 text-center text-sm" style={{ overflow: 'visible', position: 'relative' }}>
+                      <TableHead className="text-left text-sm kimi-font-body text-white/80 font-semibold">Team</TableHead>
+                      <TableHead className="text-center text-sm kimi-font-body text-white/80 font-semibold">Members</TableHead>
+                      <TableHead className="text-center text-sm kimi-font-body text-white/80 font-semibold">Wins</TableHead>
+                      <TableHead className="text-center text-sm kimi-font-body text-white/80 font-semibold">Losses</TableHead>
+                      <TableHead className="text-center text-sm kimi-font-body text-white/80 font-semibold">Win Rate</TableHead>
+                      <TableHead className="w-36 text-center text-sm kimi-font-body text-white/80 font-semibold" style={{ overflow: 'visible', position: 'relative' }}>
                         <div className="flex items-center justify-center gap-1 relative">
                           Skill Rewards (USDFG)
                         </div>
                       </TableHead>
-                      <TableHead className="w-28 text-center text-sm">Trust</TableHead>
+                      <TableHead className="w-28 text-center text-sm kimi-font-body text-white/80 font-semibold">Trust</TableHead>
                     </>
                   )}
                 </TableRow>
@@ -371,11 +595,11 @@ const LeaderboardPreview: React.FC = () => {
                       return (
                         <TableRow
                           key={player.wallet}
-                          className={`relative group transition-transform duration-200 ${i < 3 ? "z-10 animate-glow-row" : ""}`}
+                          className={`relative group transition-all duration-200 border-b border-purple-500/10 hover:bg-purple-500/5 ${i < 3 ? "z-10 animate-glow-row" : ""}`}
                           style={i < 3 ? { boxShadow: "0 0 32px 8px var(--tier-glow-" + player.rankTitle.toLowerCase() + ")" } : {}}
                         >
-                          <TableCell className="text-center font-bold text-base">{player.rank}</TableCell>
-                          <TableCell className="font-mono text-sm flex items-center gap-2">
+                          <TableCell className="text-center font-bold text-base kimi-font-body text-white">{player.rank}</TableCell>
+                          <TableCell className="font-mono text-sm kimi-font-body text-white/90 flex items-center gap-2">
                             <span>{masked}</span>
                             <TooltipProvider>
                               <Tooltip>
@@ -388,11 +612,11 @@ const LeaderboardPreview: React.FC = () => {
                               </Tooltip>
                             </TooltipProvider>
                           </TableCell>
-                          <TableCell className="text-center text-sm">{player.wins}</TableCell>
-                          <TableCell className="text-center text-sm">{player.losses}</TableCell>
-                          <TableCell className="text-center text-sm">{player.winRate}</TableCell>
-                          <TableCell className="text-center text-sm">{player.winStreak}</TableCell>
-                          <TableCell className="text-center font-bold text-amber-300 text-sm">{formatUSDFG(player.gains)}</TableCell>
+                          <TableCell className="text-center text-sm kimi-font-body text-white/80">{player.wins}</TableCell>
+                          <TableCell className="text-center text-sm kimi-font-body text-white/80">{player.losses}</TableCell>
+                          <TableCell className="text-center text-sm kimi-font-body text-white/80">{player.winRate}</TableCell>
+                          <TableCell className="text-center text-sm kimi-font-body text-white/80">{player.winStreak}</TableCell>
+                          <TableCell className="text-center font-bold text-amber-300 text-sm kimi-font-body">{formatUSDFG(player.gains)}</TableCell>
                           <TableCell className="text-center">
                             <TooltipProvider>
                               <Tooltip>
@@ -441,10 +665,10 @@ const LeaderboardPreview: React.FC = () => {
                     return (
                       <TableRow
                         key={team.teamKey}
-                        className={`relative group transition-transform duration-200 ${i < 3 ? "z-10 animate-glow-row" : ""}`}
+                        className={`relative group transition-all duration-200 border-b border-purple-500/10 hover:bg-purple-500/5 ${i < 3 ? "z-10 animate-glow-row" : ""}`}
                       >
-                        <TableCell className="text-center font-bold text-base">{team.rank}</TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="text-center font-bold text-base kimi-font-body text-white">{team.rank}</TableCell>
+                        <TableCell className="text-sm kimi-font-body">
                           <div className="flex flex-col">
                             <span className="font-semibold text-white text-sm md:text-base">{team.teamName}</span>
                             <div className="flex items-center gap-2 text-xs text-amber-200 mt-1">
@@ -462,12 +686,12 @@ const LeaderboardPreview: React.FC = () => {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-center text-sm">{team.members}</TableCell>
-                        <TableCell className="text-center text-sm">{team.wins}</TableCell>
-                        <TableCell className="text-center text-sm">{team.losses}</TableCell>
-                        <TableCell className="text-center text-sm">{team.winRate}</TableCell>
-                        <TableCell className="text-center font-bold text-amber-300 text-sm">{formatUSDFG(team.gains)}</TableCell>
-                        <TableCell className="text-center text-sm">
+                        <TableCell className="text-center text-sm kimi-font-body text-white/80">{team.members}</TableCell>
+                        <TableCell className="text-center text-sm kimi-font-body text-white/80">{team.wins}</TableCell>
+                        <TableCell className="text-center text-sm kimi-font-body text-white/80">{team.losses}</TableCell>
+                        <TableCell className="text-center text-sm kimi-font-body text-white/80">{team.winRate}</TableCell>
+                        <TableCell className="text-center font-bold text-amber-300 text-sm kimi-font-body">{formatUSDFG(team.gains)}</TableCell>
+                        <TableCell className="text-center text-sm kimi-font-body">
                           <span className="text-amber-200 font-semibold">{team.trustScore.toFixed(1)}/10</span>
                           {team.trustReviews > 0 && (
                             <span className="block text-xs text-zinc-400 mt-0.5">{team.trustReviews} review{team.trustReviews === 1 ? '' : 's'}</span>
@@ -481,12 +705,12 @@ const LeaderboardPreview: React.FC = () => {
             </Table>
           </div>
 
-          {/* Expand/Collapse Button */}
+          {/* Expand/Collapse Button - Kimi Style */}
           {!loading && ((leaderboardType === 'solo' && players.length > 0) || (leaderboardType === 'team' && teams.length > 0)) && (
             <div className="flex justify-center mt-6">
               <Button
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="px-6 py-2 bg-gradient-to-r from-purple-600 to-amber-500 text-white font-semibold shadow-[0_0_15px_rgba(147,51,234,0.3)] border border-purple-500/50 hover:from-purple-500 hover:to-amber-400 transition-all"
+                className="kimi-font-body px-6 py-2 bg-gradient-to-r from-purple-500 to-orange-500 text-white font-semibold uppercase tracking-wide border-0 shadow-[0_0_15px_rgba(126,67,255,0.3)] hover:from-purple-400 hover:to-orange-400 transition-all rounded-lg"
               >
                 {isExpanded ? '▼ Show Less' : '▲ Show More'}
               </Button>
@@ -494,10 +718,6 @@ const LeaderboardPreview: React.FC = () => {
           )}
         </div>
       </div>
-
-      {/* Floating Orbs */}
-      <div className="absolute top-1/4 left-1/4 w-48 h-48 bg-purple-600/10 rounded-full blur-[80px] animate-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-amber-500/5 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
     </section>
   );
 };

@@ -138,15 +138,24 @@ const Home: React.FC = () => {
 
       <Navbar />
       <LiveActivityTicker />
-      <main id="main-content" role="main" aria-label="Homepage Main Content" className="min-h-screen flex-1 relative overflow-hidden bg-black">
-        {/* Elite Background - Matching Hero Design */}
-        <div className="fixed inset-0 -z-10 bg-black">
-          {/* Gradient overlays */}
+      <main id="main-content" role="main" aria-label="Homepage Main Content" className="min-h-screen flex-1 relative overflow-hidden">
+        {/* Global Unified Background - Kimi Hero Style */}
+        <div className="fixed inset-0 z-0 bg-black">
+          {/* Kimi Linear Grid Pattern (Purple Lines) */}
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: `
+                linear-gradient(rgba(126, 67, 255, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(126, 67, 255, 0.1) 1px, transparent 1px)
+              `,
+              backgroundSize: "50px 50px"
+            }}
+          />
+          
+          {/* Background Gradients */}
           <div className="absolute inset-0 bg-gradient-to-b from-black via-black/95 to-black" />
           <div className="absolute inset-0 bg-purple-600/5" />
-          {/* Floating orbs */}
-          <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-amber-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
         </div>
         
         <section aria-label="Hero Section" className="relative z-10">

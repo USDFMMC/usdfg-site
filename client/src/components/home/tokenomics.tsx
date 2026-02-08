@@ -38,10 +38,10 @@ const Tokenomics: React.FC = () => {
   useEffect(() => {
     const ctx = gsap.context(() => {
       // Initial states
-      gsap.set(headingRef.current, { opacity: 0, y: 30 });
-      gsap.set(subtitleRef.current, { opacity: 0, y: 20 });
-      gsap.set(cardsRef.current, { opacity: 0, y: 40 });
-      gsap.set(infoRef.current, { opacity: 0, y: 20 });
+      gsap.set(headingRef.current, { opacity: 0, y: 12 });
+      gsap.set(subtitleRef.current, { opacity: 0, y: 8 });
+      gsap.set(cardsRef.current, { opacity: 0, y: 16 });
+      gsap.set(infoRef.current, { opacity: 0, y: 8 });
 
       // Entrance timeline
       const tl = gsap.timeline({
@@ -134,11 +134,6 @@ const Tokenomics: React.FC = () => {
       id="tokenomics"
       className="py-12 lg:py-16 text-center relative overflow-hidden"
     >
-      {/* Background Gradients */}
-      <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/50" />
-        <div className="absolute inset-0 bg-purple-600/5" />
-      </div>
 
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
         <h2
@@ -168,7 +163,11 @@ const Tokenomics: React.FC = () => {
             ref={(el) => {
               if (el) cardsRef.current[0] = el;
             }}
-            className="relative bg-black/40 backdrop-blur-sm border border-purple-500/20 rounded-lg p-4 lg:p-6 text-center animate-float-soft transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(147,51,234,0.3)] hover:border-purple-500/50 hover:bg-black/60"
+            className="relative bg-black/40 backdrop-blur-sm rounded-lg p-4 lg:p-6 text-center animate-float-soft transition-all duration-300 kimi-bottom-neon"
+            style={{ 
+              '--neon-color': 'rgba(168, 85, 247, 0.3)',
+              '--neon-hover-color': 'rgba(168, 85, 247, 0.5)',
+            } as React.CSSProperties}
             onMouseEnter={handleHover(65, setVal1, 0)}
             onMouseLeave={handleMouseLeave}
           >
@@ -194,7 +193,11 @@ const Tokenomics: React.FC = () => {
             ref={(el) => {
               if (el) cardsRef.current[1] = el;
             }}
-            className="relative bg-black/40 backdrop-blur-sm border border-purple-500/20 rounded-lg p-4 lg:p-6 text-center animate-float-soft transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(147,51,234,0.3)] hover:border-purple-500/50 hover:bg-black/60"
+            className="relative bg-black/40 backdrop-blur-sm rounded-lg p-4 lg:p-6 text-center animate-float-soft transition-all duration-300 kimi-bottom-neon"
+            style={{ 
+              '--neon-color': 'rgba(168, 85, 247, 0.3)',
+              '--neon-hover-color': 'rgba(168, 85, 247, 0.5)',
+            } as React.CSSProperties}
             style={{ animationDelay: '0.1s' }}
             onMouseEnter={handleHover(15, setVal2, 1)}
             onMouseLeave={handleMouseLeave}
@@ -220,7 +223,11 @@ const Tokenomics: React.FC = () => {
             ref={(el) => {
               if (el) cardsRef.current[2] = el;
             }}
-            className="relative bg-black/40 backdrop-blur-sm border border-purple-500/20 rounded-lg p-4 lg:p-6 text-center animate-float-soft transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(147,51,234,0.3)] hover:border-purple-500/50 hover:bg-black/60"
+            className="relative bg-black/40 backdrop-blur-sm rounded-lg p-4 lg:p-6 text-center animate-float-soft transition-all duration-300 kimi-bottom-neon"
+            style={{ 
+              '--neon-color': 'rgba(168, 85, 247, 0.3)',
+              '--neon-hover-color': 'rgba(168, 85, 247, 0.5)',
+            } as React.CSSProperties}
             style={{ animationDelay: '0.2s' }}
             onMouseEnter={handleHover(10, setVal3, 2)}
             onMouseLeave={handleMouseLeave}
@@ -246,7 +253,11 @@ const Tokenomics: React.FC = () => {
             ref={(el) => {
               if (el) cardsRef.current[3] = el;
             }}
-            className="relative bg-black/40 backdrop-blur-sm border border-purple-500/20 rounded-lg p-4 lg:p-6 text-center animate-float-soft transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(147,51,234,0.3)] hover:border-purple-500/50 hover:bg-black/60"
+            className="relative bg-black/40 backdrop-blur-sm rounded-lg p-4 lg:p-6 text-center animate-float-soft transition-all duration-300 kimi-bottom-neon"
+            style={{ 
+              '--neon-color': 'rgba(168, 85, 247, 0.3)',
+              '--neon-hover-color': 'rgba(168, 85, 247, 0.5)',
+            } as React.CSSProperties}
             style={{ animationDelay: '0.3s' }}
             onMouseEnter={handleHover(10, setVal4, 3)}
             onMouseLeave={handleMouseLeave}
@@ -288,18 +299,14 @@ const Tokenomics: React.FC = () => {
           <p className="text-white/70 text-sm md:text-base mt-2 leading-relaxed">No income, interest, or financial benefit is promised or implied. This is not financial advice.</p>
         </div>
       </div>
-
-      {/* Floating Orbs */}
-      <div className="absolute top-1/4 left-1/4 w-48 h-48 bg-purple-600/10 rounded-full blur-[80px] animate-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-amber-500/5 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
       <style>{`
         @keyframes floatSoft {
           0% { transform: translateY(0); }
-          50% { transform: translateY(-6px); }
+          50% { transform: translateY(-3px); }
           100% { transform: translateY(0); }
         }
         .animate-float-soft {
-          animation: floatSoft 3.2s ease-in-out infinite;
+          animation: floatSoft 4s ease-in-out infinite;
         }
         @keyframes pulseSoft {
           0% { text-shadow: 0 0 8px rgba(251, 191, 36, 0.3); }

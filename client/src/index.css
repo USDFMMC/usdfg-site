@@ -2,6 +2,73 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Kimi-style utilities (from _kimi reference) */
+.kimi-font-display { font-family: 'Oxanium', sans-serif; }
+.kimi-font-body { font-family: 'Rajdhani', sans-serif; }
+.kimi-glass {
+  background: rgba(20, 5, 33, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.text-gradient-kimi {
+  background: linear-gradient(135deg, #7e43ff, #f472b6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Kimi Bottom-Emissive Neon Effect for Category Cards */
+.kimi-bottom-neon {
+  position: relative;
+}
+
+.kimi-bottom-neon::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 0;
+  right: 0;
+  height: 80px;
+  background: linear-gradient(
+    to top,
+    transparent 0%,
+    var(--neon-color, rgba(168, 85, 247, 0.3)) 20%,
+    var(--neon-color, rgba(168, 85, 247, 0.5)) 50%,
+    var(--neon-color, rgba(168, 85, 247, 0.3)) 80%,
+    transparent 100%
+  );
+  opacity: 0.4;
+  filter: blur(24px);
+  pointer-events: none;
+  z-index: 0;
+  animation: neonShimmer 5s ease-in-out infinite;
+  transform-origin: bottom;
+}
+
+.kimi-bottom-neon:hover::after {
+  opacity: 0.7;
+  filter: blur(30px);
+  background: linear-gradient(
+    to top,
+    transparent 0%,
+    var(--neon-hover-color, rgba(168, 85, 247, 0.5)) 20%,
+    var(--neon-hover-color, rgba(168, 85, 247, 0.7)) 50%,
+    var(--neon-hover-color, rgba(168, 85, 247, 0.5)) 80%,
+    transparent 100%
+  );
+}
+
+@keyframes neonShimmer {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scaleY(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scaleY(1.05);
+  }
+}
+
 /* Arena page border pulse animation */
 @keyframes borderPulse {
   0%, 100% { opacity: 0.4; }

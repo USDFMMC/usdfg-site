@@ -10,6 +10,8 @@ interface Game {
   title: string;
   challenges: string;
   alt: string;
+  icon: string;
+  metric: string;
 }
 
 const GameCategories: React.FC = () => {
@@ -20,27 +22,35 @@ const GameCategories: React.FC = () => {
   const games: Game[] = [
     {
       image: "/assets/usdfg-sports-game-competition.png",
-      title: "🏀 Sports Game Challenge",
+      title: "Sports Game Challenge",
       challenges: "Compete across major sports genres. Outplay the competition. Only the best walk away.",
-      alt: "USDFG sports game competition - dominate head-to-head matches"
+      alt: "USDFG sports game competition - dominate head-to-head matches",
+      icon: "🏀",
+      metric: "50K+"
     },
     {
       image: "/assets/usdfg-fighting-game-tournament.png",
-      title: "🥋 Fighting Game Challenge",
+      title: "Fighting Game Challenge",
       challenges: "Every move counts. No gimmicks, no RNG — just pure skill.",
-      alt: "USDFG fighting game tournament - master combos and counters"
+      alt: "USDFG fighting game tournament - master combos and counters",
+      icon: "🥋",
+      metric: "10K+"
     },
     {
       image: "/assets/usdfg-racing-game-challenge.png",
-      title: "🏎️ Racing Game Challenge",
+      title: "Racing Game Challenge",
       challenges: "Time is your enemy. Every millisecond earned, not given.",
-      alt: "USDFG racing game challenge - test your precision and speed"
+      alt: "USDFG racing game challenge - test your precision and speed",
+      icon: "🏎️",
+      metric: "1M+"
     },
     {
       image: "/assets/usdfg-shooting-game-battle.png",
-      title: "🔫 Shooter Game Challenge",
+      title: "Shooter Game Challenge",
       challenges: "Clutch moments. Custom chaos. Only your aim decides the outcome.",
-      alt: "USDFG shooting game battle - prove your aim and reflexes"
+      alt: "USDFG shooting game battle - prove your aim and reflexes",
+      icon: "🔫",
+      metric: "100+"
     }
   ];
 
@@ -55,7 +65,7 @@ const GameCategories: React.FC = () => {
   };
 
   const cardVariants = {
-    hidden: { opacity: 0, y: 20 },
+    hidden: { opacity: 0, y: 6 },
     visible: {
       opacity: 1,
       y: 0,
@@ -70,8 +80,8 @@ const GameCategories: React.FC = () => {
   useEffect(() => {
     const ctx = gsap.context(() => {
       // Initial states
-      gsap.set(headingRef.current, { opacity: 0, y: 30 });
-      gsap.set(introRef.current, { opacity: 0, y: 20 });
+      gsap.set(headingRef.current, { opacity: 0, y: 12 });
+      gsap.set(introRef.current, { opacity: 0, y: 8 });
 
       // Entrance timeline
       const tl = gsap.timeline({
@@ -106,123 +116,115 @@ const GameCategories: React.FC = () => {
   return (
     <section
       ref={sectionRef}
-      className="py-12 lg:py-16 px-4 sm:px-6 lg:px-12 xl:px-20 text-white relative overflow-hidden"
+      className="relative py-20 px-4 sm:px-6 lg:px-12 xl:px-20 text-white overflow-hidden"
     >
-      {/* Background Gradients */}
-      <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/50" />
-        <div className="absolute inset-0 bg-purple-600/5" />
-      </div>
 
       <div className="relative z-10 max-w-7xl mx-auto">
+        {/* Heading - using Kimi exact design */}
         <motion.h2
           ref={headingRef}
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="text-2xl md:text-3xl lg:text-4xl font-extrabold tracking-wide mb-3 text-center"
-          style={{
-            textShadow: "0 0 20px rgba(255, 255, 255, 0.3)",
-          }}
+          className="text-center mb-4"
         >
-          <span
-            className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent"
-            style={{
-              textShadow: "0 0 20px rgba(251, 191, 36, 0.4)",
-              filter: "drop-shadow(0 0 8px rgba(251, 191, 36, 0.3))",
-            }}
-          >
-            Supported Games
-          </span>
+          <h2 className="kimi-font-display font-bold text-3xl sm:text-4xl md:text-5xl lg:text-6xl text-white leading-tight">
+            <span className="block">SUPPORTED</span>
+            <span className="block text-gradient-kimi mt-1">GAMES</span>
+          </h2>
         </motion.h2>
-        
-        {/* Animated Divider */}
-        <motion.div 
-          initial={{ width: 0 }}
-          animate={{ width: "180px" }}
-          transition={{ duration: 0.8, delay: 0.3 }}
-          className="mx-auto mb-6 lg:mb-8 h-0.5 rounded-full bg-gradient-to-r from-amber-400/80 via-orange-500/80 to-amber-400/80 animate-pulse"
-          style={{
-            boxShadow: "0 0 20px rgba(251,191,36,0.4)",
-          }}
-        />
 
-        {/* Intro Paragraph */}
+        {/* Intro Paragraph - using Kimi exact design */}
         <motion.div
           ref={introRef}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.5 }}
-          className="relative max-w-2xl mx-auto mb-8 lg:mb-12 px-4 lg:px-6 py-4 lg:py-5 rounded-lg text-center bg-black/40 backdrop-blur-sm border border-purple-500/20 hover:shadow-[0_0_30px_rgba(147,51,234,0.2)] hover:border-purple-500/50 transition-all duration-300"
+          className="text-center mb-12 max-w-2xl mx-auto"
         >
-          {/* Gradient glow on hover */}
-          <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 via-purple-600/10 to-purple-600/0 opacity-0 hover:opacity-100 transition-opacity duration-300 rounded-lg" />
-          <p className="relative z-10 text-sm md:text-base lg:text-lg text-white/80 leading-relaxed font-medium">
-            USDFG supports competitive play across major genres and platforms. If it can be played with skill, it can be challenged.<br />
-            <span
-              className="bg-gradient-to-r from-green-400 via-emerald-400 to-green-500 bg-clip-text text-transparent font-semibold"
-              style={{
-                textShadow: "0 0 20px rgba(74, 222, 128, 0.3)",
-                filter: "drop-shadow(0 0 6px rgba(74, 222, 128, 0.2))",
-              }}
-            >
-              Custom rules. Public results. Enforced outcomes.
-            </span>
+          <p className="kimi-font-body text-white/80 text-base md:text-lg">
+            USDFG supports competitive play across major genres and platforms. If it can be played with skill, it can be challenged.
           </p>
         </motion.div>
 
+        {/* Kimi-style horizontal card layout - exact sizing */}
         <motion.div 
           variants={containerVariants}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-100px" }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6 items-stretch h-full"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6"
         >
-          {games.map((game, index) => (
+          {games.map((game, index) => {
+            // Different neon colors per card - bottom-emissive only
+            const neonColors = [
+              { color: 'rgba(34, 197, 94, 0.4)', hoverColor: 'rgba(34, 197, 94, 0.6)' }, // Green
+              { color: 'rgba(168, 85, 247, 0.4)', hoverColor: 'rgba(168, 85, 247, 0.6)' }, // Purple
+              { color: 'rgba(244, 114, 182, 0.4)', hoverColor: 'rgba(244, 114, 182, 0.6)' }, // Pink
+              { color: 'rgba(245, 158, 11, 0.4)', hoverColor: 'rgba(245, 158, 11, 0.6)' }, // Gold/Amber
+            ];
+            const neon = neonColors[index % neonColors.length];
+            
+            return (
             <motion.div
               key={index}
               variants={cardVariants}
-              className="group relative h-full flex flex-col"
+              className="group relative h-full"
             >
-              <div className="relative rounded-lg p-4 lg:p-6 h-full flex flex-col bg-black/40 backdrop-blur-sm border border-purple-500/20 hover:shadow-[0_0_30px_rgba(147,51,234,0.3)] hover:border-purple-500/50 hover:bg-black/60 transition-all duration-500 hover:scale-[1.02]">
-                {/* Gradient glow on hover */}
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 via-purple-600/10 to-purple-600/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg" />
+              <div 
+                className="relative h-full flex flex-col rounded-xl overflow-hidden kimi-glass transition-all duration-300 kimi-bottom-neon"
+                style={{ 
+                  minHeight: '400px',
+                  '--neon-color': neon.color,
+                  '--neon-hover-color': neon.hoverColor,
+                } as React.CSSProperties}
+              >
                 
-                <div className="relative z-10">
-                  <div className="relative mb-3">
+                <div className="relative z-10 flex flex-col h-full">
+                  {/* Image - Kimi style: full card image with overlay elements */}
+                  <div className="relative w-full h-64 lg:h-72 overflow-hidden flex-shrink-0">
+                    {/* Icon - top left corner (Kimi style) */}
+                    <div className="absolute top-3 left-3 z-20 w-10 h-10 rounded-full border-2 border-white/30 bg-black/40 backdrop-blur-sm flex items-center justify-center text-2xl">
+                      {game.icon}
+                    </div>
+                    
+                    {/* Metric - top right corner (Kimi style) */}
+                    <div className="absolute top-3 right-3 z-20 kimi-font-body text-white font-bold text-sm lg:text-base px-2 py-1 bg-black/40 backdrop-blur-sm rounded">
+                      {game.metric}
+                    </div>
+                    
                     <img
                       src={game.image.replace('.png', '.webp')}
                       alt={game.alt}
-                      className="w-full h-24 lg:h-32 object-cover rounded-lg shadow-[0_0_20px_rgba(147,51,234,0.2)]"
-                      loading="lazy" decoding="async"
+                      className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
+                      loading="lazy"
+                      decoding="async"
                     />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                   </div>
-                  <div className="flex-1 flex flex-col">
-                    <h3
-                      className="text-base lg:text-lg font-semibold mb-2 flex items-center gap-2 transition-colors duration-300"
-                      style={{
-                        textShadow: "0 0 10px rgba(255, 255, 255, 0.2)",
-                      }}
-                    >
-                      <span className="animate-bounce">{game.title.split(' ')[0]}</span>
-                      <span className="group-hover:bg-gradient-to-r group-hover:from-amber-300 group-hover:via-yellow-400 group-hover:to-amber-400 group-hover:bg-clip-text group-hover:text-transparent">
-                        {game.title.split(' ').slice(1).join(' ')}
-                      </span>
+                  
+                  {/* Content - using Kimi exact design */}
+                  <div className="flex flex-col flex-1 p-4 lg:p-6 min-h-[120px]">
+                    <h3 className="kimi-font-display text-lg lg:text-xl font-bold text-white mb-2 group-hover:text-gradient-kimi transition-colors">
+                      {game.title}
                     </h3>
-                    <p className="text-white/70 text-sm lg:text-base whitespace-pre-line leading-relaxed">
+                    <p className="kimi-font-body text-white/70 text-sm lg:text-base leading-relaxed">
                       {game.challenges}
                     </p>
                   </div>
                 </div>
               </div>
             </motion.div>
-          ))}
+            );
+          })}
         </motion.div>
       </div>
-
-      {/* Floating Orbs */}
-      <div className="absolute top-1/4 left-1/4 w-48 h-48 bg-purple-600/10 rounded-full blur-[80px] animate-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-amber-500/5 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
+      
+      {/* Neon lights at bottom - matching Kimi style exactly */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black to-transparent z-[5]" />
+      <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-purple-600/30 via-purple-500/15 to-transparent z-[4]" style={{ 
+        boxShadow: "0 -15px 50px rgba(147, 51, 234, 0.4), 0 -5px 20px rgba(168, 85, 247, 0.3)",
+      }} />
     </section>
   );
 };

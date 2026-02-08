@@ -2,8 +2,8 @@ import React, { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { GridScan } from "./GridScan";
 import { motion } from "framer-motion";
+import { GridScan } from "./GridScan";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -100,8 +100,8 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
       ref={sectionRef}
       className="hero relative min-h-screen w-full flex items-center justify-center overflow-hidden"
     >
-      {/* Speed Lines (Motion Effect) */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none z-[2]">
+      {/* Speed Lines (Flying Things) - Kimi Style */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-[3]">
         {[...Array(15)].map((_, i) => (
           <motion.div
             key={i}
@@ -124,10 +124,11 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
           />
         ))}
       </div>
-      {/* Background Image */}
+
+      {/* Background Image - Hero Specific */}
       <div
         ref={imageRef}
-        className="absolute inset-0 z-0"
+        className="absolute inset-0 z-[1]"
         style={{ willChange: 'transform' }}
       >
         <img
@@ -135,7 +136,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
           alt="Esports Arena"
           className="w-full h-full object-cover"
         />
-        {/* Gradient Overlays */}
         <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/50" />
         <div className="absolute inset-0 bg-purple-600/10" />
@@ -243,10 +243,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
 
       {/* Decorative Elements */}
       <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black to-transparent z-[5]" />
-      
-      {/* Floating Orbs */}
-      <div className="absolute top-1/4 right-1/4 w-64 h-64 bg-purple-600/20 rounded-full blur-[100px] animate-pulse" />
-      <div className="absolute bottom-1/3 right-1/3 w-48 h-48 bg-amber-500/10 rounded-full blur-[80px] animate-pulse" style={{ animationDelay: '1s' }} />
     </section>
   );
 };

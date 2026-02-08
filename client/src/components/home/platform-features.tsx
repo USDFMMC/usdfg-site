@@ -42,10 +42,10 @@ const PlatformFeatures: React.FC = () => {
   useEffect(() => {
     const ctx = gsap.context(() => {
       // Initial states
-      gsap.set(titleRef.current, { opacity: 0, y: 30 });
-      gsap.set(subtitleRef.current, { opacity: 0, y: 20 });
+      gsap.set(titleRef.current, { opacity: 0, y: 12 });
+      gsap.set(subtitleRef.current, { opacity: 0, y: 8 });
       featuresRef.current.forEach((ref) => {
-        if (ref) gsap.set(ref, { opacity: 0, y: 40 });
+        if (ref) gsap.set(ref, { opacity: 0, y: 12 });
       });
 
       // Entrance timeline
@@ -95,11 +95,6 @@ const PlatformFeatures: React.FC = () => {
       id="platform"
       className="py-12 lg:py-16 px-4 sm:px-6 lg:px-12 xl:px-20 text-white relative overflow-hidden"
     >
-      {/* Background Gradients */}
-      <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/50" />
-        <div className="absolute inset-0 bg-purple-600/5" />
-      </div>
 
       {/* Content */}
       <div className="relative z-10 max-w-7xl mx-auto">
@@ -123,11 +118,13 @@ const PlatformFeatures: React.FC = () => {
               ref={(el) => {
                 if (el) featuresRef.current[idx] = el;
               }}
-              className="relative group p-4 lg:p-6 bg-black/40 backdrop-blur-sm border border-purple-500/20 rounded-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(147,51,234,0.3)] hover:border-purple-500/50 hover:bg-black/60"
+              className="relative group p-4 lg:p-6 bg-black/40 backdrop-blur-sm rounded-lg transition-all duration-300 kimi-bottom-neon"
+              style={{ 
+                '--neon-color': 'rgba(168, 85, 247, 0.3)',
+                '--neon-hover-color': 'rgba(168, 85, 247, 0.5)',
+              } as React.CSSProperties}
               tabIndex={0}
             >
-              {/* Gradient glow on hover */}
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 via-purple-600/10 to-purple-600/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg" />
               
               <div className="relative z-10">
                 <span
@@ -157,15 +154,11 @@ const PlatformFeatures: React.FC = () => {
         </div>
       </div>
 
-      {/* Floating Orbs */}
-      <div className="absolute top-1/4 left-1/4 w-48 h-48 bg-purple-600/10 rounded-full blur-[80px] animate-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-amber-500/5 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
-
       {/* Custom Animations */}
       <style>{`
         @keyframes bounceSlow {
           0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-4px); }
+          50% { transform: translateY(-3px); }
         }
       `}</style>
     </section>

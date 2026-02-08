@@ -124,10 +124,10 @@ const ChallengeSystem: React.FC = () => {
   useEffect(() => {
     const ctx = gsap.context(() => {
       // Initial states
-      gsap.set(headingRef.current, { opacity: 0, y: 30 });
-      gsap.set(subtitleRef.current, { opacity: 0, y: 20 });
-      gsap.set(imageRef.current, { opacity: 0, y: 40 });
-      gsap.set(cardRef.current, { opacity: 0, y: 30 });
+      gsap.set(headingRef.current, { opacity: 0, y: 12 });
+      gsap.set(subtitleRef.current, { opacity: 0, y: 8 });
+      gsap.set(imageRef.current, { opacity: 0, y: 16 });
+      gsap.set(cardRef.current, { opacity: 0, y: 12 });
 
       // Entrance timeline
       const tl = gsap.timeline({
@@ -184,11 +184,6 @@ const ChallengeSystem: React.FC = () => {
   // -----------------------------
   return (
     <section ref={sectionRef} className="py-12 lg:py-16 relative overflow-hidden">
-      {/* Background Gradients */}
-      <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/50" />
-        <div className="absolute inset-0 bg-purple-600/5" />
-      </div>
 
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
         {/* Heading */}
@@ -246,7 +241,10 @@ const ChallengeSystem: React.FC = () => {
         {/* Rules / Explainer */}
         <Card
           ref={cardRef}
-          className="relative max-w-4xl mx-auto bg-black/40 backdrop-blur-sm border border-purple-500/20 rounded-lg transition-all duration-300 hover:scale-[1.01] hover:shadow-[0_0_40px_rgba(147,51,234,0.3)] hover:border-purple-500/50 hover:bg-black/60"
+          className="relative max-w-4xl mx-auto bg-black/40 backdrop-blur-sm rounded-lg transition-all duration-300 kimi-bottom-neon" style={{ 
+            '--neon-color': 'rgba(168, 85, 247, 0.3)',
+            '--neon-hover-color': 'rgba(168, 85, 247, 0.5)',
+          } as React.CSSProperties}
         >
           {/* Gradient glow on hover */}
           <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 via-purple-600/10 to-purple-600/0 opacity-0 hover:opacity-100 transition-opacity duration-300 rounded-lg" />
@@ -534,10 +532,6 @@ Unclear or unfair custom rules may be rejected.`}
           </CardContent>
         </Card>
       </div>
-
-      {/* Floating Orbs */}
-      <div className="absolute top-1/4 left-1/4 w-48 h-48 bg-purple-600/10 rounded-full blur-[80px] animate-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-amber-500/5 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '1s' }} />
 
       {/* Local styles just for this component */}
       <style>{`
