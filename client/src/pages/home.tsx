@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Navbar from "@/components/layout/navbar";
 import LiveActivityTicker from "@/components/LiveActivityTicker";
 import Footer from "@/components/layout/footer";
@@ -11,21 +11,64 @@ import LeaderboardPreview from "@/components/home/leaderboard-preview";
 import GameCategories from "@/components/home/game-categories";
 import CTASection from "@/components/home/cta-section";
 import { Helmet } from "react-helmet";
+import gsap from "gsap";
 
 const Home: React.FC = () => {
   const [contentRevealed, setContentRevealed] = useState(false);
+  const contentWrapperRef = useRef<HTMLDivElement>(null);
   const ogImage = "https://usdfg.pro/assets/usdfg-og-banner.webp"; // matches your file
   const canonical = "https://usdfg.pro/";
   
   const handleExploreClick = () => {
+    if (contentRevealed) return;
+    
     setContentRevealed(true);
-    // Smooth scroll to revealed content after a short delay (let animation start)
+    
+    // GSAP reveal animation - matching Kimi style
     setTimeout(() => {
-      const firstSection = document.querySelector('[aria-label="About Section"]');
-      if (firstSection) {
-        firstSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (contentWrapperRef.current) {
+        const sections = Array.from(contentWrapperRef.current.children);
+        
+        // Set initial states
+        gsap.set(contentWrapperRef.current, { 
+          opacity: 0,
+        });
+        
+        gsap.set(sections, { 
+          opacity: 0, 
+          y: 80,
+          scale: 0.9
+        });
+        
+        // Animate wrapper reveal with smooth entrance
+        const tl = gsap.timeline();
+        
+        tl.to(contentWrapperRef.current, {
+          opacity: 1,
+          duration: 0.6,
+          ease: 'power2.out',
+        })
+        .to(sections, {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          duration: 1,
+          ease: 'power3.out',
+          stagger: {
+            amount: 0.8,
+            from: "start"
+          },
+        }, '-=0.4');
+        
+        // Smooth scroll to revealed content
+        setTimeout(() => {
+          const firstSection = document.querySelector('[aria-label="About Section"]');
+          if (firstSection) {
+            firstSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 600);
       }
-    }, 300); // 300ms delay - animation is 1000ms total
+    }, 50);
   };
 
   return (
@@ -110,13 +153,13 @@ const Home: React.FC = () => {
           <HeroSection onExploreClick={handleExploreClick} />
         </section>
         
-        {/* Fade in content sections when "EXPLORE PLATFORM" is clicked */}
+        {/* Content sections - revealed with GSAP animation when "EXPLORE PLATFORM" is clicked */}
         <div 
-          className={`transition-all duration-1000 ease-in-out ${
-            contentRevealed 
-              ? 'opacity-100 translate-y-0' 
-              : 'opacity-0 translate-y-8 max-h-0 overflow-hidden pointer-events-none'
-          }`}
+          ref={contentWrapperRef}
+          className={contentRevealed ? '' : 'pointer-events-none'}
+          style={{ 
+            display: contentRevealed ? 'block' : 'none'
+          }}
         >
           <section aria-label="About Section">
             <AboutSection />

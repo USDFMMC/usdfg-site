@@ -223,10 +223,10 @@ const Privacy: React.FC = () => {
 
                   <div id="section-2" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 2. How We Use Data</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 2. How We Use Data</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p>We do not sell, profile, or track users across the internet. All data processing is limited to:</p>
                     <ul className="list-disc pl-5 space-y-2">
                       <li>Verifying wallet-based challenge participation</li>
@@ -238,48 +238,48 @@ const Privacy: React.FC = () => {
 
                   <div id="section-3" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 3. No Tracking or Profiling</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 3. No Tracking or Profiling</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p><span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent font-bold" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>USDFG does not use tracking pixels, fingerprinting scripts, cross-site cookies, or behavioral advertising systems.</span> We do not monitor users beyond the platform or build advertising profiles.</p>
                   </div>
 
                   {/* Technical Implementation */}
                   <div id="section-4" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 4. Platform Security</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 4. Platform Security</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p>While USDFG does not collect personal data, we apply technical safeguards (e.g., HTTPS encryption, code audits) to protect gameplay, transactions, and system integrity.</p>
                   </div>
 
                   <div id="section-5" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 5. Smart Contract Transparency</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 5. Smart Contract Transparency</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p>All core USDFG challenge and token contracts are publicly viewable on the Solana blockchain. Users are encouraged to review contract logic and interact only through the official platform interface.</p>
                   </div>
 
                   <div id="section-6" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 6. Audit & Security Notices</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 6. Audit & Security Notices</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p>While best efforts are made to review platform code, USDFG does not guarantee absolute security. Use of the platform is at your own risk. Known vulnerabilities should be reported to the USDFG team immediately for responsible disclosure.</p>
                   </div>
 
                   {/* User Experience */}
                   <div id="section-7" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 7. Cookies and Local Storage</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 7. Cookies and Local Storage</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p>We may use cookies or local storage to remember user preferences, such as:</p>
                     <ul className="list-disc pl-5 space-y-2">
                       <li>Dark mode settings</li>
@@ -291,10 +291,10 @@ const Privacy: React.FC = () => {
 
                   <div id="section-8" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 8. Third-Party Services</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 8. Third-Party Services</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p>USDFG integrates with external tools strictly for essential platform operations:</p>
                     <ul className="list-disc pl-5 space-y-2">
                       <li>Phantom Wallet – for wallet connection and transaction approval</li>
@@ -306,10 +306,10 @@ const Privacy: React.FC = () => {
                   {/* Data Management */}
                   <div id="section-9" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 9. Data Retention</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 9. Data Retention</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p>We retain only the minimum amount of system-level data needed to operate:</p>
                     <ul className="list-disc pl-5 space-y-2">
                       <li>No personal profiles</li>
@@ -320,29 +320,29 @@ const Privacy: React.FC = () => {
 
                   <div id="section-10" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 10. Data Location</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 10. Data Location</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p>USDFG infrastructure is hosted in the United States or on decentralized cloud services. All data interactions follow U.S. regulatory standards where applicable.</p>
                   </div>
 
                   <div id="section-11" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 11. Data Access Format</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 11. Data Access Format</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p>If you request access to your data, we will provide any stored system records linked to your wallet in a machine-readable format (e.g., JSON or CSV), where applicable.</p>
                   </div>
 
                   {/* User Rights & Compliance */}
                   <div id="section-12" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 12. Your Rights</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 12. Your Rights</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p>Depending on your jurisdiction, you may request to:</p>
                     <ul className="list-disc pl-5 space-y-2">
                       <li>Access data linked to your public wallet address</li>
@@ -354,105 +354,105 @@ const Privacy: React.FC = () => {
 
                   <div id="section-13" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 13. Global Compliance</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 13. Global Compliance</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p>USDFG aligns with major global data principles such as GDPR and CCPA by minimizing data processing, avoiding personal identifiers, and honoring data access or deletion requests when applicable. Users may contact us to exercise applicable rights.</p>
                   </div>
 
                   {/* Platform Features */}
                   <div id="section-14" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 14. Fair Play Monitoring</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 14. Fair Play Monitoring</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p>To maintain a fair competitive environment, USDFG may monitor gameplay activity, match logs, and behavior patterns for signs of cheating, abuse, or collusion. This data is processed anonymously and used strictly for enforcing platform rules.</p>
                   </div>
 
                   <div id="section-15" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 15. Non-Custodial Disclaimer</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 15. Non-Custodial Disclaimer</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p>USDFG is a non-custodial platform. Users hold and manage their own wallets and private keys. USDFG cannot assist with recovery of lost access, assets sent to incorrect addresses, or unauthorized transactions initiated from a user's wallet.</p>
                   </div>
 
                   <div id="section-16" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 16. Not a Security</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 16. Not a Security</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p>USDFG is not offered or intended to be a security, investment vehicle, or financial product. It has no profit expectation, voting rights, or dividend structure. USDFG is a utility token for skill-based participation only, and its legal structure is designed to comply with U.S. and global regulatory guidelines regarding digital assets.</p>
                   </div>
 
                   {/* Content & Governance */}
                   <div id="section-17" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 17. AI and User-Generated Content Usage</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 17. AI and User-Generated Content Usage</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p>By submitting, tagging, or creating content related to USDFG — including gameplay clips, memes, or commentary involving the brand, mascot, or platform — you grant USDFG a non-exclusive, royalty-free license to repost, remix, or use that content for marketing or community engagement. This includes AI-generated content incorporating USDFG themes.</p>
                   </div>
 
                   <div id="section-18" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 18. Community Governance (Non-Binding)</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 18. Community Governance (Non-Binding)</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p>If USDFG launches decentralized governance features or DAOs, participation is optional and non-binding unless clearly specified. DAO proposals do not override the platform's legal structure or ownership. Participation does not confer rights, control, or equity in the platform.</p>
                   </div>
 
                   {/* Platform Evolution */}
                   <div id="section-19" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 19. Platform Evolution</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 19. Platform Evolution</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p>USDFG may update features, integrate third-party tools, or expand use cases over time. Any new functionality will remain subject to these core privacy principles unless explicitly noted.</p>
                   </div>
 
                   <div id="section-20" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 20. Third-Party Hosted Events</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 20. Third-Party Hosted Events</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p>Tournaments or challenges hosted by external partners, streamers, or organizations using USDFG's infrastructure remain subject to these Terms. USDFG is not liable for rewards, results, or communications managed by third-party hosts. Users must verify host credibility before joining.</p>
                   </div>
 
                   {/* Policy Management */}
                   <div id="section-21" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 21. Policy Updates</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 21. Policy Updates</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p>We may update this Privacy Policy as the platform evolves. Major changes will be communicated via the platform or official channels.</p>
                   </div>
 
                   <div id="section-22" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 22. Children's Privacy</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 22. Children's Privacy</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p>USDFG is not intended for users under the age of 13, or the minimum legal age in your region.</p>
                     <p>We do not knowingly collect any data from minors.</p>
                   </div>
 
                   <div id="section-23" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 23. Contact</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ 23. Contact</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <div className="bg-black/40 backdrop-blur-sm border border-purple-500/20 rounded-lg p-6 shadow-[0_0_20px_rgba(147,51,234,0.2)] max-w-lg mx-auto hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(147,51,234,0.3)] transition-all">
                       <ul className="list-disc pl-5 space-y-2">
                         <li>📧 Email: <a href="mailto:founder@usdfg.pro" className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent hover:underline" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>founder@usdfg.pro</a> or <a href="mailto:support@usdfg.pro" className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent hover:underline" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>support@usdfg.pro</a></li>
@@ -463,10 +463,10 @@ const Privacy: React.FC = () => {
 
                   <div id="section-related" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ Related Policies</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>→ Related Policies</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
+                    <div className="border-t border-amber-400/30 mb-4"></div>
                     <p><a href="/terms" className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent underline hover:no-underline" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>View Terms of Service</a></p>
                   </div>
 

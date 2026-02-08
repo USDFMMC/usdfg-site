@@ -407,11 +407,11 @@ const LeaderboardPreview: React.FC = () => {
                                       : "bg-gradient-to-r from-amber-400/90 to-yellow-600/90 border-amber-400/50"
                                   } animate-fade-in-up`}
                                   >
-                                    {player.rankTitle === "Gold" && <Crown className="w-4 h-4 text-yellow-300 drop-shadow-glow animate-bounce" />}
-                                    {player.rankTitle === "Silver" && <Crown className="w-4 h-4 text-gray-200 drop-shadow-glow animate-bounce" />}
-                                    {player.rankTitle === "Bronze" && <Crown className="w-4 h-4 text-amber-400 drop-shadow-glow animate-bounce" />}
-                                    {player.rankTitle === "Platinum" && <Crown className="w-4 h-4 text-amber-200 drop-shadow-glow animate-bounce" />}
-                                    {player.rankTitle === "Ghostly" && <Crown className="w-4 h-4 text-purple-400 drop-shadow-glow animate-bounce" style={{ filter: 'drop-shadow(0 0 6px #a78bfa) drop-shadow(0 0 12px #fff)' }} />}
+                                    {player.rankTitle === "Gold" && <Crown className="w-4 h-4 text-yellow-300 animate-bounce" style={{ filter: 'drop-shadow(0 0 6px rgba(253, 224, 71, 0.6))' }} />}
+                                    {player.rankTitle === "Silver" && <Crown className="w-4 h-4 text-gray-200 animate-bounce" style={{ filter: 'drop-shadow(0 0 6px rgba(229, 231, 235, 0.6))' }} />}
+                                    {player.rankTitle === "Bronze" && <Crown className="w-4 h-4 text-amber-400 animate-bounce" style={{ filter: 'drop-shadow(0 0 6px rgba(251, 191, 36, 0.6))' }} />}
+                                    {player.rankTitle === "Platinum" && <Crown className="w-4 h-4 text-amber-200 animate-bounce" style={{ filter: 'drop-shadow(0 0 6px rgba(253, 230, 138, 0.6))' }} />}
+                                    {player.rankTitle === "Ghostly" && <Crown className="w-4 h-4 text-purple-400 animate-bounce" style={{ filter: 'drop-shadow(0 0 6px #a78bfa) drop-shadow(0 0 12px rgba(255,255,255,0.3))' }} />}
                                     <span className="ml-1">{player.rankTitle}</span>
                                   </span>
                                 </TooltipTrigger>
