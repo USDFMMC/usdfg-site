@@ -72,7 +72,7 @@ export default function LiveActivityTicker() {
   const displayItems = activityItems.concat(activityItems);
 
   return (
-    <div className="relative w-full overflow-hidden border-b border-white/10 bg-gradient-to-r from-black via-neutral-950 to-black">
+    <div className="relative w-full overflow-hidden border-b border-purple-500/20 bg-gradient-to-r from-black via-black/95 to-black shadow-[0_2px_15px_rgba(147,51,234,0.1)]">
       <div className="pointer-events-none absolute left-0 top-0 h-full w-16 bg-gradient-to-r from-black to-transparent z-10" />
       <div className="pointer-events-none absolute right-0 top-0 h-full w-16 bg-gradient-to-l from-black to-transparent z-10" />
 
@@ -82,9 +82,19 @@ export default function LiveActivityTicker() {
             <span key={index} className="mx-6 flex items-center gap-2">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400" style={{ boxShadow: "0 0 8px rgba(74, 222, 128, 0.5)" }} />
               </span>
-              <span className="text-yellow-400 font-semibold tracking-wide">Live</span>
+              <span 
+                className="font-semibold tracking-wide"
+                style={{
+                  background: "linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.4))",
+                }}
+              >
+                Live
+              </span>
               <span className={typeColor[item.type]}>· {item.text}</span>
             </span>
           ))}

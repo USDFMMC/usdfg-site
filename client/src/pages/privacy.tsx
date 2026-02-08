@@ -1,12 +1,70 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { Helmet } from "react-helmet";
 import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+gsap.registerPlugin(ScrollTrigger);
 
 const Privacy: React.FC = () => {
+  const mainRef = useRef<HTMLElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const introRef = useRef<HTMLDivElement>(null);
+  const badgesRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLElement>(null);
+
   useEffect(() => {
     // Smooth scroll to top when component mounts
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  // GSAP Animations
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      // Initial states
+      gsap.set(headingRef.current, { opacity: 0, y: 30 });
+      gsap.set(introRef.current, { opacity: 0, y: 20 });
+      gsap.set(badgesRef.current, { opacity: 0, y: 20 });
+
+      // Entrance timeline
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: mainRef.current,
+          start: 'top 80%',
+          toggleActions: 'play none none none',
+        },
+      });
+
+      tl.to(headingRef.current, {
+        opacity: 1,
+        y: 0,
+        duration: 0.8,
+        ease: 'power3.out',
+      })
+        .to(
+          introRef.current,
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.6,
+            ease: 'power3.out',
+          },
+          '-=0.5'
+        )
+        .to(
+          badgesRef.current,
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.6,
+            ease: 'power3.out',
+          },
+          '-=0.4'
+        );
+    }, mainRef);
+
+    return () => ctx.revert();
   }, []);
 
   return (
@@ -61,11 +119,11 @@ const Privacy: React.FC = () => {
       <Navbar />
       <div className="relative flex flex-col md:flex-row">
         {/* Sticky Table of Contents for desktop */}
-        <nav className="hidden md:block md:w-64 sticky top-24 h-fit self-start px-2 py-6 mr-8 bg-[#0b0b0c]/80 border border-cyan-400/30 rounded-lg shadow-[0_0_12px_#22d3ee22] mt-12 animate-fade-in">
-          <h2 className="text-cyan-400 font-bold text-lg mb-4 tracking-wide">On This Page</h2>
-          <ul className="space-y-2 text-cyan-200 text-sm">
-            <li><a href="#section-1" className="hover:text-white transition">What We Collect</a></li>
-            <li><a href="#section-2" className="hover:text-white transition">How We Use Data</a></li>
+        <nav className="hidden md:block md:w-64 sticky top-24 h-fit self-start px-4 py-6 mr-8 bg-black/40 backdrop-blur-sm border border-purple-500/20 rounded-lg shadow-[0_0_15px_rgba(147,51,234,0.2)] mt-12 animate-fade-in hover:border-purple-500/50 hover:shadow-[0_0_25px_rgba(147,51,234,0.3)] transition-all toc-nav">
+          <h2 className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent font-bold text-lg mb-4 tracking-wide" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.3))" }}>On This Page</h2>
+          <ul className="space-y-2 text-white/70 text-sm toc-list" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+            <li><a href="#section-1" className="hover:text-amber-300 transition">What We Collect</a></li>
+            <li><a href="#section-2" className="hover:text-amber-300 transition">How We Use Data</a></li>
             <li><a href="#section-3" className="hover:text-white transition">No Tracking or Profiling</a></li>
             <li><a href="#section-4" className="hover:text-white transition">Platform Security</a></li>
             <li><a href="#section-5" className="hover:text-white transition">Smart Contract Transparency</a></li>
@@ -90,39 +148,59 @@ const Privacy: React.FC = () => {
             <li><a href="#section-related" className="hover:text-white transition">Related Policies</a></li>
           </ul>
         </nav>
-        <main className="min-h-screen bg-gradient-to-b from-[#181c2f] via-[#1a142e] to-[#181c2f] flex-1 text-cyan-100">
-          <div className="container mx-auto px-4 py-12 sm:py-16 md:py-20">
-            <p className="text-center text-sm text-neutral-400 italic mb-6">
+        <main ref={mainRef} className="min-h-screen bg-gradient-to-b from-black via-black/95 to-black flex-1 text-white relative overflow-hidden">
+          {/* Background Gradients */}
+          <div className="absolute inset-0 z-0">
+            <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/50" />
+            <div className="absolute inset-0 bg-purple-600/5" />
+          </div>
+
+          {/* Floating Orbs */}
+          <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-purple-600/10 rounded-full blur-[100px] animate-pulse z-[1]" />
+          <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-amber-500/5 rounded-full blur-[80px] animate-pulse z-[1]" style={{ animationDelay: '1s' }} />
+
+          <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20 py-12 sm:py-16 md:py-20">
+            <p className="text-center text-sm md:text-base text-white/70 italic mb-6 leading-relaxed">
               No mercy. No reruns. Just skill.
             </p>
-            <h1 className="text-4xl sm:text-5xl font-bold mb-8 text-center"
+            <h1
+              ref={headingRef}
+              className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-8 text-center"
+              style={{
+                textShadow: "0 0 20px rgba(255, 255, 255, 0.3)",
+              }}
+            >
+              <span
+                className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent"
                 style={{
-                  color: 'var(--text-light)',
-                  textShadow: 'var(--neon-glow)'
-                }}>
-              Privacy Policy
+                  textShadow: "0 0 20px rgba(251, 191, 36, 0.4)",
+                  filter: "drop-shadow(0 0 8px rgba(251, 191, 36, 0.3))",
+                }}
+              >
+                Privacy Policy
+              </span>
             </h1>
 
             {/* Why This Policy Matters */}
-            <div className="max-w-2xl mx-auto mb-6 text-center animate-fade-in">
-              <p className="text-lg font-semibold text-cyan-400 mb-2">Why This Policy Matters</p>
-              <p className="text-base text-white/90">USDFG is built for elite gamers and crypto users who demand privacy, transparency, and self-custody. This policy explains exactly how we protect your data and your rights—no fine print, no hidden tracking, ever.</p>
+            <div ref={introRef} className="max-w-2xl mx-auto mb-6 lg:mb-8 text-center">
+              <p className="text-lg lg:text-xl font-semibold mb-2 bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.3))" }}>Why This Policy Matters</p>
+              <p className="text-base lg:text-lg text-white/80 leading-relaxed">USDFG is built for elite gamers and crypto users who demand privacy, transparency, and self-custody. This policy explains exactly how we protect your data and your rights—no fine print, no hidden tracking, ever.</p>
             </div>
 
             {/* Trust Badges */}
-            <div className="flex flex-wrap justify-center gap-4 mb-8 animate-fade-in">
-              <span className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-[#0b0b0c] border border-cyan-400 text-cyan-300 font-bold shadow-[0_0_8px_#22d3ee] text-sm">100% Non-Custodial</span>
-              <span className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-[#0b0b0c] border border-cyan-400 text-cyan-300 font-bold shadow-[0_0_8px_#22d3ee] text-sm">No Tracking</span>
-              <span className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-[#0b0b0c] border border-cyan-400 text-cyan-300 font-bold shadow-[0_0_8px_#22d3ee] text-sm">GDPR Aligned</span>
-              <span className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-[#0b0b0c] border border-cyan-400 text-cyan-300 font-bold shadow-[0_0_8px_#22d3ee] text-sm">Self-Custody</span>
+            <div ref={badgesRef} className="flex flex-wrap justify-center gap-4 mb-8 lg:mb-12">
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black/40 backdrop-blur-sm border border-purple-500/20 text-white font-bold shadow-[0_0_15px_rgba(147,51,234,0.2)] hover:border-purple-500/50 hover:shadow-[0_0_20px_rgba(147,51,234,0.3)] transition-all text-sm">100% Non-Custodial</span>
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black/40 backdrop-blur-sm border border-purple-500/20 text-white font-bold shadow-[0_0_15px_rgba(147,51,234,0.2)] hover:border-purple-500/50 hover:shadow-[0_0_20px_rgba(147,51,234,0.3)] transition-all text-sm">No Tracking</span>
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black/40 backdrop-blur-sm border border-purple-500/20 text-white font-bold shadow-[0_0_15px_rgba(147,51,234,0.2)] hover:border-purple-500/50 hover:shadow-[0_0_20px_rgba(147,51,234,0.3)] transition-all text-sm">GDPR Aligned</span>
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black/40 backdrop-blur-sm border border-purple-500/20 text-white font-bold shadow-[0_0_15px_rgba(147,51,234,0.2)] hover:border-purple-500/50 hover:shadow-[0_0_20px_rgba(147,51,234,0.3)] transition-all text-sm">Self-Custody</span>
             </div>
 
             {/* Last Updated Notice */}
-            <div className="text-center mb-8 animate-fade-in">
-              <span className="inline-block px-4 py-1 rounded bg-[#0b0b0c] border border-cyan-400 text-cyan-200 font-medium text-xs tracking-wide shadow-[0_0_8px_#22d3ee]">Last Updated: May 1, 2025 &nbsp;|&nbsp; Version: v1.0</span>
+            <div className="text-center mb-8 lg:mb-12">
+              <span className="inline-block px-4 py-2 rounded bg-black/40 backdrop-blur-sm border border-purple-500/20 text-white/80 font-medium text-xs tracking-wide shadow-[0_0_15px_rgba(147,51,234,0.2)] hover:border-purple-500/50 transition-all">Last Updated: May 1, 2025 &nbsp;|&nbsp; Version: v1.0</span>
             </div>
 
-            <section className="whitepaper-section max-w-4xl mx-auto bg-[#111]/90 border border-[#22d3ee] p-6 sm:p-8 rounded-lg shadow-lg mb-10 transform transition-all duration-300 hover:scale-[1.01] hover:shadow-[0_0_20px_rgba(34,211,238,0.3)]">
+            <section ref={contentRef} className="whitepaper-section max-w-4xl mx-auto bg-black/40 backdrop-blur-sm border border-purple-500/20 p-6 sm:p-8 lg:p-10 rounded-lg shadow-lg mb-10 transform transition-all duration-300 hover:scale-[1.01] hover:shadow-[0_0_40px_rgba(147,51,234,0.3)] hover:border-purple-500/50">
               <div className="prose prose-invert max-w-none">
                 <p className="text-base sm:text-lg mb-8 text-white">USDFG is built on the principles of decentralization, skill-based competition, and user sovereignty. We minimize data exposure, do not host accounts, and never collect personal identifiers.</p>
                 
@@ -130,11 +208,11 @@ const Privacy: React.FC = () => {
                   {/* Core Privacy Principles */}
                   <div id="section-1" className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="inline-block w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                      <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 1. What We Collect</h3>
+                      <span className="inline-block w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]"></span>
+                      <h3 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent tracking-wide" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.3))" }}>→ 1. What We Collect</h3>
                     </div>
-                    <div className="border-t border-cyan-400/30 mb-4"></div>
-                    <p>USDFG does not collect or store personal data such as names, emails, or passwords. The platform is fully <span className="text-cyan-400 font-bold">non-custodial</span> — we do not manage wallets or user accounts.</p>
+                    <div className="border-t border-purple-500/30 mb-4"></div>
+                    <p>USDFG does not collect or store personal data such as names, emails, or passwords. The platform is fully <span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent font-bold" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>non-custodial</span> — we do not manage wallets or user accounts.</p>
                     <p>We may process limited public and system-level data strictly for platform functionality:</p>
                     <ul className="list-disc pl-5 space-y-2">
                       <li>Public wallet addresses – used to verify challenge entries and reward eligibility</li>
@@ -164,7 +242,7 @@ const Privacy: React.FC = () => {
                       <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 3. No Tracking or Profiling</h3>
                     </div>
                     <div className="border-t border-cyan-400/30 mb-4"></div>
-                    <p><span className="text-cyan-400 font-bold">USDFG does not use tracking pixels, fingerprinting scripts, cross-site cookies, or behavioral advertising systems.</span> We do not monitor users beyond the platform or build advertising profiles.</p>
+                    <p><span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent font-bold" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>USDFG does not use tracking pixels, fingerprinting scripts, cross-site cookies, or behavioral advertising systems.</span> We do not monitor users beyond the platform or build advertising profiles.</p>
                   </div>
 
                   {/* Technical Implementation */}
@@ -375,10 +453,10 @@ const Privacy: React.FC = () => {
                       <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ 23. Contact</h3>
                     </div>
                     <div className="border-t border-cyan-400/30 mb-4"></div>
-                    <div className="bg-[#0b0b0c] border border-cyan-400 rounded-lg p-6 shadow-[0_0_16px_rgba(72,216,255,0.2)] max-w-lg mx-auto">
+                    <div className="bg-black/40 backdrop-blur-sm border border-purple-500/20 rounded-lg p-6 shadow-[0_0_20px_rgba(147,51,234,0.2)] max-w-lg mx-auto hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(147,51,234,0.3)] transition-all">
                       <ul className="list-disc pl-5 space-y-2">
-                        <li>📧 Email: <a href="mailto:founder@usdfg.pro" className="text-[#22d3ee] hover:underline">founder@usdfg.pro</a> or <a href="mailto:support@usdfg.pro" className="text-[#22d3ee] hover:underline">support@usdfg.pro</a></li>
-                        <li>🐦 Twitter/X: <a href="https://twitter.com/USDFGAMING" className="text-[#22d3ee] hover:underline">@USDFGAMING</a></li>
+                        <li>📧 Email: <a href="mailto:founder@usdfg.pro" className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent hover:underline" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>founder@usdfg.pro</a> or <a href="mailto:support@usdfg.pro" className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent hover:underline" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>support@usdfg.pro</a></li>
+                        <li>🐦 Twitter/X: <a href="https://twitter.com/USDFGAMING" className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent hover:underline" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>@USDFGAMING</a></li>
                       </ul>
                     </div>
                   </div>
@@ -389,16 +467,16 @@ const Privacy: React.FC = () => {
                       <h3 className="text-xl font-semibold text-[#22d3ee] tracking-wide">→ Related Policies</h3>
                     </div>
                     <div className="border-t border-cyan-400/30 mb-4"></div>
-                    <p><a href="/terms" className="text-[#22d3ee] hover:underline">View Terms of Service</a></p>
+                    <p><a href="/terms" className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent underline hover:no-underline" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>View Terms of Service</a></p>
                   </div>
 
-                  <div className="mt-8 pt-8 border-t border-[#22d3ee]/30 text-center">
-                    <h3 className="text-xl font-semibold text-[#22d3ee] mb-4">🔚 Closing Statement</h3>
-                    <p>USDFG is founded on self-custody, transparency, and zero reliance on centralized infrastructure.</p>
-                    <p>We believe in proof over promises — and protecting our players from exploitation at every step.</p>
+                  <div className="mt-8 pt-8 border-t border-purple-500/30 text-center">
+                    <h3 className="text-xl font-semibold mb-4 bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.3))" }}>🔚 Closing Statement</h3>
+                    <p className="text-white/80">USDFG is founded on self-custody, transparency, and zero reliance on centralized infrastructure.</p>
+                    <p className="text-white/80">We believe in proof over promises — and protecting our players from exploitation at every step.</p>
                     <div className="mt-8 flex flex-col items-center">
-                      <span className="text-cyan-400 font-bold text-lg">Hussein Ali</span>
-                      <span className="text-neutral-400 text-xs">Founder, USDFGAMING</span>
+                      <span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent font-bold text-lg" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.3))" }}>Hussein Ali</span>
+                      <span className="text-white/60 text-xs">Founder, USDFGAMING</span>
                     </div>
                   </div>
                 </div>
@@ -412,7 +490,7 @@ const Privacy: React.FC = () => {
       {/* Back to Top Button */}
       <button
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-        className="fixed bottom-6 right-6 z-50 bg-[#0b0b0c] border border-cyan-400 text-cyan-200 rounded-full px-4 py-2 shadow-[0_0_12px_#22d3ee] hover:bg-cyan-400 hover:text-[#0b0b0c] transition-all duration-300 text-sm font-bold md:block hidden"
+        className="fixed bottom-6 right-6 z-50 bg-black/40 backdrop-blur-sm border border-purple-500/20 text-white rounded-full px-4 py-2 shadow-[0_0_15px_rgba(147,51,234,0.3)] hover:bg-gradient-to-r hover:from-purple-600 hover:to-amber-500 hover:border-purple-500/50 hover:shadow-[0_0_25px_rgba(147,51,234,0.5)] transition-all duration-300 text-sm font-bold md:block hidden"
         aria-label="Back to Top"
       >
         ↑ Back to Top
@@ -526,12 +604,47 @@ const Privacy: React.FC = () => {
         }
 
         ::-webkit-scrollbar-thumb {
-          background: #22d3ee;
+          background: rgba(147, 51, 234, 0.5);
           border-radius: 4px;
         }
 
         ::-webkit-scrollbar-thumb:hover {
-          background: #67e8f9;
+          background: rgba(147, 51, 234, 0.8);
+        }
+
+        /* TOC Navigation Styling */
+        .toc-nav ul::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .toc-nav ul::-webkit-scrollbar-track {
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: 3px;
+        }
+
+        .toc-nav ul::-webkit-scrollbar-thumb {
+          background: rgba(147, 51, 234, 0.4);
+          border-radius: 3px;
+        }
+
+        .toc-nav ul::-webkit-scrollbar-thumb:hover {
+          background: rgba(147, 51, 234, 0.6);
+        }
+
+        .toc-list a {
+          display: block;
+          padding: 0.25rem 0.5rem;
+          border-radius: 0.25rem;
+          transition: all 0.2s ease;
+        }
+
+        .toc-list a:hover {
+          background: rgba(147, 51, 234, 0.1);
+          padding-left: 0.75rem;
+        }
+
+        .toc-list a:active {
+          color: rgba(251, 191, 36, 1);
         }
       `}</style>
     </>

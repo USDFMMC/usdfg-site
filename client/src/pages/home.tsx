@@ -95,11 +95,15 @@ const Home: React.FC = () => {
 
       <Navbar />
       <LiveActivityTicker />
-      <main id="main-content" role="main" aria-label="Homepage Main Content" className="min-h-screen flex-1 relative overflow-hidden bg-[#07080C]">
-        {/* Elite Background - Simplified */}
-        <div className="fixed inset-0 -z-10 bg-[#07080C]">
-          {/* Single subtle glow */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-amber-400/5 rounded-full blur-3xl" />
+      <main id="main-content" role="main" aria-label="Homepage Main Content" className="min-h-screen flex-1 relative overflow-hidden bg-black">
+        {/* Elite Background - Matching Hero Design */}
+        <div className="fixed inset-0 -z-10 bg-black">
+          {/* Gradient overlays */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black via-black/95 to-black" />
+          <div className="absolute inset-0 bg-purple-600/5" />
+          {/* Floating orbs */}
+          <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-amber-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
         </div>
         
         <section aria-label="Hero Section" className="relative z-10">
