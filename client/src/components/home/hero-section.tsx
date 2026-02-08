@@ -204,8 +204,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
               ref={subtitleRef}
               className="neocore-body mb-4 max-w-2xl text-lg sm:text-xl text-white/70 leading-relaxed"
             >
-              USDFG wasn't built for everyone.<br />
-              It was built for the ones who don't blink.
+              Join the world's premier esports crypto ecosystem. Challenge players, manage tournaments, and turn your skill into rewards. The arena awaits your arrival.
             </p>
 
             <div
