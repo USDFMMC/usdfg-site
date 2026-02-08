@@ -3,6 +3,10 @@ import { Helmet } from "react-helmet";
 import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
 import { FaLock, FaTrophy, FaUsers, FaChartLine, FaRocket, FaMobileAlt, FaGamepad, FaCheckCircle, FaGavel, FaUserShield, FaShieldAlt, FaBalanceScale, FaGlobe } from "react-icons/fa";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+gsap.registerPlugin(ScrollTrigger);
 
 // Removed custom hooks - they were causing useRef dispatcher errors
 
@@ -25,10 +29,10 @@ const tokenomics = [
   { percent: 10, label: "Rewards & Challenges", desc: "Used for player tournaments, no-fee hosted matches, new user onboarding, and promotional challenge pools." },
 ];
 
-const roadmap = [
-  {
-    icon: <FaRocket className="text-cyan-400 text-2xl" />, 
-    title: "Phase 1 – Foundation (2025)",
+  const roadmap = [
+    {
+      icon: <FaRocket className="text-amber-400 text-2xl" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.4))" }} />, 
+      title: "Phase 1 – Foundation (2025)",
     items: [
       "Platform launch: 100% skill-based, no gambling, no staking.",
       "Legal review and compliance in all supported regions.",
@@ -36,7 +40,7 @@ const roadmap = [
     ]
   },
   {
-    icon: <FaGamepad className="text-cyan-400 text-2xl" />, 
+    icon: <FaGamepad className="text-amber-400 text-2xl" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.4))" }} />, 
     title: "Phase 2 – Challenge Expansion (2025-2026)",
     items: [
       "Add new skill-based game categories.",
@@ -45,7 +49,7 @@ const roadmap = [
     ]
   },
   {
-    icon: <FaChartLine className="text-cyan-400 text-2xl" />, 
+    icon: <FaChartLine className="text-amber-400 text-2xl" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.4))" }} />, 
     title: "Phase 3 – Globalization & Governance (2026+)",
     items: [
       "Global legal review and compliance expansion.",
@@ -192,155 +196,180 @@ const Whitepaper: React.FC = () => {
       <Navbar />
       <div className="relative flex flex-col md:flex-row">
         {/* Sticky Table of Contents for desktop */}
-        <nav className="hidden md:block md:w-64 sticky top-24 h-fit self-start px-2 py-6 mr-8 bg-[#0b0b0c]/90 border border-cyan-400/20 rounded-lg shadow-none mt-12 animate-fade-in">
-          <h2 className="text-cyan-400 font-bold text-lg mb-4 tracking-wide">On This Page</h2>
-          <ul className="space-y-2 text-cyan-200 text-sm" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+        <nav className="hidden md:block md:w-64 sticky top-24 h-fit self-start px-4 py-6 mr-8 bg-black/40 backdrop-blur-sm border border-purple-500/20 rounded-lg shadow-[0_0_15px_rgba(147,51,234,0.2)] mt-12 animate-fade-in hover:border-purple-500/50 hover:shadow-[0_0_25px_rgba(147,51,234,0.3)] transition-all toc-nav">
+          <h2 className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent font-bold text-lg mb-4 tracking-wide" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.3))" }}>On This Page</h2>
+          <ul className="space-y-2 text-white/70 text-sm toc-list" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
             {toc.map((item) => (
-              <li key={item.id}><a href={`#${item.id}`} className="hover:text-white transition">{item.label}</a></li>
+              <li key={item.id}><a href={`#${item.id}`} className="hover:text-amber-300 transition">{item.label}</a></li>
             ))}
           </ul>
         </nav>
-        <main className="min-h-screen bg-gradient-to-b from-[#181c2f] via-[#1a142e] to-[#181c2f] flex-1 text-cyan-100">
-          <div className="container mx-auto px-4 py-12 sm:py-16 md:py-20">
+        <main className="min-h-screen bg-gradient-to-b from-black via-black/95 to-black flex-1 text-white relative overflow-hidden">
+          {/* Background Gradients */}
+          <div className="absolute inset-0 z-0">
+            <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/50" />
+            <div className="absolute inset-0 bg-purple-600/5" />
+          </div>
+
+          {/* Floating Orbs */}
+          <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-purple-600/10 rounded-full blur-[100px] animate-pulse z-[1]" />
+          <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-amber-500/5 rounded-full blur-[80px] animate-pulse z-[1]" style={{ animationDelay: '1s' }} />
+          <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20 py-12 sm:py-16 md:py-20">
             {/* Animated Logo */}
             <div className="flex justify-center mb-6 mt-8">
               <img
                 src="/assets/usdfgtoken.png"
                 alt="USDFG Logo"
-                className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full border-2 border-cyan-400 shadow-[0_0_32px_#22d3ee99] animate-float"
+                className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full border-2 border-purple-500/50 shadow-[0_0_32px_rgba(147,51,234,0.4)] animate-float"
                 style={{ background: 'rgba(11,11,12,0.7)' }}
               />
             </div>
-            <div className="max-w-2xl mx-auto mb-8 mt-8 px-6 py-4 rounded-xl bg-gradient-to-br from-white/10 to-[#a78bfa22] border border-purple-700/40 shadow-lg backdrop-blur-md animate-fade-in">
-              <p className="text-base md:text-lg text-white/90 text-center">
-                <span className="font-bold text-cyan-300">Disclaimer</span><br />
-                USDFG is a decentralized utility token for gameplay and access within the USDFGAMING platform. It is not a security, equity, or financial investment. There are no promises of profit, yield, or guaranteed value. All use is performance-based, skill-driven, and non-custodial. Participation is optional and self-directed. See our <a href="/terms" className="text-blue-400 hover:text-cyan-300 transition-colors underline">Terms of Service</a> and <a href="/privacy" className="text-blue-400 hover:text-cyan-300 transition-colors underline">Privacy Policy</a> for full details.
+            <div className="max-w-2xl mx-auto mb-8 mt-8 px-6 py-4 rounded-xl bg-black/40 backdrop-blur-sm border border-purple-500/20 shadow-lg hover:border-purple-500/50 transition-all animate-fade-in">
+              <p className="text-base md:text-lg text-white/80 text-center leading-relaxed">
+                <span className="font-bold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>Disclaimer</span><br />
+                USDFG is a decentralized utility token for gameplay and access within the USDFGAMING platform. It is not a security, equity, or financial investment. There are no promises of profit, yield, or guaranteed value. All use is performance-based, skill-driven, and non-custodial. Participation is optional and self-directed. See our <a href="/terms" className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent underline hover:no-underline" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>Terms of Service</a> and <a href="/privacy" className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent underline hover:no-underline" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>Privacy Policy</a> for full details.
               </p>
             </div>
-            <h1 className="text-4xl sm:text-5xl font-bold mb-2 mt-8 text-center animate-fade-in" style={{ color: 'var(--text-light)', textShadow: 'var(--neon-glow)' }}>USDFG Whitepaper</h1>
-            <div className="text-xl sm:text-2xl font-extrabold text-cyan-400 drop-shadow-glow animate-fade-in mb-4 text-center mt-1" style={{textShadow:'0 0 8px #22d3ee, 0 0 16px #a78bfa'}}>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-2 mt-8 text-center animate-fade-in" style={{ textShadow: "0 0 20px rgba(255, 255, 255, 0.3)" }}>
+              <span
+                className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent"
+                style={{
+                  textShadow: "0 0 20px rgba(251, 191, 36, 0.4)",
+                  filter: "drop-shadow(0 0 8px rgba(251, 191, 36, 0.3))",
+                }}
+              >
+                USDFG Whitepaper
+              </span>
+            </h1>
+            <div className="text-xl sm:text-2xl font-extrabold animate-fade-in mb-4 text-center mt-1" style={{
+              background: "linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              textShadow: "0 0 20px rgba(251, 191, 36, 0.4)",
+              filter: "drop-shadow(0 0 8px rgba(251, 191, 36, 0.3))"
+            }}>
               The Token of Gaming
             </div>
             <div className="flex flex-wrap justify-center gap-x-3 gap-y-2 mt-2 mb-6 animate-fade-in">
-              <span className="px-3 py-1 rounded-full bg-neutral-800 border border-cyan-500/30 text-xs font-medium">100% Non-Custodial</span>
-              <span className="px-3 py-1 rounded-full bg-neutral-800 border border-cyan-500/30 text-xs font-medium">No Gambling</span>
-              <span className="px-3 py-1 rounded-full bg-neutral-800 border border-cyan-500/30 text-xs font-medium">Skill-Based Only</span>
-              <span className="px-3 py-1 rounded-full bg-neutral-800 border border-cyan-500/30 text-xs font-medium">Self-Custody</span>
-              <span className="px-3 py-1 rounded-full bg-neutral-800 border border-cyan-500/30 text-xs font-medium">Global Compliance</span>
+              <span className="px-3 py-2 rounded-full bg-black/40 backdrop-blur-sm border border-purple-500/20 text-white text-xs font-medium shadow-[0_0_15px_rgba(147,51,234,0.2)] hover:border-purple-500/50 transition-all">100% Non-Custodial</span>
+              <span className="px-3 py-2 rounded-full bg-black/40 backdrop-blur-sm border border-purple-500/20 text-white text-xs font-medium shadow-[0_0_15px_rgba(147,51,234,0.2)] hover:border-purple-500/50 transition-all">No Gambling</span>
+              <span className="px-3 py-2 rounded-full bg-black/40 backdrop-blur-sm border border-purple-500/20 text-white text-xs font-medium shadow-[0_0_15px_rgba(147,51,234,0.2)] hover:border-purple-500/50 transition-all">Skill-Based Only</span>
+              <span className="px-3 py-2 rounded-full bg-black/40 backdrop-blur-sm border border-purple-500/20 text-white text-xs font-medium shadow-[0_0_15px_rgba(147,51,234,0.2)] hover:border-purple-500/50 transition-all">Self-Custody</span>
+              <span className="px-3 py-2 rounded-full bg-black/40 backdrop-blur-sm border border-purple-500/20 text-white text-xs font-medium shadow-[0_0_15px_rgba(147,51,234,0.2)] hover:border-purple-500/50 transition-all">Global Compliance</span>
             </div>
             
             {/* Why This Whitepaper Matters */}
-            <section id="intro" className="max-w-2xl mx-auto mb-6 text-center animate-fade-in">
-              <p className="text-lg font-semibold text-cyan-400 mb-2">Why This Whitepaper Matters</p>
-              <p className="text-base text-white/90">USDFGAMING is built for elite gamers and crypto users who value skill, fairness, and full control. This platform was designed to reward performance — not purchases. Everything is decentralized, transparent, and self-custodial. USDFG isn't built for passive gain. It's built for those who compete with purpose.</p>
+            <section id="intro" className="max-w-2xl mx-auto mb-6 lg:mb-8 text-center animate-fade-in">
+              <p className="text-lg lg:text-xl font-semibold mb-2 bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.3))" }}>Why This Whitepaper Matters</p>
+              <p className="text-base lg:text-lg text-white/80 leading-relaxed">USDFGAMING is built for elite gamers and crypto users who value skill, fairness, and full control. This platform was designed to reward performance — not purchases. Everything is decentralized, transparent, and self-custodial. USDFG isn't built for passive gain. It's built for those who compete with purpose.</p>
             </section>
 
             {/* Last Updated Notice */}
-            <div className="text-center mb-8 animate-fade-in">
-              <span className="mt-4 inline-block rounded-md px-3 py-1 text-xs bg-neutral-800 border border-cyan-500/20 text-cyan-300 font-medium">Last Updated: May 2025 &nbsp;|&nbsp; Version: v2.0</span>
+            <div className="text-center mb-8 lg:mb-12 animate-fade-in">
+              <span className="mt-4 inline-block rounded-md px-4 py-2 text-xs bg-black/40 backdrop-blur-sm border border-purple-500/20 text-white/80 font-medium shadow-[0_0_15px_rgba(147,51,234,0.2)] hover:border-purple-500/50 transition-all">Last Updated: May 2025 &nbsp;|&nbsp; Version: v2.0</span>
             </div>
 
             {/* Vision & Mission */}
-            <section id="vision" className="whitepaper-section max-w-4xl mx-auto bg-[#111]/90 border border-[#22d3ee] p-6 sm:p-8 rounded-lg shadow-lg mb-10 animate-fade-in">
+            <section id="vision" className="whitepaper-section max-w-4xl mx-auto bg-black/40 backdrop-blur-sm border border-purple-500/20 p-6 sm:p-8 lg:p-10 rounded-lg shadow-lg mb-10 animate-fade-in hover:shadow-[0_0_40px_rgba(147,51,234,0.3)] hover:border-purple-500/50 transition-all">
               <div className="prose prose-invert max-w-none">
-                <h2 className="text-2xl font-bold text-cyan-400 mb-4 flex items-center gap-2"><FaTrophy className="text-purple-400" /> Vision & Mission</h2>
-                <p className="text-white mb-4 text-lg font-semibold">USDFGAMING exists to prove that <span className="text-cyan-300 font-bold">skill—not luck—defines success</span>.</p>
-                <p className="text-white mb-2">Our mission is to build the world's most trusted competitive platform: one where every match is earned, every reward is real, and every user stays in control.</p>
-                <p className="text-cyan-300 font-bold mt-4">No middlemen. No house. Just you, your wallet, and your skill.</p>
+                <h2 className="text-2xl font-bold mb-4 flex items-center gap-2 bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.3))" }}><FaTrophy className="text-amber-400" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.4))" }} /> Vision & Mission</h2>
+                <p className="text-white/90 mb-4 text-lg font-semibold">USDFGAMING exists to prove that <span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent font-bold" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>skill—not luck—defines success</span>.</p>
+                <p className="text-white/80 mb-2 leading-relaxed">Our mission is to build the world's most trusted competitive platform: one where every match is earned, every reward is real, and every user stays in control.</p>
+                <p className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent font-bold mt-4" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.3))" }}>No middlemen. No house. Just you, your wallet, and your skill.</p>
               </div>
             </section>
 
             {/* Token Utility & Legal Framing */}
-            <section id="utility" className="whitepaper-section max-w-4xl mx-auto bg-[#111]/90 border border-[#22d3ee] p-6 sm:p-8 rounded-lg shadow-lg mb-10 animate-fade-in">
+            <section id="utility" className="whitepaper-section max-w-4xl mx-auto bg-black/40 backdrop-blur-sm border border-purple-500/20 p-6 sm:p-8 lg:p-10 rounded-lg shadow-lg mb-10 animate-fade-in hover:shadow-[0_0_40px_rgba(147,51,234,0.3)] hover:border-purple-500/50 transition-all">
               <div className="prose prose-invert max-w-none">
-                <h2 className="text-2xl font-bold text-cyan-400 mb-4 flex items-center gap-2"><FaUserShield className="text-purple-400" /> Token Utility & Legal Framing</h2>
-                <p className="text-white mb-2">USDFG is a utility token designed for skill-based access, challenge entry, and verifiable rewards.</p>
-                <p className="text-white mb-2">It is not a security, investment, or speculative asset. USDFG offers no staking, no passive yield, and no financial guarantees — all use is non-custodial and performance-based.</p>
-                <p className="text-white mb-2">Users retain full control of their wallets and assets at all times. No part of USDFG or this platform is structured for financial gain. <a href="/terms" className="text-blue-400 hover:text-cyan-300 transition-colors underline">See our Terms of Service</a> for full legal details.</p>
+                <h2 className="text-2xl font-bold mb-4 flex items-center gap-2 bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.3))" }}><FaUserShield className="text-amber-400" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.4))" }} /> Token Utility & Legal Framing</h2>
+                <p className="text-white/80 mb-2 leading-relaxed">USDFG is a utility token designed for skill-based access, challenge entry, and verifiable rewards.</p>
+                <p className="text-white/80 mb-2 leading-relaxed">It is not a security, investment, or speculative asset. USDFG offers no staking, no passive yield, and no financial guarantees — all use is non-custodial and performance-based.</p>
+                <p className="text-white/80 mb-2 leading-relaxed">Users retain full control of their wallets and assets at all times. No part of USDFG or this platform is structured for financial gain. <a href="/terms" className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent hover:underline" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>See our Terms of Service</a> for full legal details.</p>
               </div>
             </section>
 
             {/* Tokenomics & Distribution */}
-            <section id="tokenomics" className="whitepaper-section max-w-4xl mx-auto bg-[#111]/90 border border-[#22d3ee] p-6 sm:p-8 rounded-lg shadow-lg mb-10 animate-fade-in">
+            <section id="tokenomics" className="whitepaper-section max-w-4xl mx-auto bg-black/40 backdrop-blur-sm border border-purple-500/20 p-6 sm:p-8 lg:p-10 rounded-lg shadow-lg mb-10 animate-fade-in hover:shadow-[0_0_40px_rgba(147,51,234,0.3)] hover:border-purple-500/50 transition-all">
               <div className="prose prose-invert max-w-none">
-                <h2 className="text-2xl font-bold text-cyan-400 mb-4 flex items-center gap-2"><FaLock className="text-purple-400" /> Tokenomics & Distribution</h2>
-                <p className="text-white mb-4"><b>Total Supply:</b> 21,000,000 USDFG (Fixed, non-inflationary)</p>
+                <h2 className="text-2xl font-bold mb-4 flex items-center gap-2 bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.3))" }}><FaLock className="text-amber-400" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.4))" }} /> Tokenomics & Distribution</h2>
+                <p className="text-white/90 mb-4"><b>Total Supply:</b> 21,000,000 USDFG (Fixed, non-inflationary)</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-[#1a1a1a] p-4 rounded-lg border border-cyan-800/30">
-                    <h4 className="text-xl font-semibold text-purple-400 mb-2">65% Public Trading</h4>
-                    <p className="text-gray-300">Non-custodial, open market supply. No presale, no early access, no staking. All users have equal opportunity to acquire tokens through public decentralized exchanges.</p>
+                  <div className="bg-black/40 backdrop-blur-sm p-4 rounded-lg border border-purple-500/20 hover:border-purple-500/50 transition-all">
+                    <h4 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent mb-2" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>65% Public Trading</h4>
+                    <p className="text-white/70 leading-relaxed">Non-custodial, open market supply. No presale, no early access, no staking. All users have equal opportunity to acquire tokens through public decentralized exchanges.</p>
                   </div>
-                  <div className="bg-[#1a1a1a] p-4 rounded-lg border border-cyan-800/30">
-                    <h4 className="text-xl font-semibold text-purple-400 mb-2">15% Core Reserve</h4>
-                    <p className="text-gray-300">This allocation is held by the founder with full discretion. It may be used, held, or distributed at any time — including for personal, strategic, or project-related purposes. Tokens remain non-custodial and fully transparent.</p>
+                  <div className="bg-black/40 backdrop-blur-sm p-4 rounded-lg border border-purple-500/20 hover:border-purple-500/50 transition-all">
+                    <h4 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent mb-2" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>15% Core Reserve</h4>
+                    <p className="text-white/70 leading-relaxed">This allocation is held by the founder with full discretion. It may be used, held, or distributed at any time — including for personal, strategic, or project-related purposes. Tokens remain non-custodial and fully transparent.</p>
                   </div>
-                  <div className="bg-[#1a1a1a] p-4 rounded-lg border border-cyan-800/30">
-                    <h4 className="text-xl font-semibold text-purple-400 mb-2">10% Development & Operations</h4>
-                    <p className="text-gray-300">Supports active platform development, infrastructure, scaling, and operational costs. May also include allocation for external contributors or technical support partners.</p>
+                  <div className="bg-black/40 backdrop-blur-sm p-4 rounded-lg border border-purple-500/20 hover:border-purple-500/50 transition-all">
+                    <h4 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent mb-2" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>10% Development & Operations</h4>
+                    <p className="text-white/70 leading-relaxed">Supports active platform development, infrastructure, scaling, and operational costs. May also include allocation for external contributors or technical support partners.</p>
                   </div>
-                  <div className="bg-[#1a1a1a] p-4 rounded-lg border border-cyan-800/30">
-                    <h4 className="text-xl font-semibold text-purple-400 mb-2">10% Rewards & Challenges</h4>
-                    <p className="text-gray-300">Used to fund skill-based tournaments, no-entry-fee promotional matches, new player onboarding incentives, and limited challenge-based events.</p>
+                  <div className="bg-black/40 backdrop-blur-sm p-4 rounded-lg border border-purple-500/20 hover:border-purple-500/50 transition-all">
+                    <h4 className="text-xl font-semibold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent mb-2" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>10% Rewards & Challenges</h4>
+                    <p className="text-white/70 leading-relaxed">Used to fund skill-based tournaments, no-entry-fee promotional matches, new player onboarding incentives, and limited challenge-based events.</p>
                   </div>
                 </div>
                 <p className="mt-6 text-sm text-white/70">
                   For full legal and compliance details, see our{' '}
-                  <a href="/privacy" className="underline text-cyan-400 hover:text-cyan-300">Privacy Policy</a>{' '}
+                  <a href="/privacy" className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent underline hover:no-underline" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>Privacy Policy</a>{' '}
                   and{' '}
-                  <a href="/terms" className="underline text-cyan-400 hover:text-cyan-300">Terms of Service</a>.
+                  <a href="/terms" className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent underline hover:no-underline" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>Terms of Service</a>.
                 </p>
               </div>
             </section>
 
             {/* Security & Self-Custody */}
-            <section id="security" className="whitepaper-section max-w-4xl mx-auto bg-[#111]/90 border border-[#22d3ee] p-6 sm:p-8 rounded-lg shadow-lg mb-10 animate-fade-in">
+            <section id="security" className="whitepaper-section max-w-4xl mx-auto bg-black/40 backdrop-blur-sm border border-purple-500/20 p-6 sm:p-8 lg:p-10 rounded-lg shadow-lg mb-10 animate-fade-in hover:shadow-[0_0_40px_rgba(147,51,234,0.3)] hover:border-purple-500/50 transition-all">
               <div className="prose prose-invert max-w-none">
-                <h2 className="text-2xl font-bold text-cyan-400 mb-4 flex items-center gap-2"><FaLock className="text-purple-400" /> Security & Self-Custody</h2>
-                <p className="text-white mb-2">USDFGAMING, the skill-based crypto platform, is 100% non-custodial. We never hold your funds, keys, or personal data. All transactions are on-chain, transparent, and user-controlled. Security audits are published and updated regularly. If you lose access to your wallet, we cannot recover it—self-custody is your responsibility and your right.</p>
+                <h2 className="text-2xl font-bold mb-4 flex items-center gap-2 bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.3))" }}><FaLock className="text-amber-400" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.4))" }} /> Security & Self-Custody</h2>
+                <p className="text-white/80 mb-2 leading-relaxed">USDFGAMING, the skill-based crypto platform, is 100% non-custodial. We never hold your funds, keys, or personal data. All transactions are on-chain, transparent, and user-controlled. Security audits are published and updated regularly. If you lose access to your wallet, we cannot recover it—self-custody is your responsibility and your right.</p>
               </div>
             </section>
 
             {/* Roadmap */}
-            <section id="roadmap" className="whitepaper-section max-w-4xl mx-auto bg-[#111]/90 border border-[#22d3ee] p-6 sm:p-8 rounded-lg shadow-lg mb-10 animate-fade-in">
+            <section id="roadmap" className="whitepaper-section max-w-4xl mx-auto bg-black/40 backdrop-blur-sm border border-purple-500/20 p-6 sm:p-8 lg:p-10 rounded-lg shadow-lg mb-10 animate-fade-in hover:shadow-[0_0_40px_rgba(147,51,234,0.3)] hover:border-purple-500/50 transition-all">
               <div className="prose prose-invert max-w-none">
-                <h2 className="text-2xl font-bold text-cyan-400 mb-6 flex items-center gap-2"><FaChartLine className="text-purple-400" /> What's Ahead for USDFG</h2>
-                <ul className="list-disc pl-6 text-gray-300 space-y-2 mb-6">
+                <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.3))" }}><FaChartLine className="text-amber-400" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.4))" }} /> What's Ahead for USDFG</h2>
+                <ul className="list-disc pl-6 text-white/70 space-y-2 mb-6 leading-relaxed">
                   <li>Launching head-to-head challenges with verified rewards and full non-custodial control.</li>
                   <li>Expanding game categories to unlock new skill-based arenas.</li>
                   <li>Rolling out competitive leaderboards and limited-supply challenge rewards.</li>
                   <li>Staying fully legal, skill-based, and founder-led — no governance tokens, no staking, no hype games.</li>
                 </ul>
-                <p className="text-cyan-300 font-bold mt-4">USDFG doesn't grow on hype — it grows with pressure. That's the roadmap.</p>
+                <p className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent font-bold mt-4" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.3))" }}>USDFG doesn't grow on hype — it grows with pressure. That's the roadmap.</p>
               </div>
             </section>
 
             {/* Related Policies */}
-            <section id="links" className="whitepaper-section max-w-4xl mx-auto bg-[#111]/90 border border-[#22d3ee] p-6 sm:p-8 rounded-lg shadow-lg mb-10 animate-fade-in">
+            <section id="links" className="whitepaper-section max-w-4xl mx-auto bg-black/40 backdrop-blur-sm border border-purple-500/20 p-6 sm:p-8 lg:p-10 rounded-lg shadow-lg mb-10 animate-fade-in hover:shadow-[0_0_40px_rgba(147,51,234,0.3)] hover:border-purple-500/50 transition-all">
               <div className="prose prose-invert max-w-none text-center">
-                <h2 className="text-2xl font-bold text-cyan-400 mb-4 flex items-center gap-2"><FaGavel className="text-purple-400" /> Related Policies</h2>
-                <p className="text-white">For full legal and privacy details, see our <a href="/privacy" className="underline text-cyan-400 hover:text-cyan-300">Privacy Policy</a> and <a href="/terms" className="underline text-cyan-400 hover:text-cyan-300">Terms of Service</a>.<br />USDFG is built to stay transparent, secure, and fair — always.</p>
+                <h2 className="text-2xl font-bold mb-4 flex items-center gap-2 justify-center bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.3))" }}><FaGavel className="text-amber-400" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.4))" }} /> Related Policies</h2>
+                <p className="text-white/80 leading-relaxed">For full legal and privacy details, see our <a href="/privacy" className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent underline hover:no-underline" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>Privacy Policy</a> and <a href="/terms" className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent underline hover:no-underline" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>Terms of Service</a>.<br />USDFG is built to stay transparent, secure, and fair — always.</p>
               </div>
             </section>
 
             {/* Contact & Founder Signature */}
-            <section id="contact" className="whitepaper-section max-w-4xl mx-auto bg-[#111]/90 border border-[#22d3ee] p-6 sm:p-8 rounded-lg shadow-lg mb-10 animate-fade-in text-center">
+            <section id="contact" className="whitepaper-section max-w-4xl mx-auto bg-black/40 backdrop-blur-sm border border-purple-500/20 p-6 sm:p-8 lg:p-10 rounded-lg shadow-lg mb-10 animate-fade-in hover:shadow-[0_0_40px_rgba(147,51,234,0.3)] hover:border-purple-500/50 transition-all text-center">
               <div className="prose prose-invert max-w-none">
-                <h2 className="text-2xl font-bold text-cyan-400 mb-4 flex items-center gap-2"><FaUsers className="text-purple-400" /> Contact & Founder</h2>
-                <p className="text-white mb-4">For questions, compliance inquiries, or media, contact <a href="mailto:founder@usdfg.pro" className="text-cyan-300 underline">founder@usdfg.pro</a> or <a href="mailto:support@usdfg.pro" className="text-cyan-300 underline">support@usdfg.pro</a> or DM <a href="https://twitter.com/USDFGAMING" className="text-cyan-300 underline" target="_blank" rel="noopener noreferrer">@USDFGAMING</a> on Twitter.</p>
+                <h2 className="text-2xl font-bold mb-4 flex items-center gap-2 justify-center bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.3))" }}><FaUsers className="text-amber-400" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.4))" }} /> Contact & Founder</h2>
+                <p className="text-white/80 mb-4 leading-relaxed">For questions, compliance inquiries, or media, contact <a href="mailto:founder@usdfg.pro" className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent underline hover:no-underline" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>founder@usdfg.pro</a> or <a href="mailto:support@usdfg.pro" className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent underline hover:no-underline" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>support@usdfg.pro</a> or DM <a href="https://twitter.com/USDFGAMING" className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent underline hover:no-underline" target="_blank" rel="noopener noreferrer" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>@USDFGAMING</a> on Twitter.</p>
                 <div className="mt-8 text-left max-w-md mx-auto">
                   <div className="flex items-center gap-3 mb-2">
-                    <img src="/assets/usdfgtoken.png" alt="USDFG Logo" className="w-10 h-10 rounded-full border border-cyan-400" />
-                    <span className="font-bold text-cyan-300">Hussein Ali</span>
+                    <img src="/assets/usdfgtoken.png" alt="USDFG Logo" className="w-10 h-10 rounded-full border border-purple-500/50" />
+                    <span className="font-bold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>Hussein Ali</span>
                   </div>
-                  <div className="text-xs text-cyan-200 italic">Founder & Lead Developer, USDFGAMING</div>
-                  <div className="text-xs text-neutral-400 mt-1">Signed digitally for legal compliance and user trust.</div>
+                  <div className="text-xs text-white/60 italic">Founder & Lead Developer, USDFGAMING</div>
+                  <div className="text-xs text-white/40 mt-1">Signed digitally for legal compliance and user trust.</div>
                 </div>
               </div>
             </section>
             {/* Closing Legal Note */}
-            <section className="max-w-2xl mx-auto mb-12 px-6 py-4 rounded-xl bg-gradient-to-br from-white/10 to-[#a78bfa22] border border-purple-700/40 shadow-lg backdrop-blur-md animate-fade-in text-center">
-              <p className="text-base md:text-lg text-white/90 font-bold">
-                <span className="text-purple-300">Legal Note:</span><br />
+            <section className="max-w-2xl mx-auto mb-12 px-6 py-4 rounded-xl bg-black/40 backdrop-blur-sm border border-purple-500/20 shadow-lg hover:border-purple-500/50 transition-all animate-fade-in text-center">
+              <p className="text-base md:text-lg text-white/80 font-bold leading-relaxed">
+                <span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>Legal Note:</span><br />
                 This document is not financial advice and does not offer or solicit any investment.<br />
                 USDFG is a fixed-supply utility token used only for skill-based access and entertainment. Participation is optional and at your own discretion.
               </p>
@@ -351,7 +380,42 @@ const Whitepaper: React.FC = () => {
       <Footer isRevealed={true} />
       <style>{`
         .whitepaper-section { transition: box-shadow 0.3s, transform 0.3s; }
-        .whitepaper-section:hover { box-shadow: 0 0 32px #22d3ee33, 0 0 8px #a78bfa33; transform: scale(1.01); }
+        .whitepaper-section:hover { box-shadow: 0 0 40px rgba(147,51,234,0.3); transform: scale(1.01); }
+        
+        /* TOC Navigation Styling */
+        .toc-nav ul::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .toc-nav ul::-webkit-scrollbar-track {
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: 3px;
+        }
+
+        .toc-nav ul::-webkit-scrollbar-thumb {
+          background: rgba(147, 51, 234, 0.4);
+          border-radius: 3px;
+        }
+
+        .toc-nav ul::-webkit-scrollbar-thumb:hover {
+          background: rgba(147, 51, 234, 0.6);
+        }
+
+        .toc-list a {
+          display: block;
+          padding: 0.25rem 0.5rem;
+          border-radius: 0.25rem;
+          transition: all 0.2s ease;
+        }
+
+        .toc-list a:hover {
+          background: rgba(147, 51, 234, 0.1);
+          padding-left: 0.75rem;
+        }
+
+        .toc-list a:active {
+          color: rgba(251, 191, 36, 1);
+        }
         @media (max-width: 640px) {
           .whitepaper-section { padding: 1rem; margin: 0.5rem; }
           h1 { font-size: 2rem; margin-bottom: 1.5rem; }
@@ -360,9 +424,9 @@ const Whitepaper: React.FC = () => {
           p, li { font-size: 0.95rem; line-height: 1.5; }
         }
         /* Sidebar reduced glow */
-        .sidebar-glow { box-shadow: none !important; background: #0b0b0c !important; border-color: #22d3ee33 !important; }
+        .sidebar-glow { box-shadow: none !important; background: rgba(0, 0, 0, 0.4) !important; border-color: rgba(147, 51, 234, 0.2) !important; }
         /* Tag buttons - pill, less bright */
-        .tag-pill { opacity: 0.8; background: #0b0b0c; border: 1px solid #22d3ee33; color: #a5f3fc; font-size: 0.85rem; font-weight: 600; border-radius: 9999px; padding: 0.25rem 0.9rem; box-shadow: none; }
+        .tag-pill { opacity: 0.8; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(147, 51, 234, 0.2); color: rgba(251, 191, 36, 0.9); font-size: 0.85rem; font-weight: 600; border-radius: 9999px; padding: 0.25rem 0.9rem; box-shadow: none; }
         /* Soft fade-in for top elements */
         .animate-fade-in { opacity: 0; animation: fadeInSoft 1.1s cubic-bezier(.4,0,.2,1) forwards; }
         @keyframes fadeInSoft { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
