@@ -98,7 +98,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
   return (
     <section
       ref={sectionRef}
-      className="hero relative min-h-screen w-full flex items-center justify-center overflow-hidden"
+      className="hero relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-transparent"
     >
       {/* Speed Lines (Flying Things) - Kimi Style */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-[3]">
@@ -137,7 +137,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/50" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
         <div className="absolute inset-0 bg-purple-600/10" />
       </div>
 
@@ -255,7 +255,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
       </div>
 
       {/* Decorative Elements */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black to-transparent z-[5]" />
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-[5]" />
       
       {/* Floating Orbs - Kimi Exact */}
       <div className="absolute top-1/4 right-1/4 w-64 h-64 bg-purple-600/20 rounded-full blur-[100px] animate-pulse-glow" />

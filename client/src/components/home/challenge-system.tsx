@@ -116,16 +116,12 @@ const ChallengeSystem: React.FC = () => {
   // GSAP Animations
   // -----------------------------
   const sectionRef = useRef<HTMLElement>(null);
-  const headingRef = useRef<HTMLHeadingElement>(null);
-  const subtitleRef = useRef<HTMLParagraphElement>(null);
   const imageRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
       // Initial states
-      gsap.set(headingRef.current, { opacity: 0, y: 12 });
-      gsap.set(subtitleRef.current, { opacity: 0, y: 8 });
       gsap.set(imageRef.current, { opacity: 0, y: 16 });
       gsap.set(cardRef.current, { opacity: 0, y: 12 });
 
@@ -138,22 +134,15 @@ const ChallengeSystem: React.FC = () => {
         },
       });
 
-      tl.to(headingRef.current, {
-        opacity: 1,
-        y: 0,
-        duration: 0.8,
-        ease: 'power3.out',
-      })
-        .to(
-          subtitleRef.current,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.6,
-            ease: 'power3.out',
-          },
-          '-=0.5'
-        )
+      tl.to(
+        cardRef.current,
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.8,
+          ease: 'power3.out',
+        }
+      )
         .to(
           imageRef.current,
           {
@@ -163,16 +152,6 @@ const ChallengeSystem: React.FC = () => {
             ease: 'power3.out',
           },
           '-=0.4'
-        )
-        .to(
-          cardRef.current,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.8,
-            ease: 'power3.out',
-          },
-          '-=0.6'
         );
     }, sectionRef);
 
@@ -186,58 +165,6 @@ const ChallengeSystem: React.FC = () => {
     <section ref={sectionRef} className="py-12 lg:py-16 relative overflow-hidden">
 
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
-        {/* Heading */}
-        <div className="text-center mb-8 lg:mb-12">
-          <h2
-            ref={headingRef}
-            className="neocore-h2 mb-3 text-center text-3xl md:text-4xl lg:text-5xl font-bold"
-            style={{
-              background: "linear-gradient(90deg, #fbbf24 0%, #f59e0b 50%, #fbbf24 100%)",
-              backgroundSize: "200% auto",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              textShadow: "0 0 24px rgba(251, 191, 36, 0.4), 0 2px 6px #000",
-              filter: "drop-shadow(0 0 8px rgba(251, 191, 36, 0.3))",
-            }}
-          >
-            Create a Challenge. Prove it.
-          </h2>
-          <p
-            ref={subtitleRef}
-            className="neocore-body max-w-2xl mx-auto text-base md:text-lg text-white/70 leading-relaxed"
-          >
-            Real challenges. Real outcomes. Verified by players, enforced by smart contracts.
-          </p>
-        </div>
-
-        {/* Leaderboard + mascot visual (now visible) */}
-        <section className="flex justify-center py-6 lg:py-8">
-          <div
-            ref={(el) => {
-              if (el) {
-                visualRef.current = el;
-                imageRef.current = el;
-              }
-            }}
-            className="relative"
-            id="challenge-leaderboard-visual"
-          >
-            <img
-              src={imageSrcWebp}
-              onError={(e) => {
-                const target = e.currentTarget as HTMLImageElement;
-                if (!target.dataset.fallback) {
-                  target.src = imageSrcPng; // fallback to PNG once
-                  target.dataset.fallback = "1";
-                }
-              }}
-              loading="lazy"
-              alt="USDFG mascot in front of glowing leaderboard - skill gaming competition"
-              className="w-full max-w-xl rounded-lg relative z-10 select-none shadow-[0_0_40px_rgba(147,51,234,0.2)]"
-            />
-          </div>
-        </section>
-
         {/* Rules / Explainer */}
         <Card
           ref={cardRef}
@@ -335,8 +262,43 @@ const ChallengeSystem: React.FC = () => {
                 Clear rules. Verified results.
               </div>
             </motion.div>
+          </CardContent>
+        </Card>
 
-            {/* --- Challenge creator (mock) --- */}
+        {/* Leaderboard + mascot visual (moved under Challenge Rules) */}
+        <section className="flex justify-center py-6 lg:py-8">
+          <div
+            ref={(el) => {
+              if (el) {
+                visualRef.current = el;
+                imageRef.current = el;
+              }
+            }}
+            className="relative"
+            id="challenge-leaderboard-visual"
+          >
+            <img
+              src={imageSrcWebp}
+              onError={(e) => {
+                const target = e.currentTarget as HTMLImageElement;
+                if (!target.dataset.fallback) {
+                  target.src = imageSrcPng; // fallback to PNG once
+                  target.dataset.fallback = "1";
+                }
+              }}
+              loading="lazy"
+              alt="USDFG mascot in front of glowing leaderboard - skill gaming competition"
+              className="w-full max-w-xl rounded-lg relative z-10 select-none shadow-[0_0_40px_rgba(147,51,234,0.2)]"
+            />
+          </div>
+        </section>
+
+        {/* --- Challenge creator (mock) --- */}
+        <Card className="relative max-w-4xl mx-auto bg-black/40 backdrop-blur-sm rounded-lg transition-all duration-300 kimi-bottom-neon mt-8" style={{ 
+          '--neon-color': 'rgba(168, 85, 247, 0.3)',
+          '--neon-hover-color': 'rgba(168, 85, 247, 0.5)',
+        } as React.CSSProperties}>
+          <CardContent className="relative z-10 p-4 md:p-6 lg:p-8">
             <div className="space-y-3 mt-6">
               <div className="text-center mb-6">
                 <h3

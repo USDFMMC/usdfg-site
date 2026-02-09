@@ -7,7 +7,7 @@ interface PasswordFormProps {
 
 const PasswordForm: React.FC<PasswordFormProps> = ({ onSuccess }) => {
   const [password, setPassword] = useState('');
-  const correctPassword = '6996';
+  const correctPassword = '6837';
 
   const handleSubmit = () => {
     if (password === correctPassword) {

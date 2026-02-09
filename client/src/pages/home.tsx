@@ -4,11 +4,13 @@ import LiveActivityTicker from "@/components/LiveActivityTicker";
 import Footer from "@/components/layout/footer";
 import HeroSection from "@/components/home/hero-section";
 import PlatformFeatures from "@/components/home/platform-features";
+import LiveBattles from "@/components/home/live-battles";
 import ChallengeSystem from "@/components/home/challenge-system";
 import LeaderboardPreview from "@/components/home/leaderboard-preview";
 import Tokenomics from "@/components/home/tokenomics";
 import GameCategories from "@/components/home/game-categories";
 import CTASection from "@/components/home/cta-section";
+import ParticleBackground from "@/components/ParticleBackground";
 import { Helmet } from "react-helmet";
 import gsap from "gsap";
 
@@ -136,10 +138,15 @@ const Home: React.FC = () => {
       </Helmet>
 
       <Navbar />
-      <LiveActivityTicker />
+      <div className="sticky top-16 lg:top-20 z-40">
+        <LiveActivityTicker />
+      </div>
       <main id="main-content" role="main" aria-label="Homepage Main Content" className="min-h-screen flex-1 relative overflow-hidden">
+        {/* Particle Background - Kimi Galaxy Effect */}
+        <ParticleBackground />
+        
         {/* Global Unified Background - Kimi Hero Style */}
-        <div className="fixed inset-0 z-0 bg-black">
+        <div className="fixed inset-0 z-0 bg-[#0a0215]">
           {/* Kimi Linear Grid Pattern (Purple Lines) */}
           <div
             className="absolute inset-0"
@@ -153,7 +160,7 @@ const Home: React.FC = () => {
           />
           
           {/* Background Gradients */}
-          <div className="absolute inset-0 bg-gradient-to-b from-black via-black/95 to-black" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0a0215] via-[#0a0215]/95 to-[#0a0215]" />
           <div className="absolute inset-0 bg-purple-600/5" />
         </div>
         
@@ -169,19 +176,22 @@ const Home: React.FC = () => {
             display: contentRevealed ? 'block' : 'none'
           }}
         >
-          <section aria-label="Platform Features Section">
+          <section id="features" aria-label="Platform Features Section">
             <PlatformFeatures />
+          </section>
+          <section aria-label="Live Battles Section">
+            <LiveBattles />
           </section>
           <section aria-label="Challenge System Section">
             <ChallengeSystem />
           </section>
-          <section aria-label="Leaderboard Preview Section">
+          <section id="leaderboard" aria-label="Leaderboard Preview Section">
             <LeaderboardPreview />
           </section>
-          <section aria-label="Tokenomics Section">
+          <section id="tokenomics" aria-label="Tokenomics Section">
             <Tokenomics />
           </section>
-          <section aria-label="Game Categories Section">
+          <section id="games" aria-label="Game Categories Section">
             <GameCategories />
           </section>
           <section aria-label="CTA Section">
