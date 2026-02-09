@@ -26,7 +26,7 @@ const Footer: React.FC<FooterProps> = ({ isRevealed }) => {
           {/* Left: Mascot + Tagline */}
           <div className="flex items-center justify-center md:justify-start">
             <img 
-              src="/assets/usdfgtoken.png" 
+              src="/assets/usdfgtokenn.png" 
               alt="USDFG Logo" 
               className="w-10 h-10 sm:w-12 sm:h-12 object-contain mr-3"
               style={{

@@ -390,7 +390,7 @@ const LeaderboardPreview: React.FC = () => {
                                 <img
                                   src={player.profileImage}
                                   alt={`${player.wallet.slice(0, 6)}...${player.wallet.slice(-4)}`}
-                                  className="w-full h-full object-cover"
+                                  className="w-full h-full object-cover animate-float"
                                   onError={(e) => {
                                     const target = e.target as HTMLImageElement;
                                     if (!target.src.includes(`avatar-${rank}.png`)) {
@@ -402,7 +402,7 @@ const LeaderboardPreview: React.FC = () => {
                                 <img
                                   src={`/_kimi/avatar-${rank}.png`}
                                   alt={`Player ${rank}`}
-                                  className="w-full h-full object-cover"
+                                  className="w-full h-full object-cover animate-float"
                                 />
                               )}
                             </div>
@@ -420,7 +420,7 @@ const LeaderboardPreview: React.FC = () => {
                           {/* Crown for #1 - Kimi Exact */}
                           {rank === 1 && (
                             <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                              <Crown className="w-8 h-8 text-amber-400 animate-pulse" />
+                              <Crown className="w-8 h-8 text-amber-400 animate-float" />
                             </div>
                           )}
                         </div>
@@ -708,7 +708,7 @@ const LeaderboardPreview: React.FC = () => {
                           </div>
                           {rank === 1 && (
                             <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                              <Crown className="w-8 h-8 text-amber-400 animate-pulse" />
+                              <Crown className="w-8 h-8 text-amber-400 animate-float" />
                             </div>
                           )}
                         </div>

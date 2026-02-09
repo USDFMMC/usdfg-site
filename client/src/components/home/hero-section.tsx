@@ -141,6 +141,20 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
         <div className="absolute inset-0 bg-purple-600/10" />
       </div>
 
+      {/* Animated Grid Overlay - Kimi Exact */}
+      <div className="absolute inset-0 z-[2] opacity-20">
+        <div
+          className="w-full h-full"
+          style={{
+            backgroundImage: `
+              linear-gradient(rgba(126, 67, 255, 0.1) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(126, 67, 255, 0.1) 1px, transparent 1px)
+            `,
+            backgroundSize: '50px 50px',
+          }}
+        />
+      </div>
+
       {/* GridScan Background - Temporarily disabled for preview */}
       {/* <div className="absolute inset-0 w-full h-full z-[1]">
         <GridScan
@@ -204,7 +218,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
               ref={subtitleRef}
               className="neocore-body mb-4 max-w-2xl text-lg sm:text-xl text-white/70 leading-relaxed"
             >
-              A skill-based competition platform where players challenge each other directly, lock challenge assets on-chain, compete, and earn verified rewards through performance. No luck. No randomness.
+              Join the world's premier esports crypto ecosystem. Challenge players, manage tournaments, and turn your skill into rewards. The arena awaits your arrival.
             </p>
 
             <div
@@ -216,19 +230,12 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
                 className="relative font-semibold text-base px-8 py-6 bg-gradient-to-r from-purple-600 to-amber-500 hover:from-purple-400 hover:to-amber-400 text-white border-0 overflow-hidden group rounded-lg transition-all"
               >
                 <span className="relative z-10 flex items-center gap-2">
-                  See How It Works
+                  EXPLORE PLATFORM
                   <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                   </svg>
                 </span>
                 <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-              </button>
-
-              <button
-                onClick={onExploreClick}
-                className="font-semibold text-base px-8 py-6 border-2 border-purple-500/50 text-white hover:bg-purple-500/20 hover:border-purple-500 rounded-lg transition-all flex items-center gap-2"
-              >
-                Explore Platform
               </button>
 
               <Link to="/whitepaper">
@@ -249,6 +256,10 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
 
       {/* Decorative Elements */}
       <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black to-transparent z-[5]" />
+      
+      {/* Floating Orbs - Kimi Exact */}
+      <div className="absolute top-1/4 right-1/4 w-64 h-64 bg-purple-600/20 rounded-full blur-[100px] animate-pulse-glow" />
+      <div className="absolute bottom-1/3 right-1/3 w-48 h-48 bg-orange-500/10 rounded-full blur-[80px] animate-pulse-glow" style={{ animationDelay: '1s' }} />
     </section>
   );
 };

@@ -4692,7 +4692,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               onError={(e) => {
                 const target = e.currentTarget as HTMLImageElement;
                 console.error(`❌ Failed to load detail sheet image: ${imagePath} for game: ${gameName}`);
-                target.src = '/assets/usdfgtoken.png';
+                target.src = '/assets/usdfgtokenn.png';
               }}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-neutral-900 via-black/60 to-black/20" />
@@ -5594,7 +5594,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                         if (process.env.NODE_ENV === 'development') {
                         console.error(`❌ Failed to load image: ${imagePath} for game: ${gameName}, challenge: ${challenge.id}`);
                         }
-                        target.src = '/assets/usdfgtoken.png';
+                        target.src = '/assets/usdfgtokenn.png';
                       }}
                       onLoad={() => {
                         // Remove excessive logging - images are cached by browser anyway

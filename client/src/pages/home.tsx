@@ -3,9 +3,8 @@ import Navbar from "@/components/layout/navbar";
 import LiveActivityTicker from "@/components/LiveActivityTicker";
 import Footer from "@/components/layout/footer";
 import HeroSection from "@/components/home/hero-section";
-import HowItWorks from "@/components/home/how-it-works";
-import TrustVerification from "@/components/home/trust-verification";
-import AboutSection from "@/components/home/development-banner";
+import PlatformFeatures from "@/components/home/platform-features";
+import ChallengeSystem from "@/components/home/challenge-system";
 import LeaderboardPreview from "@/components/home/leaderboard-preview";
 import Tokenomics from "@/components/home/tokenomics";
 import GameCategories from "@/components/home/game-categories";
@@ -62,7 +61,7 @@ const Home: React.FC = () => {
         
         // Smooth scroll to revealed content
         setTimeout(() => {
-          const firstSection = document.querySelector('[aria-label="How It Works Section"]');
+          const firstSection = document.querySelector('[aria-label="About Section"]');
           if (firstSection) {
             firstSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
@@ -162,7 +161,7 @@ const Home: React.FC = () => {
           <HeroSection onExploreClick={handleExploreClick} />
         </section>
         
-        {/* Content sections - revealed with GSAP animation when "See How It Works" or "Explore Platform" is clicked */}
+        {/* Content sections - revealed with GSAP animation when "EXPLORE PLATFORM" is clicked */}
         <div 
           ref={contentWrapperRef}
           className={contentRevealed ? '' : 'pointer-events-none'}
@@ -170,37 +169,21 @@ const Home: React.FC = () => {
             display: contentRevealed ? 'block' : 'none'
           }}
         >
-          {/* SECTION 2 - How It Works */}
-          <section aria-label="How It Works Section">
-            <HowItWorks />
+          <section aria-label="Platform Features Section">
+            <PlatformFeatures />
           </section>
-          
-          {/* SECTION 3 - Trust & Verification */}
-          <section aria-label="Trust & Verification Section">
-            <TrustVerification />
+          <section aria-label="Challenge System Section">
+            <ChallengeSystem />
           </section>
-          
-          {/* SECTION 4 - What is USDFG */}
-          <section aria-label="About Section">
-            <AboutSection />
-          </section>
-          
-          {/* SECTION 5 - Leaderboard & Progression */}
           <section aria-label="Leaderboard Preview Section">
             <LeaderboardPreview />
           </section>
-          
-          {/* SECTION 6 - Token Utility & Allocation */}
           <section aria-label="Tokenomics Section">
             <Tokenomics />
           </section>
-          
-          {/* SECTION 7 - Supported Games */}
           <section aria-label="Game Categories Section">
             <GameCategories />
           </section>
-          
-          {/* SECTION 8 - Final CTA */}
           <section aria-label="CTA Section">
             <CTASection />
           </section>

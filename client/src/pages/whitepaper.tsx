@@ -218,7 +218,7 @@ const Whitepaper: React.FC = () => {
             {/* Animated Logo */}
             <div className="flex justify-center mb-6 mt-8">
               <img
-                src="/assets/usdfgtoken.png"
+                src="/assets/usdfgtokenn.png"
                 alt="USDFG Logo"
                 className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full border-2 border-purple-500/50 shadow-[0_0_32px_rgba(147,51,234,0.4)] animate-float"
                 style={{ background: 'rgba(11,11,12,0.7)' }}
@@ -358,7 +358,7 @@ const Whitepaper: React.FC = () => {
                 <p className="text-white/80 mb-4 leading-relaxed">For questions, compliance inquiries, or media, contact <a href="mailto:founder@usdfg.pro" className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent underline hover:no-underline" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>founder@usdfg.pro</a> or <a href="mailto:support@usdfg.pro" className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent underline hover:no-underline" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>support@usdfg.pro</a> or DM <a href="https://twitter.com/USDFGAMING" className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent underline hover:no-underline" target="_blank" rel="noopener noreferrer" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>@USDFGAMING</a> on Twitter.</p>
                 <div className="mt-8 text-left max-w-md mx-auto">
                   <div className="flex items-center gap-3 mb-2">
-                    <img src="/assets/usdfgtoken.png" alt="USDFG Logo" className="w-10 h-10 rounded-full border border-purple-500/50" />
+                    <img src="/assets/usdfgtokenn.png" alt="USDFG Logo" className="w-10 h-10 rounded-full border border-purple-500/50" />
                     <span className="font-bold bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.3))" }}>Hussein Ali</span>
                   </div>
                   <div className="text-xs text-white/60 italic">Founder & Lead Developer, USDFGAMING</div>

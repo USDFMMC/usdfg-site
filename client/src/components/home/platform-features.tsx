@@ -102,7 +102,7 @@ const PlatformFeatures: React.FC = () => {
             <span className="block bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent">OF GAMING</span>
           </h2>
           <p className="kimi-font-body text-lg sm:text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
-            Three core pillars that power USDFG's skill-based competition platform. Player-driven challenges, verified outcomes, and wallet-based reputation.
+            USDFG is a skill-based competition platform where players challenge each other directly, lock challenge assets on-chain, compete, and earn verified rewards through performance. Wallet-driven, non-custodial, and built for skill.
           </p>
         </div>
 
