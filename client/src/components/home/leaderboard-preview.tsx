@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Trophy, Copy, Crown, TrendingUp, Medal, ChevronRight } from "lucide-react";
+import { Trophy, Copy, Crown, TrendingUp, Medal, ChevronRight, Shield } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getTopPlayers, PlayerStats, getTopTeams, TeamStats } from "@/lib/firebase/firestore";
 import gsap from "gsap";
@@ -11,6 +11,8 @@ gsap.registerPlugin(ScrollTrigger);
 interface Player {
   rank: number;
   wallet: string;
+  displayName?: string;
+  country?: string;
   wins: number;
   losses: number;
   winRate: string;
@@ -18,6 +20,8 @@ interface Player {
   gains: number;
   rankTitle: string;
   profileImage?: string;
+  trustScore?: number; // Integrity score (0-10)
+  trustReviews?: number;
 }
 
 interface TeamLeaderboardEntry {
@@ -132,13 +136,17 @@ const LeaderboardPreview: React.FC = () => {
           const transformedPlayers: Player[] = topPlayers.map((p: PlayerStats, index: number) => ({
             rank: index + 1,
             wallet: p.wallet,
+            displayName: p.displayName,
+            country: p.country,
             wins: p.wins,
             losses: p.losses,
             winRate: `${p.winRate.toFixed(1)}%`,
             winStreak: 0, // TODO: Add streak tracking
             gains: p.totalEarned,
             rankTitle: getTier(p.winRate, p.gamesPlayed),
-            profileImage: p.profileImage
+            profileImage: p.profileImage,
+            trustScore: p.trustScore || 0,
+            trustReviews: p.trustReviews || 0
           }));
 
           setPlayers(transformedPlayers);
@@ -248,13 +256,22 @@ const LeaderboardPreview: React.FC = () => {
     }
   };
 
+  // Get country flag emoji
+  const getCountryFlag = (countryCode: string): string => {
+    const codePoints = countryCode
+      .toUpperCase()
+      .split('')
+      .map(char => 127397 + char.charCodeAt(0));
+    return String.fromCodePoint(...codePoints);
+  };
+
   // Get top 3 players for podium
   const top3Players = players.slice(0, 3);
   // Show all players in table (including top 3) for complete stats visibility
   const allPlayersForTable = players;
   const top3Teams = teams.slice(0, 3);
   const allTeamsForTable = teams;
-
+  
   return (
     <section
       ref={sectionRef}
@@ -271,52 +288,52 @@ const LeaderboardPreview: React.FC = () => {
         <div className="w-full h-full border border-purple-500/30 rounded-full animate-spin-slow" />
         <div className="absolute inset-8 border border-purple-500/20 rounded-full animate-spin-slow" style={{ animationDirection: 'reverse' }} />
         <div className="absolute inset-16 border border-purple-500/10 rounded-full animate-spin-slow" />
-      </div>
+        </div>
 
       <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
-        {/* Solo / Team Toggle */}
+          {/* Solo / Team Toggle */}
         <div className="flex justify-center gap-2 mb-8">
-          <Button
-            variant={leaderboardType === 'solo' ? "default" : "ghost"}
-            className={`kimi-font-body px-4 py-2 text-xs font-semibold uppercase tracking-wide rounded-lg transition-all ${
-              leaderboardType === 'solo'
-                ? "bg-gradient-to-r from-purple-500 to-orange-500 text-white border-0 shadow-[0_0_15px_rgba(126,67,255,0.3)] hover:from-purple-400 hover:to-orange-400"
-                : "text-white/70 hover:text-white border border-purple-500/30 hover:border-purple-500/50 hover:bg-purple-500/10 bg-transparent"
-            }`}
-            onClick={() => setLeaderboardType('solo')}
-          >
-            Solo
-          </Button>
-          <Button
-            variant={leaderboardType === 'team' ? "default" : "ghost"}
-            className={`kimi-font-body px-4 py-2 text-xs font-semibold uppercase tracking-wide rounded-lg transition-all ${
-              leaderboardType === 'team'
-                ? "bg-gradient-to-r from-purple-500 to-orange-500 text-white border-0 shadow-[0_0_15px_rgba(126,67,255,0.3)] hover:from-purple-400 hover:to-orange-400"
-                : "text-white/70 hover:text-white border border-purple-500/30 hover:border-purple-500/50 hover:bg-purple-500/10 bg-transparent"
-            }`}
-            onClick={() => setLeaderboardType('team')}
-          >
-            Teams
-          </Button>
-        </div>
-
-        {/* Leaderboard Tabs */}
-        <div className="flex flex-wrap justify-center mb-8 border-b border-purple-500/30">
-          {tabs.map((tab) => (
             <Button
-              key={tab.id}
-              variant={activeTab === tab.id ? "default" : "ghost"}
+              variant={leaderboardType === 'solo' ? "default" : "ghost"}
+            className={`kimi-font-body px-4 py-2 text-xs font-semibold uppercase tracking-wide rounded-lg transition-all ${
+                leaderboardType === 'solo'
+                ? "bg-gradient-to-r from-purple-500 to-orange-500 text-white border-0 shadow-[0_0_15px_rgba(126,67,255,0.3)] hover:from-purple-400 hover:to-orange-400"
+                : "text-white/70 hover:text-white border border-purple-500/30 hover:border-purple-500/50 hover:bg-purple-500/10 bg-transparent"
+              }`}
+              onClick={() => setLeaderboardType('solo')}
+            >
+              Solo
+            </Button>
+            <Button
+              variant={leaderboardType === 'team' ? "default" : "ghost"}
+            className={`kimi-font-body px-4 py-2 text-xs font-semibold uppercase tracking-wide rounded-lg transition-all ${
+                leaderboardType === 'team'
+                ? "bg-gradient-to-r from-purple-500 to-orange-500 text-white border-0 shadow-[0_0_15px_rgba(126,67,255,0.3)] hover:from-purple-400 hover:to-orange-400"
+                : "text-white/70 hover:text-white border border-purple-500/30 hover:border-purple-500/50 hover:bg-purple-500/10 bg-transparent"
+              }`}
+              onClick={() => setLeaderboardType('team')}
+            >
+              Teams
+            </Button>
+          </div>
+
+          {/* Leaderboard Tabs */}
+        <div className="flex flex-wrap justify-center mb-8 border-b border-purple-500/30">
+            {tabs.map((tab) => (
+              <Button
+                key={tab.id}
+                variant={activeTab === tab.id ? "default" : "ghost"}
               className={`kimi-font-body rounded-none rounded-t-md font-semibold uppercase tracking-wide px-4 py-2 text-sm transition-all ${
-                activeTab === tab.id 
+                  activeTab === tab.id 
                   ? "bg-gradient-to-r from-purple-500 to-orange-500 text-white border-0 shadow-[0_0_15px_rgba(126,67,255,0.3)] hover:from-purple-400 hover:to-orange-400" 
                   : "text-white/70 hover:text-white border border-transparent hover:border-purple-500/30 bg-transparent"
-              }`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-            </Button>
-          ))}
-        </div>
+                }`}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+              </Button>
+            ))}
+          </div>
 
         {/* Section Header - Kimi Exact */}
         <div ref={titleRef} className="text-center mb-16 lg:mb-20">
@@ -328,7 +345,7 @@ const LeaderboardPreview: React.FC = () => {
             USDFG <span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent">BOARD</span>
           </h2>
           <p className="kimi-font-body text-lg text-white/60 max-w-2xl mx-auto">
-            Compete to claim your place among the legends. No usernames. No profiles. Just your wallet, your skill, your record.
+            No usernames. No profiles. Your wallet, your skill, your record. Wallet-based identity, performance record, and competitive progression.
           </p>
         </div>
 
@@ -408,11 +425,21 @@ const LeaderboardPreview: React.FC = () => {
                           )}
                         </div>
 
-                        {/* Info - Kimi Exact */}
+                        {/* Info - USDFG Format with Name */}
                         <div className="text-center mb-4">
                           <h3 className="kimi-font-display font-bold text-sm sm:text-lg text-white mb-1">
-                            {player.wallet.slice(0, 6)}...{player.wallet.slice(-4)}
+                            {player.displayName || `${player.wallet.slice(0, 6)}...${player.wallet.slice(-4)}`}
                           </h3>
+                          <div className="flex items-center justify-center gap-2 mb-1">
+                            <Shield className="w-3 h-3 text-amber-400" />
+                            <span className="kimi-font-body text-xs text-white/70">
+                              Integrity {player.trustScore?.toFixed(1) || '0.0'}/10
+                            </span>
+                            <span className="kimi-font-body text-xs text-white/50">•</span>
+                            <span className="kimi-font-body text-xs text-white/70">
+                              Streak {player.winStreak}
+                            </span>
+                          </div>
                           <p className="kimi-font-display font-bold text-xl sm:text-2xl lg:text-3xl bg-gradient-to-r from-purple-400 to-orange-400 bg-clip-text text-transparent">
                             {formatUSDFG(player.gains)}
                           </p>
@@ -447,7 +474,10 @@ const LeaderboardPreview: React.FC = () => {
                       Rank
                     </div>
                     <div className="flex-1 kimi-font-body text-xs text-white/50 uppercase">
-                      Wallet
+                      Player
+                    </div>
+                    <div className="hidden sm:block w-32 text-right kimi-font-body text-xs text-white/50 uppercase">
+                      Integrity
                     </div>
                     <div className="hidden md:block w-20 text-right kimi-font-body text-xs text-white/50 uppercase">
                       Wins
@@ -467,7 +497,7 @@ const LeaderboardPreview: React.FC = () => {
                     <div className="hidden lg:block w-24 text-center kimi-font-body text-xs text-white/50 uppercase">
                       Tier
                     </div>
-                  </div>
+                        </div>
 
                   {/* List - Shows all players including top 3 */}
                   <div className="divide-y divide-purple-500/10">
@@ -487,25 +517,67 @@ const LeaderboardPreview: React.FC = () => {
                             )}
                           </div>
                           <div className="flex-1 flex items-center gap-3">
-                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-purple-500/30 to-orange-500/30 flex items-center justify-center">
-                              <span className="kimi-font-display font-bold text-xs sm:text-sm text-white">
-                                {masked[0]}
-                              </span>
+                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-purple-500/30 to-orange-500/30 flex items-center justify-center overflow-hidden">
+                              {player.profileImage ? (
+                                <img 
+                                  src={player.profileImage} 
+                                  alt={player.displayName || masked}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    const parent = target.parentElement;
+                                    if (parent && !parent.querySelector('span')) {
+                                      const fallback = document.createElement('span');
+                                      fallback.className = 'kimi-font-display font-bold text-xs sm:text-sm text-white';
+                                      fallback.textContent = (player.displayName || masked)[0].toUpperCase();
+                                      parent.appendChild(fallback);
+                                    }
+                                  }}
+                                />
+                              ) : (
+                                <span className="kimi-font-display font-bold text-xs sm:text-sm text-white">
+                                  {(player.displayName || masked)[0].toUpperCase()}
+                                </span>
+                              )}
                             </div>
-                            <div className="flex items-center gap-2">
-                              <span className="kimi-font-body font-medium text-sm sm:text-base text-white truncate font-mono">
-                                {masked}
-                              </span>
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Copy className="w-3 h-3 cursor-pointer text-white/60 hover:text-amber-400 transition-colors" onClick={() => {navigator.clipboard.writeText(player.wallet); setCopiedIdx(player.rank); setTimeout(() => setCopiedIdx(null), 1200);}} />
-                                  </TooltipTrigger>
-                                  <TooltipContent className="bg-black/80 text-amber-100 border-amber-400/40">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                <span className="kimi-font-body font-medium text-sm sm:text-base text-white truncate">
+                                  {player.displayName || masked}
+                                </span>
+                                {player.country && (
+                                  <span className="text-base leading-none flex-shrink-0" title={player.country}>
+                                    {getCountryFlag(player.country)}
+                                  </span>
+                                )}
+                                {player.rank <= 3 && (
+                                  <Trophy className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                                )}
+                              </div>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Copy className="w-3 h-3 cursor-pointer text-white/60 hover:text-amber-400 transition-colors flex-shrink-0" onClick={() => {navigator.clipboard.writeText(player.wallet); setCopiedIdx(player.rank); setTimeout(() => setCopiedIdx(null), 1200);}} />
+                                </TooltipTrigger>
+                                <TooltipContent className="bg-black/80 text-amber-100 border-amber-400/40">
                                     {copiedIdx === player.rank ? "Copied!" : "Copy wallet address"}
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            </div>
+                          </div>
+                          <div className="hidden sm:block w-32 text-right">
+                            <div className="flex flex-col items-end gap-0.5">
+                              <div className="flex items-center gap-1">
+                                <Shield className="w-3 h-3 text-amber-400" />
+                                <span className="kimi-font-body text-xs text-white/70">
+                                  {player.trustScore?.toFixed(1) || '0.0'}/10
+                                </span>
+                              </div>
+                              <span className="kimi-font-body text-xs text-white/50">
+                                Streak {player.winStreak}
+                              </span>
                             </div>
                           </div>
                           <div className="hidden md:block w-20 text-right">
@@ -583,7 +655,7 @@ const LeaderboardPreview: React.FC = () => {
 
             {players.length === 0 && (
               <div className="flex flex-col items-center justify-center py-12">
-                <Trophy className="w-12 h-12 text-amber-400/50" />
+                        <Trophy className="w-12 h-12 text-amber-400/50" />
                 <p className="text-amber-300 text-sm font-semibold mt-4">No players yet!</p>
                 <p className="text-gray-400 text-xs mt-2">Be the first to complete a challenge and claim the top spot.</p>
               </div>
@@ -679,10 +751,10 @@ const LeaderboardPreview: React.FC = () => {
                   </div>
                   <div className="divide-y divide-purple-500/10">
                     {allTeamsForTable.map((team) => {
-                      const masked = `${team.teamKey.slice(0, 6)}...${team.teamKey.slice(-4)}`;
-                      return (
+                    const masked = `${team.teamKey.slice(0, 6)}...${team.teamKey.slice(-4)}`;
+                    return (
                         <div
-                          key={team.teamKey}
+                        key={team.teamKey}
                           className="list-item group flex items-center px-4 sm:px-6 py-4 hover:bg-purple-600/5 transition-colors cursor-pointer"
                         >
                           <div className="w-12 sm:w-16 flex items-center gap-2">
@@ -735,7 +807,7 @@ const LeaderboardPreview: React.FC = () => {
                     </button>
                   </div>
                 )}
-              </div>
+          </div>
             )}
 
             {teams.length === 0 && (
@@ -743,14 +815,14 @@ const LeaderboardPreview: React.FC = () => {
                 <Trophy className="w-12 h-12 text-amber-400/50" />
                 <p className="text-amber-300 text-sm font-semibold mt-4">No teams yet!</p>
                 <p className="text-gray-400 text-xs mt-2">Create a team to climb the leaderboard.</p>
-              </div>
-            )}
+            </div>
+          )}
           </>
         ) : (
           <div className="flex flex-col items-center justify-center py-12">
             <Trophy className="w-12 h-12 text-amber-400/50" />
             <p className="text-amber-300 text-sm font-semibold mt-4">No data available</p>
-          </div>
+        </div>
         )}
       </div>
     </section>

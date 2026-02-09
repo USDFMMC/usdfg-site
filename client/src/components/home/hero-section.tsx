@@ -204,7 +204,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
               ref={subtitleRef}
               className="neocore-body mb-4 max-w-2xl text-lg sm:text-xl text-white/70 leading-relaxed"
             >
-              Join the world's premier esports crypto ecosystem. Challenge players, manage tournaments, and turn your skill into rewards. The arena awaits your arrival.
+              A skill-based competition platform where players challenge each other directly, lock challenge assets on-chain, compete, and earn verified rewards through performance. No luck. No randomness.
             </p>
 
             <div
@@ -216,12 +216,19 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
                 className="relative font-semibold text-base px-8 py-6 bg-gradient-to-r from-purple-600 to-amber-500 hover:from-purple-400 hover:to-amber-400 text-white border-0 overflow-hidden group rounded-lg transition-all"
               >
                 <span className="relative z-10 flex items-center gap-2">
-                  EXPLORE PLATFORM
+                  See How It Works
                   <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                   </svg>
                 </span>
                 <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+              </button>
+
+              <button
+                onClick={onExploreClick}
+                className="font-semibold text-base px-8 py-6 border-2 border-purple-500/50 text-white hover:bg-purple-500/20 hover:border-purple-500 rounded-lg transition-all flex items-center gap-2"
+              >
+                Explore Platform
               </button>
 
               <Link to="/whitepaper">

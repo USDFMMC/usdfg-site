@@ -148,14 +148,14 @@ const Tokenomics: React.FC = () => {
               filter: "drop-shadow(0 0 8px rgba(251, 191, 36, 0.3))",
             }}
           >
-            TOKENOMICS
+            TOKEN UTILITY & ALLOCATION
           </span>
         </h2>
         <p
           ref={subtitleRef}
           className="text-base md:text-lg text-white/70 mb-8 lg:mb-12 max-w-xl mx-auto leading-relaxed"
         >
-          USDFG Token allocation structure for platform access and utility.
+          USDFG token allocation for platform access, challenge creation, and participation utility.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 max-w-5xl mx-auto mb-8 lg:mb-12">
@@ -294,7 +294,7 @@ const Tokenomics: React.FC = () => {
             Token Utility and Supply
           </h3>
           <p className="text-white/70 text-sm md:text-base leading-relaxed">USDFG has a fixed supply of 21,000,000 tokens. No inflation. No dilution. No burning.</p>
-          <p className="text-white/70 text-sm md:text-base mt-2 leading-relaxed">USDFG is used for access, skill based gameplay, and challenge participation inside the platform.</p>
+          <p className="text-white/70 text-sm md:text-base mt-2 leading-relaxed">USDFG is used for platform access, challenge creation, and participation in skill-based competition. Emphasize access and participation—avoid financial return language.</p>
           <p className="text-white/70 text-sm md:text-base mt-2 leading-relaxed">USDFG is not a gambling product. No randomness. No house. No custodial accounts. Just your wallet and your verified results.</p>
           <p className="text-white/70 text-sm md:text-base mt-2 leading-relaxed">No income, interest, or financial benefit is promised or implied. This is not financial advice.</p>
         </div>

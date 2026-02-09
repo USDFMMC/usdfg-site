@@ -281,12 +281,12 @@ const ChallengeSystem: React.FC = () => {
               >
                 <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
                   <FaCheckCircle className="text-green-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
-                  <span>If both players confirm the result, rewards release automatically.</span>
+                  <span>If both players confirm the result, verified rewards release automatically.</span>
                 </motion.li>
 
                 <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
                   <FaLock className="text-amber-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
-                  <span>Funds remain locked until confirmation or dispute review.</span>
+                  <span>Challenge assets remain locked until confirmation or dispute review.</span>
                 </motion.li>
 
                 <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">

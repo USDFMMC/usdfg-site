@@ -72,7 +72,7 @@ const CTASection: React.FC = () => {
 
           {/* Kimi supporting copy */}
           <p className="kimi-font-body text-white/80 text-lg mb-8 max-w-2xl mx-auto">
-            Join elite gamers competing for glory and fortune. The arena is waiting for your arrival.
+            Compete through skill. Earn verified rewards. Join the skill-based competition platform built for performance.
           </p>
 
           {/* Kimi CTAs: Enter the Arena (gradient) + Learn More (outline) */}

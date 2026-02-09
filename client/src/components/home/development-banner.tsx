@@ -110,17 +110,7 @@ const AboutSection: React.FC = () => {
                 className="text-base md:text-lg lg:text-xl text-center mb-4 font-semibold text-white leading-relaxed"
                 style={{ textShadow: "0 0 10px rgba(255, 255, 255, 0.2)" }}
               >
-                USDFG is the access token for a skill based competition platform where players challenge each other directly, lock funds, play, verify results, and receive rewards through clear outcomes.
-              </p>
-              <p
-                ref={taglineRef}
-                className="text-sm md:text-base lg:text-lg text-center bg-gradient-to-r from-green-400 via-emerald-400 to-green-500 bg-clip-text text-transparent font-semibold"
-                style={{
-                  textShadow: "0 0 20px rgba(74, 222, 128, 0.3)",
-                  filter: "drop-shadow(0 0 6px rgba(74, 222, 128, 0.2))",
-                }}
-              >
-                Built for performance and execution, not luck.
+                USDFG is a skill-based competition platform where players challenge each other directly, lock challenge assets on-chain, compete, and earn verified rewards through performance. Wallet-driven, non-custodial, and built for skill.
               </p>
             </div>
           </div>

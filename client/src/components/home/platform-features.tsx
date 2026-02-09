@@ -9,7 +9,7 @@ const features = [
   {
     icon: Swords,
     title: "Create Challenges",
-    description: "Get USDFG into your wallet, then choose your game, define the rules, and launch a challenge. No accounts, just player-owned flow. Lock funds, compete, and verify results directly.",
+    description: "Get USDFG into your wallet, then choose your game, define the rules, and launch a challenge. No accounts, just player-owned flow. Lock challenge assets, compete, and verify results directly.",
     image: "/_kimi/feature-challenge.jpg",
     metric: "Player-Created",
     color: "from-purple-500 to-purple-600",
