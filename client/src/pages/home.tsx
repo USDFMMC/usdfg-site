@@ -102,8 +102,8 @@ const Home: React.FC = () => {
         {/* Particle Background - Kimi Galaxy Effect */}
         <ParticleBackground />
         
-        {/* Global Unified Background - Kimi Hero Style */}
-        <div className="fixed inset-0 z-0 bg-[#0a0215]">
+        {/* Global Unified Background - Kimi style: void #0a0215, grid, radial glow, purple tint */}
+        <div className="fixed inset-0 z-0 bg-[var(--kimi-void)]">
           {/* Kimi Linear Grid Pattern (Purple Lines) */}
           <div
             className="absolute inset-0"
@@ -115,10 +115,11 @@ const Home: React.FC = () => {
               backgroundSize: "50px 50px"
             }}
           />
-          
-          {/* Background Gradients */}
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0a0215] via-[#0a0215]/95 to-[#0a0215]" />
-          <div className="absolute inset-0 bg-purple-600/5" />
+          {/* Kimi radial glow (center) */}
+          <div className="absolute inset-0 bg-gradient-radial-kimi pointer-events-none" />
+          {/* Void gradient + Kimi purple tint (same as Kimi purple/5) */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[var(--kimi-void)] via-[var(--kimi-void)]/95 to-[var(--kimi-void)]" />
+          <div className="absolute inset-0 bg-kimi-purple-tint-5" />
         </div>
         
         <section aria-label="Hero Section" className="relative z-10">

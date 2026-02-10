@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { Trophy, Gamepad2, Gem, Award, ChevronLeft, ChevronRight } from "lucide-react";
+import { Medal, Swords, Car, Target, Gem, ChevronLeft, ChevronRight } from "lucide-react";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -12,7 +12,7 @@ interface Game {
   alt: string;
   icon: string;
   metric: string;
-  iconComponent: typeof Trophy;
+  iconComponent: typeof Medal;
   color: string;
 }
 
@@ -30,7 +30,7 @@ const GameCategories: React.FC = () => {
       alt: "USDFG sports game competition - dominate head-to-head matches",
       icon: "🏀",
       metric: "50K+",
-      iconComponent: Trophy,
+      iconComponent: Medal,
       color: "from-yellow-400 to-amber-600",
     },
     {
@@ -40,7 +40,7 @@ const GameCategories: React.FC = () => {
       alt: "USDFG fighting game tournament - master combos and counters",
       icon: "🥋",
       metric: "10K+",
-      iconComponent: Gamepad2,
+      iconComponent: Swords,
       color: "from-purple-500 to-purple-600",
     },
     {
@@ -50,7 +50,7 @@ const GameCategories: React.FC = () => {
       alt: "USDFG racing game challenge - test your precision and speed",
       icon: "🏎️",
       metric: "1M+",
-      iconComponent: Gem,
+      iconComponent: Car,
       color: "from-pink-400 to-rose-600",
     },
     {
@@ -60,7 +60,7 @@ const GameCategories: React.FC = () => {
       alt: "USDFG shooting game battle - prove your aim and reflexes",
       icon: "🔫",
       metric: "100+",
-      iconComponent: Award,
+      iconComponent: Target,
       color: "from-cyan-400 to-blue-600",
     }
   ];
@@ -159,7 +159,7 @@ const GameCategories: React.FC = () => {
           </div>
         </div>
 
-        {/* Carousel - Kimi Exact Structure */}
+        {/* Carousel - Kimi sizes: card w-72/w-80, gap-6 (1.5rem), image h-48 (12rem), p-6, rounded-2xl; section py-24 lg:py-32, header mb-12 lg:mb-16 */}
         <div ref={carouselRef} className="relative">
           <div
             ref={scrollContainerRef}
@@ -171,7 +171,7 @@ const GameCategories: React.FC = () => {
               return (
                 <div
                   key={index}
-                  className="prize-card flex-shrink-0 w-80 sm:w-96 group"
+                  className="prize-card flex-shrink-0 w-72 sm:w-80 group"
                 >
                   <div className="relative h-full kimi-glass border border-purple-500/20 rounded-2xl overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(168,85,247,0.3)]">
                     {/* Image - Kimi Exact */}

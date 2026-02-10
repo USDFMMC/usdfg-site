@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Kimi palette (from _kimi reference) – use for backgrounds and effects */
+:root {
+  --kimi-void: #0a0215;
+  --kimi-void-light: #140521;
+  --kimi-purple: #7e43ff;
+  --kimi-orange: #ff7e3e;
+  --kimi-purple-10: rgba(126, 67, 255, 0.1);
+  --kimi-purple-5: rgba(126, 67, 255, 0.05);
+}
+
 /* Kimi-style utilities (from _kimi reference) */
 .kimi-font-display { font-family: 'Oxanium', sans-serif; }
 .kimi-font-body { font-family: 'Rajdhani', sans-serif; }
@@ -16,6 +26,24 @@
   background-clip: text;
   color: transparent;
 }
+/* Kimi exact: purple → orange (matches their .text-gradient) */
+.text-gradient-kimi-orange {
+  background: linear-gradient(135deg, #7e43ff, #ff7e3e);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/* Kimi radial glow for page background */
+.bg-gradient-radial-kimi {
+  background: radial-gradient(ellipse at center, rgba(126, 67, 255, 0.1) 0%, transparent 70%);
+}
+/* Kimi purple tint overlays (use instead of purple-600/x for Kimi look) */
+.bg-kimi-purple-tint-5 { background-color: var(--kimi-purple-5); }
+.bg-kimi-purple-tint-10 { background-color: var(--kimi-purple-10); }
+/* Kimi badge border: border-purple/30 = #7e43ff4d (from _kimi index-ayMPO7tf.css) */
+.border-kimi-purple-30 { border-color: #7e43ff4d; }
+/* Kimi badge icon color (text-orange = #ff7e3e) */
+.text-kimi-orange { color: var(--kimi-orange); }
 
 /* Kimi Bottom-Emissive Neon Effect for Category Cards */
 .kimi-bottom-neon {
@@ -99,6 +127,15 @@
   animation: pulseGlow 4s ease-in-out infinite;
 }
 
+/* Kimi exact: box-shadow only, 2s (from _kimi .animate-pulse-glow) */
+@keyframes pulseGlowKimi {
+  0%, 100% { box-shadow: 0 0 20px #7e43ff66; }
+  50% { box-shadow: 0 0 40px #7e43ffcc; }
+}
+.animate-pulse-glow-kimi {
+  animation: pulseGlowKimi 2s ease-in-out infinite;
+}
+
 /* Kimi float animation for avatars and icons */
 @keyframes float {
   0%, 100% {
@@ -159,6 +196,40 @@
 .animate-kimi-reveal {
   animation: kimiReveal 1s ease-out forwards;
 }
+
+/* Kimi exact enter/exit (from _kimi index-ayMPO7tf.css) – same effects and motion as Kimi */
+@keyframes enter {
+  0% {
+    opacity: var(--tw-enter-opacity, 1);
+    transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0)
+      scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), var(--tw-enter-scale, 1))
+      rotate(var(--tw-enter-rotate, 0));
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale3d(1, 1, 1) rotate(0);
+  }
+}
+@keyframes exit {
+  to {
+    opacity: var(--tw-exit-opacity, 1);
+    transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0)
+      scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), var(--tw-exit-scale, 1))
+      rotate(var(--tw-exit-rotate, 0));
+  }
+}
+.animate-in {
+  animation-name: enter;
+  animation-duration: 0.15s;
+  animation-fill-mode: forwards;
+  --tw-enter-opacity: initial;
+  --tw-enter-scale: initial;
+  --tw-enter-rotate: initial;
+  --tw-enter-translate-x: initial;
+  --tw-enter-translate-y: initial;
+}
+.fade-in-0 { --tw-enter-opacity: 0; }
+.zoom-in-95 { --tw-enter-scale: 0.95; }
 
 /* Stagger delays for hero/CTA */
 .kimi-delay-0 { animation-delay: 0s; }

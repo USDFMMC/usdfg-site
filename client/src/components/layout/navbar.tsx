@@ -14,26 +14,25 @@ const Navbar: React.FC = () => {
       </a>
       <header className="sticky top-0 z-50 border-b border-purple-500/20 shadow-[0_2px_24px_rgba(147,51,234,0.15)] backdrop-blur-md bg-black/80">
         <div className="container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20 py-3 flex flex-wrap items-center justify-between">
-          {/* Logo */}
-          <Link to="/" className="flex items-center group" style={{ gap: '2px' }} title="Built for the ones who don't blink.">
+          {/* Logo - Kimi style: purple/pink accent (same as Kimi), white wordmark */}
+          <Link to="/" className="flex items-center group" style={{ gap: '2px' }} title="World's Premier Esports Arena.">
             <div className="relative flex-shrink-0">
-                <img 
-                src="/assets/usdfgToken2.png" 
-                  alt="USDFG Logo" 
-                  className="w-10 h-10 object-contain transition-transform duration-300 group-hover:scale-110"
-                  loading="lazy"
-                  decoding="async"
-                  style={{ filter: "drop-shadow(0 0 8px rgba(251, 191, 36, 0.3))" }}
-                />
-              <div className="absolute inset-0 bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 rounded-lg blur-md opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+              <img
+                src="/assets/usdfgToken2.png"
+                alt="USDFG Logo"
+                className="w-10 h-10 object-contain transition-transform duration-300 group-hover:scale-110"
+                loading="lazy"
+                decoding="async"
+                style={{ filter: "drop-shadow(0 0 8px rgba(126, 67, 255, 0.5))" }}
+              />
+              <div className="absolute inset-0 rounded-lg blur-md opacity-0 group-hover:opacity-40 transition-opacity duration-300 bg-[#7e43ff]" />
             </div>
-            <span 
-              className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent font-extrabold text-xl tracking-tighter whitespace-nowrap" 
-              style={{ 
-                marginLeft: '-2px', 
+            <span
+              className="text-white font-extrabold text-xl tracking-tighter whitespace-nowrap"
+              style={{
+                marginLeft: '-2px',
                 letterSpacing: '-0.02em',
-                textShadow: "0 0 20px rgba(251, 191, 36, 0.3)",
-                filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.2))"
+                textShadow: "0 0 20px rgba(126, 67, 255, 0.3)",
               }}
             >
               USDFG
