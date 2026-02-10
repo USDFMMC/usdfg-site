@@ -86,7 +86,7 @@ const LiveBattles: React.FC = () => {
     >
       <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
         {/* Section Header */}
-        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between mb-12 lg:mb-16 opacity-0 animate-in fade-in-0 zoom-in-95">
+        <div data-kimi-scroll className="flex flex-col lg:flex-row lg:items-end lg:justify-between mb-12 lg:mb-16 kimi-scroll">
           <div>
             <span className="inline-flex items-center gap-2 font-body text-sm text-orange uppercase tracking-[0.3em] mb-4">
               <Radio className="w-4 h-4 animate-live-pulse" />
@@ -115,7 +115,8 @@ const LiveBattles: React.FC = () => {
           {matches.map((match, index) => (
             <div
               key={match.id}
-              className="match-item group opacity-0 animate-in fade-in-0 zoom-in-95"
+              data-kimi-scroll
+              className="match-item group kimi-scroll"
               style={{ animationDelay: `${0.05 + index * 0.05}s` }}
               onClick={() =>
                 setExpandedId(expandedId === match.id ? null : match.id)
@@ -242,7 +243,7 @@ const LiveBattles: React.FC = () => {
 
         {/* View All Button */}
         <div className="mt-8 text-center">
-          <button className="inline-flex items-center gap-2 px-6 py-3 kimi-glass border border-purple-500/30 rounded-full kimi-font-body text-white/70 hover:text-white hover:border-purple-500/60 transition-all">
+          <button data-kimi-scroll className="inline-flex items-center gap-2 px-6 py-3 kimi-glass border border-purple-500/30 rounded-full kimi-font-body text-white/70 hover:text-white hover:border-purple-500/60 transition-all kimi-scroll" style={{ animationDelay: "0.4s" }}>
             View All Challenges
             <ChevronRight className="w-4 h-4" />
           </button>

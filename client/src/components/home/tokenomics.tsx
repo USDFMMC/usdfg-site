@@ -68,16 +68,17 @@ const Tokenomics: React.FC = () => {
     >
 
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
-        <h2 className="font-display font-bold text-3xl sm:text-4xl lg:text-5xl mb-4 text-white opacity-0 animate-in fade-in-0 zoom-in-95">
+        <h2 data-kimi-scroll className="font-display font-bold text-3xl sm:text-4xl lg:text-5xl mb-4 text-white kimi-scroll">
           <span className="text-gradient">TOKEN UTILITY &amp; ALLOCATION</span>
         </h2>
-        <p className="font-body text-base md:text-lg text-white/70 mb-8 lg:mb-12 max-w-xl mx-auto leading-relaxed opacity-0 animate-in fade-in-0 zoom-in-95 kimi-delay-1">
+        <p data-kimi-scroll className="font-body text-base md:text-lg text-white/70 mb-8 lg:mb-12 max-w-xl mx-auto leading-relaxed kimi-scroll kimi-delay-1">
           USDFG token allocation for platform access, challenge creation, and participation utility.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 max-w-5xl mx-auto mb-8 lg:mb-12">
           <div
-            className="relative glass border border-purple/30 rounded-2xl p-4 lg:p-6 text-center transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.18)] kimi-bottom-neon opacity-0 animate-in fade-in-0 zoom-in-95"
+            data-kimi-scroll
+            className="relative glass border border-purple/30 rounded-2xl p-4 lg:p-6 text-center transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.18)] kimi-bottom-neon kimi-scroll"
             style={
               {
                 "--neon-color": "rgba(126, 67, 255, 0.25)",
@@ -100,7 +101,8 @@ const Tokenomics: React.FC = () => {
             </div>
           </div>
           <div
-            className="relative glass border border-purple/30 rounded-2xl p-4 lg:p-6 text-center transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.18)] kimi-bottom-neon opacity-0 animate-in fade-in-0 zoom-in-95"
+            data-kimi-scroll
+            className="relative glass border border-purple/30 rounded-2xl p-4 lg:p-6 text-center transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.18)] kimi-bottom-neon kimi-scroll"
             style={
               {
                 "--neon-color": "rgba(126, 67, 255, 0.25)",
@@ -122,7 +124,8 @@ const Tokenomics: React.FC = () => {
             </div>
           </div>
           <div
-            className="relative glass border border-purple/30 rounded-2xl p-4 lg:p-6 text-center transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.18)] kimi-bottom-neon opacity-0 animate-in fade-in-0 zoom-in-95"
+            data-kimi-scroll
+            className="relative glass border border-purple/30 rounded-2xl p-4 lg:p-6 text-center transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.18)] kimi-bottom-neon kimi-scroll"
             style={
               {
                 "--neon-color": "rgba(126, 67, 255, 0.25)",
@@ -144,7 +147,8 @@ const Tokenomics: React.FC = () => {
             </div>
           </div>
           <div
-            className="relative glass border border-purple/30 rounded-2xl p-4 lg:p-6 text-center transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.18)] kimi-bottom-neon opacity-0 animate-in fade-in-0 zoom-in-95"
+            data-kimi-scroll
+            className="relative glass border border-purple/30 rounded-2xl p-4 lg:p-6 text-center transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.18)] kimi-bottom-neon kimi-scroll"
             style={
               {
                 "--neon-color": "rgba(126, 67, 255, 0.25)",
@@ -167,7 +171,8 @@ const Tokenomics: React.FC = () => {
           </div>
         </div>
         <div
-          className="text-center mt-6 lg:mt-8 max-w-2xl mx-auto glass border border-purple/30 rounded-2xl p-5 lg:p-6 opacity-0 animate-in fade-in-0 zoom-in-95"
+          data-kimi-scroll
+          className="text-center mt-6 lg:mt-8 max-w-2xl mx-auto glass border border-purple/30 rounded-2xl p-5 lg:p-6 kimi-scroll"
           style={{ animationDelay: "0.25s" }}
         >
           <h3

@@ -98,7 +98,8 @@ const ChallengeSystem: React.FC = () => {
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
         {/* Rules / Explainer */}
         <Card
-          className="relative max-w-4xl mx-auto glass border border-purple/30 rounded-2xl transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_40px_rgba(126,67,255,0.18)] kimi-bottom-neon opacity-0 animate-in fade-in-0 zoom-in-95"
+          data-kimi-scroll
+          className="relative max-w-4xl mx-auto glass border border-purple/30 rounded-2xl transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_40px_rgba(126,67,255,0.18)] kimi-bottom-neon kimi-scroll"
           style={
             {
               "--neon-color": "rgba(126, 67, 255, 0.25)",
@@ -111,7 +112,11 @@ const ChallengeSystem: React.FC = () => {
           <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 via-purple-600/10 to-purple-600/0 opacity-0 hover:opacity-100 transition-opacity duration-300 rounded-2xl" />
           <CardContent className="relative z-10 p-4 md:p-6 lg:p-8">
             <div className="mb-6">
-              <h3 className="font-display font-bold text-xl md:text-2xl mb-3 flex items-center justify-center text-white tracking-wide opacity-0 animate-in fade-in-0 zoom-in-95">
+              <h3
+                data-kimi-scroll
+                className="font-display font-bold text-xl md:text-2xl mb-3 flex items-center justify-center text-white tracking-wide kimi-scroll"
+                style={{ animationDelay: "0.08s" }}
+              >
                 <span
                   className="mr-3"
                 >
@@ -121,27 +126,47 @@ const ChallengeSystem: React.FC = () => {
               </h3>
 
               <ul className="space-y-3">
-                <li className="flex items-start text-sm md:text-base opacity-0 animate-in fade-in-0 zoom-in-95" style={{ animationDelay: "0.1s" }}>
+                <li
+                  data-kimi-scroll
+                  className="flex items-start text-sm md:text-base kimi-scroll"
+                  style={{ animationDelay: "0.1s" }}
+                >
                   <FaCheckCircle className="text-green-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
                   <span>If both players confirm the result, verified rewards release automatically.</span>
                 </li>
 
-                <li className="flex items-start text-sm md:text-base opacity-0 animate-in fade-in-0 zoom-in-95" style={{ animationDelay: "0.15s" }}>
+                <li
+                  data-kimi-scroll
+                  className="flex items-start text-sm md:text-base kimi-scroll"
+                  style={{ animationDelay: "0.15s" }}
+                >
                   <FaLock className="text-orange mt-1 mr-3 w-4 h-4 flex-shrink-0" />
                   <span>Challenge assets remain locked until confirmation or dispute review.</span>
                 </li>
 
-                <li className="flex items-start text-sm md:text-base opacity-0 animate-in fade-in-0 zoom-in-95" style={{ animationDelay: "0.2s" }}>
+                <li
+                  data-kimi-scroll
+                  className="flex items-start text-sm md:text-base kimi-scroll"
+                  style={{ animationDelay: "0.2s" }}
+                >
                   <FaExclamationTriangle className="text-orange mt-1 mr-3 w-4 h-4 flex-shrink-0" />
                   <span>If disputed, players submit video or screenshot proof.</span>
                 </li>
 
-                <li className="flex items-start text-sm md:text-base opacity-0 animate-in fade-in-0 zoom-in-95" style={{ animationDelay: "0.25s" }}>
+                <li
+                  data-kimi-scroll
+                  className="flex items-start text-sm md:text-base kimi-scroll"
+                  style={{ animationDelay: "0.25s" }}
+                >
                   <FaGavel className="text-orange mt-1 mr-3 w-4 h-4 flex-shrink-0" />
                   <span>Disputes are reviewed and resolved based on submitted proof.</span>
                 </li>
 
-                <li className="flex items-start text-sm md:text-base opacity-0 animate-in fade-in-0 zoom-in-95" style={{ animationDelay: "0.3s" }}>
+                <li
+                  data-kimi-scroll
+                  className="flex items-start text-sm md:text-base kimi-scroll"
+                  style={{ animationDelay: "0.3s" }}
+                >
                   <FaUserShield className="text-orange mt-1 mr-3 w-4 h-4 flex-shrink-0" />
                   <span>Attempts to falsify results can lead to deactivation.</span>
                 </li>
@@ -149,7 +174,7 @@ const ChallengeSystem: React.FC = () => {
             </div>
 
             {/* Info callout */}
-            <div className="mb-4 opacity-0 animate-in fade-in-0 zoom-in-95" style={{ animationDelay: "0.35s" }}>
+            <div data-kimi-scroll className="mb-4 kimi-scroll" style={{ animationDelay: "0.35s" }}>
               <div className="glass border border-purple/30 p-3 text-sm text-center shadow-[0_0_20px_rgba(126,67,255,0.14)] rounded-xl flex items-center justify-center gap-2">
                 <FaExclamationTriangle className="text-orange w-4 h-4" />
                 <span className="font-semibold text-white/90">
@@ -159,7 +184,7 @@ const ChallengeSystem: React.FC = () => {
             </div>
 
             {/* Trust badge */}
-            <div className="flex justify-center mt-4 opacity-0 animate-in fade-in-0 zoom-in-95" style={{ animationDelay: "0.4s" }}>
+            <div data-kimi-scroll className="flex justify-center mt-4 kimi-scroll" style={{ animationDelay: "0.4s" }}>
               <div className="flex items-center gap-2 px-4 py-2 rounded-full glass border border-purple/30 shadow-[0_0_15px_rgba(126,67,255,0.18)] text-white text-sm font-semibold">
                 <FaUserShield className="text-orange w-4 h-4 mr-1" />
                 Clear rules. Verified results.
@@ -171,7 +196,8 @@ const ChallengeSystem: React.FC = () => {
         {/* Leaderboard + mascot visual (moved under Challenge Rules) */}
         <section className="flex justify-center py-6 lg:py-8">
           <div
-            className="relative opacity-0 animate-in fade-in-0 zoom-in-95"
+            data-kimi-scroll
+            className="relative kimi-scroll"
             style={{ animationDelay: "0.15s" }}
             id="challenge-leaderboard-visual"
           >

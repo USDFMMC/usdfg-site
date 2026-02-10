@@ -39,7 +39,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
         <div className="w-full">
           <div className="flex flex-col items-start text-left max-w-4xl">
             {/* Badge – Kimi exact: glass, border-purple/30, w-4 h-4 icon, font-body text-sm text-white/80. Icon: Kimi SVG (trophy) in Kimi orange. */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 mb-6 kimi-glass rounded-full border border-kimi-purple-30 opacity-0 animate-in fade-in-0 zoom-in-95 kimi-delay-0">
+            <div data-kimi-scroll className="inline-flex items-center gap-2 px-4 py-2 mb-6 kimi-glass rounded-full border border-kimi-purple-30 kimi-scroll kimi-delay-0">
               <img
                 src="/_kimi/hero-badge-icon.svg"
                 alt=""
@@ -54,13 +54,14 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
             </div>
 
             <div
-              className="text-2xl md:text-3xl lg:text-4xl font-bold mb-2 text-white opacity-0 animate-in fade-in-0 zoom-in-95 kimi-delay-1"
+              data-kimi-scroll
+              className="text-2xl md:text-3xl lg:text-4xl font-bold mb-2 text-white kimi-scroll kimi-delay-1"
               style={{ textShadow: "0 0 20px rgba(255, 255, 255, 0.3)" }}
             >
               USDFG
             </div>
 
-            <h1 className="neocore-h1 mb-4 text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold leading-tight opacity-0 animate-in fade-in-0 zoom-in-95 kimi-delay-2">
+            <h1 data-kimi-scroll className="neocore-h1 mb-4 text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold leading-tight kimi-scroll kimi-delay-2">
               <span className="block">
                 <span className="text-white">GAME. </span>
                 <span
@@ -84,13 +85,13 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
               </span>
             </h1>
 
-            <p className="neocore-body mb-4 max-w-2xl text-lg sm:text-xl text-white/70 leading-relaxed opacity-0 animate-in fade-in-0 zoom-in-95 kimi-delay-3">
+            <p data-kimi-scroll className="neocore-body mb-4 max-w-2xl text-lg sm:text-xl text-white/70 leading-relaxed kimi-scroll kimi-delay-3">
               Join the world's premier esports crypto ecosystem. Challenge
               players, manage tournaments, and turn your skill into rewards. The
               arena awaits your arrival.
             </p>
 
-            <div className="flex flex-col sm:flex-row justify-start gap-4 opacity-0 animate-in fade-in-0 zoom-in-95 kimi-delay-4">
+            <div data-kimi-scroll className="flex flex-col sm:flex-row justify-start gap-4 kimi-scroll kimi-delay-4">
               <button
                 onClick={onExploreClick}
                 className="relative font-semibold text-base px-8 py-6 bg-gradient-to-r from-purple-600 to-amber-500 hover:from-purple-400 hover:to-amber-400 text-white border-0 overflow-hidden group rounded-lg transition-all"

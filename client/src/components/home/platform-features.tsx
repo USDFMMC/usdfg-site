@@ -38,7 +38,7 @@ const PlatformFeatures: React.FC = () => {
       
       <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
         {/* Section Header - Kimi Exact */}
-        <div className="text-center mb-16 lg:mb-20">
+        <div data-kimi-scroll className="text-center mb-16 lg:mb-20 kimi-scroll" style={{ animationDelay: "0.05s" }}>
           <span className="inline-block kimi-font-body text-sm text-purple-500 uppercase tracking-[0.3em] mb-4">
             The Platform
           </span>
@@ -56,7 +56,9 @@ const PlatformFeatures: React.FC = () => {
           {features.map((feature, index) => (
             <div
               key={index}
-              className="group relative"
+              data-kimi-scroll
+              className="group relative kimi-scroll"
+              style={{ animationDelay: `${0.08 + index * 0.08}s` }}
             >
               <div className="relative h-full kimi-glass border border-purple-500/20 rounded-2xl overflow-hidden transition-all duration-500 hover:border-purple-500/50 kimi-bottom-neon" style={{
                 '--neon-color': 'rgba(168, 85, 247, 0.3)',

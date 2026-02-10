@@ -75,7 +75,7 @@ const GameCategories: React.FC = () => {
     >
       <div className="relative z-10">
         {/* Section Header - Kimi Exact Structure */}
-        <div className="w-full px-4 sm:px-6 lg:px-12 xl:px-20 mb-12 lg:mb-16 opacity-0 animate-in fade-in-0 zoom-in-95">
+        <div data-kimi-scroll className="w-full px-4 sm:px-6 lg:px-12 xl:px-20 mb-12 lg:mb-16 kimi-scroll">
           <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between">
             <div>
               <span className="inline-flex items-center gap-2 font-body text-sm text-orange uppercase tracking-[0.3em] mb-4">
@@ -115,7 +115,8 @@ const GameCategories: React.FC = () => {
               return (
                 <div
                   key={index}
-                  className="prize-card flex-shrink-0 w-72 sm:w-80 group opacity-0 animate-in fade-in-0 zoom-in-95"
+                  data-kimi-scroll
+                  className="prize-card flex-shrink-0 w-72 sm:w-80 group kimi-scroll"
                   style={{ animationDelay: `${0.05 + index * 0.05}s` }}
                 >
                   <div className="relative h-full glass border border-purple-500/20 rounded-2xl overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)]">

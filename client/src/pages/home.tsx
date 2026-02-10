@@ -119,7 +119,7 @@ const Home: React.FC = () => {
         
         {/* Content sections - revealed with Kimi CSS animation when "EXPLORE PLATFORM" is clicked */}
         <div
-          className={contentRevealed ? "content-revealed pointer-events-auto" : "pointer-events-none"}
+          className={contentRevealed ? "pointer-events-auto" : "pointer-events-none"}
           style={{
             display: contentRevealed ? "block" : "none",
           }}

@@ -257,6 +257,35 @@
 .fade-in-0 { --tw-enter-opacity: 0; }
 .zoom-in-95 { --tw-enter-scale: 0.95; }
 
+/* Kimi scroll-in/out (IntersectionObserver toggles these) */
+.kimi-scroll {
+  opacity: 0;
+  will-change: opacity, transform;
+  backface-visibility: hidden;
+
+  /* Match Kimi enter/exit primitives */
+  --tw-enter-opacity: 0;
+  --tw-enter-scale: 0.95;
+  --tw-enter-translate-y: 12px;
+  --tw-exit-opacity: 0;
+  --tw-exit-scale: 0.95;
+  --tw-exit-translate-y: 12px;
+}
+.kimi-scroll--in {
+  animation-name: enter;
+  animation-duration: 0.15s;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+}
+.kimi-scroll--out {
+  animation-name: exit;
+  animation-duration: 0.15s;
+  animation-timing-function: ease-in;
+  animation-fill-mode: forwards;
+  /* Never delay exit (even if element has kimi-delay-* classes) */
+  animation-delay: 0s !important;
+}
+
 /* Kimi special effects (keyframes exist in _kimi; opt-in usage) */
 @keyframes scanline { 0% { transform: translateY(-100%); } 100% { transform: translateY(100vh); } }
 @keyframes glitch {
@@ -278,22 +307,15 @@
 .kimi-delay-5 { animation-delay: 0.5s; }
 .kimi-delay-6 { animation-delay: 0.6s; }
 
-/* Home content reveal: stagger children */
-.content-revealed > * {
-  opacity: 0;
-  /* Match Kimi motion primitives: enter (0.15s) + fade + zoom */
-  animation: enter 0.15s ease-out forwards;
-  --tw-enter-opacity: 0;
-  --tw-enter-scale: 0.95;
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .kimi-scroll {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+    filter: none !important;
+  }
 }
-.content-revealed > *:nth-child(1) { animation-delay: 0.05s; }
-.content-revealed > *:nth-child(2) { animation-delay: 0.1s; }
-.content-revealed > *:nth-child(3) { animation-delay: 0.15s; }
-.content-revealed > *:nth-child(4) { animation-delay: 0.2s; }
-.content-revealed > *:nth-child(5) { animation-delay: 0.25s; }
-.content-revealed > *:nth-child(6) { animation-delay: 0.3s; }
-.content-revealed > *:nth-child(7) { animation-delay: 0.35s; }
-.content-revealed > *:nth-child(8) { animation-delay: 0.4s; }
 
 /* Scrollbar hide utility */
 .scrollbar-hide {
