@@ -1,9 +1,5 @@
-import React, { useEffect, useRef } from "react";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
+import React from "react";
 import { Swords, Trophy, BarChart3, ArrowRight } from "lucide-react";
-
-gsap.registerPlugin(ScrollTrigger);
 
 const features = [
   {
@@ -33,59 +29,8 @@ const features = [
 ];
 
 const PlatformFeatures: React.FC = () => {
-  const sectionRef = useRef<HTMLElement>(null);
-  const titleRef = useRef<HTMLDivElement>(null);
-  const cardsRef = useRef<(HTMLDivElement | null)[]>([]);
-
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      // Title animation - Kimi Exact
-      gsap.fromTo(
-        titleRef.current,
-        { opacity: 0, y: 50 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: 'power3.out',
-          scrollTrigger: {
-            trigger: titleRef.current,
-            start: 'top 80%',
-            toggleActions: 'play none none reverse',
-          },
-        }
-      );
-
-      // Cards animation - Kimi Exact
-      cardsRef.current.forEach((card, index) => {
-        if (!card) return;
-
-        gsap.fromTo(
-          card,
-          { opacity: 0, y: 60, scale: 0.9 },
-          {
-            opacity: 1,
-            y: 0,
-            scale: 1,
-            duration: 0.6,
-            delay: index * 0.15,
-            ease: 'power3.out',
-            scrollTrigger: {
-              trigger: card,
-              start: 'top 85%',
-              toggleActions: 'play none none reverse',
-            },
-          }
-        );
-      });
-    }, sectionRef);
-
-    return () => ctx.revert();
-  }, []);
-
   return (
     <section
-      ref={sectionRef}
       id="platform"
       className="relative py-24 lg:py-32 w-full"
     >
@@ -93,13 +38,13 @@ const PlatformFeatures: React.FC = () => {
       
       <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
         {/* Section Header - Kimi Exact */}
-        <div ref={titleRef} className="text-center mb-16 lg:mb-20">
+        <div className="text-center mb-16 lg:mb-20">
           <span className="inline-block kimi-font-body text-sm text-purple-500 uppercase tracking-[0.3em] mb-4">
             The Platform
           </span>
           <h2 className="kimi-font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white mb-6">
             THE BITCOIN
-            <span className="block bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent">OF GAMING</span>
+            <span className="block text-gradient-kimi-orange">OF GAMING</span>
           </h2>
           <p className="kimi-font-body text-lg sm:text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
             USDFG is a skill-based competition platform where players challenge each other directly, lock challenge assets on-chain, compete, and earn verified rewards through performance. Wallet-driven, non-custodial, and built for skill.
@@ -111,7 +56,6 @@ const PlatformFeatures: React.FC = () => {
           {features.map((feature, index) => (
             <div
               key={index}
-              ref={(el) => { cardsRef.current[index] = el; }}
               className="group relative"
             >
               <div className="relative h-full kimi-glass border border-purple-500/20 rounded-2xl overflow-hidden transition-all duration-500 hover:border-purple-500/50 kimi-bottom-neon" style={{
@@ -139,7 +83,7 @@ const PlatformFeatures: React.FC = () => {
 
                   {/* Metric Badge - Kimi Exact */}
                   <div className="absolute top-4 right-4 px-4 py-2 kimi-glass rounded-full">
-                    <span className="kimi-font-display font-bold text-sm bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent">
+                    <span className="kimi-font-display font-bold text-sm text-gradient-kimi-orange">
                       {feature.metric}
                     </span>
                   </div>

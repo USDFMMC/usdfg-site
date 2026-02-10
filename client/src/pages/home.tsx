@@ -102,19 +102,10 @@ const Home: React.FC = () => {
         {/* Particle Background - Kimi Galaxy Effect */}
         <ParticleBackground />
         
-        {/* Global Unified Background - Kimi style: void #0a0215, grid, radial glow, purple tint */}
+        {/* Global Unified Background - Kimi style: void + dot grid + radial glow + subtle purple tint */}
         <div className="fixed inset-0 z-0 bg-[var(--kimi-void)]">
-          {/* Kimi Linear Grid Pattern (Purple Lines) */}
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage: `
-                linear-gradient(rgba(126, 67, 255, 0.1) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(126, 67, 255, 0.1) 1px, transparent 1px)
-              `,
-              backgroundSize: "50px 50px"
-            }}
-          />
+          {/* Kimi Dot Grid Pattern (reference hero) */}
+          <div className="absolute inset-0 bg-kimi-dot-grid opacity-25" />
           {/* Kimi radial glow (center) */}
           <div className="absolute inset-0 bg-gradient-radial-kimi pointer-events-none" />
           {/* Void gradient + Kimi purple tint (same as Kimi purple/5) */}

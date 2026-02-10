@@ -1,9 +1,5 @@
-import React, { useEffect, useRef } from "react";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
+import React, { useRef } from "react";
 import { Medal, Swords, Car, Target, Gem, ChevronLeft, ChevronRight } from "lucide-react";
-
-gsap.registerPlugin(ScrollTrigger);
 
 interface Game {
   image: string;
@@ -17,9 +13,6 @@ interface Game {
 }
 
 const GameCategories: React.FC = () => {
-  const sectionRef = useRef<HTMLElement>(null);
-  const titleRef = useRef<HTMLDivElement>(null);
-  const carouselRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const games: Game[] = [
@@ -65,51 +58,6 @@ const GameCategories: React.FC = () => {
     }
   ];
 
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      // Title animation - Kimi Exact
-      gsap.fromTo(
-        titleRef.current,
-        { opacity: 0, y: 50 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: 'power3.out',
-          scrollTrigger: {
-            trigger: titleRef.current,
-            start: 'top 80%',
-            toggleActions: 'play none none reverse',
-          },
-        }
-      );
-
-      // Cards animation - Kimi Exact
-      const cards = carouselRef.current?.querySelectorAll('.prize-card');
-      if (cards) {
-        gsap.fromTo(
-          cards,
-          { opacity: 0, y: 60, scale: 0.9 },
-          {
-            opacity: 1,
-            y: 0,
-            scale: 1,
-            duration: 0.6,
-            stagger: 0.15,
-            ease: 'power3.out',
-            scrollTrigger: {
-              trigger: carouselRef.current,
-              start: 'top 80%',
-              toggleActions: 'play none none reverse',
-            },
-          }
-        );
-      }
-    }, sectionRef);
-
-    return () => ctx.revert();
-  }, []);
-
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
       const scrollAmount = 400;
@@ -122,36 +70,32 @@ const GameCategories: React.FC = () => {
 
   return (
     <section
-      ref={sectionRef}
       id="supported-games"
       className="relative py-24 lg:py-32 w-full overflow-hidden"
     >
-      {/* Background - Kimi Exact */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black via-black/95 to-black" />
-
       <div className="relative z-10">
         {/* Section Header - Kimi Exact Structure */}
-        <div ref={titleRef} className="w-full px-4 sm:px-6 lg:px-12 xl:px-20 mb-12 lg:mb-16">
+        <div className="w-full px-4 sm:px-6 lg:px-12 xl:px-20 mb-12 lg:mb-16 opacity-0 animate-in fade-in-0 zoom-in-95">
           <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <span className="inline-flex items-center gap-2 kimi-font-body text-sm text-amber-400 uppercase tracking-[0.3em] mb-4">
+              <span className="inline-flex items-center gap-2 font-body text-sm text-orange uppercase tracking-[0.3em] mb-4">
                 <Gem className="w-4 h-4" />
                 Supported Genres
               </span>
-              <h2 className="kimi-font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white">
-                SUPPORTED <span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent">GAMES</span>
+              <h2 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white">
+                SUPPORTED <span className="text-gradient">GAMES</span>
               </h2>
             </div>
             <div className="mt-4 lg:mt-0 flex items-center gap-3">
               <button
                 onClick={() => scroll('left')}
-                className="w-12 h-12 flex items-center justify-center kimi-glass border border-purple-500/30 rounded-full hover:border-purple-500/60 transition-colors"
+                className="w-12 h-12 flex items-center justify-center glass border border-purple/30 rounded-full hover:border-purple-500/60 transition-colors"
               >
                 <ChevronLeft className="w-5 h-5 text-white" />
               </button>
               <button
                 onClick={() => scroll('right')}
-                className="w-12 h-12 flex items-center justify-center kimi-glass border border-purple-500/30 rounded-full hover:border-purple-500/60 transition-colors"
+                className="w-12 h-12 flex items-center justify-center glass border border-purple/30 rounded-full hover:border-purple-500/60 transition-colors"
               >
                 <ChevronRight className="w-5 h-5 text-white" />
               </button>
@@ -160,7 +104,7 @@ const GameCategories: React.FC = () => {
         </div>
 
         {/* Carousel - Kimi sizes: card w-72/w-80, gap-6 (1.5rem), image h-48 (12rem), p-6, rounded-2xl; section py-24 lg:py-32, header mb-12 lg:mb-16 */}
-        <div ref={carouselRef} className="relative">
+        <div className="relative">
           <div
             ref={scrollContainerRef}
             className="flex gap-6 overflow-x-auto scrollbar-hide px-4 sm:px-6 lg:px-12 xl:px-20 pb-4"
@@ -171,9 +115,10 @@ const GameCategories: React.FC = () => {
               return (
                 <div
                   key={index}
-                  className="prize-card flex-shrink-0 w-72 sm:w-80 group"
+                  className="prize-card flex-shrink-0 w-72 sm:w-80 group opacity-0 animate-in fade-in-0 zoom-in-95"
+                  style={{ animationDelay: `${0.05 + index * 0.05}s` }}
                 >
-                  <div className="relative h-full kimi-glass border border-purple-500/20 rounded-2xl overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(168,85,247,0.3)]">
+                  <div className="relative h-full glass border border-purple-500/20 rounded-2xl overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)]">
                     {/* Image - Kimi Exact */}
                     <div className="relative h-48 overflow-hidden">
                       <img
@@ -198,8 +143,8 @@ const GameCategories: React.FC = () => {
                       </div>
 
                       {/* Value Badge - Kimi Exact */}
-                      <div className="absolute top-4 right-4 px-4 py-2 kimi-glass rounded-full">
-                        <span className="kimi-font-display font-bold text-sm bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent">
+                      <div className="absolute top-4 right-4 px-4 py-2 glass rounded-full border border-purple/30">
+                        <span className="font-display font-bold text-sm text-gradient">
                           {game.metric}
                         </span>
                       </div>
@@ -207,10 +152,10 @@ const GameCategories: React.FC = () => {
 
                     {/* Content - Kimi Exact */}
                     <div className="p-6">
-                      <h3 className="kimi-font-display font-bold text-xl text-white mb-2 group-hover:bg-gradient-to-r group-hover:from-purple-400 group-hover:to-orange-400 group-hover:bg-clip-text group-hover:text-transparent transition-all">
+                      <h3 className="font-display font-bold text-xl text-white mb-2 group-hover:text-gradient transition-all">
                         {game.title}
                       </h3>
-                      <p className="kimi-font-body text-white/60 text-sm leading-relaxed">
+                      <p className="font-body text-white/60 text-sm leading-relaxed">
                         {game.challenges}
                       </p>
                     </div>

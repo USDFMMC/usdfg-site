@@ -4,11 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { FaBalanceScale, FaLock, FaGavel, FaExclamationTriangle, FaUserShield, FaCheckCircle } from "react-icons/fa";
-import { motion } from "framer-motion";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-
-gsap.registerPlugin(ScrollTrigger);
 
 /**
  * ChallengeSystem
@@ -91,190 +86,93 @@ const ChallengeSystem: React.FC = () => {
   // -----------------------------
   // Leaderboard visual: lazy reveal + WEBP → PNG fallback
   // -----------------------------
-  const visualRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (!visualRef.current) return;
-    const el = visualRef.current;
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => {
-          if (e.isIntersecting) {
-            el.classList.add("fade-in-up");
-          }
-        });
-      },
-      { threshold: 0.2 }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-
   const imageSrcWebp = "/assets/usdfg-leaderboard-competition.webp";
   const imageSrcPng = "/assets/usdfg-leaderboard-competition.png";
-
-  // -----------------------------
-  // GSAP Animations
-  // -----------------------------
-  const sectionRef = useRef<HTMLElement>(null);
-  const imageRef = useRef<HTMLDivElement>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      // Initial states
-      gsap.set(imageRef.current, { opacity: 0, y: 16 });
-      gsap.set(cardRef.current, { opacity: 0, y: 12 });
-
-      // Entrance timeline
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: 'top 80%',
-          toggleActions: 'play none none none',
-        },
-      });
-
-      tl.to(
-        cardRef.current,
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: 'power3.out',
-        }
-      )
-        .to(
-          imageRef.current,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.8,
-            ease: 'power3.out',
-          },
-          '-=0.4'
-        );
-    }, sectionRef);
-
-    return () => ctx.revert();
-  }, []);
 
   // -----------------------------
   // Render
   // -----------------------------
   return (
-    <section ref={sectionRef} className="py-12 lg:py-16 relative overflow-hidden">
+    <section className="py-12 lg:py-16 relative overflow-hidden">
 
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
         {/* Rules / Explainer */}
         <Card
-          ref={cardRef}
-          className="relative max-w-4xl mx-auto bg-black/40 backdrop-blur-sm rounded-lg transition-all duration-300 kimi-bottom-neon" style={{ 
-            '--neon-color': 'rgba(168, 85, 247, 0.3)',
-            '--neon-hover-color': 'rgba(168, 85, 247, 0.5)',
-          } as React.CSSProperties}
+          className="relative max-w-4xl mx-auto glass border border-purple/30 rounded-2xl transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_40px_rgba(126,67,255,0.18)] kimi-bottom-neon opacity-0 animate-in fade-in-0 zoom-in-95"
+          style={
+            {
+              "--neon-color": "rgba(126, 67, 255, 0.25)",
+              "--neon-hover-color": "rgba(126, 67, 255, 0.45)",
+              animationDelay: "0.05s",
+            } as React.CSSProperties
+          }
         >
           {/* Gradient glow on hover */}
-          <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 via-purple-600/10 to-purple-600/0 opacity-0 hover:opacity-100 transition-opacity duration-300 rounded-lg" />
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 via-purple-600/10 to-purple-600/0 opacity-0 hover:opacity-100 transition-opacity duration-300 rounded-2xl" />
           <CardContent className="relative z-10 p-4 md:p-6 lg:p-8">
             <div className="mb-6">
-              <motion.h3
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6 }}
-                className="neocore-h2 mb-3 flex items-center justify-center text-white tracking-wide"
-                style={{
-                  textShadow: "0 0 20px rgba(255, 255, 255, 0.3)",
-                  filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.3))",
-                }}
-              >
+              <h3 className="font-display font-bold text-xl md:text-2xl mb-3 flex items-center justify-center text-white tracking-wide opacity-0 animate-in fade-in-0 zoom-in-95">
                 <span
                   className="mr-3"
-                  style={{
-                    filter: "drop-shadow(0 0 8px rgba(251, 191, 36, 0.5))",
-                  }}
                 >
-                  <FaBalanceScale className="inline-block w-5 h-5 md:w-6 md:h-6 text-amber-300" />
+                  <FaBalanceScale className="inline-block w-5 h-5 md:w-6 md:h-6 text-orange" />
                 </span>
                 Challenge Rules & Result Verification
-              </motion.h3>
+              </h3>
 
-              <motion.ul
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.12 } } }}
-                className="space-y-3"
-              >
-                <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
+              <ul className="space-y-3">
+                <li className="flex items-start text-sm md:text-base opacity-0 animate-in fade-in-0 zoom-in-95" style={{ animationDelay: "0.1s" }}>
                   <FaCheckCircle className="text-green-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
                   <span>If both players confirm the result, verified rewards release automatically.</span>
-                </motion.li>
+                </li>
 
-                <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
-                  <FaLock className="text-amber-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
+                <li className="flex items-start text-sm md:text-base opacity-0 animate-in fade-in-0 zoom-in-95" style={{ animationDelay: "0.15s" }}>
+                  <FaLock className="text-orange mt-1 mr-3 w-4 h-4 flex-shrink-0" />
                   <span>Challenge assets remain locked until confirmation or dispute review.</span>
-                </motion.li>
+                </li>
 
-                <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
-                  <FaExclamationTriangle className="text-amber-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
+                <li className="flex items-start text-sm md:text-base opacity-0 animate-in fade-in-0 zoom-in-95" style={{ animationDelay: "0.2s" }}>
+                  <FaExclamationTriangle className="text-orange mt-1 mr-3 w-4 h-4 flex-shrink-0" />
                   <span>If disputed, players submit video or screenshot proof.</span>
-                </motion.li>
+                </li>
 
-                <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
-                  <FaGavel className="text-amber-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
+                <li className="flex items-start text-sm md:text-base opacity-0 animate-in fade-in-0 zoom-in-95" style={{ animationDelay: "0.25s" }}>
+                  <FaGavel className="text-orange mt-1 mr-3 w-4 h-4 flex-shrink-0" />
                   <span>Disputes are reviewed and resolved based on submitted proof.</span>
-                </motion.li>
+                </li>
 
-                <motion.li variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }} className="flex items-start text-sm md:text-base">
-                  <FaUserShield className="text-amber-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
+                <li className="flex items-start text-sm md:text-base opacity-0 animate-in fade-in-0 zoom-in-95" style={{ animationDelay: "0.3s" }}>
+                  <FaUserShield className="text-orange mt-1 mr-3 w-4 h-4 flex-shrink-0" />
                   <span>Attempts to falsify results can lead to deactivation.</span>
-                </motion.li>
-              </motion.ul>
+                </li>
+              </ul>
             </div>
 
             {/* Info callout */}
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="mb-4"
-            >
-              <div className="bg-gradient-to-br from-amber-900/30 to-orange-900/20 border border-amber-500/30 p-3 text-sm text-center shadow-[0_0_20px_rgba(251,191,36,0.15)] backdrop-blur-md rounded-lg flex items-center justify-center gap-2">
-                <FaExclamationTriangle className="text-amber-300 w-4 h-4" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.5))" }} />
-                <span className="font-semibold text-amber-100">
+            <div className="mb-4 opacity-0 animate-in fade-in-0 zoom-in-95" style={{ animationDelay: "0.35s" }}>
+              <div className="glass border border-purple/30 p-3 text-sm text-center shadow-[0_0_20px_rgba(126,67,255,0.14)] rounded-xl flex items-center justify-center gap-2">
+                <FaExclamationTriangle className="text-orange w-4 h-4" />
+                <span className="font-semibold text-white/90">
                   Make sure your challenge description clearly defines all win conditions and game settings.
                 </span>
               </div>
-            </motion.div>
+            </div>
 
             {/* Trust badge */}
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-              className="flex justify-center mt-4"
-            >
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-600/40 to-amber-600/40 border border-purple-500/30 shadow-[0_0_15px_rgba(147,51,234,0.2)] text-white text-sm font-semibold">
-                <FaUserShield className="text-amber-300 w-4 h-4 mr-1" style={{ filter: "drop-shadow(0 0 4px rgba(251, 191, 36, 0.5))" }} />
+            <div className="flex justify-center mt-4 opacity-0 animate-in fade-in-0 zoom-in-95" style={{ animationDelay: "0.4s" }}>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full glass border border-purple/30 shadow-[0_0_15px_rgba(126,67,255,0.18)] text-white text-sm font-semibold">
+                <FaUserShield className="text-orange w-4 h-4 mr-1" />
                 Clear rules. Verified results.
               </div>
-            </motion.div>
+            </div>
           </CardContent>
         </Card>
 
         {/* Leaderboard + mascot visual (moved under Challenge Rules) */}
         <section className="flex justify-center py-6 lg:py-8">
           <div
-            ref={(el) => {
-              if (el) {
-                visualRef.current = el;
-                imageRef.current = el;
-              }
-            }}
-            className="relative"
+            className="relative opacity-0 animate-in fade-in-0 zoom-in-95"
+            style={{ animationDelay: "0.15s" }}
             id="challenge-leaderboard-visual"
           >
             <img
@@ -288,7 +186,7 @@ const ChallengeSystem: React.FC = () => {
               }}
               loading="lazy"
               alt="USDFG mascot in front of glowing leaderboard - skill gaming competition"
-              className="w-full max-w-xl rounded-lg relative z-10 select-none shadow-[0_0_40px_rgba(147,51,234,0.2)]"
+              className="w-full max-w-xl rounded-2xl relative z-10 select-none shadow-[0_0_40px_rgba(126,67,255,0.18)]"
             />
           </div>
         </section>

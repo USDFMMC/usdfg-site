@@ -1,10 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import React, { useState } from 'react';
 import { Radio, Clock, Users, Eye, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-
-gsap.registerPlugin(ScrollTrigger);
 
 interface Match {
   id: number;
@@ -74,54 +70,7 @@ const gameColors: Record<string, string> = {
 };
 
 const LiveBattles: React.FC = () => {
-  const sectionRef = useRef<HTMLElement>(null);
-  const titleRef = useRef<HTMLDivElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
-
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      // Title animation
-      gsap.fromTo(
-        titleRef.current,
-        { opacity: 0, y: 50 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: 'power3.out',
-          scrollTrigger: {
-            trigger: titleRef.current,
-            start: 'top 80%',
-            toggleActions: 'play none none reverse',
-          },
-        }
-      );
-
-      // List items animation
-      const items = listRef.current?.querySelectorAll('.match-item');
-      if (items) {
-        gsap.fromTo(
-          items,
-          { opacity: 0, x: 100 },
-          {
-            opacity: 1,
-            x: 0,
-            duration: 0.6,
-            stagger: 0.1,
-            ease: 'power3.out',
-            scrollTrigger: {
-              trigger: listRef.current,
-              start: 'top 80%',
-              toggleActions: 'play none none reverse',
-            },
-          }
-        );
-      }
-    }, sectionRef);
-
-    return () => ctx.revert();
-  }, []);
 
   const formatViewers = (num: number) => {
     if (num >= 1000) {
@@ -132,30 +81,29 @@ const LiveBattles: React.FC = () => {
 
   return (
     <section
-      ref={sectionRef}
       id="live-battles"
       className="relative py-24 lg:py-32 w-full"
     >
       <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
         {/* Section Header */}
-        <div ref={titleRef} className="flex flex-col lg:flex-row lg:items-end lg:justify-between mb-12 lg:mb-16">
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between mb-12 lg:mb-16 opacity-0 animate-in fade-in-0 zoom-in-95">
           <div>
-            <span className="inline-flex items-center gap-2 kimi-font-body text-sm text-orange-500 uppercase tracking-[0.3em] mb-4">
+            <span className="inline-flex items-center gap-2 font-body text-sm text-orange uppercase tracking-[0.3em] mb-4">
               <Radio className="w-4 h-4 animate-live-pulse" />
               Live Competition
             </span>
-            <h2 className="kimi-font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white">
-              ACTIVE <span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent">CHALLENGES</span>
+            <h2 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white">
+              ACTIVE <span className="text-gradient">CHALLENGES</span>
             </h2>
           </div>
           <div className="mt-4 lg:mt-0 flex items-center gap-4">
-            <div className="flex items-center gap-2 px-4 py-2 kimi-glass rounded-full">
+            <div className="flex items-center gap-2 px-4 py-2 glass rounded-full border border-purple/30">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-live-pulse" />
-              <span className="kimi-font-body text-sm text-white/70">
+              <span className="font-body text-sm text-white/70">
                 {matches.filter((m) => m.status === 'live').length} Live Now
               </span>
             </div>
-            <button className="kimi-font-body text-sm text-purple-500 hover:text-orange-500 transition-colors flex items-center gap-1">
+            <button className="font-body text-sm text-white/70 hover:text-orange transition-colors flex items-center gap-1">
               View All
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -163,17 +111,18 @@ const LiveBattles: React.FC = () => {
         </div>
 
         {/* Matches List */}
-        <div ref={listRef} className="space-y-4">
-          {matches.map((match) => (
+        <div className="space-y-4">
+          {matches.map((match, index) => (
             <div
               key={match.id}
-              className="match-item group"
+              className="match-item group opacity-0 animate-in fade-in-0 zoom-in-95"
+              style={{ animationDelay: `${0.05 + index * 0.05}s` }}
               onClick={() =>
                 setExpandedId(expandedId === match.id ? null : match.id)
               }
             >
               <div
-                className={`relative kimi-glass border ${
+                className={`relative glass border ${
                   match.status === 'live'
                     ? 'border-orange-500/50'
                     : 'border-purple-500/20 hover:border-purple-500/50'
@@ -190,7 +139,7 @@ const LiveBattles: React.FC = () => {
                     ) : (
                       <div className="flex items-center gap-1 text-white/50">
                         <Clock className="w-4 h-4" />
-                        <span className="kimi-font-body text-sm">{match.time}</span>
+                        <span className="font-body text-sm">{match.time}</span>
                       </div>
                     )}
                   </div>
@@ -198,13 +147,13 @@ const LiveBattles: React.FC = () => {
                   {/* Teams */}
                   <div className="flex-1 min-w-0 px-4">
                     <div className="flex items-center justify-center gap-3 sm:gap-6">
-                      <span className="kimi-font-display font-semibold text-sm sm:text-lg text-white truncate">
+                      <span className="font-display font-semibold text-sm sm:text-lg text-white truncate">
                         {match.team1}
                       </span>
-                      <span className="flex-shrink-0 kimi-font-display font-bold text-xs sm:text-sm text-white/40">
+                      <span className="flex-shrink-0 font-display font-bold text-xs sm:text-sm text-white/40">
                         VS
                       </span>
-                      <span className="kimi-font-display font-semibold text-sm sm:text-lg text-white truncate">
+                      <span className="font-display font-semibold text-sm sm:text-lg text-white truncate">
                         {match.team2}
                       </span>
                     </div>
@@ -218,11 +167,11 @@ const LiveBattles: React.FC = () => {
                           gameColors[match.game] || 'from-purple-500 to-orange-500'
                         }`}
                       />
-                      <span className="kimi-font-body text-sm text-white/60">
+                      <span className="font-body text-sm text-white/60">
                         {match.game}
                       </span>
                     </div>
-                    <div className="kimi-font-body text-sm text-white/40">
+                    <div className="font-body text-sm text-white/40">
                       {match.format}
                     </div>
                   </div>

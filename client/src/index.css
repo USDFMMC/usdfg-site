@@ -33,6 +33,28 @@
   background-clip: text;
   color: transparent;
 }
+/* Kimi exact class aliases (so we can use Kimi markup 1:1) */
+.font-display { font-family: 'Oxanium', sans-serif; }
+.font-body { font-family: 'Rajdhani', sans-serif; }
+.glass {
+  background: rgba(20, 5, 33, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.text-gradient {
+  background-image: linear-gradient(135deg, #7e43ff, #ff7e3e);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.text-orange { color: var(--kimi-orange); }
+.border-purple\/30 { border-color: #7e43ff4d; }
+
+/* Kimi dot-grid overlay (used in Kimi hero reference) */
+.bg-kimi-dot-grid {
+  background-image: radial-gradient(circle, #333 1px, transparent 1px);
+  background-size: 50px 50px;
+}
 /* Kimi radial glow for page background */
 .bg-gradient-radial-kimi {
   background: radial-gradient(ellipse at center, rgba(126, 67, 255, 0.1) 0%, transparent 70%);
@@ -166,6 +188,10 @@
   animation: livePulse 1.5s ease-in-out infinite;
 }
 
+/* Kimi caret blink (from _kimi) */
+@keyframes caret-blink { 0%, 70%, 100% { opacity: 1; } 20%, 50% { opacity: 0; } }
+.animate-caret-blink { animation: caret-blink 1.25s ease-out infinite; }
+
 /* Kimi-style enter animations (no GSAP) */
 @keyframes kimiFadeInUp {
   from {
@@ -231,6 +257,18 @@
 .fade-in-0 { --tw-enter-opacity: 0; }
 .zoom-in-95 { --tw-enter-scale: 0.95; }
 
+/* Kimi special effects (keyframes exist in _kimi; opt-in usage) */
+@keyframes scanline { 0% { transform: translateY(-100%); } 100% { transform: translateY(100vh); } }
+@keyframes glitch {
+  0% { text-shadow: 2px 0 #ff0000, -2px 0 #00ff00; }
+  25% { text-shadow: -2px 0 #ff0000, 2px 0 #00ff00; }
+  50% { text-shadow: 2px 0 #0000ff, -2px 0 #ff0000; }
+  75% { text-shadow: -2px 0 #0000ff, 2px 0 #ff0000; }
+  100% { text-shadow: none; }
+}
+.animate-scanline { animation: scanline 4s linear infinite; }
+.animate-glitch { animation: glitch 1.5s ease-in-out infinite; }
+
 /* Stagger delays for hero/CTA */
 .kimi-delay-0 { animation-delay: 0s; }
 .kimi-delay-1 { animation-delay: 0.1s; }
@@ -243,7 +281,10 @@
 /* Home content reveal: stagger children */
 .content-revealed > * {
   opacity: 0;
-  animation: kimiFadeInUp 0.6s ease-out forwards;
+  /* Match Kimi motion primitives: enter (0.15s) + fade + zoom */
+  animation: enter 0.15s ease-out forwards;
+  --tw-enter-opacity: 0;
+  --tw-enter-scale: 0.95;
 }
 .content-revealed > *:nth-child(1) { animation-delay: 0.05s; }
 .content-revealed > *:nth-child(2) { animation-delay: 0.1s; }
