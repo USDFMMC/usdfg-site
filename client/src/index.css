@@ -129,6 +129,60 @@
   animation: livePulse 1.5s ease-in-out infinite;
 }
 
+/* Kimi-style enter animations (no GSAP) */
+@keyframes kimiFadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes kimiReveal {
+  from {
+    opacity: 0;
+    transform: scale(1.15);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-kimi-in {
+  animation: kimiFadeInUp 0.6s ease-out forwards;
+}
+
+.animate-kimi-reveal {
+  animation: kimiReveal 1s ease-out forwards;
+}
+
+/* Stagger delays for hero/CTA */
+.kimi-delay-0 { animation-delay: 0s; }
+.kimi-delay-1 { animation-delay: 0.1s; }
+.kimi-delay-2 { animation-delay: 0.2s; }
+.kimi-delay-3 { animation-delay: 0.3s; }
+.kimi-delay-4 { animation-delay: 0.4s; }
+.kimi-delay-5 { animation-delay: 0.5s; }
+.kimi-delay-6 { animation-delay: 0.6s; }
+
+/* Home content reveal: stagger children */
+.content-revealed > * {
+  opacity: 0;
+  animation: kimiFadeInUp 0.6s ease-out forwards;
+}
+.content-revealed > *:nth-child(1) { animation-delay: 0.05s; }
+.content-revealed > *:nth-child(2) { animation-delay: 0.1s; }
+.content-revealed > *:nth-child(3) { animation-delay: 0.15s; }
+.content-revealed > *:nth-child(4) { animation-delay: 0.2s; }
+.content-revealed > *:nth-child(5) { animation-delay: 0.25s; }
+.content-revealed > *:nth-child(6) { animation-delay: 0.3s; }
+.content-revealed > *:nth-child(7) { animation-delay: 0.35s; }
+.content-revealed > *:nth-child(8) { animation-delay: 0.4s; }
+
 /* Scrollbar hide utility */
 .scrollbar-hide {
   -ms-overflow-style: none;

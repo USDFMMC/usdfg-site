@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState } from "react";
 import Navbar from "@/components/layout/navbar";
 import LiveActivityTicker from "@/components/LiveActivityTicker";
 import Footer from "@/components/layout/footer";
@@ -12,64 +12,21 @@ import GameCategories from "@/components/home/game-categories";
 import CTASection from "@/components/home/cta-section";
 import ParticleBackground from "@/components/ParticleBackground";
 import { Helmet } from "react-helmet";
-import gsap from "gsap";
 
 const Home: React.FC = () => {
   const [contentRevealed, setContentRevealed] = useState(false);
-  const contentWrapperRef = useRef<HTMLDivElement>(null);
-  const ogImage = "https://usdfg.pro/assets/usdfg-og-banner.webp"; // matches your file
+  const ogImage = "https://usdfg.pro/assets/usdfg-og-banner.webp";
   const canonical = "https://usdfg.pro/";
-  
+
   const handleExploreClick = () => {
     if (contentRevealed) return;
-    
     setContentRevealed(true);
-    
-    // GSAP reveal animation - matching Kimi style
     setTimeout(() => {
-      if (contentWrapperRef.current) {
-        const sections = Array.from(contentWrapperRef.current.children);
-        
-        // Set initial states
-        gsap.set(contentWrapperRef.current, { 
-          opacity: 0,
-        });
-        
-        gsap.set(sections, { 
-          opacity: 0, 
-          y: 80,
-          scale: 0.9
-        });
-        
-        // Animate wrapper reveal with smooth entrance
-        const tl = gsap.timeline();
-        
-        tl.to(contentWrapperRef.current, {
-          opacity: 1,
-          duration: 0.6,
-          ease: 'power2.out',
-        })
-        .to(sections, {
-          opacity: 1,
-          y: 0,
-          scale: 1,
-          duration: 1,
-          ease: 'power3.out',
-          stagger: {
-            amount: 0.8,
-            from: "start"
-          },
-        }, '-=0.4');
-        
-        // Smooth scroll to revealed content
-        setTimeout(() => {
-          const firstSection = document.querySelector('[aria-label="About Section"]');
-          if (firstSection) {
-            firstSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }, 600);
+      const firstSection = document.querySelector('[aria-label="Platform Features Section"]');
+      if (firstSection) {
+        firstSection.scrollIntoView({ behavior: "smooth", block: "start" });
       }
-    }, 50);
+    }, 100);
   };
 
   return (
@@ -168,12 +125,11 @@ const Home: React.FC = () => {
           <HeroSection onExploreClick={handleExploreClick} />
         </section>
         
-        {/* Content sections - revealed with GSAP animation when "EXPLORE PLATFORM" is clicked */}
-        <div 
-          ref={contentWrapperRef}
-          className={contentRevealed ? '' : 'pointer-events-none'}
-          style={{ 
-            display: contentRevealed ? 'block' : 'none'
+        {/* Content sections - revealed with Kimi CSS animation when "EXPLORE PLATFORM" is clicked */}
+        <div
+          className={contentRevealed ? "content-revealed pointer-events-auto" : "pointer-events-none"}
+          style={{
+            display: contentRevealed ? "block" : "none",
           }}
         >
           <section id="features" aria-label="Platform Features Section">

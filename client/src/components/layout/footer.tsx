@@ -23,25 +23,36 @@ const Footer: React.FC<FooterProps> = ({ isRevealed }) => {
 
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
         <div className="grid grid-cols-1 md:grid-cols-3 items-center gap-6 md:gap-0 w-full">
-          {/* Left: Mascot + Tagline */}
+          {/* Left: Same logo as navbar + Tagline */}
           <div className="flex items-center justify-center md:justify-start">
-            <img 
-              src="/assets/usdfgtokenn.png" 
-              alt="USDFG Logo" 
-              className="w-10 h-10 sm:w-12 sm:h-12 object-contain mr-3"
-              style={{
-                filter: 'drop-shadow(0 0 10px rgba(251, 191, 36, 0.4))'
-              }} 
-              loading="lazy"
-              decoding="async"
-            />
-            <span 
-              className="text-sm text-white/80 font-medium whitespace-nowrap"
+            <Link to="/" className="flex items-center group flex-shrink-0" style={{ gap: "2px" }} title="Built for the ones who don't blink.">
+              <img
+                src="/assets/usdfgToken2.png"
+                alt="USDFG Logo"
+                className="w-10 h-10 object-contain transition-transform duration-300 group-hover:scale-110"
+                loading="lazy"
+                decoding="async"
+                style={{ filter: "drop-shadow(0 0 8px rgba(251, 191, 36, 0.3))" }}
+              />
+              <span
+                className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent font-extrabold text-xl tracking-tighter whitespace-nowrap"
+                style={{
+                  marginLeft: "-2px",
+                  letterSpacing: "-0.02em",
+                  textShadow: "0 0 20px rgba(251, 191, 36, 0.3)",
+                  filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.2))",
+                }}
+              >
+                USDFG
+              </span>
+            </Link>
+            <span
+              className="text-sm text-white/80 font-medium whitespace-nowrap ml-3"
               style={{
                 textShadow: "0 0 10px rgba(255, 255, 255, 0.2)",
               }}
             >
-              <span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent font-semibold">USDFG.PRO</span> — The Last Great Token for Gamers.
+              — The Last Great Token for Gamers.
             </span>
           </div>
 
