@@ -10,7 +10,7 @@ import LeaderboardPreview from "@/components/home/leaderboard-preview";
 import Tokenomics from "@/components/home/tokenomics";
 import GameCategories from "@/components/home/game-categories";
 import CTASection from "@/components/home/cta-section";
-import ParticleBackground from "@/components/ParticleBackground";
+import GalaxyBackground from "@/components/GalaxyBackground";
 import { Helmet } from "react-helmet";
 
 const Home: React.FC = () => {
@@ -99,8 +99,8 @@ const Home: React.FC = () => {
         <LiveActivityTicker />
       </div>
       <main id="main-content" role="main" aria-label="Homepage Main Content" className="min-h-screen flex-1 relative overflow-hidden">
-        {/* Particle Background - Kimi Galaxy Effect */}
-        <ParticleBackground />
+        {/* Galaxy Background - Kimi Galaxy Effect */}
+        <GalaxyBackground />
         
         {/* Global Unified Background - Kimi style: void + dot grid + radial glow + subtle purple tint */}
         <div className="fixed inset-0 z-0 bg-[var(--kimi-void)]">
