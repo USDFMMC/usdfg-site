@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useChallenges } from '@/hooks/useChallenges';
 import { getGameCategory, getGameImage, resolveGameName } from '@/lib/gameAssets';
+import KimiBackground from '@/components/KimiBackground';
 
 const CategoryDetailPage: React.FC = () => {
   const { category } = useParams<{ category: string }>();
@@ -78,7 +79,8 @@ const CategoryDetailPage: React.FC = () => {
   };
   
   return (
-    <div className="min-h-screen bg-[#0A0D14] text-white">
+    <div className="min-h-screen text-white relative">
+      <KimiBackground includeGalaxy={true} />
       {/* Header with back button */}
       <div className="sticky top-0 z-10 bg-[#0A0D14]/95 backdrop-blur-sm border-b border-gray-800/50">
         <div className="px-4 py-3 flex items-center gap-3">

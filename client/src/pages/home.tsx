@@ -10,7 +10,7 @@ import LeaderboardPreview from "@/components/home/leaderboard-preview";
 import Tokenomics from "@/components/home/tokenomics";
 import GameCategories from "@/components/home/game-categories";
 import CTASection from "@/components/home/cta-section";
-import GalaxyBackground from "@/components/GalaxyBackground";
+import KimiBackground from "@/components/KimiBackground";
 import { Helmet } from "react-helmet";
 
 const Home: React.FC = () => {
@@ -99,19 +99,8 @@ const Home: React.FC = () => {
         <LiveActivityTicker />
       </div>
       <main id="main-content" role="main" aria-label="Homepage Main Content" className="min-h-screen flex-1 relative overflow-hidden">
-        {/* Galaxy Background - Kimi Galaxy Effect */}
-        <GalaxyBackground />
-        
-        {/* Global Unified Background - Kimi style: void + dot grid + radial glow + subtle purple tint */}
-        <div className="fixed inset-0 z-0 bg-[var(--kimi-void)]">
-          {/* Kimi Dot Grid Pattern (reference hero) */}
-          <div className="absolute inset-0 bg-kimi-dot-grid opacity-25" />
-          {/* Kimi radial glow (center) */}
-          <div className="absolute inset-0 bg-gradient-radial-kimi pointer-events-none" />
-          {/* Void gradient + Kimi purple tint (same as Kimi purple/5) */}
-          <div className="absolute inset-0 bg-gradient-to-b from-[var(--kimi-void)] via-[var(--kimi-void)]/95 to-[var(--kimi-void)]" />
-          <div className="absolute inset-0 bg-kimi-purple-tint-5" />
-        </div>
+        {/* Kimi Galaxy Theme Background */}
+        <KimiBackground includeGalaxy={true} />
         
         <section aria-label="Hero Section" className="relative z-10">
           <HeroSection onExploreClick={handleExploreClick} />

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ArrowLeft, Trophy, Gamepad2, Zap } from "lucide-react";
 import { getPlayerStats, getPlayerEarningsByChallenge } from "@/lib/firebase/firestore";
+import KimiBackground from "@/components/KimiBackground";
 
 interface PlayerProfile {
   address: string;
@@ -84,8 +85,9 @@ const PlayerProfile: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-card flex items-center justify-center">
-        <div className="text-center space-y-4">
+      <div className="min-h-screen flex items-center justify-center relative">
+        <KimiBackground includeGalaxy={true} />
+        <div className="text-center space-y-4 relative z-10">
           <div className="w-12 h-12 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-full flex items-center justify-center mx-auto animate-pulse">
             <Gamepad2 className="w-6 h-6 text-black" />
           </div>
@@ -97,8 +99,9 @@ const PlayerProfile: React.FC = () => {
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-card flex items-center justify-center">
-        <div className="text-center space-y-4">
+      <div className="min-h-screen flex items-center justify-center relative">
+        <KimiBackground includeGalaxy={true} />
+        <div className="text-center space-y-4 relative z-10">
           <h1 className="text-2xl font-bold text-white">Player Not Found</h1>
           <p className="text-gray-400">This player profile could not be found.</p>
           <div className="flex flex-wrap items-center justify-center gap-3">
@@ -120,9 +123,10 @@ const PlayerProfile: React.FC = () => {
         <meta name="description" content={`View ${profile.displayName}'s gaming stats and challenge history in the USDFG Arena.`} />
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-card">
+      <div className="min-h-screen relative">
+        <KimiBackground includeGalaxy={true} />
         {/* Header */}
-        <header className="border-b border-gray-800 bg-background/80 backdrop-blur-sm">
+        <header className="border-b border-gray-800 bg-background/80 backdrop-blur-sm relative z-10">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center space-x-4">
               <Link to="/app">
@@ -142,7 +146,7 @@ const PlayerProfile: React.FC = () => {
         </header>
 
         {/* Main Content */}
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-4 py-8 relative z-10">
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Profile Header */}
             <Card className="bg-card/50 border-gray-800">
