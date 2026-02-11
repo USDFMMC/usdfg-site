@@ -25,7 +25,7 @@ const Navbar: React.FC = () => {
                 decoding="async"
                 style={{ filter: "drop-shadow(0 0 8px var(--kimi-purple))" }}
               />
-              <div className="absolute inset-0 rounded-lg blur-md opacity-0 group-hover:opacity-50 transition-opacity duration-300 bg-gradient-radial-kimi" style={{ background: 'radial-gradient(circle, var(--kimi-purple) 0%, transparent 70%)' }} />
+              <div className="absolute inset-0 rounded-lg blur-md opacity-0 group-hover:opacity-50 transition-opacity duration-300" style={{ background: 'radial-gradient(circle, var(--kimi-purple) 0%, transparent 70%)' }} />
             </div>
             <span
               className="text-white font-extrabold text-xl tracking-tighter whitespace-nowrap"
