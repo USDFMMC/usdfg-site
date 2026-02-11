@@ -568,7 +568,7 @@ body {
   
   body {
     @apply bg-background text-foreground;
-    background-color: #121421 !important;
+    background-color: var(--kimi-void) !important;
   }
   
   h1, h2, h3, h4, h5, h6 {
