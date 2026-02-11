@@ -41,7 +41,10 @@ const GalaxyBackground: React.FC = () => {
     rendererRef.current = renderer;
 
     // Galaxy particle system
-    const particleCount = 15000;
+    // Adjust particle count based on device performance
+    const baseParticleCount = 15000;
+    const performanceRatio = Math.min(window.devicePixelRatio, 2) / 2;
+    const particleCount = Math.floor(baseParticleCount * performanceRatio);
     const positions = new Float32Array(particleCount * 3);
     const colors = new Float32Array(particleCount * 3);
     const sizes = new Float32Array(particleCount);
@@ -155,8 +158,8 @@ const GalaxyBackground: React.FC = () => {
       }
 
       // Camera gentle movement
-      if (camera) {
-        camera.position.y = Math.sin(elapsedTime * 0.3) * 2;
+      if (cameraRef.current) {
+        cameraRef.current.position.y = Math.sin(elapsedTime * 0.3) * 2;
       }
 
       renderer.render(scene, camera);
