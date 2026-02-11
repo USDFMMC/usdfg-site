@@ -41,9 +41,9 @@ const GalaxyBackground: React.FC = () => {
     rendererRef.current = renderer;
 
     // Galaxy particle system
-    // Adjust particle count based on device performance
+    // Adjust particle count based on device performance (maintain at least 75% on all devices)
     const baseParticleCount = 15000;
-    const performanceRatio = Math.min(window.devicePixelRatio, 2) / 2;
+    const performanceRatio = Math.max(0.75, Math.min(window.devicePixelRatio, 2) / 2);
     const particleCount = Math.floor(baseParticleCount * performanceRatio);
     const positions = new Float32Array(particleCount * 3);
     const colors = new Float32Array(particleCount * 3);
@@ -144,17 +144,14 @@ const GalaxyBackground: React.FC = () => {
     const animate = () => {
       const elapsedTime = clock.getElapsedTime();
 
-      if (particles) {
-        // Slow rotation of the galaxy
-        particles.rotation.y = elapsedTime * 0.05;
+      if (particlesRef.current) {
+        // Combine rotation and mouse parallax effect
+        particlesRef.current.rotation.y = elapsedTime * 0.05 + mouseRef.current.x * 0.2;
+        particlesRef.current.rotation.x = mouseRef.current.y * 0.1;
         
         // Subtle pulsing effect
         const pulseScale = 1 + Math.sin(elapsedTime * 0.5) * 0.02;
-        particles.scale.set(pulseScale, pulseScale, pulseScale);
-
-        // Mouse parallax effect
-        particles.rotation.x = mouseRef.current.y * 0.1;
-        particles.rotation.y = elapsedTime * 0.05 + mouseRef.current.x * 0.2;
+        particlesRef.current.scale.set(pulseScale, pulseScale, pulseScale);
       }
 
       // Camera gentle movement
