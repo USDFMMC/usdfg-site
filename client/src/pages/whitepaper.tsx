@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Helmet } from "react-helmet";
 import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
+import KimiBackground from "@/components/KimiBackground";
 import { FaLock, FaTrophy, FaUsers, FaChartLine, FaRocket, FaMobileAlt, FaGamepad, FaCheckCircle, FaGavel, FaUserShield, FaShieldAlt, FaBalanceScale, FaGlobe } from "react-icons/fa";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -204,16 +205,9 @@ const Whitepaper: React.FC = () => {
             ))}
           </ul>
         </nav>
-        <main className="min-h-screen bg-gradient-to-b from-black via-black/95 to-black flex-1 text-white relative overflow-hidden">
-          {/* Background Gradients */}
-          <div className="absolute inset-0 z-0">
-            <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/50" />
-            <div className="absolute inset-0 bg-purple-600/5" />
-          </div>
-
-          {/* Floating Orbs */}
-          <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-purple-600/10 rounded-full blur-[100px] animate-pulse z-[1]" />
-          <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-amber-500/5 rounded-full blur-[80px] animate-pulse z-[1]" style={{ animationDelay: '1s' }} />
+        <main className="min-h-screen flex-1 text-white relative overflow-hidden">
+          {/* Kimi Galaxy Theme Background */}
+          <KimiBackground includeGalaxy={true} />
           <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20 py-12 sm:py-16 md:py-20">
             {/* Animated Logo */}
             <div className="flex justify-center mb-6 mt-8">

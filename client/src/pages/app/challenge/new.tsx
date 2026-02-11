@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Gamepad2 } from "lucide-react";
 import CreateChallengeForm from "@/components/arena/CreateChallengeForm";
+import KimiBackground from "@/components/KimiBackground";
 
 const CreateChallenge: React.FC = () => {
   const navigate = useNavigate();
@@ -29,9 +30,10 @@ const CreateChallenge: React.FC = () => {
         <meta name="description" content="Create a new skill-based gaming challenge in the USDFG Arena." />
       </Helmet>
 
-      <div className="min-h-screen bg-background-1 relative">
+      <div className="min-h-screen relative">
+        <KimiBackground includeGalaxy={true} />
         {/* Header */}
-        <header className="border-b border-soft bg-background-2/80 backdrop-blur-sm neocore-panel">
+        <header className="border-b border-soft bg-background-2/80 backdrop-blur-sm neocore-panel relative z-10">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center space-x-4">
               <Link to="/app">
