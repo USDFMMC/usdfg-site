@@ -9,6 +9,8 @@ const GalaxyBackground: React.FC = () => {
   const particlesRef = useRef<THREE.Points | null>(null);
   const animationRef = useRef<number | null>(null);
   const mouseRef = useRef({ x: 0, y: 0 });
+  const geometryRef = useRef<THREE.BufferGeometry | null>(null);
+  const materialRef = useRef<THREE.PointsMaterial | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -89,6 +91,7 @@ const GalaxyBackground: React.FC = () => {
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    geometryRef.current = geometry;
 
     // Material with custom shader for glow effect
     const material = new THREE.PointsMaterial({
@@ -100,6 +103,7 @@ const GalaxyBackground: React.FC = () => {
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
+    materialRef.current = material;
 
     const particles = new THREE.Points(geometry, material);
     scene.add(particles);
@@ -124,10 +128,10 @@ const GalaxyBackground: React.FC = () => {
 
     // Handle resize
     const handleResize = () => {
-      if (!camera || !renderer) return;
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      if (!cameraRef.current || !rendererRef.current) return;
+      cameraRef.current.aspect = window.innerWidth / window.innerHeight;
+      cameraRef.current.updateProjectionMatrix();
+      rendererRef.current.setSize(window.innerWidth, window.innerHeight);
     };
 
     window.addEventListener('resize', handleResize);
@@ -170,12 +174,12 @@ const GalaxyBackground: React.FC = () => {
         cancelAnimationFrame(animationRef.current);
       }
 
-      if (geometry) geometry.dispose();
-      if (material) material.dispose();
-      if (renderer) {
-        renderer.dispose();
-        if (containerRef.current && renderer.domElement) {
-          containerRef.current.removeChild(renderer.domElement);
+      if (geometryRef.current) geometryRef.current.dispose();
+      if (materialRef.current) materialRef.current.dispose();
+      if (rendererRef.current) {
+        rendererRef.current.dispose();
+        if (containerRef.current && rendererRef.current.domElement) {
+          containerRef.current.removeChild(rendererRef.current.domElement);
         }
       }
     };
