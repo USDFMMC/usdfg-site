@@ -1,5 +1,9 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Swords, Trophy, BarChart3, ArrowRight } from "lucide-react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+gsap.registerPlugin(ScrollTrigger);
 
 const features = [
   {
@@ -29,41 +33,86 @@ const features = [
 ];
 
 const PlatformFeatures: React.FC = () => {
+  const sectionRef = useRef<HTMLElement>(null);
+  const titleRef = useRef<HTMLDivElement>(null);
+  const cardsRef = useRef<(HTMLDivElement | null)[]>([]);
+
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        titleRef.current,
+        { opacity: 0, y: 50 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.8,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: titleRef.current,
+            start: "top 80%",
+            toggleActions: "play none none reverse",
+          },
+        }
+      );
+
+      cardsRef.current.forEach((card, index) => {
+        if (!card) return;
+        gsap.fromTo(
+          card,
+          { opacity: 0, y: 80, rotateX: 15 },
+          {
+            opacity: 1,
+            y: 0,
+            rotateX: 0,
+            duration: 0.8,
+            delay: index * 0.2,
+            ease: "power3.out",
+            scrollTrigger: {
+              trigger: card,
+              start: "top 85%",
+              toggleActions: "play none none reverse",
+            },
+          }
+        );
+      });
+    }, sectionRef);
+
+    return () => ctx.revert();
+  }, []);
+
   return (
     <section
+      ref={sectionRef}
       id="platform"
       className="relative py-24 lg:py-32 w-full"
     >
-      {/* Background Elements - Inherits global Kimi background */}
+      <div className="absolute inset-0 bg-gradient-radial-kimi opacity-50" />
       
       <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
         {/* Section Header - Kimi Exact */}
-        <div data-kimi-scroll className="text-center mb-16 lg:mb-20 kimi-scroll" style={{ animationDelay: "0.05s" }}>
-          <span className="inline-block kimi-font-body text-sm text-purple-500 uppercase tracking-[0.3em] mb-4">
+        <div ref={titleRef} className="text-center mb-16 lg:mb-20">
+          <span className="inline-block font-body text-sm text-purple-500 uppercase tracking-[0.3em] mb-4">
             The Platform
           </span>
-          <h2 className="kimi-font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white mb-6">
-            THE BITCOIN
-            <span className="block text-gradient-kimi-orange">OF GAMING</span>
+          <h2 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white mb-6">
+            THE ARENA <span className="text-gradient">AWAITS</span>
           </h2>
-          <p className="kimi-font-body text-lg sm:text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
-            USDFG is a skill-based competition platform where players challenge each other directly, lock challenge assets on-chain, compete, and earn verified rewards through performance. Wallet-driven, non-custodial, and built for skill.
+          <p className="font-body text-lg text-white/60 max-w-2xl mx-auto leading-relaxed">
+            Three pillars designed to elevate your competitive gaming experience to legendary heights.
           </p>
         </div>
 
         {/* Feature Cards - Kimi Exact Structure with Images */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto">
           {features.map((feature, index) => (
             <div
               key={index}
-              data-kimi-scroll
-              className="group relative kimi-scroll"
-              style={{ animationDelay: `${0.12 + index * 0.16}s` }}
+              ref={(el) => {
+                cardsRef.current[index] = el;
+              }}
+              className="group relative"
             >
-              <div className="relative h-full kimi-glass border border-purple-500/20 rounded-2xl overflow-hidden transition-all duration-500 hover:border-purple-500/50 kimi-bottom-neon" style={{
-                '--neon-color': 'rgba(168, 85, 247, 0.3)',
-                '--neon-hover-color': 'rgba(168, 85, 247, 0.5)',
-              } as React.CSSProperties}>
+              <div className="relative h-full glass border border-purple-500/20 rounded-2xl overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)]">
                 {/* Image - Kimi Exact */}
                 <div className="relative h-48 overflow-hidden">
                   <img
@@ -85,7 +134,7 @@ const PlatformFeatures: React.FC = () => {
 
                   {/* Metric Badge - Kimi Exact */}
                   <div className="absolute top-4 right-4 px-4 py-2 kimi-glass rounded-full">
-                    <span className="kimi-font-display font-bold text-sm text-gradient-kimi-orange">
+                    <span className="font-display font-bold text-sm text-gradient">
                       {feature.metric}
                     </span>
                   </div>
@@ -93,10 +142,10 @@ const PlatformFeatures: React.FC = () => {
 
                 {/* Content - Kimi Exact */}
                 <div className="p-6">
-                  <h3 className="kimi-font-display font-bold text-xl text-white mb-2 group-hover:bg-gradient-to-r group-hover:from-purple-400 group-hover:to-orange-400 group-hover:bg-clip-text group-hover:text-transparent transition-all">
+                  <h3 className="font-display font-bold text-xl text-white mb-2 group-hover:text-gradient transition-all">
                     {feature.title}
                   </h3>
-                  <p className="kimi-font-body text-white/60 text-sm leading-relaxed">
+                  <p className="font-body text-white/60 text-sm leading-relaxed">
                     {feature.description}
                   </p>
                 </div>

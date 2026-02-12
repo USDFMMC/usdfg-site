@@ -19,7 +19,6 @@ import { startVersionMonitoring } from "@/lib/version";
 import UpdateBanner from "@/components/ui/UpdateBanner";
 import nacl from "tweetnacl";
 import { resetNavigationGuard } from "@/lib/wallet/mobile";
-import { useKimiScrollObserver } from "@/hooks/useKimiScrollObserver";
 
 function RoutesWithLogging() {
   const location = useLocation();
@@ -78,9 +77,6 @@ function AppRouter() {
 
 function App() {
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
-
-  // Global Kimi scroll-in/out animations (marketing site + app pages opt-in via data-kimi-scroll)
-  useKimiScrollObserver();
 
   // Phantom return handler - decrypts payload when Phantom returns
   // CRITICAL: This runs BEFORE Router, so it catches /app/ and /app with query params

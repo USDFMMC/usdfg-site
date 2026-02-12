@@ -1,14 +1,47 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Sparkles } from "lucide-react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+gsap.registerPlugin(ScrollTrigger);
 
 const CTASection: React.FC = () => {
+  const sectionRef = useRef<HTMLElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      const items = contentRef.current?.querySelectorAll(".cta-reveal");
+      if (!items || items.length === 0) return;
+
+      gsap.fromTo(
+        items,
+        { opacity: 0, y: 50 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.8,
+          stagger: 0.12,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: contentRef.current,
+            start: "top 70%",
+            toggleActions: "play none none reverse",
+          },
+        }
+      );
+    }, sectionRef);
+
+    return () => ctx.revert();
+  }, []);
+
   return (
-    <section className="relative min-h-[80vh] flex flex-col items-center justify-center overflow-hidden py-20">
-      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
+    <section ref={sectionRef} className="relative min-h-[80vh] flex flex-col items-center justify-center overflow-hidden py-20">
+      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20" ref={contentRef}>
         <div className="max-w-4xl mx-auto text-center">
           {/* Kimi badge: glass pill with icon + text */}
-          <div data-kimi-scroll className="inline-flex items-center gap-2 px-4 py-2 mb-6 glass rounded-full border border-purple/30 kimi-scroll kimi-delay-0">
+          <div className="cta-reveal inline-flex items-center gap-2 px-4 py-2 mb-6 glass rounded-full border border-purple/30">
             <Sparkles className="w-4 h-4 shrink-0 text-orange" aria-hidden />
             <span className="kimi-font-body text-sm text-white/80">
               Your Journey Begins Now
@@ -16,7 +49,7 @@ const CTASection: React.FC = () => {
           </div>
 
           {/* Kimi headline: font-display, gradient on second line */}
-          <h2 data-kimi-scroll className="font-display font-bold text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl text-white leading-tight mb-6 kimi-scroll kimi-delay-1">
+          <h2 className="cta-reveal font-display font-bold text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl text-white leading-tight mb-6">
             <span className="block">Ready to enter</span>
             <span className="block mt-1 text-gradient">
               the arena?
@@ -24,13 +57,13 @@ const CTASection: React.FC = () => {
           </h2>
 
           {/* Kimi supporting copy */}
-          <p data-kimi-scroll className="font-body text-white/80 text-lg mb-8 max-w-2xl mx-auto kimi-scroll kimi-delay-2">
+          <p className="cta-reveal font-body text-white/80 text-lg mb-8 max-w-2xl mx-auto">
             Compete through skill. Earn verified rewards. Join the skill-based
             competition platform built for performance.
           </p>
 
           {/* Kimi CTAs: Enter the Arena (gradient) + Learn More (outline) */}
-          <div data-kimi-scroll className="flex flex-wrap items-center justify-center gap-4 mb-8 kimi-scroll kimi-delay-3">
+          <div className="cta-reveal flex flex-wrap items-center justify-center gap-4 mb-8">
             <Link to="/app" className="inline-block">
               <button className="relative font-semibold text-base uppercase tracking-wide px-8 py-4 bg-gradient-to-r from-purple-500 to-orange-500 hover:from-purple-400 hover:to-orange-400 text-white border-0 overflow-hidden group rounded-lg transition-all kimi-font-body">
                 <span className="relative z-10 flex items-center gap-2">
@@ -56,7 +89,7 @@ const CTASection: React.FC = () => {
           </div>
 
           {/* Kimi feature bullets: green dots */}
-          <div data-kimi-scroll className="font-body flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-sm text-white/80 mb-12 kimi-scroll kimi-delay-4">
+          <div className="cta-reveal font-body flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-sm text-white/80 mb-12">
             <span className="inline-flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" aria-hidden />
               Free to Join
@@ -77,8 +110,7 @@ const CTASection: React.FC = () => {
       <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
         <div className="flex justify-center max-w-4xl mx-auto">
           <div
-            data-kimi-scroll
-            className="relative max-w-2xl w-full glass border border-purple/30 rounded-2xl px-6 lg:px-8 py-6 lg:py-8 transition-all duration-300 kimi-bottom-neon kimi-scroll kimi-delay-5"
+            className="cta-reveal relative max-w-2xl w-full glass border border-purple/30 rounded-2xl px-6 lg:px-8 py-6 lg:py-8 transition-all duration-300 kimi-bottom-neon"
             style={
               {
                 "--neon-color": "rgba(168, 85, 247, 0.3)",

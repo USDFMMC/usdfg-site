@@ -98,8 +98,7 @@ const ChallengeSystem: React.FC = () => {
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
         {/* Rules / Explainer */}
         <Card
-          data-kimi-scroll
-          className="relative max-w-4xl mx-auto glass border border-purple/30 rounded-2xl transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_40px_rgba(126,67,255,0.18)] kimi-bottom-neon kimi-scroll"
+          className="relative max-w-4xl mx-auto glass border border-purple/30 rounded-2xl transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_40px_rgba(126,67,255,0.18)] kimi-bottom-neon"
           style={
             {
               "--neon-color": "rgba(126, 67, 255, 0.25)",
@@ -113,8 +112,7 @@ const ChallengeSystem: React.FC = () => {
           <CardContent className="relative z-10 p-4 md:p-6 lg:p-8">
             <div className="mb-6">
               <h3
-                data-kimi-scroll
-                className="font-display font-bold text-xl md:text-2xl mb-3 flex items-center justify-center text-white tracking-wide kimi-scroll"
+                className="font-display font-bold text-xl md:text-2xl mb-3 flex items-center justify-center text-white tracking-wide"
                 style={{ animationDelay: "0.08s" }}
               >
                 <span
@@ -127,8 +125,7 @@ const ChallengeSystem: React.FC = () => {
 
               <ul className="space-y-3">
                 <li
-                  data-kimi-scroll
-                  className="flex items-start text-sm md:text-base kimi-scroll"
+                  className="flex items-start text-sm md:text-base"
                   style={{ animationDelay: "0.1s" }}
                 >
                   <FaCheckCircle className="text-green-400 mt-1 mr-3 w-4 h-4 flex-shrink-0" />
@@ -136,8 +133,7 @@ const ChallengeSystem: React.FC = () => {
                 </li>
 
                 <li
-                  data-kimi-scroll
-                  className="flex items-start text-sm md:text-base kimi-scroll"
+                  className="flex items-start text-sm md:text-base"
                   style={{ animationDelay: "0.15s" }}
                 >
                   <FaLock className="text-orange mt-1 mr-3 w-4 h-4 flex-shrink-0" />
@@ -145,8 +141,7 @@ const ChallengeSystem: React.FC = () => {
                 </li>
 
                 <li
-                  data-kimi-scroll
-                  className="flex items-start text-sm md:text-base kimi-scroll"
+                  className="flex items-start text-sm md:text-base"
                   style={{ animationDelay: "0.2s" }}
                 >
                   <FaExclamationTriangle className="text-orange mt-1 mr-3 w-4 h-4 flex-shrink-0" />
@@ -154,8 +149,7 @@ const ChallengeSystem: React.FC = () => {
                 </li>
 
                 <li
-                  data-kimi-scroll
-                  className="flex items-start text-sm md:text-base kimi-scroll"
+                  className="flex items-start text-sm md:text-base"
                   style={{ animationDelay: "0.25s" }}
                 >
                   <FaGavel className="text-orange mt-1 mr-3 w-4 h-4 flex-shrink-0" />
@@ -163,8 +157,7 @@ const ChallengeSystem: React.FC = () => {
                 </li>
 
                 <li
-                  data-kimi-scroll
-                  className="flex items-start text-sm md:text-base kimi-scroll"
+                  className="flex items-start text-sm md:text-base"
                   style={{ animationDelay: "0.3s" }}
                 >
                   <FaUserShield className="text-orange mt-1 mr-3 w-4 h-4 flex-shrink-0" />
@@ -174,7 +167,7 @@ const ChallengeSystem: React.FC = () => {
             </div>
 
             {/* Info callout */}
-            <div data-kimi-scroll className="mb-4 kimi-scroll" style={{ animationDelay: "0.35s" }}>
+            <div className="mb-4" style={{ animationDelay: "0.35s" }}>
               <div className="glass border border-purple/30 p-3 text-sm text-center shadow-[0_0_20px_rgba(126,67,255,0.14)] rounded-xl flex items-center justify-center gap-2">
                 <FaExclamationTriangle className="text-orange w-4 h-4" />
                 <span className="font-semibold text-white/90">
@@ -184,7 +177,7 @@ const ChallengeSystem: React.FC = () => {
             </div>
 
             {/* Trust badge */}
-            <div data-kimi-scroll className="flex justify-center mt-4 kimi-scroll" style={{ animationDelay: "0.4s" }}>
+            <div className="flex justify-center mt-4" style={{ animationDelay: "0.4s" }}>
               <div className="flex items-center gap-2 px-4 py-2 rounded-full glass border border-purple/30 shadow-[0_0_15px_rgba(126,67,255,0.18)] text-white text-sm font-semibold">
                 <FaUserShield className="text-orange w-4 h-4 mr-1" />
                 Clear rules. Verified results.
@@ -196,8 +189,7 @@ const ChallengeSystem: React.FC = () => {
         {/* Leaderboard + mascot visual (moved under Challenge Rules) */}
         <section className="flex justify-center py-6 lg:py-8">
           <div
-            data-kimi-scroll
-            className="relative kimi-scroll"
+            className="relative"
             style={{ animationDelay: "0.15s" }}
             id="challenge-leaderboard-visual"
           >

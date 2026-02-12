@@ -257,35 +257,6 @@
 .fade-in-0 { --tw-enter-opacity: 0; }
 .zoom-in-95 { --tw-enter-scale: 0.95; }
 
-/* Kimi scroll-in/out (IntersectionObserver toggles these) */
-.kimi-scroll {
-  opacity: 0;
-  will-change: opacity, transform;
-  backface-visibility: hidden;
-
-  /* Match Kimi enter/exit primitives */
-  --tw-enter-opacity: 0;
-  --tw-enter-scale: 0.96;
-  --tw-enter-translate-y: 24px;
-  --tw-exit-opacity: 0;
-  --tw-exit-scale: 0.98;
-  --tw-exit-translate-y: 18px;
-}
-.kimi-scroll--in {
-  animation-name: enter;
-  animation-duration: 0.55s;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-  animation-fill-mode: forwards;
-}
-.kimi-scroll--out {
-  animation-name: exit;
-  animation-duration: 0.35s;
-  animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
-  animation-fill-mode: forwards;
-  /* Never delay exit (even if element has kimi-delay-* classes) */
-  animation-delay: 0s !important;
-}
-
 /* Kimi special effects (keyframes exist in _kimi; opt-in usage) */
 @keyframes scanline { 0% { transform: translateY(-100%); } 100% { transform: translateY(100vh); } }
 @keyframes glitch {
@@ -306,16 +277,6 @@
 .kimi-delay-4 { animation-delay: 0.4s; }
 .kimi-delay-5 { animation-delay: 0.5s; }
 .kimi-delay-6 { animation-delay: 0.6s; }
-
-/* Respect reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  .kimi-scroll {
-    opacity: 1 !important;
-    transform: none !important;
-    animation: none !important;
-    filter: none !important;
-  }
-}
 
 /* Scrollbar hide utility */
 .scrollbar-hide {
