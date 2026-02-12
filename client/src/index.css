@@ -265,22 +265,22 @@
 
   /* Match Kimi enter/exit primitives */
   --tw-enter-opacity: 0;
-  --tw-enter-scale: 0.95;
-  --tw-enter-translate-y: 12px;
+  --tw-enter-scale: 0.96;
+  --tw-enter-translate-y: 24px;
   --tw-exit-opacity: 0;
-  --tw-exit-scale: 0.95;
-  --tw-exit-translate-y: 12px;
+  --tw-exit-scale: 0.98;
+  --tw-exit-translate-y: 18px;
 }
 .kimi-scroll--in {
   animation-name: enter;
-  animation-duration: 0.15s;
-  animation-timing-function: ease-out;
+  animation-duration: 0.55s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   animation-fill-mode: forwards;
 }
 .kimi-scroll--out {
   animation-name: exit;
-  animation-duration: 0.15s;
-  animation-timing-function: ease-in;
+  animation-duration: 0.35s;
+  animation-timing-function: cubic-bezier(0.4, 0, 1, 1);
   animation-fill-mode: forwards;
   /* Never delay exit (even if element has kimi-delay-* classes) */
   animation-delay: 0s !important;

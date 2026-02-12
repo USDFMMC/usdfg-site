@@ -58,7 +58,7 @@ const PlatformFeatures: React.FC = () => {
               key={index}
               data-kimi-scroll
               className="group relative kimi-scroll"
-              style={{ animationDelay: `${0.08 + index * 0.08}s` }}
+              style={{ animationDelay: `${0.12 + index * 0.16}s` }}
             >
               <div className="relative h-full kimi-glass border border-purple-500/20 rounded-2xl overflow-hidden transition-all duration-500 hover:border-purple-500/50 kimi-bottom-neon" style={{
                 '--neon-color': 'rgba(168, 85, 247, 0.3)',

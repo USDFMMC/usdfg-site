@@ -117,7 +117,7 @@ const LiveBattles: React.FC = () => {
               key={match.id}
               data-kimi-scroll
               className="match-item group kimi-scroll"
-              style={{ animationDelay: `${0.05 + index * 0.05}s` }}
+              style={{ animationDelay: `${0.1 + index * 0.1}s` }}
               onClick={() =>
                 setExpandedId(expandedId === match.id ? null : match.id)
               }

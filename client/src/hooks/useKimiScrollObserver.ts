@@ -21,11 +21,15 @@ export function useKimiScrollObserver() {
       (entries) => {
         for (const entry of entries) {
           const el = entry.target as HTMLElement;
-          if (entry.isIntersecting) {
+          const ratio = entry.intersectionRatio;
+          const shouldEnter = entry.isIntersecting && ratio >= 0.2;
+          const shouldExit = !entry.isIntersecting || ratio < 0.12;
+
+          if (shouldEnter) {
             el.classList.remove("kimi-scroll--out");
             el.classList.add("kimi-scroll--in");
             el.dataset.kimiSeen = "1";
-          } else if (el.dataset.kimiSeen === "1") {
+          } else if (shouldExit && el.dataset.kimiSeen === "1") {
             el.classList.add("kimi-scroll--out");
             // Let exit start from visible state, then clear enter so re-entry can replay.
             requestAnimationFrame(() => {
@@ -37,8 +41,9 @@ export function useKimiScrollObserver() {
         }
       },
       {
-        threshold: 0.2,
-        rootMargin: "0px 0px -10% 0px",
+        threshold: [0, 0.12, 0.2, 0.45, 0.7],
+        // Enter later in viewport so reveals feel sequential on scroll.
+        rootMargin: "0px 0px -20% 0px",
       }
     );
 

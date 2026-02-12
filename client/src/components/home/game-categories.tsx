@@ -117,7 +117,7 @@ const GameCategories: React.FC = () => {
                   key={index}
                   data-kimi-scroll
                   className="prize-card flex-shrink-0 w-72 sm:w-80 group kimi-scroll"
-                  style={{ animationDelay: `${0.05 + index * 0.05}s` }}
+                  style={{ animationDelay: `${0.12 + index * 0.14}s` }}
                 >
                   <div className="relative h-full glass border border-purple-500/20 rounded-2xl overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)]">
                     {/* Image - Kimi Exact */}
