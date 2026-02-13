@@ -49,9 +49,31 @@
 }
 .text-orange { color: var(--kimi-orange); }
 .text-purple { color: var(--kimi-purple); }
+.bg-purple\/80 { background-color: rgba(126, 67, 255, 0.8); }
+.bg-purple\/20 { background-color: rgba(126, 67, 255, 0.2); }
+.bg-purple\/10 { background-color: rgba(126, 67, 255, 0.1); }
+.bg-purple\/5 { background-color: rgba(126, 67, 255, 0.05); }
 .border-purple\/30 { border-color: #7e43ff4d; }
+.border-purple\/10 { border-color: rgba(126, 67, 255, 0.1); }
 .border-purple\/20 { border-color: rgba(126, 67, 255, 0.2); }
 .border-purple\/50 { border-color: rgba(126, 67, 255, 0.5); }
+.text-gradient-gold {
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  background-image: linear-gradient(135deg, gold, #fa0, gold);
+}
+
+/* Kimi gradient stop aliases used in their markup */
+.from-purple\/10 {
+  --tw-gradient-from: rgba(126, 67, 255, 0.1) var(--tw-gradient-from-position);
+  --tw-gradient-to: rgba(126, 67, 255, 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+.via-purple\/20 {
+  --tw-gradient-to: rgba(126, 67, 255, 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), rgba(126, 67, 255, 0.2) var(--tw-gradient-via-position), var(--tw-gradient-to);
+}
 
 /* Kimi dot-grid overlay (used in Kimi hero reference) */
 .bg-kimi-dot-grid {
@@ -200,6 +222,15 @@
 
 .animate-live-pulse {
   animation: livePulse 1.5s ease-in-out infinite;
+}
+
+/* Kimi scanline effect used in card hovers */
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+.animate-scanline {
+  animation: scanline 2.25s linear infinite;
 }
 
 /* Kimi caret blink (from _kimi) */

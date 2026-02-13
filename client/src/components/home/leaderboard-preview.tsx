@@ -77,10 +77,7 @@ function getTier(winRate: number, gamesPlayed: number): string {
 
 const LeaderboardPreview: React.FC = () => {
   const sectionRef = useRef<HTMLElement>(null);
-  const wrapperRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLDivElement>(null);
-  const headingRef = useRef<HTMLHeadingElement>(null);
-  const subRef = useRef<HTMLParagraphElement>(null);
   const podiumRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   
@@ -170,51 +167,26 @@ const LeaderboardPreview: React.FC = () => {
   // GSAP Animations - Kimi Exact Code
   useEffect(() => {
     const ctx = gsap.context(() => {
-      // Podium animation
-      const podiumCards = podiumRef.current?.querySelectorAll('.podium-card');
-      // List animation
-      const listItems = listRef.current?.querySelectorAll('.list-item');
-
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: 'top 80%',
-          toggleActions: 'play none none reverse',
-        },
-      });
-
-      // 1) Section wrapper
-      tl.fromTo(
-        wrapperRef.current,
-        { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out' }
-      );
-
-      // 2) Heading (header block) separate, slightly earlier (overlap wrapper)
-      tl.fromTo(
+      // Kimi Leaderboard: separate triggers (not a single timeline)
+      gsap.fromTo(
         titleRef.current,
         { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out' },
-        '-=0.6'
-      );
-      tl.fromTo(
-        headingRef.current,
-        { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out' },
-        '<'
-      );
-
-      // 3) Subheading / paragraph after heading
-      tl.fromTo(
-        subRef.current,
-        { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out' },
-        '>-0.72'
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.8,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: titleRef.current,
+            start: "top 80%",
+            toggleActions: "play none none reverse",
+          },
+        }
       );
 
-      // 4) Podium + list start after heading completes
+      const podiumCards = podiumRef.current?.querySelectorAll(".podium-card");
       if (podiumCards && podiumCards.length) {
-        tl.fromTo(
+        gsap.fromTo(
           podiumCards,
           { opacity: 0, y: 100 },
           {
@@ -222,13 +194,19 @@ const LeaderboardPreview: React.FC = () => {
             y: 0,
             duration: 1,
             stagger: 0.15,
-            ease: 'power3.out',
-          },
-          '>'
+            ease: "power3.out",
+            scrollTrigger: {
+              trigger: podiumRef.current,
+              start: "top 80%",
+              toggleActions: "play none none reverse",
+            },
+          }
         );
       }
+
+      const listItems = listRef.current?.querySelectorAll(".list-item");
       if (listItems && listItems.length) {
-        tl.fromTo(
+        gsap.fromTo(
           listItems,
           { opacity: 0, x: -50 },
           {
@@ -236,15 +214,22 @@ const LeaderboardPreview: React.FC = () => {
             x: 0,
             duration: 0.5,
             stagger: 0.08,
-            ease: 'power3.out',
-          },
-          podiumCards && podiumCards.length ? '<0.1' : '>'
+            ease: "power3.out",
+            scrollTrigger: {
+              trigger: listRef.current,
+              start: "top 85%",
+              toggleActions: "play none none reverse",
+            },
+          }
         );
       }
+
+      // When leaderboard data swaps, measurements change.
+      ScrollTrigger.refresh();
     }, sectionRef);
 
     return () => ctx.revert();
-  }, [players, teams, leaderboardType, activeTab]);
+  }, [loading, players.length, teams.length, leaderboardType, activeTab, isExpanded]);
 
   const getRankColor = (rank: number) => {
     switch (rank) {
@@ -296,17 +281,17 @@ const LeaderboardPreview: React.FC = () => {
     >
       {/* Background Effects - Kimi Exact */}
       <div className="absolute inset-0">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple-600/5 rounded-full blur-[150px]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-purple/5 rounded-full blur-[150px]" />
       </div>
 
       {/* Wireframe Sphere (Decorative) - Kimi Exact */}
       <div className="absolute top-1/4 right-0 w-96 h-96 opacity-10">
-        <div className="w-full h-full border border-purple-500/30 rounded-full animate-spin-slow" />
-        <div className="absolute inset-8 border border-purple-500/20 rounded-full animate-spin-slow" style={{ animationDirection: 'reverse' }} />
-        <div className="absolute inset-16 border border-purple-500/10 rounded-full animate-spin-slow" />
+        <div className="w-full h-full border border-purple/30 rounded-full animate-spin-slow" />
+        <div className="absolute inset-8 border border-purple/20 rounded-full animate-spin-slow" style={{ animationDirection: 'reverse' }} />
+        <div className="absolute inset-16 border border-purple/10 rounded-full animate-spin-slow" />
         </div>
 
-      <div ref={wrapperRef} className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
+      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
           {/* Solo / Team Toggle */}
         <div className="flex justify-center gap-2 mb-8">
             <Button
@@ -353,14 +338,14 @@ const LeaderboardPreview: React.FC = () => {
 
         {/* Section Header - Kimi Exact */}
         <div ref={titleRef} className="text-center mb-16 lg:mb-20">
-          <span className="inline-flex items-center gap-2 kimi-font-body text-sm text-amber-400 uppercase tracking-[0.3em] mb-4">
+          <span className="inline-flex items-center gap-2 font-body text-sm text-orange uppercase tracking-[0.3em] mb-4">
             <Crown className="w-4 h-4" />
             Elite Rankings
           </span>
-          <h2 ref={headingRef} className="kimi-font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white mb-6">
-            USDFG <span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent">BOARD</span>
+          <h2 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white mb-6">
+            USDFG <span className="text-gradient-gold">BOARD</span>
           </h2>
-          <p ref={subRef} className="kimi-font-body text-lg text-white/60 max-w-2xl mx-auto">
+          <p className="font-body text-lg text-white/60 max-w-2xl mx-auto">
             No usernames. No profiles. Your wallet, your skill, your record. Wallet-based identity, performance record, and competitive progression.
           </p>
         </div>

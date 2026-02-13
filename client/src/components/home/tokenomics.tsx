@@ -58,63 +58,68 @@ const Tokenomics: React.FC = () => {
   // GSAP section choreography (Kimi preset)
   useEffect(() => {
     const ctx = gsap.context(() => {
-      const cards = gridRef.current?.querySelectorAll(".token-card");
+      const cards = Array.from(gridRef.current?.querySelectorAll<HTMLElement>(".token-card") ?? []);
 
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: "top 80%",
-          toggleActions: "play none none reverse",
-        },
+      // Heading + sub trigger on their own
+      [headingRef.current, subRef.current].filter(Boolean).forEach((el, index) => {
+        const node = el as HTMLElement;
+        gsap.fromTo(
+          node,
+          { opacity: 0, y: 50 },
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.8,
+            delay: index * 0.06,
+            ease: "power3.out",
+            scrollTrigger: {
+              trigger: node,
+              start: "top 85%",
+              toggleActions: "play none none reverse",
+            },
+          }
+        );
       });
 
-      // 1) Section wrapper
-      tl.fromTo(
-        wrapperRef.current,
-        { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }
-      );
-
-      // 2) Heading
-      tl.fromTo(
-        headingRef.current,
-        { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
-        "-=0.6"
-      );
-
-      // 3) Subheading / paragraph
-      tl.fromTo(
-        subRef.current,
-        { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
-        ">-0.72"
-      );
-
-      // 4) Grid with stagger (after heading completes)
-      if (cards && cards.length) {
-        tl.fromTo(
-          cards,
+      // Per-card triggers
+      cards.forEach((card, index) => {
+        gsap.fromTo(
+          card,
           { opacity: 0, y: 80, rotateX: 15 },
           {
             opacity: 1,
             y: 0,
             rotateX: 0,
             duration: 0.8,
+            delay: index * 0.12,
             ease: "power3.out",
-            stagger: 0.15,
-          },
-          ">"
+            scrollTrigger: {
+              trigger: card,
+              start: "top 85%",
+              toggleActions: "play none none reverse",
+            },
+          }
+        );
+      });
+
+      // Info card trigger
+      if (infoRef.current) {
+        gsap.fromTo(
+          infoRef.current,
+          { opacity: 0, y: 50 },
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.8,
+            ease: "power3.out",
+            scrollTrigger: {
+              trigger: infoRef.current,
+              start: "top 85%",
+              toggleActions: "play none none reverse",
+            },
+          }
         );
       }
-
-      // Info card after grid
-      tl.fromTo(
-        infoRef.current,
-        { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
-        ">-0.72"
-      );
     }, sectionRef);
 
     return () => ctx.revert();

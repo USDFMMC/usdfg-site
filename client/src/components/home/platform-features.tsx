@@ -34,69 +34,49 @@ const features = [
 
 const PlatformFeatures: React.FC = () => {
   const sectionRef = useRef<HTMLElement>(null);
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const kickerRef = useRef<HTMLSpanElement>(null);
-  const headingRef = useRef<HTMLHeadingElement>(null);
-  const subRef = useRef<HTMLParagraphElement>(null);
+  const titleRef = useRef<HTMLDivElement>(null);
   const cardsRef = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      const cards = cardsRef.current.filter(Boolean) as HTMLDivElement[];
-
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: "top 80%",
-          toggleActions: "play none none reverse",
-        },
-      });
-
-      // 1) Section wrapper: subtle opacity + translateY
-      tl.fromTo(
-        wrapperRef.current,
+      // Title animation (Kimi exact pattern)
+      gsap.fromTo(
+        titleRef.current,
         { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.8,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: titleRef.current,
+            start: "top 80%",
+            toggleActions: "play none none reverse",
+          },
+        }
       );
 
-      // 2) Heading: separate reveal, slightly earlier (overlap wrapper)
-      tl.fromTo(
-        kickerRef.current,
-        { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
-        "-=0.6"
-      );
-      tl.fromTo(
-        headingRef.current,
-        { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
-        "<"
-      );
-
-      // 3) Subheading / paragraph: small delay after heading (0.05–0.1)
-      tl.fromTo(
-        subRef.current,
-        { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
-        ">-0.72"
-      );
-
-      // 4) Card grid: separate reveal with stagger, starts after heading completes
-      if (cards.length) {
-        tl.fromTo(
-          cards,
+      // Cards: each card triggers + reveals one-by-one (Kimi exact)
+      cardsRef.current.forEach((card, index) => {
+        if (!card) return;
+        gsap.fromTo(
+          card,
           { opacity: 0, y: 80, rotateX: 15 },
           {
             opacity: 1,
             y: 0,
             rotateX: 0,
             duration: 0.8,
+            delay: index * 0.2,
             ease: "power3.out",
-            stagger: 0.2,
-          },
-          ">"
+            scrollTrigger: {
+              trigger: card,
+              start: "top 85%",
+              toggleActions: "play none none reverse",
+            },
+          }
         );
-      }
+      });
     }, sectionRef);
 
     return () => ctx.revert();
@@ -110,27 +90,35 @@ const PlatformFeatures: React.FC = () => {
     >
       <div className="absolute inset-0 bg-gradient-radial-kimi opacity-50" />
       
-      <div ref={wrapperRef} className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
+      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
         {/* Section Header - Kimi Exact */}
-        <div className="text-center mb-16 lg:mb-20">
-          <span ref={kickerRef} className="inline-block font-body text-sm text-purple-500 uppercase tracking-[0.3em] mb-4">
-            THE PLATFORM
+        <div ref={titleRef} className="text-center mb-16 lg:mb-20">
+          <span className="inline-block font-body text-sm text-purple uppercase tracking-[0.3em] mb-4">
+            The Platform
           </span>
-          <h2 ref={headingRef} className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white mb-6">
-            <span className="block text-white">
-              THE{" "}
-              <span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent">
-                BITCOIN
-              </span>
-            </span>
-            <span className="block">
-              <span className="text-white">OF </span>
-              <span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent">
-                GAMING
-              </span>
+          <h2 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white mb-6">
+            THE{" "}
+            <span
+              className="bg-gradient-to-r from-green-400 via-emerald-400 to-green-500 bg-clip-text text-transparent"
+              style={{
+                textShadow: "0 0 20px rgba(74, 222, 128, 0.4)",
+                filter: "drop-shadow(0 0 8px rgba(74, 222, 128, 0.3))",
+              }}
+            >
+              BITCOIN
+            </span>{" "}
+            OF{" "}
+            <span
+              className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent"
+              style={{
+                textShadow: "0 0 20px rgba(251, 191, 36, 0.4)",
+                filter: "drop-shadow(0 0 8px rgba(251, 191, 36, 0.3))",
+              }}
+            >
+              GAMING
             </span>
           </h2>
-          <p ref={subRef} className="font-body text-lg text-white/60 max-w-2xl mx-auto leading-relaxed">
+          <p className="font-body text-lg text-white/60 max-w-2xl mx-auto">
             USDFG is a skill-based competition platform where players challenge each other directly, lock challenge assets on-chain, compete, and earn verified rewards through performance. Wallet-driven, non-custodial, and built for skill.
           </p>
         </div>
@@ -161,26 +149,39 @@ const PlatformFeatures: React.FC = () => {
                   </div>
 
                   {/* Icon Badge - Kimi Exact */}
-                  <div className={`absolute top-4 left-4 w-12 h-12 flex items-center justify-center bg-gradient-to-br ${feature.color} rounded-xl shadow-lg`}>
+                  <div className="absolute top-4 left-4 w-12 h-12 flex items-center justify-center bg-purple/80 backdrop-blur-sm rounded-xl">
                     <feature.icon className="w-6 h-6 text-white" />
                   </div>
 
                   {/* Metric Badge - Kimi Exact */}
-                  <div className="absolute top-4 right-4 px-4 py-2 glass rounded-full">
-                    <span className="font-display font-bold text-sm text-gradient">
+                  <div className="absolute top-4 right-4 px-3 py-1 glass rounded-full">
+                    <span className="font-body text-xs text-white/80">
                       {feature.metric}
                     </span>
+                  </div>
+
+                  {/* Scanline Hover - Kimi Exact */}
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                    <div className="absolute inset-0 bg-gradient-to-b from-transparent via-purple/20 to-transparent h-4 animate-scanline" />
                   </div>
                 </div>
 
                 {/* Content - Kimi Exact */}
                 <div className="p-6">
-                  <h3 className="font-display font-bold text-xl text-white mb-2 group-hover:text-gradient transition-all">
+                  <h3 className="font-display font-bold text-xl text-white mb-3 group-hover:text-gradient transition-colors">
                     {feature.title}
                   </h3>
-                  <p className="font-body text-white/60 text-sm leading-relaxed">
+                  <p className="font-body text-white/60 text-sm leading-relaxed mb-4">
                     {feature.description}
                   </p>
+                  <a
+                    href="#"
+                    onClick={(e) => e.preventDefault()}
+                    className="inline-flex items-center gap-2 font-body text-sm text-purple hover:text-orange transition-colors group/link"
+                  >
+                    Explore Feature
+                    <ArrowRight className="w-4 h-4 group-hover/link:translate-x-1 group-hover/link:-translate-y-1 transition-transform" />
+                  </a>
                 </div>
 
                 {/* Bottom Gradient - Kimi Exact */}
@@ -188,7 +189,7 @@ const PlatformFeatures: React.FC = () => {
 
                 {/* Hover Glow - Kimi Exact */}
                 <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
-                  <div className="absolute inset-0 bg-gradient-to-t from-purple-500/10 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-purple/10 to-transparent" />
                 </div>
               </div>
             </div>

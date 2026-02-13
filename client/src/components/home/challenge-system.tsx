@@ -99,72 +99,87 @@ const ChallengeSystem: React.FC = () => {
   // GSAP layered choreography (Kimi preset)
   useEffect(() => {
     const ctx = gsap.context(() => {
-      const ruleItems = rulesItemsWrapRef.current?.querySelectorAll("li");
+      const ruleItems = Array.from(rulesItemsWrapRef.current?.querySelectorAll<HTMLElement>("li") ?? []);
 
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: "top 80%",
-          toggleActions: "play none none reverse",
-        },
+      // Wrapper + main card trigger
+      [wrapperRef.current, rulesCardRef.current, rulesHeadingRef.current]
+        .filter(Boolean)
+        .forEach((el, index) => {
+          const node = el as HTMLElement;
+          gsap.fromTo(
+            node,
+            { opacity: 0, y: 50 },
+            {
+              opacity: 1,
+              y: 0,
+              duration: 0.8,
+              delay: index * 0.06,
+              ease: "power3.out",
+              scrollTrigger: {
+                trigger: node,
+                start: "top 85%",
+                toggleActions: "play none none reverse",
+              },
+            }
+          );
+        });
+
+      // Rule bullets per-item triggers
+      ruleItems.forEach((item, index) => {
+        gsap.fromTo(
+          item,
+          { opacity: 0, y: 50 },
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.8,
+            delay: index * 0.05,
+            ease: "power3.out",
+            scrollTrigger: {
+              trigger: item,
+              start: "top 90%",
+              toggleActions: "play none none reverse",
+            },
+          }
+        );
       });
 
-      // 1) Section wrapper
-      tl.fromTo(
-        wrapperRef.current,
-        { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }
-      );
-
-      // 2) Heading (rules card heading) separate, slightly earlier
-      tl.fromTo(
-        rulesCardRef.current,
-        { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
-        "-=0.6"
-      );
-      tl.fromTo(
-        rulesHeadingRef.current,
-        { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
-        "<"
-      );
-
-      // 3) Subheading/paragraph equivalent: rule bullets after heading (small delay)
-      if (ruleItems && ruleItems.length) {
-        tl.fromTo(
-          ruleItems,
+      // Visual + creator card per triggers
+      if (visualRef.current) {
+        gsap.fromTo(
+          visualRef.current,
           { opacity: 0, y: 50 },
           {
             opacity: 1,
             y: 0,
             duration: 0.8,
             ease: "power3.out",
-            stagger: 0.08,
-          },
-          ">-0.72"
+            scrollTrigger: {
+              trigger: visualRef.current,
+              start: "top 85%",
+              toggleActions: "play none none reverse",
+            },
+          }
         );
       }
-
-      // 4) Visual + creator card as the "grid/cards" reveal, starts after heading completes
-      tl.fromTo(
-        visualRef.current,
-        { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
-        ">"
-      );
-      tl.fromTo(
-        creatorCardRef.current,
-        { opacity: 0, y: 80, rotateX: 15 },
-        {
-          opacity: 1,
-          y: 0,
-          rotateX: 0,
-          duration: 0.8,
-          ease: "power3.out",
-        },
-        ">-0.72"
-      );
+      if (creatorCardRef.current) {
+        gsap.fromTo(
+          creatorCardRef.current,
+          { opacity: 0, y: 80, rotateX: 15 },
+          {
+            opacity: 1,
+            y: 0,
+            rotateX: 0,
+            duration: 0.8,
+            ease: "power3.out",
+            scrollTrigger: {
+              trigger: creatorCardRef.current,
+              start: "top 85%",
+              toggleActions: "play none none reverse",
+            },
+          }
+        );
+      }
     }, sectionRef);
 
     return () => ctx.revert();

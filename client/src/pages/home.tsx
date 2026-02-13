@@ -106,35 +106,32 @@ const Home: React.FC = () => {
           <HeroSection onExploreClick={handleExploreClick} />
         </section>
         
-        {/* Content sections - revealed with Kimi CSS animation when "EXPLORE PLATFORM" is clicked */}
-        <div
-          className={contentRevealed ? "pointer-events-auto" : "pointer-events-none"}
-          style={{
-            display: contentRevealed ? "block" : "none",
-          }}
-        >
-          <section id="features" aria-label="Platform Features Section">
-            <PlatformFeatures />
-          </section>
-          <section aria-label="Live Battles Section">
-            <LiveBattles />
-          </section>
-          <section aria-label="Challenge System Section">
-            <ChallengeSystem />
-          </section>
-          <section id="leaderboard" aria-label="Leaderboard Preview Section">
-            <LeaderboardPreview />
-          </section>
-          <section id="tokenomics" aria-label="Tokenomics Section">
-            <Tokenomics />
-          </section>
-          <section id="games" aria-label="Game Categories Section">
-            <GameCategories />
-          </section>
-          <section aria-label="CTA Section">
-            <CTASection />
-          </section>
-        </div>
+        {/* Content sections - mount only after "EXPLORE PLATFORM" so ScrollTrigger measures correctly */}
+        {contentRevealed ? (
+          <div className="pointer-events-auto">
+            <section id="features" aria-label="Platform Features Section">
+              <PlatformFeatures />
+            </section>
+            <section aria-label="Live Battles Section">
+              <LiveBattles />
+            </section>
+            <section aria-label="Challenge System Section">
+              <ChallengeSystem />
+            </section>
+            <section id="leaderboard" aria-label="Leaderboard Preview Section">
+              <LeaderboardPreview />
+            </section>
+            <section id="tokenomics" aria-label="Tokenomics Section">
+              <Tokenomics />
+            </section>
+            <section id="games" aria-label="Game Categories Section">
+              <GameCategories />
+            </section>
+            <section aria-label="CTA Section">
+              <CTASection />
+            </section>
+          </div>
+        ) : null}
       </main>
       <Footer isRevealed={contentRevealed} />
     </>

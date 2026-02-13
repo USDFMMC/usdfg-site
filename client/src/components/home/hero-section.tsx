@@ -206,7 +206,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
             </div>
 
             {/* Kimi stat strip (exact structure; USDFG metrics only) */}
-            <div ref={statsRef} className="flex flex-wrap gap-8 sm:gap-12 mt-8">
+            <div ref={statsRef} className="flex flex-wrap gap-8 sm:gap-12">
               {stats.map((stat) => (
                 <div key={stat.label} className="text-left">
                   <div className="font-display font-bold text-2xl sm:text-3xl text-gradient">{stat.value}</div>

@@ -9,6 +9,7 @@ gsap.registerPlugin(ScrollTrigger);
 const CTASection: React.FC = () => {
   const sectionRef = useRef<HTMLElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const badgeRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const subRef = useRef<HTMLParagraphElement>(null);
   const ctasRef = useRef<HTMLDivElement>(null);
@@ -17,56 +18,33 @@ const CTASection: React.FC = () => {
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: "top 70%",
-          toggleActions: "play none none reverse",
-        },
-      });
-
-      // 1) Section wrapper
-      tl.fromTo(
-        contentRef.current,
-        { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }
-      );
-
-      // 2) Heading
-      tl.fromTo(
+      const items = [
+        badgeRef.current,
         headingRef.current,
-        { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
-        "-=0.6"
-      );
-
-      // 3) Paragraph
-      tl.fromTo(
         subRef.current,
-        { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
-        ">-0.72"
-      );
-
-      // 4) CTA row + bullets + quote after heading completes
-      tl.fromTo(
         ctasRef.current,
-        { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
-        ">"
-      );
-      tl.fromTo(
         bulletsRef.current,
-        { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
-        ">-0.72"
-      );
-      tl.fromTo(
         quoteRef.current,
-        { opacity: 0, y: 50 },
-        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
-        ">-0.72"
-      );
+      ].filter(Boolean) as HTMLElement[];
+
+      items.forEach((el, index) => {
+        gsap.fromTo(
+          el,
+          { opacity: 0, y: 50 },
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.8,
+            delay: index * 0.08,
+            ease: "power3.out",
+            scrollTrigger: {
+              trigger: el,
+              start: "top 85%",
+              toggleActions: "play none none reverse",
+            },
+          }
+        );
+      });
     }, sectionRef);
 
     return () => ctx.revert();
@@ -77,7 +55,7 @@ const CTASection: React.FC = () => {
       <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20" ref={contentRef}>
         <div className="max-w-4xl mx-auto text-center">
           {/* Kimi badge: glass pill with icon + text */}
-          <div className="cta-reveal inline-flex items-center gap-2 px-4 py-2 mb-6 glass rounded-full border border-purple/30">
+          <div ref={badgeRef} className="cta-reveal inline-flex items-center gap-2 px-4 py-2 mb-6 glass rounded-full border border-purple/30">
             <Sparkles className="w-4 h-4 shrink-0 text-orange" aria-hidden />
             <span className="kimi-font-body text-sm text-white/80">
               Your Journey Begins Now
