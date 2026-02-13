@@ -41,9 +41,10 @@ const PlatformFeatures: React.FC = () => {
       // Title animation (Kimi exact pattern)
       gsap.fromTo(
         titleRef.current,
-        { opacity: 0, y: 50 },
+        // Avoid pre-hiding. If ScrollTrigger fails to fire (mobile, reduced motion, SPA mount),
+        // we still want the section to be visible.
+        { y: 50 },
         {
-          opacity: 1,
           y: 0,
           duration: 0.8,
           ease: "power3.out",
@@ -60,9 +61,9 @@ const PlatformFeatures: React.FC = () => {
       cards.forEach((card, index) => {
         gsap.fromTo(
           card,
-          { opacity: 0, y: 80, rotateX: 15 },
+          // Avoid opacity: 0 so cards never get stuck invisible if triggers don't run.
+          { y: 80, rotateX: 15 },
           {
-            opacity: 1,
             y: 0,
             rotateX: 0,
             duration: 0.8,
