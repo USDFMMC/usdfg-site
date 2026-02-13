@@ -31,12 +31,18 @@ const features = [
 
 const PlatformFeatures: React.FC = () => {
   return (
-    <Reveal as="section" id="platform" className="relative py-24 lg:py-32 w-full">
+    <Reveal
+      as="section"
+      id="platform"
+      className="relative py-24 lg:py-32 w-full"
+      selector="[data-platform-reveal]"
+      stagger={false}
+    >
       <div className="absolute inset-0 bg-gradient-radial-kimi opacity-50" />
       
       <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
         {/* Section Header - Kimi Exact */}
-        <Reveal as="div" className="text-center mb-16 lg:mb-20" stagger={false}>
+        <div data-platform-reveal className="text-center mb-16 lg:mb-20">
           <span className="inline-block font-body text-sm text-purple-500 uppercase tracking-[0.3em] mb-4">
             THE PLATFORM
           </span>
@@ -52,7 +58,7 @@ const PlatformFeatures: React.FC = () => {
           <p className="font-body text-lg text-white/60 max-w-2xl mx-auto leading-relaxed">
             Three pillars designed to elevate your competitive gaming experience to legendary heights.
           </p>
-        </Reveal>
+        </div>
 
         {/* Feature Cards - Kimi Exact Structure with Images */}
         <Reveal
