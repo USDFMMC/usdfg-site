@@ -47,8 +47,8 @@ const Home: React.FC = () => {
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="USDFG.PRO" />
         <meta property="og:url" content={canonical} />
-        <meta property="og:title" content="USDFG.PRO – Skill-Based Crypto Gaming Platform" />
-        <meta property="og:description" content="Compete in verified challenges, earn USDFG, and prove your skill. No gambling, 100% on-chain." />
+        <meta property="og:title" content="USDFG" />
+        <meta property="og:description" content={"Skill-Based Competitive Arena\nGAME. EARN. CONQUER."} />
         <meta property="og:image" content={ogImage} />
         <meta property="og:image:type" content="image/png" />
         <meta property="og:image:width" content="1024" />
@@ -59,8 +59,8 @@ const Home: React.FC = () => {
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:site" content="@USDFGAMING" />
         <meta name="twitter:url" content={canonical} />
-        <meta name="twitter:title" content="USDFG.PRO – Skill-Based Crypto Gaming Platform" />
-        <meta name="twitter:description" content="Compete in verified challenges, earn USDFG, and prove your skill. No gambling, 100% on-chain." />
+        <meta name="twitter:title" content="USDFG" />
+        <meta name="twitter:description" content={"Skill-Based Competitive Arena\nGAME. EARN. CONQUER."} />
         <meta name="twitter:image" content={ogImage} />
 
         {/* JSON-LD */}
