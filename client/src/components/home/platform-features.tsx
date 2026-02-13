@@ -92,10 +92,16 @@ const PlatformFeatures: React.FC = () => {
         {/* Section Header - Kimi Exact */}
         <div ref={titleRef} className="text-center mb-16 lg:mb-20">
           <span className="inline-block font-body text-sm text-purple-500 uppercase tracking-[0.3em] mb-4">
-            The Platform
+            THE PLATFORM
           </span>
           <h2 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white mb-6">
-            THE ARENA <span className="text-gradient">AWAITS</span>
+            <span className="block text-white">THE BITCOIN</span>
+            <span className="block">
+              <span className="text-white">OF </span>
+              <span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent">
+                GAMING
+              </span>
+            </span>
           </h2>
           <p className="font-body text-lg text-white/60 max-w-2xl mx-auto leading-relaxed">
             Three pillars designed to elevate your competitive gaming experience to legendary heights.
