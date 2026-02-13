@@ -1,4 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+gsap.registerPlugin(ScrollTrigger);
 
 const Tokenomics: React.FC = () => {
   // Count-up states
@@ -9,6 +13,11 @@ const Tokenomics: React.FC = () => {
   const animRefs = useRef<(number | null)[]>([null, null, null, null]);
   const hasAnimated = useRef(false);
   const sectionRef = useRef<HTMLElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const subRef = useRef<HTMLParagraphElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const infoRef = useRef<HTMLDivElement>(null);
 
   // Count-up animation function
   const animateCount = (target: number, setter: (v: number) => void, duration = 1000, idx?: number) => {
@@ -46,6 +55,71 @@ const Tokenomics: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
+  // GSAP section choreography (Kimi preset)
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      const cards = gridRef.current?.querySelectorAll(".token-card");
+
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: sectionRef.current,
+          start: "top 80%",
+          toggleActions: "play none none reverse",
+        },
+      });
+
+      // 1) Section wrapper
+      tl.fromTo(
+        wrapperRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }
+      );
+
+      // 2) Heading
+      tl.fromTo(
+        headingRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+        "-=0.6"
+      );
+
+      // 3) Subheading / paragraph
+      tl.fromTo(
+        subRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+        ">-0.72"
+      );
+
+      // 4) Grid with stagger (after heading completes)
+      if (cards && cards.length) {
+        tl.fromTo(
+          cards,
+          { opacity: 0, y: 80, rotateX: 15 },
+          {
+            opacity: 1,
+            y: 0,
+            rotateX: 0,
+            duration: 0.8,
+            ease: "power3.out",
+            stagger: 0.15,
+          },
+          ">"
+        );
+      }
+
+      // Info card after grid
+      tl.fromTo(
+        infoRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+        ">-0.72"
+      );
+    }, sectionRef);
+
+    return () => ctx.revert();
+  }, []);
+
   // Hover handlers
   const handleHover = (target: number, setter: (v: number) => void, idx: number) => {
     return () => {
@@ -67,17 +141,17 @@ const Tokenomics: React.FC = () => {
       className="py-12 lg:py-16 text-center relative overflow-hidden"
     >
 
-      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
-        <h2 className="font-display font-bold text-3xl sm:text-4xl lg:text-5xl mb-4 text-white">
+      <div ref={wrapperRef} className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
+        <h2 ref={headingRef} className="font-display font-bold text-3xl sm:text-4xl lg:text-5xl mb-4 text-white">
           <span className="text-gradient">TOKEN UTILITY &amp; ALLOCATION</span>
         </h2>
-        <p className="font-body text-base md:text-lg text-white/70 mb-8 lg:mb-12 max-w-xl mx-auto leading-relaxed">
+        <p ref={subRef} className="font-body text-base md:text-lg text-white/70 mb-8 lg:mb-12 max-w-xl mx-auto leading-relaxed">
           USDFG token allocation for platform access, challenge creation, and participation utility.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 max-w-5xl mx-auto mb-8 lg:mb-12">
+        <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 max-w-5xl mx-auto mb-8 lg:mb-12">
           <div
-            className="relative glass border border-purple/30 rounded-2xl p-4 lg:p-6 text-center transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.18)] kimi-bottom-neon"
+            className="token-card relative glass border border-purple/30 rounded-2xl p-4 lg:p-6 text-center transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.18)] kimi-bottom-neon"
             style={
               {
                 "--neon-color": "rgba(126, 67, 255, 0.25)",
@@ -100,7 +174,7 @@ const Tokenomics: React.FC = () => {
             </div>
           </div>
           <div
-            className="relative glass border border-purple/30 rounded-2xl p-4 lg:p-6 text-center transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.18)] kimi-bottom-neon"
+            className="token-card relative glass border border-purple/30 rounded-2xl p-4 lg:p-6 text-center transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.18)] kimi-bottom-neon"
             style={
               {
                 "--neon-color": "rgba(126, 67, 255, 0.25)",
@@ -122,7 +196,7 @@ const Tokenomics: React.FC = () => {
             </div>
           </div>
           <div
-            className="relative glass border border-purple/30 rounded-2xl p-4 lg:p-6 text-center transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.18)] kimi-bottom-neon"
+            className="token-card relative glass border border-purple/30 rounded-2xl p-4 lg:p-6 text-center transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.18)] kimi-bottom-neon"
             style={
               {
                 "--neon-color": "rgba(126, 67, 255, 0.25)",
@@ -144,7 +218,7 @@ const Tokenomics: React.FC = () => {
             </div>
           </div>
           <div
-            className="relative glass border border-purple/30 rounded-2xl p-4 lg:p-6 text-center transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.18)] kimi-bottom-neon"
+            className="token-card relative glass border border-purple/30 rounded-2xl p-4 lg:p-6 text-center transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.18)] kimi-bottom-neon"
             style={
               {
                 "--neon-color": "rgba(126, 67, 255, 0.25)",
@@ -167,6 +241,7 @@ const Tokenomics: React.FC = () => {
           </div>
         </div>
         <div
+          ref={infoRef}
           className="text-center mt-6 lg:mt-8 max-w-2xl mx-auto glass border border-purple/30 rounded-2xl p-5 lg:p-6"
           style={{ animationDelay: "0.25s" }}
         >

@@ -75,31 +75,57 @@ const gameColors: Record<string, string> = {
 
 const LiveBattles: React.FC = () => {
   const sectionRef = useRef<HTMLElement>(null);
-  const titleRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const headingWrapRef = useRef<HTMLDivElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const metaRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      gsap.fromTo(
-        titleRef.current,
+      const items = listRef.current?.querySelectorAll(".match-item");
+
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: sectionRef.current,
+          start: "top 80%",
+          toggleActions: "play none none reverse",
+        },
+      });
+
+      // 1) Section wrapper
+      tl.fromTo(
+        wrapperRef.current,
         { opacity: 0, y: 50 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: titleRef.current,
-            start: "top 80%",
-            toggleActions: "play none none reverse",
-          },
-        }
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }
       );
 
-      const items = listRef.current?.querySelectorAll(".match-item");
-      if (items) {
-        gsap.fromTo(
+      // 2) Heading (badge + headline) separate, slightly earlier (overlap)
+      tl.fromTo(
+        headingWrapRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+        "-=0.6"
+      );
+      tl.fromTo(
+        headingRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+        "<"
+      );
+
+      // 3) Meta (Live Now + View All) after heading
+      tl.fromTo(
+        metaRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+        ">-0.72"
+      );
+
+      // 4) List reveal with stagger, starts after heading completes
+      if (items && items.length) {
+        tl.fromTo(
           items,
           { opacity: 0, x: 100 },
           {
@@ -108,12 +134,8 @@ const LiveBattles: React.FC = () => {
             duration: 0.6,
             stagger: 0.1,
             ease: "power3.out",
-            scrollTrigger: {
-              trigger: listRef.current,
-              start: "top 80%",
-              toggleActions: "play none none reverse",
-            },
-          }
+          },
+          ">"
         );
       }
     }, sectionRef);
@@ -134,19 +156,19 @@ const LiveBattles: React.FC = () => {
       id="live-battles"
       className="relative py-24 lg:py-32 w-full"
     >
-      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
+      <div ref={wrapperRef} className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
         {/* Section Header */}
-        <div ref={titleRef} className="flex flex-col lg:flex-row lg:items-end lg:justify-between mb-12 lg:mb-16">
-          <div>
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between mb-12 lg:mb-16">
+          <div ref={headingWrapRef}>
             <span className="inline-flex items-center gap-2 font-body text-sm text-orange uppercase tracking-[0.3em] mb-4">
               <Radio className="w-4 h-4 animate-live-pulse" />
               Live Competition
             </span>
-            <h2 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white">
+            <h2 ref={headingRef} className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white">
               ACTIVE <span className="text-gradient">CHALLENGES</span>
             </h2>
           </div>
-          <div className="mt-4 lg:mt-0 flex items-center gap-4">
+          <div ref={metaRef} className="mt-4 lg:mt-0 flex items-center gap-4">
             <div className="flex items-center gap-2 px-4 py-2 glass rounded-full border border-purple/30">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-live-pulse" />
               <span className="font-body text-sm text-white/70">

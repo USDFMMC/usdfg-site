@@ -9,27 +9,63 @@ gsap.registerPlugin(ScrollTrigger);
 const CTASection: React.FC = () => {
   const sectionRef = useRef<HTMLElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const subRef = useRef<HTMLParagraphElement>(null);
+  const ctasRef = useRef<HTMLDivElement>(null);
+  const bulletsRef = useRef<HTMLDivElement>(null);
+  const quoteRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      const items = contentRef.current?.querySelectorAll(".cta-reveal");
-      if (!items || items.length === 0) return;
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: sectionRef.current,
+          start: "top 70%",
+          toggleActions: "play none none reverse",
+        },
+      });
 
-      gsap.fromTo(
-        items,
+      // 1) Section wrapper
+      tl.fromTo(
+        contentRef.current,
         { opacity: 0, y: 50 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          stagger: 0.12,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: contentRef.current,
-            start: "top 70%",
-            toggleActions: "play none none reverse",
-          },
-        }
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }
+      );
+
+      // 2) Heading
+      tl.fromTo(
+        headingRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+        "-=0.6"
+      );
+
+      // 3) Paragraph
+      tl.fromTo(
+        subRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+        ">-0.72"
+      );
+
+      // 4) CTA row + bullets + quote after heading completes
+      tl.fromTo(
+        ctasRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+        ">"
+      );
+      tl.fromTo(
+        bulletsRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+        ">-0.72"
+      );
+      tl.fromTo(
+        quoteRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+        ">-0.72"
       );
     }, sectionRef);
 
@@ -49,7 +85,7 @@ const CTASection: React.FC = () => {
           </div>
 
           {/* Kimi headline: font-display, gradient on second line */}
-          <h2 className="cta-reveal font-display font-bold text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl text-white leading-tight mb-6">
+          <h2 ref={headingRef} className="cta-reveal font-display font-bold text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl text-white leading-tight mb-6">
             <span className="block">Ready to enter</span>
             <span className="block mt-1 text-gradient">
               the arena?
@@ -57,13 +93,13 @@ const CTASection: React.FC = () => {
           </h2>
 
           {/* Kimi supporting copy */}
-          <p className="cta-reveal font-body text-white/80 text-lg mb-8 max-w-2xl mx-auto">
+          <p ref={subRef} className="cta-reveal font-body text-white/80 text-lg mb-8 max-w-2xl mx-auto">
             Compete through skill. Earn verified rewards. Join the skill-based
             competition platform built for performance.
           </p>
 
           {/* Kimi CTAs: Enter the Arena (gradient) + Learn More (outline) */}
-          <div className="cta-reveal flex flex-wrap items-center justify-center gap-4 mb-8">
+          <div ref={ctasRef} className="cta-reveal flex flex-wrap items-center justify-center gap-4 mb-8">
             <Link to="/app" className="inline-block">
               <button className="relative font-semibold text-base uppercase tracking-wide px-8 py-4 bg-gradient-to-r from-purple-500 to-orange-500 hover:from-purple-400 hover:to-orange-400 text-white border-0 overflow-hidden group rounded-lg transition-all kimi-font-body">
                 <span className="relative z-10 flex items-center gap-2">
@@ -89,7 +125,7 @@ const CTASection: React.FC = () => {
           </div>
 
           {/* Kimi feature bullets: green dots */}
-          <div className="cta-reveal font-body flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-sm text-white/80 mb-12">
+          <div ref={bulletsRef} className="cta-reveal font-body flex flex-wrap items-center justify-center gap-x-6 gap-y-1 text-sm text-white/80 mb-12">
             <span className="inline-flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" aria-hidden />
               Free to Join
@@ -110,6 +146,7 @@ const CTASection: React.FC = () => {
       <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
         <div className="flex justify-center max-w-4xl mx-auto">
           <div
+            ref={quoteRef}
             className="cta-reveal relative max-w-2xl w-full glass border border-purple/30 rounded-2xl px-6 lg:px-8 py-6 lg:py-8 transition-all duration-300 kimi-bottom-neon"
             style={
               {

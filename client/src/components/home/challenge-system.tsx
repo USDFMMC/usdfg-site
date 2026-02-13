@@ -4,6 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { FaBalanceScale, FaLock, FaGavel, FaExclamationTriangle, FaUserShield, FaCheckCircle } from "react-icons/fa";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+gsap.registerPlugin(ScrollTrigger);
 
 /**
  * ChallengeSystem
@@ -66,6 +70,15 @@ const ChallengeSystem: React.FC = () => {
   const [showGameDropdown, setShowGameDropdown] = useState(false);
   const [showChallengeModeDropdown, setShowChallengeModeDropdown] = useState(false);
 
+  // GSAP refs for choreographed reveals
+  const sectionRef = useRef<HTMLElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const rulesCardRef = useRef<HTMLDivElement>(null);
+  const rulesHeadingRef = useRef<HTMLHeadingElement>(null);
+  const rulesItemsWrapRef = useRef<HTMLUListElement>(null);
+  const visualRef = useRef<HTMLDivElement>(null);
+  const creatorCardRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     setShowGameDropdown(!!selectedCategory);
     if (!selectedCategory) {
@@ -83,6 +96,80 @@ const ChallengeSystem: React.FC = () => {
     setSelectedChallengeMode("");
   }, [selectedGame]);
 
+  // GSAP layered choreography (Kimi preset)
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      const ruleItems = rulesItemsWrapRef.current?.querySelectorAll("li");
+
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: sectionRef.current,
+          start: "top 80%",
+          toggleActions: "play none none reverse",
+        },
+      });
+
+      // 1) Section wrapper
+      tl.fromTo(
+        wrapperRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }
+      );
+
+      // 2) Heading (rules card heading) separate, slightly earlier
+      tl.fromTo(
+        rulesCardRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+        "-=0.6"
+      );
+      tl.fromTo(
+        rulesHeadingRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+        "<"
+      );
+
+      // 3) Subheading/paragraph equivalent: rule bullets after heading (small delay)
+      if (ruleItems && ruleItems.length) {
+        tl.fromTo(
+          ruleItems,
+          { opacity: 0, y: 50 },
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.8,
+            ease: "power3.out",
+            stagger: 0.08,
+          },
+          ">-0.72"
+        );
+      }
+
+      // 4) Visual + creator card as the "grid/cards" reveal, starts after heading completes
+      tl.fromTo(
+        visualRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+        ">"
+      );
+      tl.fromTo(
+        creatorCardRef.current,
+        { opacity: 0, y: 80, rotateX: 15 },
+        {
+          opacity: 1,
+          y: 0,
+          rotateX: 0,
+          duration: 0.8,
+          ease: "power3.out",
+        },
+        ">-0.72"
+      );
+    }, sectionRef);
+
+    return () => ctx.revert();
+  }, []);
+
   // -----------------------------
   // Leaderboard visual: lazy reveal + WEBP → PNG fallback
   // -----------------------------
@@ -93,11 +180,12 @@ const ChallengeSystem: React.FC = () => {
   // Render
   // -----------------------------
   return (
-    <section className="py-12 lg:py-16 relative overflow-hidden">
+    <section ref={sectionRef} className="py-12 lg:py-16 relative overflow-hidden">
 
-      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
+      <div ref={wrapperRef} className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
         {/* Rules / Explainer */}
         <Card
+          ref={rulesCardRef}
           className="relative max-w-4xl mx-auto glass border border-purple/30 rounded-2xl transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_40px_rgba(126,67,255,0.18)] kimi-bottom-neon"
           style={
             {
@@ -112,6 +200,7 @@ const ChallengeSystem: React.FC = () => {
           <CardContent className="relative z-10 p-4 md:p-6 lg:p-8">
             <div className="mb-6">
               <h3
+                ref={rulesHeadingRef}
                 className="font-display font-bold text-xl md:text-2xl mb-3 flex items-center justify-center text-white tracking-wide"
                 style={{ animationDelay: "0.08s" }}
               >
@@ -123,7 +212,7 @@ const ChallengeSystem: React.FC = () => {
                 Challenge Rules & Result Verification
               </h3>
 
-              <ul className="space-y-3">
+              <ul ref={rulesItemsWrapRef} className="space-y-3">
                 <li
                   className="flex items-start text-sm md:text-base"
                   style={{ animationDelay: "0.1s" }}
@@ -189,6 +278,7 @@ const ChallengeSystem: React.FC = () => {
         {/* Leaderboard + mascot visual (moved under Challenge Rules) */}
         <section className="flex justify-center py-6 lg:py-8">
           <div
+            ref={visualRef}
             className="relative"
             style={{ animationDelay: "0.15s" }}
             id="challenge-leaderboard-visual"
@@ -210,7 +300,10 @@ const ChallengeSystem: React.FC = () => {
         </section>
 
         {/* --- Challenge creator (mock) --- */}
-        <Card className="relative max-w-4xl mx-auto bg-black/40 backdrop-blur-sm rounded-lg transition-all duration-300 kimi-bottom-neon mt-8" style={{ 
+        <Card
+          ref={creatorCardRef}
+          className="relative max-w-4xl mx-auto bg-black/40 backdrop-blur-sm rounded-lg transition-all duration-300 kimi-bottom-neon mt-8"
+          style={{ 
           '--neon-color': 'rgba(168, 85, 247, 0.3)',
           '--neon-hover-color': 'rgba(168, 85, 247, 0.5)',
         } as React.CSSProperties}>

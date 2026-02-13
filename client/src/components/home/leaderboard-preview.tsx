@@ -77,7 +77,10 @@ function getTier(winRate: number, gamesPlayed: number): string {
 
 const LeaderboardPreview: React.FC = () => {
   const sectionRef = useRef<HTMLElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLDivElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const subRef = useRef<HTMLParagraphElement>(null);
   const podiumRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   
@@ -167,27 +170,51 @@ const LeaderboardPreview: React.FC = () => {
   // GSAP Animations - Kimi Exact Code
   useEffect(() => {
     const ctx = gsap.context(() => {
-      // Title animation
-      gsap.fromTo(
-        titleRef.current,
-        { opacity: 0, y: 50 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: 'power3.out',
-          scrollTrigger: {
-            trigger: titleRef.current,
-            start: 'top 80%',
-            toggleActions: 'play none none reverse',
-          },
-        }
-      );
-
       // Podium animation
       const podiumCards = podiumRef.current?.querySelectorAll('.podium-card');
-      if (podiumCards) {
-        gsap.fromTo(
+      // List animation
+      const listItems = listRef.current?.querySelectorAll('.list-item');
+
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: sectionRef.current,
+          start: 'top 80%',
+          toggleActions: 'play none none reverse',
+        },
+      });
+
+      // 1) Section wrapper
+      tl.fromTo(
+        wrapperRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out' }
+      );
+
+      // 2) Heading (header block) separate, slightly earlier (overlap wrapper)
+      tl.fromTo(
+        titleRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out' },
+        '-=0.6'
+      );
+      tl.fromTo(
+        headingRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out' },
+        '<'
+      );
+
+      // 3) Subheading / paragraph after heading
+      tl.fromTo(
+        subRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out' },
+        '>-0.72'
+      );
+
+      // 4) Podium + list start after heading completes
+      if (podiumCards && podiumCards.length) {
+        tl.fromTo(
           podiumCards,
           { opacity: 0, y: 100 },
           {
@@ -196,19 +223,12 @@ const LeaderboardPreview: React.FC = () => {
             duration: 1,
             stagger: 0.15,
             ease: 'power3.out',
-            scrollTrigger: {
-              trigger: podiumRef.current,
-              start: 'top 80%',
-              toggleActions: 'play none none reverse',
-            },
-          }
+          },
+          '>'
         );
       }
-
-      // List animation
-      const listItems = listRef.current?.querySelectorAll('.list-item');
-      if (listItems) {
-        gsap.fromTo(
+      if (listItems && listItems.length) {
+        tl.fromTo(
           listItems,
           { opacity: 0, x: -50 },
           {
@@ -217,12 +237,8 @@ const LeaderboardPreview: React.FC = () => {
             duration: 0.5,
             stagger: 0.08,
             ease: 'power3.out',
-            scrollTrigger: {
-              trigger: listRef.current,
-              start: 'top 85%',
-              toggleActions: 'play none none reverse',
-            },
-          }
+          },
+          podiumCards && podiumCards.length ? '<0.1' : '>'
         );
       }
     }, sectionRef);
@@ -290,7 +306,7 @@ const LeaderboardPreview: React.FC = () => {
         <div className="absolute inset-16 border border-purple-500/10 rounded-full animate-spin-slow" />
         </div>
 
-      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
+      <div ref={wrapperRef} className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
           {/* Solo / Team Toggle */}
         <div className="flex justify-center gap-2 mb-8">
             <Button
@@ -341,10 +357,10 @@ const LeaderboardPreview: React.FC = () => {
             <Crown className="w-4 h-4" />
             Elite Rankings
           </span>
-          <h2 className="kimi-font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white mb-6">
+          <h2 ref={headingRef} className="kimi-font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white mb-6">
             USDFG <span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent">BOARD</span>
           </h2>
-          <p className="kimi-font-body text-lg text-white/60 max-w-2xl mx-auto">
+          <p ref={subRef} className="kimi-font-body text-lg text-white/60 max-w-2xl mx-auto">
             No usernames. No profiles. Your wallet, your skill, your record. Wallet-based identity, performance record, and competitive progression.
           </p>
         </div>

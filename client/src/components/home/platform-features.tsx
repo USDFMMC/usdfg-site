@@ -34,47 +34,69 @@ const features = [
 
 const PlatformFeatures: React.FC = () => {
   const sectionRef = useRef<HTMLElement>(null);
-  const titleRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const kickerRef = useRef<HTMLSpanElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const subRef = useRef<HTMLParagraphElement>(null);
   const cardsRef = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      gsap.fromTo(
-        titleRef.current,
+      const cards = cardsRef.current.filter(Boolean) as HTMLDivElement[];
+
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: sectionRef.current,
+          start: "top 80%",
+          toggleActions: "play none none reverse",
+        },
+      });
+
+      // 1) Section wrapper: subtle opacity + translateY
+      tl.fromTo(
+        wrapperRef.current,
         { opacity: 0, y: 50 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: titleRef.current,
-            start: "top 80%",
-            toggleActions: "play none none reverse",
-          },
-        }
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }
       );
 
-      cardsRef.current.forEach((card, index) => {
-        if (!card) return;
-        gsap.fromTo(
-          card,
+      // 2) Heading: separate reveal, slightly earlier (overlap wrapper)
+      tl.fromTo(
+        kickerRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+        "-=0.6"
+      );
+      tl.fromTo(
+        headingRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+        "<"
+      );
+
+      // 3) Subheading / paragraph: small delay after heading (0.05–0.1)
+      tl.fromTo(
+        subRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+        ">-0.72"
+      );
+
+      // 4) Card grid: separate reveal with stagger, starts after heading completes
+      if (cards.length) {
+        tl.fromTo(
+          cards,
           { opacity: 0, y: 80, rotateX: 15 },
           {
             opacity: 1,
             y: 0,
             rotateX: 0,
             duration: 0.8,
-            delay: index * 0.2,
             ease: "power3.out",
-            scrollTrigger: {
-              trigger: card,
-              start: "top 85%",
-              toggleActions: "play none none reverse",
-            },
-          }
+            stagger: 0.2,
+          },
+          ">"
         );
-      });
+      }
     }, sectionRef);
 
     return () => ctx.revert();
@@ -88,13 +110,13 @@ const PlatformFeatures: React.FC = () => {
     >
       <div className="absolute inset-0 bg-gradient-radial-kimi opacity-50" />
       
-      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
+      <div ref={wrapperRef} className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
         {/* Section Header - Kimi Exact */}
-        <div ref={titleRef} className="text-center mb-16 lg:mb-20">
-          <span className="inline-block font-body text-sm text-purple-500 uppercase tracking-[0.3em] mb-4">
+        <div className="text-center mb-16 lg:mb-20">
+          <span ref={kickerRef} className="inline-block font-body text-sm text-purple-500 uppercase tracking-[0.3em] mb-4">
             THE PLATFORM
           </span>
-          <h2 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white mb-6">
+          <h2 ref={headingRef} className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white mb-6">
             <span className="block text-white">THE BITCOIN</span>
             <span className="block">
               <span className="text-white">OF </span>
@@ -103,7 +125,7 @@ const PlatformFeatures: React.FC = () => {
               </span>
             </span>
           </h2>
-          <p className="font-body text-lg text-white/60 max-w-2xl mx-auto leading-relaxed">
+          <p ref={subRef} className="font-body text-lg text-white/60 max-w-2xl mx-auto leading-relaxed">
             Three pillars designed to elevate your competitive gaming experience to legendary heights.
           </p>
         </div>

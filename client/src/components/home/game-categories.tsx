@@ -18,7 +18,10 @@ interface Game {
 
 const GameCategories: React.FC = () => {
   const sectionRef = useRef<HTMLElement>(null);
-  const titleRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const headingWrapRef = useRef<HTMLDivElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const controlsRef = useRef<HTMLDivElement>(null);
   const carouselRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -67,25 +70,48 @@ const GameCategories: React.FC = () => {
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      gsap.fromTo(
-        titleRef.current,
+      const cards = carouselRef.current?.querySelectorAll(".prize-card");
+
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: sectionRef.current,
+          start: "top 80%",
+          toggleActions: "play none none reverse",
+        },
+      });
+
+      // 1) Section wrapper
+      tl.fromTo(
+        wrapperRef.current,
         { opacity: 0, y: 50 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: titleRef.current,
-            start: "top 80%",
-            toggleActions: "play none none reverse",
-          },
-        }
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }
       );
 
-      const cards = carouselRef.current?.querySelectorAll(".prize-card");
-      if (cards) {
-        gsap.fromTo(
+      // 2) Heading (badge + headline)
+      tl.fromTo(
+        headingWrapRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+        "-=0.6"
+      );
+      tl.fromTo(
+        headingRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+        "<"
+      );
+
+      // 3) Controls after heading
+      tl.fromTo(
+        controlsRef.current,
+        { opacity: 0, y: 50 },
+        { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" },
+        ">-0.72"
+      );
+
+      // 4) Card carousel reveal with stagger, starts after heading completes
+      if (cards && cards.length) {
+        tl.fromTo(
           cards,
           { opacity: 0, y: 60, scale: 0.9 },
           {
@@ -95,12 +121,8 @@ const GameCategories: React.FC = () => {
             duration: 0.6,
             stagger: 0.15,
             ease: "power3.out",
-            scrollTrigger: {
-              trigger: carouselRef.current,
-              start: "top 80%",
-              toggleActions: "play none none reverse",
-            },
-          }
+          },
+          ">"
         );
       }
     }, sectionRef);
@@ -124,20 +146,20 @@ const GameCategories: React.FC = () => {
       id="supported-games"
       className="relative py-24 lg:py-32 w-full overflow-hidden"
     >
-      <div className="relative z-10">
+      <div ref={wrapperRef} className="relative z-10">
         {/* Section Header - Kimi Exact Structure */}
-        <div ref={titleRef} className="w-full px-4 sm:px-6 lg:px-12 xl:px-20 mb-12 lg:mb-16">
+        <div className="w-full px-4 sm:px-6 lg:px-12 xl:px-20 mb-12 lg:mb-16">
           <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between">
-            <div>
+            <div ref={headingWrapRef}>
               <span className="inline-flex items-center gap-2 font-body text-sm text-orange uppercase tracking-[0.3em] mb-4">
                 <Gem className="w-4 h-4" />
                 Supported Genres
               </span>
-              <h2 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white">
+              <h2 ref={headingRef} className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white">
                 SUPPORTED <span className="text-gradient">GAMES</span>
               </h2>
             </div>
-            <div className="mt-4 lg:mt-0 flex items-center gap-3">
+            <div ref={controlsRef} className="mt-4 lg:mt-0 flex items-center gap-3">
               <button
                 onClick={() => scroll('left')}
                 className="w-12 h-12 flex items-center justify-center glass border border-purple/30 rounded-full hover:border-purple-500/60 transition-colors"
