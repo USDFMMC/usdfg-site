@@ -7,7 +7,7 @@ import React, {
 import gsap from "gsap";
 import { kimiDurations, kimiEasing, kimiStagger } from "@/lib/kimi-motion";
 
-type RevealAs = keyof JSX.IntrinsicElements;
+type RevealAs = keyof React.JSX.IntrinsicElements;
 
 function mergeRefs<T>(...refs: Array<React.Ref<T> | undefined>) {
   return (value: T) => {
