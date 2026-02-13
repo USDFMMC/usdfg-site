@@ -15,7 +15,7 @@ import { Helmet } from "react-helmet";
 
 const Home: React.FC = () => {
   const [contentRevealed, setContentRevealed] = useState(false);
-  const ogImage = "https://usdfg.pro/assets/usdfg-og-banner.webp";
+  const ogImage = "https://usdfg.pro/assets/usdfg-token.png?v=27";
   const canonical = "https://usdfg.pro/";
 
   const handleExploreClick = () => {
@@ -50,10 +50,10 @@ const Home: React.FC = () => {
         <meta property="og:title" content="USDFG.PRO – Skill-Based Crypto Gaming Platform" />
         <meta property="og:description" content="Compete in verified challenges, earn USDFG, and prove your skill. No gambling, 100% on-chain." />
         <meta property="og:image" content={ogImage} />
-        <meta property="og:image:type" content="image/webp" />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        <meta property="og:image:alt" content="USDFG mascot entering neon arcade: ENTER THE CHALLENGE" />
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:width" content="1024" />
+        <meta property="og:image:height" content="1024" />
+        <meta property="og:image:alt" content="USDFG" />
 
         {/* Twitter / X */}
         <meta name="twitter:card" content="summary_large_image" />
