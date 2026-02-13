@@ -13,7 +13,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
   const sectionRef = useRef<HTMLElement>(null);
   const bgRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const badgeRef = useRef<HTMLDivElement>(null);
   const brandRef = useRef<HTMLDivElement>(null);
   const headlineRef = useRef<HTMLHeadingElement>(null);
   const subRef = useRef<HTMLParagraphElement>(null);
@@ -22,23 +21,22 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      gsap.set(bgRef.current, { scale: 1.2, opacity: 0 });
-      gsap.set([badgeRef.current, brandRef.current, headlineRef.current, subRef.current, buttonsRef.current, statsRef.current], {
+      gsap.set(bgRef.current, { scale: 1.08, opacity: 0 });
+      gsap.set([brandRef.current, headlineRef.current, subRef.current, buttonsRef.current, statsRef.current], {
         opacity: 0,
         y: 24,
       });
 
       gsap
         .timeline({ delay: 0.3 })
-        .to(bgRef.current, { scale: 1, opacity: 1, duration: 1.8, ease: "power3.out" })
-        .to(headlineRef.current, { opacity: 1, y: 0, duration: 1.0, ease: "power3.out" }, "-=1.2")
-        .to(brandRef.current, { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }, "-=0.6")
-        .to(badgeRef.current, { opacity: 1, y: 0, duration: 0.6, ease: "back.out(1.7)" }, "-=0.4")
-        .to(subRef.current, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, "-=0.3")
+        .to(bgRef.current, { scale: 1, opacity: 1, duration: 1.4, ease: "power3.out" })
+        .to(brandRef.current, { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" }, "-=1.0")
+        .to(headlineRef.current, { opacity: 1, y: 0, duration: 0.85, ease: "power3.out" }, "-=0.6")
+        .to(subRef.current, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, "-=0.35")
         .to(buttonsRef.current, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, "-=0.3")
         .to(statsRef.current, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, "-=0.2");
 
-      // Subtle parallax like Kimi
+      // Subtle parallax (kept restrained)
       gsap.to(contentRef.current, {
         y: -100,
         ease: "none",
@@ -50,7 +48,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
         },
       });
       gsap.to(bgRef.current, {
-        y: 50,
+        y: 30,
         ease: "none",
         scrollTrigger: {
           trigger: sectionRef.current,
@@ -72,20 +70,15 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
 
   return (
     <section ref={sectionRef} className="hero relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-transparent">
-      {/* Background Image - Hero (static like Kimi; no reveal animation) */}
+      {/* Background (no mascot / no arcade hallway image) */}
       <div ref={bgRef} className="absolute inset-0 z-[1]" style={{ willChange: "transform" }}>
-        <img
-          src="/hero-bg.jpg"
-          alt="Esports Arena"
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-        <div className="absolute inset-0 bg-kimi-purple-tint-10" />
+        <div className="absolute inset-0 bg-void" />
+        <div className="absolute inset-0 bg-gradient-to-b from-void via-void-light to-void opacity-80" />
+        <div className="absolute inset-0 bg-gradient-radial-kimi opacity-60" />
       </div>
 
-      {/* Animated Grid Overlay - Kimi Exact */}
-      <div className="absolute inset-0 z-[2] opacity-20">
+      {/* Subtle grid overlay (kept restrained) */}
+      <div className="absolute inset-0 z-[2] opacity-10">
         <div
           className="w-full h-full"
           style={{
@@ -98,67 +91,44 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
         />
       </div>
 
-      {/* Content - Kimi structure: badge then headline (from HeroSection.kimi.tsx) */}
+      {/* Content (premium, mobile-first) */}
       <div ref={contentRef} className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20 pt-20" style={{ willChange: "transform" }}>
         <div className="w-full">
-          <div className="flex flex-col items-start text-left max-w-4xl">
-            {/* Badge – Kimi exact: glass, border-purple/30, w-4 h-4 icon, font-body text-sm text-white/80. Icon: Kimi SVG (trophy) in Kimi orange. */}
-            <div ref={badgeRef} className="inline-flex items-center gap-2 px-4 py-2 mb-6 kimi-glass rounded-full border border-kimi-purple-30">
+          <div className="flex flex-col items-start text-left max-w-3xl">
+            {/* Branding hierarchy:
+                [ USDFG Emblem ]
+                USDFG
+                Skill-Based Competition Platform
+            */}
+            <div ref={brandRef} className="flex flex-col items-start text-left mb-8">
               <img
-                src="/_kimi/hero-badge-icon.svg"
-                alt=""
-                className="w-4 h-4 shrink-0 object-contain"
-                width={16}
-                height={16}
-                aria-hidden
+                src="/assets/usdfgToken2.png"
+                alt="USDFG emblem"
+                className="w-14 h-14 sm:w-16 sm:h-16 object-contain"
+                loading="eager"
+                decoding="async"
               />
-              <span className="kimi-font-body text-sm text-white/80">
-                World's Premier Esports Arena
-              </span>
+              <div className="mt-4 font-display font-bold text-2xl sm:text-3xl text-white tracking-tight">
+                USDFG
+              </div>
+              <div className="mt-1 font-body text-sm sm:text-base text-white/60">
+                Skill-Based Competition Platform
+              </div>
             </div>
 
-            <div
-              ref={brandRef}
-              className="text-2xl md:text-3xl lg:text-4xl font-bold mb-2 text-white"
-              style={{ textShadow: "0 0 20px rgba(255, 255, 255, 0.3)" }}
-            >
-              USDFG
-            </div>
-
-            <h1 ref={headlineRef} className="neocore-h1 mb-4 text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold leading-tight">
-              <span className="block">
-                <span className="text-white">GAME. </span>
-                <span
-                  className="bg-gradient-to-r from-green-400 via-emerald-400 to-green-500 bg-clip-text text-transparent"
-                  style={{
-                    textShadow: "0 0 20px rgba(74, 222, 128, 0.4)",
-                    filter: "drop-shadow(0 0 8px rgba(74, 222, 128, 0.3))",
-                  }}
-                >
-                  EARN.
-                </span>
-              </span>
-              <span
-                className="block bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent"
-                style={{
-                  textShadow: "0 0 20px rgba(251, 191, 36, 0.4)",
-                  filter: "drop-shadow(0 0 8px rgba(251, 191, 36, 0.3))",
-                }}
-              >
-                CONQUER.
-              </span>
+            <h1 ref={headlineRef} className="font-display mb-5 text-4xl sm:text-5xl md:text-6xl font-bold leading-tight text-white">
+              GAME. EARN. CONQUER.
             </h1>
 
-            <p ref={subRef} className="neocore-body mb-4 max-w-2xl text-lg sm:text-xl text-white/70 leading-relaxed">
-              Join the world's premier esports crypto ecosystem. Challenge
-              players, manage tournaments, and turn your skill into rewards. The
-              arena awaits your arrival.
+            <p ref={subRef} className="font-body mb-8 max-w-2xl text-lg sm:text-xl text-white/70 leading-relaxed">
+              Commit challenge assets on-chain, compete, and settle with verified outcomes.
+              Earn performance-based rewards through a wallet-native, non-custodial structure.
             </p>
 
             <div ref={buttonsRef} className="flex flex-col sm:flex-row justify-start gap-4">
               <button
                 onClick={onExploreClick}
-                className="relative font-semibold text-base px-8 py-6 bg-gradient-to-r from-purple-600 to-amber-500 hover:from-purple-400 hover:to-amber-400 text-white border-0 overflow-hidden group rounded-lg transition-all"
+                className="relative font-semibold text-base px-8 py-6 bg-gradient-to-r from-purple to-orange hover:from-purple-400 hover:to-orange-400 text-white border-0 overflow-hidden group rounded-lg transition-all"
               >
                 <span className="relative z-10 flex items-center gap-2">
                   EXPLORE PLATFORM
@@ -180,7 +150,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
               </button>
 
               <Link to="/whitepaper">
-                <button className="font-semibold text-base px-8 py-6 border-2 border-purple-500/50 text-white hover:bg-purple-500/20 hover:border-purple-500 rounded-lg transition-all flex items-center gap-2">
+                <button className="font-semibold text-base px-8 py-6 border-2 border-purple/50 text-white hover:bg-white/5 hover:border-purple/50 rounded-lg transition-all flex items-center gap-2">
                   <svg
                     className="w-5 h-5"
                     fill="none"
@@ -225,20 +195,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
 
       {/* Decorative Elements */}
       <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-[5]" />
-
-      {/* Floating Orbs - Kimi Exact */}
-      <div
-        className="absolute top-1/4 right-1/4 w-64 h-64 rounded-full blur-[100px] animate-pulse-glow-kimi"
-        style={{ background: "var(--kimi-purple)", opacity: 0.25 }}
-      />
-      <div
-        className="absolute bottom-1/3 right-1/3 w-48 h-48 rounded-full blur-[80px] animate-pulse-glow-kimi"
-        style={{
-          background: "var(--kimi-orange)",
-          opacity: 0.15,
-          animationDelay: "1s",
-        }}
-      />
     </section>
   );
 };
