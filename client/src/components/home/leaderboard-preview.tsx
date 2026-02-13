@@ -1,12 +1,9 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Trophy, Copy, Crown, TrendingUp, Medal, ChevronRight, Shield } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { getTopPlayers, PlayerStats, getTopTeams, TeamStats } from "@/lib/firebase/firestore";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-
-gsap.registerPlugin(ScrollTrigger);
+import Reveal from "@/components/Reveal";
 
 interface Player {
   rank: number;
@@ -76,11 +73,6 @@ function getTier(winRate: number, gamesPlayed: number): string {
 }
 
 const LeaderboardPreview: React.FC = () => {
-  const sectionRef = useRef<HTMLElement>(null);
-  const titleRef = useRef<HTMLDivElement>(null);
-  const podiumRef = useRef<HTMLDivElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
-  
   const [activeTab, setActiveTab] = useState("total-gains");
   const [leaderboardType, setLeaderboardType] = useState<'solo' | 'team'>('solo');
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
@@ -164,71 +156,7 @@ const LeaderboardPreview: React.FC = () => {
     fetchLeaderboard();
   }, [activeTab, leaderboardType, isExpanded]);
 
-  // GSAP Animations - Kimi Exact Code
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      // Title animation
-      gsap.fromTo(
-        titleRef.current,
-        { opacity: 0, y: 50 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: 'power3.out',
-          scrollTrigger: {
-            trigger: titleRef.current,
-            start: 'top 80%',
-            toggleActions: 'play none none reverse',
-          },
-        }
-      );
-
-      // Podium animation
-      const podiumCards = podiumRef.current?.querySelectorAll('.podium-card');
-      if (podiumCards) {
-        gsap.fromTo(
-          podiumCards,
-          { opacity: 0, y: 100 },
-          {
-            opacity: 1,
-            y: 0,
-            duration: 1,
-            stagger: 0.15,
-            ease: 'power3.out',
-            scrollTrigger: {
-              trigger: podiumRef.current,
-              start: 'top 80%',
-              toggleActions: 'play none none reverse',
-            },
-          }
-        );
-      }
-
-      // List animation
-      const listItems = listRef.current?.querySelectorAll('.list-item');
-      if (listItems) {
-        gsap.fromTo(
-          listItems,
-          { opacity: 0, x: -50 },
-          {
-            opacity: 1,
-            x: 0,
-            duration: 0.5,
-            stagger: 0.08,
-            ease: 'power3.out',
-            scrollTrigger: {
-              trigger: listRef.current,
-              start: 'top 85%',
-              toggleActions: 'play none none reverse',
-            },
-          }
-        );
-      }
-    }, sectionRef);
-
-    return () => ctx.revert();
-  }, [players, teams, leaderboardType, activeTab]);
+  const revealKey = `${leaderboardType}-${activeTab}-${isExpanded}-${loading}-${players.length}-${teams.length}`;
 
   const getRankColor = (rank: number) => {
     switch (rank) {
@@ -273,10 +201,13 @@ const LeaderboardPreview: React.FC = () => {
   const allTeamsForTable = teams;
   
   return (
-    <section
-      ref={sectionRef}
+    <Reveal
+      as="section"
+      preset="section"
       id="leaderboard"
       className="relative py-24 lg:py-32 w-full overflow-hidden"
+      selector="[data-leaderboard-reveal]"
+      refreshKey={revealKey}
     >
       {/* Background Effects - Kimi Exact */}
       <div className="absolute inset-0">
@@ -336,7 +267,7 @@ const LeaderboardPreview: React.FC = () => {
           </div>
 
         {/* Section Header - Kimi Exact */}
-        <div ref={titleRef} className="text-center mb-16 lg:mb-20">
+        <div data-leaderboard-reveal className="text-center mb-16 lg:mb-20">
           <span className="inline-flex items-center gap-2 kimi-font-body text-sm text-amber-400 uppercase tracking-[0.3em] mb-4">
             <Crown className="w-4 h-4" />
             Elite Rankings
@@ -358,9 +289,12 @@ const LeaderboardPreview: React.FC = () => {
           <>
             {/* Podium - Top 3 - Kimi Exact Structure */}
             {top3Players.length >= 3 && (
-              <div
-                ref={podiumRef}
+              <Reveal
+                as="div"
+                preset="leaderboardPodium"
                 className="flex justify-center items-end gap-4 lg:gap-8 mb-16 lg:mb-20"
+                selector=".podium-card"
+                refreshKey={revealKey}
               >
                 {[2, 1, 3].map((rank) => {
                   const player = top3Players.find((p) => p.rank === rank);
@@ -461,12 +395,18 @@ const LeaderboardPreview: React.FC = () => {
                     </div>
                   );
                 })}
-              </div>
+              </Reveal>
             )}
 
             {/* All Players List - Shows complete stats including top 3 */}
             {allPlayersForTable.length > 0 && (
-              <div ref={listRef} className="max-w-4xl mx-auto">
+              <Reveal
+                as="div"
+                preset="leaderboardList"
+                className="max-w-4xl mx-auto"
+                selector=".list-item"
+                refreshKey={revealKey}
+              >
                 <div className="kimi-glass border border-purple-500/20 rounded-2xl overflow-hidden">
                   {/* Header - USDFG Original Stats */}
                   <div className="flex items-center px-4 sm:px-6 py-4 border-b border-purple-500/10 bg-purple-600/5">
@@ -650,7 +590,7 @@ const LeaderboardPreview: React.FC = () => {
                     </button>
                   </div>
                 )}
-              </div>
+              </Reveal>
             )}
 
             {players.length === 0 && (
@@ -665,9 +605,12 @@ const LeaderboardPreview: React.FC = () => {
           <>
             {/* Teams Podium - Similar structure */}
             {top3Teams.length >= 3 && (
-              <div
-                ref={podiumRef}
+              <Reveal
+                as="div"
+                preset="leaderboardPodium"
                 className="flex justify-center items-end gap-4 lg:gap-8 mb-16 lg:mb-20"
+                selector=".podium-card"
+                refreshKey={revealKey}
               >
                 {[2, 1, 3].map((rank) => {
                   const team = top3Teams.find((t) => t.rank === rank);
@@ -735,12 +678,18 @@ const LeaderboardPreview: React.FC = () => {
                     </div>
                   );
                 })}
-              </div>
+              </Reveal>
             )}
 
             {/* Teams List - Shows all teams including top 3 */}
             {allTeamsForTable.length > 0 && (
-              <div ref={listRef} className="max-w-4xl mx-auto">
+              <Reveal
+                as="div"
+                preset="leaderboardList"
+                className="max-w-4xl mx-auto"
+                selector=".list-item"
+                refreshKey={revealKey}
+              >
                 <div className="kimi-glass border border-purple-500/20 rounded-2xl overflow-hidden">
                   <div className="flex items-center px-4 sm:px-6 py-4 border-b border-purple-500/10 bg-purple-600/5">
                     <div className="w-12 sm:w-16 kimi-font-body text-xs text-white/50 uppercase">Rank</div>
@@ -807,7 +756,7 @@ const LeaderboardPreview: React.FC = () => {
                     </button>
                   </div>
                 )}
-          </div>
+              </Reveal>
             )}
 
             {teams.length === 0 && (
@@ -825,7 +774,7 @@ const LeaderboardPreview: React.FC = () => {
         </div>
         )}
       </div>
-    </section>
+    </Reveal>
   );
 };
 

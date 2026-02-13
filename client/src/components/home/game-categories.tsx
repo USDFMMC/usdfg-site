@@ -1,9 +1,6 @@
-import React, { useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import { Medal, Swords, Car, Target, Gem, ChevronLeft, ChevronRight } from "lucide-react";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-
-gsap.registerPlugin(ScrollTrigger);
+import Reveal from "@/components/Reveal";
 
 interface Game {
   image: string;
@@ -17,9 +14,6 @@ interface Game {
 }
 
 const GameCategories: React.FC = () => {
-  const sectionRef = useRef<HTMLElement>(null);
-  const titleRef = useRef<HTMLDivElement>(null);
-  const carouselRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const games: Game[] = [
@@ -65,49 +59,6 @@ const GameCategories: React.FC = () => {
     }
   ];
 
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      gsap.fromTo(
-        titleRef.current,
-        { opacity: 0, y: 50 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: titleRef.current,
-            start: "top 80%",
-            toggleActions: "play none none reverse",
-          },
-        }
-      );
-
-      const cards = carouselRef.current?.querySelectorAll(".prize-card");
-      if (cards) {
-        gsap.fromTo(
-          cards,
-          { opacity: 0, y: 60, scale: 0.9 },
-          {
-            opacity: 1,
-            y: 0,
-            scale: 1,
-            duration: 0.6,
-            stagger: 0.15,
-            ease: "power3.out",
-            scrollTrigger: {
-              trigger: carouselRef.current,
-              start: "top 80%",
-              toggleActions: "play none none reverse",
-            },
-          }
-        );
-      }
-    }, sectionRef);
-
-    return () => ctx.revert();
-  }, []);
-
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
       const scrollAmount = 400;
@@ -119,14 +70,16 @@ const GameCategories: React.FC = () => {
   };
 
   return (
-    <section
-      ref={sectionRef}
+    <Reveal
+      as="section"
+      preset="section"
       id="supported-games"
       className="relative py-24 lg:py-32 w-full overflow-hidden"
+      selector="[data-games-reveal]"
     >
       <div className="relative z-10">
         {/* Section Header - Kimi Exact Structure */}
-        <div ref={titleRef} className="w-full px-4 sm:px-6 lg:px-12 xl:px-20 mb-12 lg:mb-16">
+        <div data-games-reveal className="w-full px-4 sm:px-6 lg:px-12 xl:px-20 mb-12 lg:mb-16">
           <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between">
             <div>
               <span className="inline-flex items-center gap-2 font-body text-sm text-orange uppercase tracking-[0.3em] mb-4">
@@ -155,7 +108,7 @@ const GameCategories: React.FC = () => {
         </div>
 
         {/* Carousel - Kimi sizes: card w-72/w-80, gap-6 (1.5rem), image h-48 (12rem), p-6, rounded-2xl; section py-24 lg:py-32, header mb-12 lg:mb-16 */}
-        <div ref={carouselRef} className="relative">
+        <Reveal as="div" preset="gameCarouselCards" className="relative" selector=".prize-card">
           <div
             ref={scrollContainerRef}
             className="flex gap-6 overflow-x-auto scrollbar-hide px-4 sm:px-6 lg:px-12 xl:px-20 pb-4"
@@ -174,7 +127,7 @@ const GameCategories: React.FC = () => {
                       <img
                         src={game.image.replace('.png', '.webp')}
                         alt={game.alt}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                         loading="lazy"
                         decoding="async"
                       />
@@ -219,10 +172,10 @@ const GameCategories: React.FC = () => {
               );
             })}
           </div>
-        </div>
+        </Reveal>
 
       </div>
-    </section>
+    </Reveal>
   );
 };
 

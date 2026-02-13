@@ -1,71 +1,14 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import { Helmet } from "react-helmet";
 import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
 import KimiBackground from "@/components/KimiBackground";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-
-gsap.registerPlugin(ScrollTrigger);
+import Reveal from "@/components/Reveal";
 
 const Terms: React.FC = () => {
-  const mainRef = useRef<HTMLElement>(null);
-  const headingRef = useRef<HTMLHeadingElement>(null);
-  const introRef = useRef<HTMLDivElement>(null);
-  const badgesRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLElement>(null);
-
   useEffect(() => {
     // Smooth scroll to top when component mounts
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
-
-  // GSAP Animations
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      // Initial states
-      gsap.set(headingRef.current, { opacity: 0, y: 30 });
-      gsap.set(introRef.current, { opacity: 0, y: 20 });
-      gsap.set(badgesRef.current, { opacity: 0, y: 20 });
-
-      // Entrance timeline
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: mainRef.current,
-          start: 'top 80%',
-          toggleActions: 'play none none none',
-        },
-      });
-
-      tl.to(headingRef.current, {
-        opacity: 1,
-        y: 0,
-        duration: 0.8,
-        ease: 'power3.out',
-      })
-        .to(
-          introRef.current,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.6,
-            ease: 'power3.out',
-          },
-          '-=0.5'
-        )
-        .to(
-          badgesRef.current,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.6,
-            ease: 'power3.out',
-          },
-          '-=0.4'
-        );
-    }, mainRef);
-
-    return () => ctx.revert();
   }, []);
 
   return (
@@ -196,7 +139,12 @@ const Terms: React.FC = () => {
             <li><a href="#section-70" className="hover:text-white transition">Related Policies</a></li>
           </ul>
         </nav>
-        <main ref={mainRef} className="min-h-screen flex-1 text-white relative overflow-hidden">
+        <Reveal
+          as="main"
+          className="min-h-screen flex-1 text-white relative overflow-hidden"
+          selector="[data-terms-reveal]"
+          stagger
+        >
           {/* Kimi Galaxy Theme Background */}
           <KimiBackground includeGalaxy={true} />
 
@@ -205,7 +153,7 @@ const Terms: React.FC = () => {
             No mercy. No reruns. Just skill.
           </p>
           <h1
-            ref={headingRef}
+            data-terms-reveal
             className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-8 text-center"
             style={{
               textShadow: "0 0 20px rgba(255, 255, 255, 0.3)",
@@ -223,13 +171,13 @@ const Terms: React.FC = () => {
           </h1>
 
             {/* Why These Terms Matter */}
-            <div ref={introRef} className="max-w-2xl mx-auto mb-6 lg:mb-8 text-center">
+            <div data-terms-reveal className="max-w-2xl mx-auto mb-6 lg:mb-8 text-center">
               <p className="text-lg lg:text-xl font-semibold mb-2 bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent" style={{ filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.3))" }}>Why These Terms Matter</p>
               <p className="text-base lg:text-lg text-white/80 leading-relaxed">USDFG is built for elite gamers and crypto users who demand fairness, transparency, and self-custody. These Terms set the standard for how we protect your rights, your assets, and your experience—no fine print, no hidden risks, ever.</p>
             </div>
 
             {/* Trust Badges */}
-            <div ref={badgesRef} className="flex flex-wrap justify-center gap-4 mb-8 lg:mb-12">
+            <div data-terms-reveal className="flex flex-wrap justify-center gap-4 mb-8 lg:mb-12">
               <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black/40 backdrop-blur-sm border border-purple-500/20 text-white font-bold shadow-[0_0_15px_rgba(147,51,234,0.2)] hover:border-purple-500/50 hover:shadow-[0_0_20px_rgba(147,51,234,0.3)] transition-all text-sm">100% Non-Custodial</span>
               <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black/40 backdrop-blur-sm border border-purple-500/20 text-white font-bold shadow-[0_0_15px_rgba(147,51,234,0.2)] hover:border-purple-500/50 hover:shadow-[0_0_20px_rgba(147,51,234,0.3)] transition-all text-sm">No Gambling</span>
               <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black/40 backdrop-blur-sm border border-purple-500/20 text-white font-bold shadow-[0_0_15px_rgba(147,51,234,0.2)] hover:border-purple-500/50 hover:shadow-[0_0_20px_rgba(147,51,234,0.3)] transition-all text-sm">Skill-Based</span>
@@ -241,7 +189,7 @@ const Terms: React.FC = () => {
               <span className="inline-block px-4 py-2 rounded bg-black/40 backdrop-blur-sm border border-purple-500/20 text-white/80 font-medium text-xs tracking-wide shadow-[0_0_15px_rgba(147,51,234,0.2)] hover:border-purple-500/50 transition-all">Last Updated: May 1, 2025 &nbsp;|&nbsp; Version: v1.0</span>
             </div>
 
-          <section ref={contentRef} className="whitepaper-section max-w-4xl mx-auto bg-black/40 backdrop-blur-sm border border-purple-500/20 p-6 sm:p-8 lg:p-10 rounded-lg shadow-lg mb-10 transform transition-all duration-300 hover:scale-[1.01] hover:shadow-[0_0_40px_rgba(147,51,234,0.3)] hover:border-purple-500/50">
+          <section data-terms-reveal className="whitepaper-section max-w-4xl mx-auto bg-black/40 backdrop-blur-sm border border-purple-500/20 p-6 sm:p-8 lg:p-10 rounded-lg shadow-lg mb-10 transform transition-all duration-300 hover:scale-[1.01] hover:shadow-[0_0_40px_rgba(147,51,234,0.3)] hover:border-purple-500/50">
             <div className="prose prose-invert max-w-none">
               <p className="text-base sm:text-lg mb-4 text-white">Effective Date: May 1, 2025</p>
               <p className="text-base sm:text-lg mb-4 text-white font-semibold">USDFG is founded and led by Hussein Ali, a builder who created the platform to champion skill, self-sovereignty, and competition over chance.</p>
@@ -928,7 +876,7 @@ const Terms: React.FC = () => {
             </div>
           </section>
         </div>
-      </main>
+      </Reveal>
       </div>
       <Footer />
       <p className="text-sm text-muted-foreground text-center mt-10 mb-4">
