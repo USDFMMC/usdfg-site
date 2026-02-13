@@ -754,9 +754,9 @@ const LeaderboardPreview: React.FC = () => {
                       View Full Rankings
                       <ChevronRight className="w-4 h-4" />
                     </button>
-              </Reveal>
+                  </div>
                 )}
-          </div>
+              </Reveal>
             )}
 
             {teams.length === 0 && (
