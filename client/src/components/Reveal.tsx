@@ -5,10 +5,7 @@ import React, {
   useRef,
 } from "react";
 import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { kimiDurations, kimiEasing, kimiStagger } from "@/lib/kimi-motion";
-
-gsap.registerPlugin(ScrollTrigger);
 
 type RevealAs = keyof JSX.IntrinsicElements;
 
@@ -25,11 +22,9 @@ function mergeRefs<T>(...refs: Array<React.Ref<T> | undefined>) {
   };
 }
 
-export interface RevealProps<T extends HTMLElement = HTMLDivElement> {
+export interface RevealProps extends React.HTMLAttributes<HTMLElement> {
   /** Which element to render. */
   as?: RevealAs;
-  className?: string;
-  children: React.ReactNode;
 
   /** Animate only the root (default) or matched descendants. */
   selector?: string;
@@ -64,6 +59,7 @@ const Reveal = forwardRef<HTMLElement, RevealProps>(function Reveal(
     start = "top 85%",
     once = true,
     refreshKey,
+    ...rest
   },
   forwardedRef
 ) {
@@ -80,7 +76,7 @@ const Reveal = forwardRef<HTMLElement, RevealProps>(function Reveal(
 
     if (reducedMotion) {
       // Ensure content is visible with no transforms.
-      const targets = selector ? (el.querySelectorAll(selector) as unknown as HTMLElement[]) : [el];
+      const targets = selector ? (Array.from(el.querySelectorAll(selector)) as HTMLElement[]) : [el];
       gsap.set(targets, { opacity: 1, y: 0, clearProps: "transform" });
       return;
     }
@@ -95,7 +91,7 @@ const Reveal = forwardRef<HTMLElement, RevealProps>(function Reveal(
       const toggleActions = once ? "play none none none" : "play none none reverse";
 
       gsap.set(targets, { opacity: 0, y: Math.min(Math.max(y, 0), 20) });
-      gsap.to(targets, {
+      const tween = gsap.to(targets, {
         opacity: 1,
         y: 0,
         duration: kimiDurations.medium,
@@ -108,6 +104,11 @@ const Reveal = forwardRef<HTMLElement, RevealProps>(function Reveal(
           invalidateOnRefresh: true,
         },
       });
+
+      return () => {
+        tween.scrollTrigger?.kill();
+        tween.kill();
+      };
     }, el);
 
     return () => ctx.revert();
@@ -117,7 +118,7 @@ const Reveal = forwardRef<HTMLElement, RevealProps>(function Reveal(
   const Comp = as as any;
 
   return (
-    <Comp ref={mergeRefs(localRef, forwardedRef)} className={className}>
+    <Comp {...rest} ref={mergeRefs(localRef, forwardedRef)} className={className}>
       {children}
     </Comp>
   );
