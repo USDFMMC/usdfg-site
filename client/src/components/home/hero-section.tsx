@@ -125,10 +125,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
               USDFG
             </div>
 
-            <p ref={subRef} className="neocore-body mb-4 max-w-2xl text-lg sm:text-xl text-white/70 leading-relaxed">
-              Skill-Based Competitive Arena
-            </p>
-
             <h1 ref={headlineRef} className="neocore-h1 mb-4 text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold leading-tight">
               <span className="block">
                 <span className="text-white">GAME. </span>
@@ -152,6 +148,10 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
                 CONQUER.
               </span>
             </h1>
+
+            <p ref={subRef} className="neocore-body mb-4 max-w-2xl text-lg sm:text-xl text-white/70 leading-relaxed">
+              Skill-Based Competitive Arena
+            </p>
 
             <div ref={buttonsRef} className="flex flex-col sm:flex-row justify-start gap-4">
               <button
