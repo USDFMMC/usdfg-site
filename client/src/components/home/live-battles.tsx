@@ -197,8 +197,13 @@ const LiveBattles: React.FC = () => {
                   match.status === 'live'
                     ? 'border-orange-500/50'
                     : 'border-purple-500/20 hover:border-purple-500/50'
-                } rounded-xl overflow-hidden transition-all duration-300 cursor-pointer`}
+                } rounded-2xl overflow-hidden transition-all duration-500 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)] cursor-pointer`}
               >
+                {/* Shine Effect - Kimi style */}
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                </div>
+
                 {/* Main Row */}
                 <div className="flex items-center p-4 sm:p-6">
                   {/* Status Indicator */}
@@ -265,6 +270,13 @@ const LiveBattles: React.FC = () => {
                     />
                   </div>
                 </div>
+
+                {/* Bottom Gradient - Kimi style */}
+                <div
+                  className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${
+                    gameColors[match.game] || "from-purple-500 to-orange-500"
+                  }`}
+                />
 
                 {/* Expanded Content */}
                 <div

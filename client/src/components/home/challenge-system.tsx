@@ -302,11 +302,15 @@ const ChallengeSystem: React.FC = () => {
         {/* --- Challenge creator (mock) --- */}
         <Card
           ref={creatorCardRef}
-          className="relative max-w-4xl mx-auto bg-black/40 backdrop-blur-sm rounded-lg transition-all duration-300 kimi-bottom-neon mt-8"
+          className="relative max-w-4xl mx-auto glass border border-purple-500/20 rounded-2xl overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)] kimi-bottom-neon mt-8"
           style={{ 
           '--neon-color': 'rgba(168, 85, 247, 0.3)',
           '--neon-hover-color': 'rgba(168, 85, 247, 0.5)',
         } as React.CSSProperties}>
+          {/* Shine Effect - Kimi style */}
+          <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full hover:translate-x-full transition-transform duration-1000" />
+          </div>
           <CardContent className="relative z-10 p-4 md:p-6 lg:p-8">
             <div className="space-y-3 mt-6">
               <div className="text-center mb-6">

@@ -151,7 +151,7 @@ const Tokenomics: React.FC = () => {
 
         <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 max-w-5xl mx-auto mb-8 lg:mb-12">
           <div
-            className="token-card relative glass border border-purple/30 rounded-2xl p-4 lg:p-6 text-center transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.18)] kimi-bottom-neon"
+            className="token-card relative glass border border-purple-500/20 rounded-2xl p-6 text-center overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)] kimi-bottom-neon"
             style={
               {
                 "--neon-color": "rgba(126, 67, 255, 0.25)",
@@ -164,6 +164,10 @@ const Tokenomics: React.FC = () => {
           >
             {/* Gradient glow on hover */}
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 via-purple-600/10 to-purple-600/0 opacity-0 hover:opacity-100 transition-opacity duration-300 rounded-2xl" />
+            {/* Shine Effect - Kimi style */}
+            <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full hover:translate-x-full transition-transform duration-1000" />
+            </div>
             <div className="relative z-10">
               <p
                 className="font-display text-3xl md:text-4xl lg:text-5xl font-extrabold mb-2 text-gradient"
@@ -174,7 +178,7 @@ const Tokenomics: React.FC = () => {
             </div>
           </div>
           <div
-            className="token-card relative glass border border-purple/30 rounded-2xl p-4 lg:p-6 text-center transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.18)] kimi-bottom-neon"
+            className="token-card relative glass border border-purple-500/20 rounded-2xl p-6 text-center overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)] kimi-bottom-neon"
             style={
               {
                 "--neon-color": "rgba(126, 67, 255, 0.25)",
@@ -186,6 +190,9 @@ const Tokenomics: React.FC = () => {
             onMouseLeave={handleMouseLeave}
           >
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 via-purple-600/10 to-purple-600/0 opacity-0 hover:opacity-100 transition-opacity duration-300 rounded-2xl" />
+            <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full hover:translate-x-full transition-transform duration-1000" />
+            </div>
             <div className="relative z-10">
               <p
                 className="font-display text-3xl md:text-4xl lg:text-5xl font-extrabold mb-2 text-gradient"
@@ -196,7 +203,7 @@ const Tokenomics: React.FC = () => {
             </div>
           </div>
           <div
-            className="token-card relative glass border border-purple/30 rounded-2xl p-4 lg:p-6 text-center transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.18)] kimi-bottom-neon"
+            className="token-card relative glass border border-purple-500/20 rounded-2xl p-6 text-center overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)] kimi-bottom-neon"
             style={
               {
                 "--neon-color": "rgba(126, 67, 255, 0.25)",
@@ -208,6 +215,9 @@ const Tokenomics: React.FC = () => {
             onMouseLeave={handleMouseLeave}
           >
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 via-purple-600/10 to-purple-600/0 opacity-0 hover:opacity-100 transition-opacity duration-300 rounded-2xl" />
+            <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full hover:translate-x-full transition-transform duration-1000" />
+            </div>
             <div className="relative z-10">
               <p
                 className="font-display text-3xl md:text-4xl lg:text-5xl font-extrabold mb-2 text-gradient"
@@ -218,7 +228,7 @@ const Tokenomics: React.FC = () => {
             </div>
           </div>
           <div
-            className="token-card relative glass border border-purple/30 rounded-2xl p-4 lg:p-6 text-center transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.18)] kimi-bottom-neon"
+            className="token-card relative glass border border-purple-500/20 rounded-2xl p-6 text-center overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)] kimi-bottom-neon"
             style={
               {
                 "--neon-color": "rgba(126, 67, 255, 0.25)",
@@ -230,6 +240,9 @@ const Tokenomics: React.FC = () => {
             onMouseLeave={handleMouseLeave}
           >
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 via-purple-600/10 to-purple-600/0 opacity-0 hover:opacity-100 transition-opacity duration-300 rounded-2xl" />
+            <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity duration-500 pointer-events-none">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full hover:translate-x-full transition-transform duration-1000" />
+            </div>
             <div className="relative z-10">
               <p
                 className="font-display text-3xl md:text-4xl lg:text-5xl font-extrabold mb-2 text-gradient"
