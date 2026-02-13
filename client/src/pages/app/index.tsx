@@ -636,7 +636,8 @@ const ArenaHome: React.FC = () => {
   const [leaderboardSearchTerm, setLeaderboardSearchTerm] = useState<string>('');
   const [totalUSDFGRewarded, setTotalUSDFGRewarded] = useState<number>(0);
   const [activeChallengesCount, setActiveChallengesCount] = useState<number>(0);
-  // Players online count removed — use static copy; no Firestore presence polling
+  const [arenaPlayersCount, setArenaPlayersCount] = useState<number>(0);
+  // Players online count removed — use derived count from active challenges (no presence polling)
   
   // Trust Review Modal state
   const [showTrustReview, setShowTrustReview] = useState(false);
@@ -1150,12 +1151,41 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   
   // Calculate active challenges count from real-time data
   useEffect(() => {
-    if (firestoreChallenges) {
-      const activeCount = firestoreChallenges.filter((c: any) => 
-        c.status === 'active' || c.status === 'pending_waiting_for_opponent' || c.status === 'creator_confirmation_required' || c.status === 'creator_funded'
-      ).length;
-      setActiveChallengesCount(activeCount);
+    if (!firestoreChallenges) return;
+
+    const activeChallenges = firestoreChallenges.filter(
+      (c: any) =>
+        c.status === 'active' ||
+        c.status === 'pending_waiting_for_opponent' ||
+        c.status === 'creator_confirmation_required' ||
+        c.status === 'creator_funded'
+    );
+
+    setActiveChallengesCount(activeChallenges.length);
+
+    // Derive an "in the arena" player count from wallets involved in active/pending challenges.
+    const uniqueWallets = new Set<string>();
+    for (const c of activeChallenges) {
+      const creator = getChallengeCreator(c);
+      const challenger = getChallengeChallenger(c);
+      const pendingJoiner = getChallengePendingJoiner(c);
+
+      if (creator) uniqueWallets.add(String(creator).toLowerCase());
+      if (challenger) uniqueWallets.add(String(challenger).toLowerCase());
+      if (pendingJoiner) uniqueWallets.add(String(pendingJoiner).toLowerCase());
+
+      const players: any[] | undefined = c.players ?? c.rawData?.players;
+      if (Array.isArray(players)) {
+        for (const p of players) {
+          if (!p) continue;
+          if (typeof p === 'string') uniqueWallets.add(p.toLowerCase());
+          else if (p.wallet) uniqueWallets.add(String(p.wallet).toLowerCase());
+          else if (p.address) uniqueWallets.add(String(p.address).toLowerCase());
+        }
+      }
     }
+
+    setArenaPlayersCount(uniqueWallets.size);
   }, [firestoreChallenges]);
 
   // Timeout monitoring: Check and revert expired challenges
@@ -5350,7 +5380,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               <div className="relative z-10">
                 <div className="text-lg mb-1">👥</div>
                 <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">
-                  —
+                  {arenaPlayersCount.toLocaleString()}
                 </div>
                 <div className="text-sm text-amber-400 mt-1 font-semibold">Join the arena</div>
               </div>
