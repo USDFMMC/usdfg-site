@@ -117,7 +117,12 @@ const PlatformFeatures: React.FC = () => {
             THE PLATFORM
           </span>
           <h2 ref={headingRef} className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white mb-6">
-            <span className="block text-white">THE BITCOIN</span>
+            <span className="block text-white">
+              THE{" "}
+              <span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent">
+                BITCOIN
+              </span>
+            </span>
             <span className="block">
               <span className="text-white">OF </span>
               <span className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent">
@@ -126,23 +131,23 @@ const PlatformFeatures: React.FC = () => {
             </span>
           </h2>
           <p ref={subRef} className="font-body text-lg text-white/60 max-w-2xl mx-auto leading-relaxed">
-            Three pillars designed to elevate your competitive gaming experience to legendary heights.
+            USDFG is a skill-based competition platform where players challenge each other directly, lock challenge assets on-chain, compete, and earn verified rewards through performance. Wallet-driven, non-custodial, and built for skill.
           </p>
         </div>
 
         {/* Feature Cards - Kimi Exact Structure with Images */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 perspective-1000">
           {features.map((feature, index) => (
             <div
               key={index}
               ref={(el) => {
                 cardsRef.current[index] = el;
               }}
-              className="group relative"
+              className="group relative preserve-3d"
             >
-              <div className="relative h-full glass border border-purple-500/20 rounded-2xl overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)]">
+              <div className="relative h-full glass border border-purple/20 rounded-2xl overflow-hidden transition-all duration-500 hover:border-purple/50 hover:shadow-glow">
                 {/* Image - Kimi Exact */}
-                <div className="relative h-48 overflow-hidden">
+                <div className="relative h-48 sm:h-56 overflow-hidden">
                   <img
                     src={feature.image}
                     alt={feature.title}
@@ -161,7 +166,7 @@ const PlatformFeatures: React.FC = () => {
                   </div>
 
                   {/* Metric Badge - Kimi Exact */}
-                  <div className="absolute top-4 right-4 px-4 py-2 kimi-glass rounded-full">
+                  <div className="absolute top-4 right-4 px-4 py-2 glass rounded-full">
                     <span className="font-display font-bold text-sm text-gradient">
                       {feature.metric}
                     </span>

@@ -48,12 +48,26 @@
   color: transparent;
 }
 .text-orange { color: var(--kimi-orange); }
+.text-purple { color: var(--kimi-purple); }
 .border-purple\/30 { border-color: #7e43ff4d; }
+.border-purple\/20 { border-color: rgba(126, 67, 255, 0.2); }
+.border-purple\/50 { border-color: rgba(126, 67, 255, 0.5); }
 
 /* Kimi dot-grid overlay (used in Kimi hero reference) */
 .bg-kimi-dot-grid {
   background-image: radial-gradient(circle, #333 1px, transparent 1px);
   background-size: 50px 50px;
+}
+
+/* Kimi 3D utilities used in Features section */
+.perspective-1000 { perspective: 1000px; }
+.preserve-3d { transform-style: preserve-3d; }
+
+/* Kimi hover glow shadow utility */
+.hover\:shadow-glow:hover {
+  --tw-shadow: 0 0 30px rgba(126, 67, 255, 0.5);
+  --tw-shadow-colored: 0 0 30px var(--tw-shadow-color);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
 }
 /* Kimi radial glow for page background */
 .bg-gradient-radial-kimi {

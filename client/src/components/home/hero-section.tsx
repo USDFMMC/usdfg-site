@@ -18,11 +18,12 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
   const headlineRef = useRef<HTMLHeadingElement>(null);
   const subRef = useRef<HTMLParagraphElement>(null);
   const buttonsRef = useRef<HTMLDivElement>(null);
+  const statsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
       gsap.set(bgRef.current, { scale: 1.2, opacity: 0 });
-      gsap.set([badgeRef.current, brandRef.current, headlineRef.current, subRef.current, buttonsRef.current], {
+      gsap.set([badgeRef.current, brandRef.current, headlineRef.current, subRef.current, buttonsRef.current, statsRef.current], {
         opacity: 0,
         y: 24,
       });
@@ -34,7 +35,8 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
         .to(brandRef.current, { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }, "-=0.6")
         .to(badgeRef.current, { opacity: 1, y: 0, duration: 0.6, ease: "back.out(1.7)" }, "-=0.4")
         .to(subRef.current, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, "-=0.3")
-        .to(buttonsRef.current, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, "-=0.3");
+        .to(buttonsRef.current, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, "-=0.3")
+        .to(statsRef.current, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, "-=0.2");
 
       // Subtle parallax like Kimi
       gsap.to(contentRef.current, {
@@ -61,6 +63,12 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
 
     return () => ctx.revert();
   }, []);
+
+  const stats = [
+    { value: "25+", label: "Supported Game Categories" },
+    { value: "50+", label: "Challenge Formats & Match Types" },
+    { value: "100%", label: "Verified On-Chain Outcomes" },
+  ];
 
   return (
     <section ref={sectionRef} className="hero relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-transparent">
@@ -195,6 +203,16 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
                   WHITEPAPER
                 </button>
               </Link>
+            </div>
+
+            {/* Kimi stat strip (exact structure; USDFG metrics only) */}
+            <div ref={statsRef} className="flex flex-wrap gap-8 sm:gap-12 mt-8">
+              {stats.map((stat) => (
+                <div key={stat.label} className="text-left">
+                  <div className="font-display font-bold text-2xl sm:text-3xl text-gradient">{stat.value}</div>
+                  <div className="font-body text-sm text-white/50 uppercase tracking-wider">{stat.label}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
