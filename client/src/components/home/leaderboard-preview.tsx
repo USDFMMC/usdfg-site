@@ -203,10 +203,10 @@ const LeaderboardPreview: React.FC = () => {
   return (
     <Reveal
       as="section"
+      preset="section"
       id="leaderboard"
       className="relative py-24 lg:py-32 w-full overflow-hidden"
       selector="[data-leaderboard-reveal]"
-      stagger={false}
       refreshKey={revealKey}
     >
       {/* Background Effects - Kimi Exact */}
@@ -291,9 +291,9 @@ const LeaderboardPreview: React.FC = () => {
             {top3Players.length >= 3 && (
               <Reveal
                 as="div"
+                preset="leaderboardPodium"
                 className="flex justify-center items-end gap-4 lg:gap-8 mb-16 lg:mb-20"
                 selector=".podium-card"
-                stagger
                 refreshKey={revealKey}
               >
                 {[2, 1, 3].map((rank) => {
@@ -402,9 +402,9 @@ const LeaderboardPreview: React.FC = () => {
             {allPlayersForTable.length > 0 && (
               <Reveal
                 as="div"
+                preset="leaderboardList"
                 className="max-w-4xl mx-auto"
                 selector=".list-item"
-                stagger
                 refreshKey={revealKey}
               >
                 <div className="kimi-glass border border-purple-500/20 rounded-2xl overflow-hidden">
@@ -607,9 +607,9 @@ const LeaderboardPreview: React.FC = () => {
             {top3Teams.length >= 3 && (
               <Reveal
                 as="div"
+                preset="leaderboardPodium"
                 className="flex justify-center items-end gap-4 lg:gap-8 mb-16 lg:mb-20"
                 selector=".podium-card"
-                stagger
                 refreshKey={revealKey}
               >
                 {[2, 1, 3].map((rank) => {
@@ -685,9 +685,9 @@ const LeaderboardPreview: React.FC = () => {
             {allTeamsForTable.length > 0 && (
               <Reveal
                 as="div"
+                preset="leaderboardList"
                 className="max-w-4xl mx-auto"
                 selector=".list-item"
-                stagger
                 refreshKey={revealKey}
               >
                 <div className="kimi-glass border border-purple-500/20 rounded-2xl overflow-hidden">

@@ -96,7 +96,6 @@ const Privacy: React.FC = () => {
           as="main"
           className="min-h-screen flex-1 text-white relative overflow-hidden"
           selector="[data-privacy-reveal]"
-          stagger
         >
           {/* Kimi Galaxy Theme Background */}
           <KimiBackground includeGalaxy={true} />

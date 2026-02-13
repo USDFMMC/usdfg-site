@@ -10,13 +10,11 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
   return (
     <Reveal
       as="section"
+      preset="heroTimeline"
       className="hero relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-transparent"
-      selector="[data-hero-reveal]"
-      stagger
-      start="top 95%"
     >
       {/* Background Image - Hero (static like Kimi; no reveal animation) */}
-      <div className="absolute inset-0 z-[1]" style={{ willChange: "transform" }}>
+      <div data-kimi-hero-bg className="absolute inset-0 z-[1]" style={{ willChange: "transform" }}>
         <img
           src="/hero-bg.jpg"
           alt="Esports Arena"
@@ -42,11 +40,11 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
       </div>
 
       {/* Content - Kimi structure: badge then headline (from HeroSection.kimi.tsx) */}
-      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20 pt-20" style={{ willChange: "transform" }}>
+      <div data-kimi-hero-content className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20 pt-20" style={{ willChange: "transform" }}>
         <div className="w-full">
           <div className="flex flex-col items-start text-left max-w-4xl">
             {/* Badge – Kimi exact: glass, border-purple/30, w-4 h-4 icon, font-body text-sm text-white/80. Icon: Kimi SVG (trophy) in Kimi orange. */}
-            <div data-hero-reveal className="inline-flex items-center gap-2 px-4 py-2 mb-6 kimi-glass rounded-full border border-kimi-purple-30">
+            <div data-kimi-hero-item data-kimi-hero-badge className="inline-flex items-center gap-2 px-4 py-2 mb-6 kimi-glass rounded-full border border-kimi-purple-30">
               <img
                 src="/_kimi/hero-badge-icon.svg"
                 alt=""
@@ -61,14 +59,15 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
             </div>
 
             <div
-              data-hero-reveal
+              data-kimi-hero-item
+              data-kimi-hero-brand
               className="text-2xl md:text-3xl lg:text-4xl font-bold mb-2 text-white"
               style={{ textShadow: "0 0 20px rgba(255, 255, 255, 0.3)" }}
             >
               USDFG
             </div>
 
-            <h1 data-hero-reveal className="neocore-h1 mb-4 text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold leading-tight">
+            <h1 data-kimi-hero-item data-kimi-hero-headline className="neocore-h1 mb-4 text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold leading-tight">
               <span className="block">
                 <span className="text-white">GAME. </span>
                 <span
@@ -92,13 +91,13 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
               </span>
             </h1>
 
-            <p data-hero-reveal className="neocore-body mb-4 max-w-2xl text-lg sm:text-xl text-white/70 leading-relaxed">
+            <p data-kimi-hero-item data-kimi-hero-sub className="neocore-body mb-4 max-w-2xl text-lg sm:text-xl text-white/70 leading-relaxed">
               Join the world's premier esports crypto ecosystem. Challenge
               players, manage tournaments, and turn your skill into rewards. The
               arena awaits your arrival.
             </p>
 
-            <div data-hero-reveal className="flex flex-col sm:flex-row justify-start gap-4">
+            <div data-kimi-hero-item data-kimi-hero-buttons className="flex flex-col sm:flex-row justify-start gap-4">
               <button
                 onClick={onExploreClick}
                 className="relative font-semibold text-base px-8 py-6 bg-gradient-to-r from-purple-600 to-amber-500 hover:from-purple-400 hover:to-amber-400 text-white border-0 overflow-hidden group rounded-lg transition-all"

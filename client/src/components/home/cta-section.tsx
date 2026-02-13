@@ -7,10 +7,9 @@ const CTASection: React.FC = () => {
   return (
     <Reveal
       as="section"
+      preset="cta"
       className="relative min-h-[80vh] flex flex-col items-center justify-center overflow-hidden py-20"
       selector=".cta-reveal"
-      stagger
-      start="top 70%"
     >
       <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
         <div className="max-w-4xl mx-auto text-center">

@@ -83,10 +83,10 @@ const LiveBattles: React.FC = () => {
   return (
     <Reveal
       as="section"
+      preset="section"
       id="live-battles"
       className="relative py-24 lg:py-32 w-full"
       selector="[data-live-reveal]"
-      stagger={false}
     >
       <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
         {/* Section Header */}
@@ -115,7 +115,7 @@ const LiveBattles: React.FC = () => {
         </div>
 
         {/* Matches List */}
-        <Reveal as="div" className="space-y-4" selector=".match-item" stagger>
+        <Reveal as="div" preset="liveList" className="space-y-4" selector=".match-item">
           {matches.map((match) => (
             <div
               key={match.id}

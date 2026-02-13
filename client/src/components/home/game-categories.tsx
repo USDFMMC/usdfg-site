@@ -72,10 +72,10 @@ const GameCategories: React.FC = () => {
   return (
     <Reveal
       as="section"
+      preset="section"
       id="supported-games"
       className="relative py-24 lg:py-32 w-full overflow-hidden"
       selector="[data-games-reveal]"
-      stagger={false}
     >
       <div className="relative z-10">
         {/* Section Header - Kimi Exact Structure */}
@@ -108,7 +108,7 @@ const GameCategories: React.FC = () => {
         </div>
 
         {/* Carousel - Kimi sizes: card w-72/w-80, gap-6 (1.5rem), image h-48 (12rem), p-6, rounded-2xl; section py-24 lg:py-32, header mb-12 lg:mb-16 */}
-        <Reveal as="div" className="relative" selector=".prize-card" stagger>
+        <Reveal as="div" preset="gameCarouselCards" className="relative" selector=".prize-card">
           <div
             ref={scrollContainerRef}
             className="flex gap-6 overflow-x-auto scrollbar-hide px-4 sm:px-6 lg:px-12 xl:px-20 pb-4"

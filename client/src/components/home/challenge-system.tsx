@@ -94,7 +94,7 @@ const ChallengeSystem: React.FC = () => {
   // Render
   // -----------------------------
   return (
-    <Reveal as="section" className="py-12 lg:py-16 relative overflow-hidden">
+    <Reveal as="section" preset="section" className="py-12 lg:py-16 relative overflow-hidden">
 
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
         {/* Rules / Explainer */}

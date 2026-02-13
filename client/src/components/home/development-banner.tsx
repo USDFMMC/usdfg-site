@@ -5,16 +5,15 @@ const AboutSection: React.FC = () => {
   return (
     <Reveal
       as="section"
+      preset="aboutTimeline"
       id="about-usdfg"
       className="relative flex justify-center items-center min-h-[60vh] px-4 sm:px-6 lg:px-12 xl:px-20 py-12 lg:py-16 overflow-hidden"
-      selector="[data-about-reveal]"
-      stagger={false}
     >
 
       {/* Content */}
       <div className="relative z-10 w-full max-w-4xl mx-auto">
         <div
-          data-about-reveal
+          data-kimi-about-card
           className="relative w-full bg-black/40 backdrop-blur-sm rounded-lg px-6 lg:px-8 py-8 lg:py-10 flex flex-col items-center transition-all duration-500 kimi-bottom-neon" style={{ 
             '--neon-color': 'rgba(168, 85, 247, 0.3)',
             '--neon-hover-color': 'rgba(168, 85, 247, 0.5)',
@@ -25,6 +24,7 @@ const AboutSection: React.FC = () => {
 
           <div className="relative z-10 w-full flex flex-col items-center text-center space-y-4">
             <h2
+              data-kimi-about-title
               className="text-2xl md:text-3xl lg:text-4xl font-bold text-center mb-4"
             >
               What is{' '}
@@ -40,6 +40,7 @@ const AboutSection: React.FC = () => {
             </h2>
             <div className="max-w-2xl mx-auto text-center">
               <p
+                data-kimi-about-description
                 className="text-base md:text-lg lg:text-xl text-center mb-4 font-semibold text-white leading-relaxed"
                 style={{ textShadow: "0 0 10px rgba(255, 255, 255, 0.2)" }}
               >

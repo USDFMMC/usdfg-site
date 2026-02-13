@@ -33,10 +33,10 @@ const PlatformFeatures: React.FC = () => {
   return (
     <Reveal
       as="section"
+      preset="section"
       id="platform"
       className="relative py-24 lg:py-32 w-full"
       selector="[data-platform-reveal]"
-      stagger={false}
     >
       <div className="absolute inset-0 bg-gradient-radial-kimi opacity-50" />
       
@@ -63,9 +63,9 @@ const PlatformFeatures: React.FC = () => {
         {/* Feature Cards - Kimi Exact Structure with Images */}
         <Reveal
           as="div"
+          preset="platformCards"
           className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto"
           selector=".platform-feature-card"
-          stagger
         >
           {features.map((feature, index) => (
             <div

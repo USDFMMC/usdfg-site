@@ -64,10 +64,10 @@ const Tokenomics: React.FC = () => {
   return (
     <Reveal
       as="section"
+      preset="section"
       ref={sectionRef}
       id="tokenomics"
       className="py-12 lg:py-16 text-center relative overflow-hidden"
-      stagger={false}
     >
 
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
