@@ -35,7 +35,6 @@ const features = [
 const PlatformFeatures: React.FC = () => {
   const sectionRef = useRef<HTMLElement>(null);
   const titleRef = useRef<HTMLDivElement>(null);
-  const cardsRef = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -57,8 +56,8 @@ const PlatformFeatures: React.FC = () => {
       );
 
       // Cards: each card triggers + reveals one-by-one (Kimi exact)
-      cardsRef.current.forEach((card, index) => {
-        if (!card) return;
+      const cards = Array.from(sectionRef.current?.querySelectorAll<HTMLElement>("[data-platform-feature-card]") ?? []);
+      cards.forEach((card, index) => {
         gsap.fromTo(
           card,
           { opacity: 0, y: 80, rotateX: 15 },
@@ -128,9 +127,7 @@ const PlatformFeatures: React.FC = () => {
           {features.map((feature, index) => (
             <div
               key={index}
-              ref={(el) => {
-                cardsRef.current[index] = el;
-              }}
+              data-platform-feature-card
               className="group relative preserve-3d"
             >
               <div className="relative h-full glass border border-purple/20 rounded-2xl overflow-hidden transition-all duration-500 hover:border-purple/50 hover:shadow-glow">
