@@ -1,7 +1,16 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 const Navbar: React.FC = () => {
+  // Kimi Navigation.tsx behavior: bg + border only after scrolling
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setIsScrolled(window.scrollY > 100);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
     <>
@@ -12,48 +21,54 @@ const Navbar: React.FC = () => {
       >
         Skip to main content
       </a>
-      <header className="sticky top-0 z-50 border-b border-kimi-purple-30 shadow-[0_2px_24px_rgba(126,67,255,0.15)] kimi-glass animate-in fade-in-0 kimi-delay-0">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20 py-3 flex flex-wrap items-center justify-between">
-          {/* Logo - Kimi style: purple/pink accent (same as Kimi), white wordmark */}
-          <Link to="/" className="flex items-center group animate-in fade-in-0 zoom-in-95 kimi-delay-1" style={{ gap: '2px' }} title="World's Premier Esports Arena.">
-            <div className="relative flex-shrink-0">
+      {/* Kimi-style top navigation (from _kimi src/sections/Navigation.tsx) */}
+      <nav
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+          isScrolled ? "bg-void/90 backdrop-blur-xl border-b border-purple/20" : "bg-transparent"
+        }`}
+        role="navigation"
+        aria-label="Main Navigation"
+      >
+        <div className="w-full px-4 sm:px-6 lg:px-12 xl:px-20">
+          <div className="flex items-center justify-between h-16 lg:h-20">
+            {/* Logo */}
+            <Link
+              to="/"
+              onClick={() => {
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className="flex items-center gap-2 group"
+              aria-label="USDFG home"
+            >
               <img
                 src="/assets/usdfgToken2.png"
                 alt="USDFG Logo"
-                className="w-10 h-10 object-contain transition-transform duration-300 group-hover:scale-110 group-hover:animate-pulse-glow-kimi"
+                className="w-10 h-10 object-contain transition-transform duration-300 group-hover:scale-110"
                 loading="lazy"
                 decoding="async"
                 style={{ filter: "drop-shadow(0 0 8px var(--kimi-purple))" }}
               />
-              <div className="absolute inset-0 rounded-lg blur-md opacity-0 group-hover:opacity-50 transition-opacity duration-300" style={{ background: 'radial-gradient(circle, var(--kimi-purple) 0%, transparent 70%)' }} />
-            </div>
-            <span
-              className="text-white font-extrabold text-xl tracking-tighter whitespace-nowrap"
-              style={{
-                marginLeft: '-2px',
-                letterSpacing: '-0.02em',
-                textShadow: "0 0 20px rgba(126, 67, 255, 0.3)",
-              }}
-            >
-              USDFG
-            </span>
-          </Link>
-
-          {/* Navigation - "Enter the Arena" Button */}
-          <nav className="flex items-center space-x-6 animate-in fade-in-0 zoom-in-95 kimi-delay-2" role="navigation" aria-label="Main Navigation">
-            <Link to="/app">
-              <button className="relative font-semibold text-sm lg:text-base px-4 lg:px-6 py-2 lg:py-3 bg-gradient-to-r from-[#7e43ff] to-[#ff7e3e] hover:from-[#9d67ff] hover:to-[#ff9c6a] text-white border-0 overflow-hidden group rounded-lg transition-all shadow-[0_0_20px_rgba(126,67,255,0.3)] hover:shadow-[0_0_30px_rgba(126,67,255,0.5)]">
-                <span className="relative z-10 flex items-center gap-2">
-                  <span role="img" aria-label="controller">🎮</span>
-                  <span className="hidden sm:inline">Enter the Arena</span>
-                  <span className="sm:hidden">Enter Arena</span>
-                </span>
-                <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-              </button>
+              <span
+                className="font-display font-bold text-xl text-white whitespace-nowrap"
+                style={{ textShadow: "0 0 20px rgba(126, 67, 255, 0.25)" }}
+              >
+                USDFG
+              </span>
             </Link>
-          </nav>
+
+            {/* Primary action */}
+            <div className="flex items-center">
+              <Link
+                to="/app"
+                className="relative font-display font-semibold text-sm px-5 py-2.5 lg:px-6 lg:py-3 rounded-lg bg-gradient-to-r from-purple to-orange hover:from-purple-400 hover:to-orange-400 text-white border-0 overflow-hidden group"
+              >
+                <span className="relative z-10">Enter Arena</span>
+                <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500" />
+              </Link>
+            </div>
+          </div>
         </div>
-      </header>
+      </nav>
     </>
   );
 };

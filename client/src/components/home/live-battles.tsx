@@ -132,7 +132,7 @@ const LiveBattles: React.FC = () => {
   return (
     <section
       ref={sectionRef}
-      id="live-battles"
+      id="matches"
       className="relative py-24 lg:py-32 w-full"
     >
       <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">

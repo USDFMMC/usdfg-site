@@ -49,6 +49,11 @@
 }
 .text-orange { color: var(--kimi-orange); }
 .text-purple { color: var(--kimi-purple); }
+.bg-void { background-color: var(--kimi-void); }
+.bg-void-light { background-color: var(--kimi-void-light); }
+.bg-void\/95 { background-color: rgba(10, 2, 21, 0.95); }
+.bg-void\/90 { background-color: rgba(10, 2, 21, 0.90); }
+.bg-void\/80 { background-color: rgba(10, 2, 21, 0.80); }
 .bg-purple\/80 { background-color: rgba(126, 67, 255, 0.8); }
 .bg-purple\/20 { background-color: rgba(126, 67, 255, 0.2); }
 .bg-purple\/10 { background-color: rgba(126, 67, 255, 0.1); }
@@ -73,6 +78,16 @@
 .via-purple\/20 {
   --tw-gradient-to: rgba(126, 67, 255, 0) var(--tw-gradient-to-position);
   --tw-gradient-stops: var(--tw-gradient-from), rgba(126, 67, 255, 0.2) var(--tw-gradient-via-position), var(--tw-gradient-to);
+}
+
+/* Kimi gradient color tokens used as Tailwind-like stops */
+.from-purple {
+  --tw-gradient-from: var(--kimi-purple) var(--tw-gradient-from-position);
+  --tw-gradient-to: rgba(126, 67, 255, 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+.to-orange {
+  --tw-gradient-to: var(--kimi-orange) var(--tw-gradient-to-position);
 }
 
 /* Kimi dot-grid overlay (used in Kimi hero reference) */

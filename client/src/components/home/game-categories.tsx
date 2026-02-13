@@ -122,7 +122,7 @@ const GameCategories: React.FC = () => {
   return (
     <section
       ref={sectionRef}
-      id="supported-games"
+      id="prizes"
       className="relative py-24 lg:py-32 w-full overflow-hidden"
     >
       <div className="relative z-10">
