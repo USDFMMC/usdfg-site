@@ -1,10 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { Radio, Clock, Users, Eye, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-
-gsap.registerPlugin(ScrollTrigger);
+import Reveal from "@/components/Reveal";
 
 interface Match {
   id: number;
@@ -74,52 +71,7 @@ const gameColors: Record<string, string> = {
 };
 
 const LiveBattles: React.FC = () => {
-  const sectionRef = useRef<HTMLElement>(null);
-  const titleRef = useRef<HTMLDivElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
-
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      gsap.fromTo(
-        titleRef.current,
-        { opacity: 0, y: 50 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: titleRef.current,
-            start: "top 80%",
-            toggleActions: "play none none reverse",
-          },
-        }
-      );
-
-      const items = listRef.current?.querySelectorAll(".match-item");
-      if (items) {
-        gsap.fromTo(
-          items,
-          { opacity: 0, x: 100 },
-          {
-            opacity: 1,
-            x: 0,
-            duration: 0.6,
-            stagger: 0.1,
-            ease: "power3.out",
-            scrollTrigger: {
-              trigger: listRef.current,
-              start: "top 80%",
-              toggleActions: "play none none reverse",
-            },
-          }
-        );
-      }
-    }, sectionRef);
-
-    return () => ctx.revert();
-  }, []);
 
   const formatViewers = (num: number) => {
     if (num >= 1000) {
@@ -129,14 +81,16 @@ const LiveBattles: React.FC = () => {
   };
 
   return (
-    <section
-      ref={sectionRef}
+    <Reveal
+      as="section"
       id="live-battles"
       className="relative py-24 lg:py-32 w-full"
+      selector="[data-live-reveal]"
+      stagger={false}
     >
       <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
         {/* Section Header */}
-        <div ref={titleRef} className="flex flex-col lg:flex-row lg:items-end lg:justify-between mb-12 lg:mb-16">
+        <div data-live-reveal className="flex flex-col lg:flex-row lg:items-end lg:justify-between mb-12 lg:mb-16">
           <div>
             <span className="inline-flex items-center gap-2 font-body text-sm text-orange uppercase tracking-[0.3em] mb-4">
               <Radio className="w-4 h-4 animate-live-pulse" />
@@ -161,7 +115,7 @@ const LiveBattles: React.FC = () => {
         </div>
 
         {/* Matches List */}
-        <div ref={listRef} className="space-y-4">
+        <Reveal as="div" className="space-y-4" selector=".match-item" stagger>
           {matches.map((match) => (
             <div
               key={match.id}
@@ -287,7 +241,7 @@ const LiveBattles: React.FC = () => {
               </div>
             </div>
           ))}
-        </div>
+        </Reveal>
 
         {/* View All Button */}
         <div className="mt-8 text-center">
@@ -297,7 +251,7 @@ const LiveBattles: React.FC = () => {
           </button>
         </div>
       </div>
-    </section>
+    </Reveal>
   );
 };
 

@@ -4,10 +4,6 @@ import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
 import KimiBackground from "@/components/KimiBackground";
 import { FaLock, FaTrophy, FaUsers, FaChartLine, FaRocket, FaMobileAlt, FaGamepad, FaCheckCircle, FaGavel, FaUserShield, FaShieldAlt, FaBalanceScale, FaGlobe } from "react-icons/fa";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-
-gsap.registerPlugin(ScrollTrigger);
 
 // Removed custom hooks - they were causing useRef dispatcher errors
 

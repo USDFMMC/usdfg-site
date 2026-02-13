@@ -1,44 +1,18 @@
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
 import { Sparkles } from "lucide-react";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-
-gsap.registerPlugin(ScrollTrigger);
+import Reveal from "@/components/Reveal";
 
 const CTASection: React.FC = () => {
-  const sectionRef = useRef<HTMLElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      const items = contentRef.current?.querySelectorAll(".cta-reveal");
-      if (!items || items.length === 0) return;
-
-      gsap.fromTo(
-        items,
-        { opacity: 0, y: 50 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          stagger: 0.12,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: contentRef.current,
-            start: "top 70%",
-            toggleActions: "play none none reverse",
-          },
-        }
-      );
-    }, sectionRef);
-
-    return () => ctx.revert();
-  }, []);
-
   return (
-    <section ref={sectionRef} className="relative min-h-[80vh] flex flex-col items-center justify-center overflow-hidden py-20">
-      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20" ref={contentRef}>
+    <Reveal
+      as="section"
+      className="relative min-h-[80vh] flex flex-col items-center justify-center overflow-hidden py-20"
+      selector=".cta-reveal"
+      stagger
+      start="top 70%"
+    >
+      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
         <div className="max-w-4xl mx-auto text-center">
           {/* Kimi badge: glass pill with icon + text */}
           <div className="cta-reveal inline-flex items-center gap-2 px-4 py-2 mb-6 glass rounded-full border border-purple/30">
@@ -131,7 +105,7 @@ const CTASection: React.FC = () => {
           </div>
         </div>
       </div>
-    </section>
+    </Reveal>
   );
 };
 

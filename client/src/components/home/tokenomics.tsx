@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import Reveal from "@/components/Reveal";
 
 const Tokenomics: React.FC = () => {
   // Count-up states
@@ -61,10 +62,12 @@ const Tokenomics: React.FC = () => {
   };
 
   return (
-    <section
+    <Reveal
+      as="section"
       ref={sectionRef}
       id="tokenomics"
       className="py-12 lg:py-16 text-center relative overflow-hidden"
+      stagger={false}
     >
 
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
@@ -181,7 +184,7 @@ const Tokenomics: React.FC = () => {
           <p className="font-body text-white/70 text-sm md:text-base mt-2 leading-relaxed">No income, interest, or financial benefit is promised or implied. This is not financial advice.</p>
         </div>
       </div>
-    </section>
+    </Reveal>
   );
 };
 

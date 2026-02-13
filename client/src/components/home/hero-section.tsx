@@ -1,71 +1,22 @@
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-
-gsap.registerPlugin(ScrollTrigger);
+import Reveal from "@/components/Reveal";
 
 interface HeroSectionProps {
   onExploreClick?: () => void;
 }
 
 const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
-  const sectionRef = useRef<HTMLElement>(null);
-  const bgRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const badgeRef = useRef<HTMLDivElement>(null);
-  const brandRef = useRef<HTMLDivElement>(null);
-  const headlineRef = useRef<HTMLHeadingElement>(null);
-  const subRef = useRef<HTMLParagraphElement>(null);
-  const buttonsRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      gsap.set(bgRef.current, { scale: 1.2, opacity: 0 });
-      gsap.set([badgeRef.current, brandRef.current, headlineRef.current, subRef.current, buttonsRef.current], {
-        opacity: 0,
-        y: 24,
-      });
-
-      gsap
-        .timeline({ delay: 0.3 })
-        .to(bgRef.current, { scale: 1, opacity: 1, duration: 1.8, ease: "power3.out" })
-        .to(headlineRef.current, { opacity: 1, y: 0, duration: 1.0, ease: "power3.out" }, "-=1.2")
-        .to(brandRef.current, { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }, "-=0.6")
-        .to(badgeRef.current, { opacity: 1, y: 0, duration: 0.6, ease: "back.out(1.7)" }, "-=0.4")
-        .to(subRef.current, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, "-=0.3")
-        .to(buttonsRef.current, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, "-=0.3");
-
-      // Subtle parallax like Kimi
-      gsap.to(contentRef.current, {
-        y: -100,
-        ease: "none",
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: "top top",
-          end: "bottom top",
-          scrub: 1,
-        },
-      });
-      gsap.to(bgRef.current, {
-        y: 50,
-        ease: "none",
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: "top top",
-          end: "bottom top",
-          scrub: 1,
-        },
-      });
-    }, sectionRef);
-
-    return () => ctx.revert();
-  }, []);
-
   return (
-    <section ref={sectionRef} className="hero relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-transparent">
+    <Reveal
+      as="section"
+      className="hero relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-transparent"
+      selector="[data-hero-reveal]"
+      stagger
+      start="top 95%"
+    >
       {/* Background Image - Hero (static like Kimi; no reveal animation) */}
-      <div ref={bgRef} className="absolute inset-0 z-[1]" style={{ willChange: "transform" }}>
+      <div className="absolute inset-0 z-[1]" style={{ willChange: "transform" }}>
         <img
           src="/hero-bg.jpg"
           alt="Esports Arena"
@@ -91,11 +42,11 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
       </div>
 
       {/* Content - Kimi structure: badge then headline (from HeroSection.kimi.tsx) */}
-      <div ref={contentRef} className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20 pt-20" style={{ willChange: "transform" }}>
+      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20 pt-20" style={{ willChange: "transform" }}>
         <div className="w-full">
           <div className="flex flex-col items-start text-left max-w-4xl">
             {/* Badge – Kimi exact: glass, border-purple/30, w-4 h-4 icon, font-body text-sm text-white/80. Icon: Kimi SVG (trophy) in Kimi orange. */}
-            <div ref={badgeRef} className="inline-flex items-center gap-2 px-4 py-2 mb-6 kimi-glass rounded-full border border-kimi-purple-30">
+            <div data-hero-reveal className="inline-flex items-center gap-2 px-4 py-2 mb-6 kimi-glass rounded-full border border-kimi-purple-30">
               <img
                 src="/_kimi/hero-badge-icon.svg"
                 alt=""
@@ -110,14 +61,14 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
             </div>
 
             <div
-              ref={brandRef}
+              data-hero-reveal
               className="text-2xl md:text-3xl lg:text-4xl font-bold mb-2 text-white"
               style={{ textShadow: "0 0 20px rgba(255, 255, 255, 0.3)" }}
             >
               USDFG
             </div>
 
-            <h1 ref={headlineRef} className="neocore-h1 mb-4 text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold leading-tight">
+            <h1 data-hero-reveal className="neocore-h1 mb-4 text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold leading-tight">
               <span className="block">
                 <span className="text-white">GAME. </span>
                 <span
@@ -141,13 +92,13 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
               </span>
             </h1>
 
-            <p ref={subRef} className="neocore-body mb-4 max-w-2xl text-lg sm:text-xl text-white/70 leading-relaxed">
+            <p data-hero-reveal className="neocore-body mb-4 max-w-2xl text-lg sm:text-xl text-white/70 leading-relaxed">
               Join the world's premier esports crypto ecosystem. Challenge
               players, manage tournaments, and turn your skill into rewards. The
               arena awaits your arrival.
             </p>
 
-            <div ref={buttonsRef} className="flex flex-col sm:flex-row justify-start gap-4">
+            <div data-hero-reveal className="flex flex-col sm:flex-row justify-start gap-4">
               <button
                 onClick={onExploreClick}
                 className="relative font-semibold text-base px-8 py-6 bg-gradient-to-r from-purple-600 to-amber-500 hover:from-purple-400 hover:to-amber-400 text-white border-0 overflow-hidden group rounded-lg transition-all"
@@ -216,7 +167,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
           animationDelay: "1s",
         }}
       />
-    </section>
+    </Reveal>
   );
 };
 

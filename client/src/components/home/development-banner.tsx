@@ -1,85 +1,20 @@
-import React, { useEffect, useRef } from "react";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-
-gsap.registerPlugin(ScrollTrigger);
+import React from "react";
+import Reveal from "@/components/Reveal";
 
 const AboutSection: React.FC = () => {
-  const sectionRef = useRef<HTMLElement>(null);
-  const titleRef = useRef<HTMLHeadingElement>(null);
-  const descriptionRef = useRef<HTMLParagraphElement>(null);
-  const taglineRef = useRef<HTMLParagraphElement>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      // Initial states
-      gsap.set(titleRef.current, { opacity: 0, y: 12 });
-      gsap.set(descriptionRef.current, { opacity: 0, y: 8 });
-      gsap.set(taglineRef.current, { opacity: 0, y: 8 });
-      gsap.set(cardRef.current, { opacity: 0, scale: 0.99 });
-
-      // Entrance timeline
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: 'top 80%',
-          toggleActions: 'play none none none',
-        },
-      });
-
-      tl.to(cardRef.current, {
-        opacity: 1,
-        scale: 1,
-        duration: 0.8,
-        ease: 'power3.out',
-      })
-        .to(
-          titleRef.current,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.6,
-            ease: 'power3.out',
-          },
-          '-=0.5'
-        )
-        .to(
-          descriptionRef.current,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.6,
-            ease: 'power3.out',
-          },
-          '-=0.4'
-        )
-        .to(
-          taglineRef.current,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.6,
-            ease: 'power3.out',
-          },
-          '-=0.4'
-        );
-    }, sectionRef);
-
-    return () => ctx.revert();
-  }, []);
-
   return (
-    <section
-      ref={sectionRef}
+    <Reveal
+      as="section"
       id="about-usdfg"
       className="relative flex justify-center items-center min-h-[60vh] px-4 sm:px-6 lg:px-12 xl:px-20 py-12 lg:py-16 overflow-hidden"
+      selector="[data-about-reveal]"
+      stagger={false}
     >
 
       {/* Content */}
       <div className="relative z-10 w-full max-w-4xl mx-auto">
         <div
-          ref={cardRef}
+          data-about-reveal
           className="relative w-full bg-black/40 backdrop-blur-sm rounded-lg px-6 lg:px-8 py-8 lg:py-10 flex flex-col items-center transition-all duration-500 kimi-bottom-neon" style={{ 
             '--neon-color': 'rgba(168, 85, 247, 0.3)',
             '--neon-hover-color': 'rgba(168, 85, 247, 0.5)',
@@ -90,7 +25,6 @@ const AboutSection: React.FC = () => {
 
           <div className="relative z-10 w-full flex flex-col items-center text-center space-y-4">
             <h2
-              ref={titleRef}
               className="text-2xl md:text-3xl lg:text-4xl font-bold text-center mb-4"
             >
               What is{' '}
@@ -106,7 +40,6 @@ const AboutSection: React.FC = () => {
             </h2>
             <div className="max-w-2xl mx-auto text-center">
               <p
-                ref={descriptionRef}
                 className="text-base md:text-lg lg:text-xl text-center mb-4 font-semibold text-white leading-relaxed"
                 style={{ textShadow: "0 0 10px rgba(255, 255, 255, 0.2)" }}
               >
@@ -116,7 +49,7 @@ const AboutSection: React.FC = () => {
           </div>
         </div>
       </div>
-    </section>
+    </Reveal>
   );
 };
 

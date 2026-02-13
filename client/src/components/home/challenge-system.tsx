@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { FaBalanceScale, FaLock, FaGavel, FaExclamationTriangle, FaUserShield, FaCheckCircle } from "react-icons/fa";
+import Reveal from "@/components/Reveal";
 
 /**
  * ChallengeSystem
@@ -93,7 +94,7 @@ const ChallengeSystem: React.FC = () => {
   // Render
   // -----------------------------
   return (
-    <section className="py-12 lg:py-16 relative overflow-hidden">
+    <Reveal as="section" className="py-12 lg:py-16 relative overflow-hidden">
 
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
         {/* Rules / Explainer */}
@@ -456,7 +457,7 @@ Unclear or unfair custom rules may be rejected.`}
         .animate-bounce-x { display:inline-block; animation: bounce-x 1.2s infinite alternate; }
         @keyframes bounce-x { 0% { transform: translateX(0);} 100% { transform: translateX(8px);} }
       `}</style>
-    </section>
+    </Reveal>
   );
 };
 

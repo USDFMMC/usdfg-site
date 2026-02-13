@@ -1,9 +1,6 @@
-import React, { useEffect, useRef } from "react";
-import { Swords, Trophy, BarChart3, ArrowRight } from "lucide-react";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-
-gsap.registerPlugin(ScrollTrigger);
+import React from "react";
+import { Swords, Trophy, BarChart3 } from "lucide-react";
+import Reveal from "@/components/Reveal";
 
 const features = [
   {
@@ -33,64 +30,13 @@ const features = [
 ];
 
 const PlatformFeatures: React.FC = () => {
-  const sectionRef = useRef<HTMLElement>(null);
-  const titleRef = useRef<HTMLDivElement>(null);
-  const cardsRef = useRef<(HTMLDivElement | null)[]>([]);
-
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      gsap.fromTo(
-        titleRef.current,
-        { opacity: 0, y: 50 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.8,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: titleRef.current,
-            start: "top 80%",
-            toggleActions: "play none none reverse",
-          },
-        }
-      );
-
-      cardsRef.current.forEach((card, index) => {
-        if (!card) return;
-        gsap.fromTo(
-          card,
-          { opacity: 0, y: 80, rotateX: 15 },
-          {
-            opacity: 1,
-            y: 0,
-            rotateX: 0,
-            duration: 0.8,
-            delay: index * 0.2,
-            ease: "power3.out",
-            scrollTrigger: {
-              trigger: card,
-              start: "top 85%",
-              toggleActions: "play none none reverse",
-            },
-          }
-        );
-      });
-    }, sectionRef);
-
-    return () => ctx.revert();
-  }, []);
-
   return (
-    <section
-      ref={sectionRef}
-      id="platform"
-      className="relative py-24 lg:py-32 w-full"
-    >
+    <Reveal as="section" id="platform" className="relative py-24 lg:py-32 w-full">
       <div className="absolute inset-0 bg-gradient-radial-kimi opacity-50" />
       
       <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
         {/* Section Header - Kimi Exact */}
-        <div ref={titleRef} className="text-center mb-16 lg:mb-20">
+        <Reveal as="div" className="text-center mb-16 lg:mb-20" stagger={false}>
           <span className="inline-block font-body text-sm text-purple-500 uppercase tracking-[0.3em] mb-4">
             THE PLATFORM
           </span>
@@ -106,17 +52,19 @@ const PlatformFeatures: React.FC = () => {
           <p className="font-body text-lg text-white/60 max-w-2xl mx-auto leading-relaxed">
             Three pillars designed to elevate your competitive gaming experience to legendary heights.
           </p>
-        </div>
+        </Reveal>
 
         {/* Feature Cards - Kimi Exact Structure with Images */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto">
+        <Reveal
+          as="div"
+          className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto"
+          selector=".platform-feature-card"
+          stagger
+        >
           {features.map((feature, index) => (
             <div
               key={index}
-              ref={(el) => {
-                cardsRef.current[index] = el;
-              }}
-              className="group relative"
+              className="platform-feature-card group relative"
             >
               <div className="relative h-full glass border border-purple-500/20 rounded-2xl overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)]">
                 {/* Image - Kimi Exact */}
@@ -124,7 +72,7 @@ const PlatformFeatures: React.FC = () => {
                   <img
                     src={feature.image}
                     alt={feature.title}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
                   
@@ -166,9 +114,9 @@ const PlatformFeatures: React.FC = () => {
               </div>
             </div>
           ))}
-        </div>
+        </Reveal>
       </div>
-    </section>
+    </Reveal>
   );
 };
 
