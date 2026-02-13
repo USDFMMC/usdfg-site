@@ -150,9 +150,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
             </h1>
 
             <p ref={subRef} className="neocore-body mb-4 max-w-2xl text-lg sm:text-xl text-white/70 leading-relaxed">
-              Join the world's premier esports crypto ecosystem. Challenge
-              players, manage tournaments, and turn your skill into rewards. The
-              arena awaits your arrival.
+              Skill-Based Competitive Arena
             </p>
 
             <div ref={buttonsRef} className="flex flex-col sm:flex-row justify-start gap-4">
