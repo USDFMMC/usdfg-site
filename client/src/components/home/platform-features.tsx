@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import { Swords, Trophy, BarChart3, ArrowRight } from "lucide-react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -192,6 +193,20 @@ const PlatformFeatures: React.FC = () => {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Bottom CTA (Kimi exact placement + sizing) */}
+        <div className="mt-16 text-center">
+          <p className="font-body text-white/50 mb-4">
+            Ready to experience the future of competitive gaming?
+          </p>
+          <Link
+            to="/app"
+            className="inline-flex items-center gap-2 font-display font-semibold text-purple hover:text-orange transition-colors"
+          >
+            Enter the Arena
+            <ArrowRight className="w-5 h-5" />
+          </Link>
         </div>
       </div>
     </section>
