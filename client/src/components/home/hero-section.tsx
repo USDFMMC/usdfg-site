@@ -151,7 +151,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
             </h1>
 
             <p ref={subRef} className="font-body text-lg sm:text-xl text-white/70 max-w-2xl mb-8 leading-relaxed">
-              Skill-Based Competitive Arena
+              Join the world's premier esports crypto ecosystem. Challenge players, manage tournaments, and turn your skill into rewards. The arena awaits your arrival.
             </p>
 
             <div ref={buttonsRef} className="flex flex-col sm:flex-row justify-start gap-4">
