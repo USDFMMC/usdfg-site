@@ -129,9 +129,25 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
             >
               <span className="block">
                 <span className="text-white">GAME. </span>
-                <span className="text-gradient">EARN.</span>
+                <span
+                  className="bg-gradient-to-r from-green-400 via-emerald-400 to-green-500 bg-clip-text text-transparent"
+                  style={{
+                    textShadow: "0 0 16px rgba(74, 222, 128, 0.28)",
+                    filter: "drop-shadow(0 0 6px rgba(74, 222, 128, 0.22))",
+                  }}
+                >
+                  EARN.
+                </span>
               </span>
-              <span className="block text-gradient">CONQUER.</span>
+              <span
+                className="block bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent"
+                style={{
+                  textShadow: "0 0 16px rgba(251, 191, 36, 0.22)",
+                  filter: "drop-shadow(0 0 6px rgba(251, 191, 36, 0.18))",
+                }}
+              >
+                CONQUER.
+              </span>
             </h1>
 
             <p ref={subRef} className="font-body text-lg sm:text-xl text-white/70 max-w-2xl mb-8 leading-relaxed">
