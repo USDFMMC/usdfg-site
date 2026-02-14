@@ -70,9 +70,8 @@ const GameCategories: React.FC = () => {
       // Kimi Prizes: title trigger + carousel trigger with stagger
       gsap.fromTo(
         titleRef.current,
-        { opacity: 0, y: 50 },
+        { y: 50 },
         {
-          opacity: 1,
           y: 0,
           duration: 0.8,
           ease: "power3.out",
@@ -88,9 +87,8 @@ const GameCategories: React.FC = () => {
       if (cards) {
         gsap.fromTo(
           cards,
-          { opacity: 0, y: 60, scale: 0.9 },
+          { y: 60, scale: 0.9 },
           {
-            opacity: 1,
             y: 0,
             scale: 1,
             duration: 0.6,

@@ -108,9 +108,8 @@ const ChallengeSystem: React.FC = () => {
           const node = el as HTMLElement;
           gsap.fromTo(
             node,
-            { opacity: 0, y: 50 },
+            { y: 50 },
             {
-              opacity: 1,
               y: 0,
               duration: 0.8,
               delay: index * 0.06,
@@ -128,9 +127,8 @@ const ChallengeSystem: React.FC = () => {
       ruleItems.forEach((item, index) => {
         gsap.fromTo(
           item,
-          { opacity: 0, y: 50 },
+          { y: 50 },
           {
-            opacity: 1,
             y: 0,
             duration: 0.8,
             delay: index * 0.05,
@@ -148,9 +146,8 @@ const ChallengeSystem: React.FC = () => {
       if (visualRef.current) {
         gsap.fromTo(
           visualRef.current,
-          { opacity: 0, y: 50 },
+          { y: 50 },
           {
-            opacity: 1,
             y: 0,
             duration: 0.8,
             ease: "power3.out",
@@ -165,9 +162,8 @@ const ChallengeSystem: React.FC = () => {
       if (creatorCardRef.current) {
         gsap.fromTo(
           creatorCardRef.current,
-          { opacity: 0, y: 80, rotateX: 15 },
+          { y: 80, rotateX: 15 },
           {
-            opacity: 1,
             y: 0,
             rotateX: 0,
             duration: 0.8,

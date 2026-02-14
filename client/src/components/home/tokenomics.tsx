@@ -65,9 +65,8 @@ const Tokenomics: React.FC = () => {
         const node = el as HTMLElement;
         gsap.fromTo(
           node,
-          { opacity: 0, y: 50 },
+          { y: 50 },
           {
-            opacity: 1,
             y: 0,
             duration: 0.8,
             delay: index * 0.06,
@@ -85,9 +84,8 @@ const Tokenomics: React.FC = () => {
       cards.forEach((card, index) => {
         gsap.fromTo(
           card,
-          { opacity: 0, y: 80, rotateX: 15 },
+          { y: 80, rotateX: 15 },
           {
-            opacity: 1,
             y: 0,
             rotateX: 0,
             duration: 0.8,
@@ -106,9 +104,8 @@ const Tokenomics: React.FC = () => {
       if (infoRef.current) {
         gsap.fromTo(
           infoRef.current,
-          { opacity: 0, y: 50 },
+          { y: 50 },
           {
-            opacity: 1,
             y: 0,
             duration: 0.8,
             ease: "power3.out",

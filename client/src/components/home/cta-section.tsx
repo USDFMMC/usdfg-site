@@ -30,9 +30,8 @@ const CTASection: React.FC = () => {
       items.forEach((el, index) => {
         gsap.fromTo(
           el,
-          { opacity: 0, y: 50 },
+          { y: 50 },
           {
-            opacity: 1,
             y: 0,
             duration: 0.8,
             delay: index * 0.08,

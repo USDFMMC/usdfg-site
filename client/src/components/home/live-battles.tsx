@@ -84,9 +84,8 @@ const LiveBattles: React.FC = () => {
       // Kimi LiveMatches: title trigger + list trigger with stagger
       gsap.fromTo(
         titleRef.current,
-        { opacity: 0, y: 50 },
+        { y: 50 },
         {
-          opacity: 1,
           y: 0,
           duration: 0.8,
           ease: "power3.out",
@@ -102,9 +101,8 @@ const LiveBattles: React.FC = () => {
       if (items) {
         gsap.fromTo(
           items,
-          { opacity: 0, x: 100 },
+          { x: 40 },
           {
-            opacity: 1,
             x: 0,
             duration: 0.6,
             stagger: 0.1,

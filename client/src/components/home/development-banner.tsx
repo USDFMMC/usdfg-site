@@ -14,10 +14,11 @@ const AboutSection: React.FC = () => {
   useEffect(() => {
     const ctx = gsap.context(() => {
       // Initial states
-      gsap.set(titleRef.current, { opacity: 0, y: 12 });
-      gsap.set(descriptionRef.current, { opacity: 0, y: 8 });
-      gsap.set(taglineRef.current, { opacity: 0, y: 8 });
-      gsap.set(cardRef.current, { opacity: 0, scale: 0.99 });
+      // Avoid pre-hiding content (mobile ScrollTrigger can fail).
+      gsap.set(titleRef.current, { y: 12 });
+      gsap.set(descriptionRef.current, { y: 8 });
+      gsap.set(taglineRef.current, { y: 8 });
+      gsap.set(cardRef.current, { scale: 0.99 });
 
       // Entrance timeline
       const tl = gsap.timeline({

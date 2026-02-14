@@ -170,9 +170,8 @@ const LeaderboardPreview: React.FC = () => {
       // Kimi Leaderboard: separate triggers (not a single timeline)
       gsap.fromTo(
         titleRef.current,
-        { opacity: 0, y: 50 },
+        { y: 50 },
         {
-          opacity: 1,
           y: 0,
           duration: 0.8,
           ease: "power3.out",
@@ -188,9 +187,8 @@ const LeaderboardPreview: React.FC = () => {
       if (podiumCards && podiumCards.length) {
         gsap.fromTo(
           podiumCards,
-          { opacity: 0, y: 100 },
+          { y: 100 },
           {
-            opacity: 1,
             y: 0,
             duration: 1,
             stagger: 0.15,
@@ -208,9 +206,8 @@ const LeaderboardPreview: React.FC = () => {
       if (listItems && listItems.length) {
         gsap.fromTo(
           listItems,
-          { opacity: 0, x: -50 },
+          { x: -20 },
           {
-            opacity: 1,
             x: 0,
             duration: 0.5,
             stagger: 0.08,
