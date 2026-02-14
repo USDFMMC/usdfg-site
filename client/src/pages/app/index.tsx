@@ -5293,7 +5293,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white drop-shadow-[0_0_20px_rgba(255,215,130,0.3)]">
               Welcome to the <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-200">Arena</span>
             </h1>
-            <p className="text-sm md:text-base max-w-2xl mx-auto neocore-body mb-4 px-4">
+            <p className="relative z-10 block text-sm md:text-base max-w-2xl mx-auto text-white/70 mb-4 px-4 leading-relaxed opacity-100">
               Compete in skill-based challenges, earn USDFG, and prove your gaming prowess against players worldwide.
             </p>
             
