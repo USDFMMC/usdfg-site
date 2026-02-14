@@ -144,12 +144,7 @@ const PlatformFeatures: React.FC = () => {
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                     onLoad={() => ScrollTrigger.refresh()}
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
-                  
-                  {/* Shine Effect - Kimi Exact */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-void via-void/50 to-transparent" />
 
                   {/* Icon Badge - Kimi Exact */}
                   <div className="absolute top-4 left-4 w-12 h-12 flex items-center justify-center bg-purple/80 backdrop-blur-sm rounded-xl">
@@ -187,13 +182,13 @@ const PlatformFeatures: React.FC = () => {
                   </a>
                 </div>
 
-                {/* Bottom Gradient - Kimi Exact */}
-                <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${feature.color}`} />
-
                 {/* Hover Glow - Kimi Exact */}
                 <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
                   <div className="absolute inset-0 bg-gradient-to-t from-purple/10 to-transparent" />
                 </div>
+
+                {/* Bottom Gradient Bar (USDFG accent) */}
+                <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${feature.color}`} />
               </div>
             </div>
           ))}

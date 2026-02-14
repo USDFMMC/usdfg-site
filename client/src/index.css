@@ -96,6 +96,28 @@
   --tw-gradient-to: var(--kimi-orange) var(--tw-gradient-to-position);
 }
 
+/* Kimi void gradient stops used across overlays */
+.from-void {
+  --tw-gradient-from: var(--kimi-void) var(--tw-gradient-from-position);
+  --tw-gradient-to: rgba(10, 2, 21, 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+.via-void\/80 {
+  --tw-gradient-to: rgba(10, 2, 21, 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), rgba(10, 2, 21, 0.8) var(--tw-gradient-via-position), var(--tw-gradient-to);
+}
+.via-void\/50 {
+  --tw-gradient-to: rgba(10, 2, 21, 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), rgba(10, 2, 21, 0.5) var(--tw-gradient-via-position), var(--tw-gradient-to);
+}
+.to-void\/50 {
+  --tw-gradient-to: rgba(10, 2, 21, 0.5) var(--tw-gradient-to-position);
+}
+
+/* Orange bg aliases used in Kimi hero */
+.bg-orange\/10 { background-color: rgba(255, 126, 62, 0.1); }
+.bg-orange\/20 { background-color: rgba(255, 126, 62, 0.2); }
+
 /* Kimi dot-grid overlay (used in Kimi hero reference) */
 .bg-kimi-dot-grid {
   background-image: radial-gradient(circle, #333 1px, transparent 1px);
@@ -190,29 +212,17 @@
   animation: spin-slow 20s linear infinite;
 }
 
-/* Kimi pulse-glow animation for floating orbs */
-@keyframes pulseGlow {
-  0%, 100% {
-    opacity: 0.3;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.6;
-    transform: scale(1.1);
-  }
-}
-
-.animate-pulse-glow {
-  animation: pulseGlow 4s ease-in-out infinite;
-}
-
-/* Kimi exact: box-shadow only, 2s (from _kimi .animate-pulse-glow) */
-@keyframes pulseGlowKimi {
+/* Kimi exact: pulse glow is box-shadow, 2s (from _kimi .animate-pulse-glow) */
+@keyframes pulse-glow {
   0%, 100% { box-shadow: 0 0 20px #7e43ff66; }
   50% { box-shadow: 0 0 40px #7e43ffcc; }
 }
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+/* Backwards-compatible alias (we used this earlier in a few spots) */
 .animate-pulse-glow-kimi {
-  animation: pulseGlowKimi 2s ease-in-out infinite;
+  animation: pulse-glow 2s ease-in-out infinite;
 }
 
 /* Kimi float animation for avatars and icons */

@@ -78,10 +78,12 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
           src="/hero-bg.jpg"
           alt="Esports Arena"
           className="w-full h-full object-cover"
+          style={{ filter: "brightness(1.08) saturate(1.15) contrast(1.05)" }}
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-        <div className="absolute inset-0 bg-kimi-purple-tint-10" />
+        <div className="absolute inset-0 bg-gradient-to-r from-void via-void/80 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-void via-transparent to-void/50" />
+        <div className="absolute inset-0 bg-purple/10" />
+        <div className="absolute inset-0 bg-gradient-radial-kimi opacity-70" />
       </div>
 
       {/* Animated Grid Overlay - Kimi Exact */}
@@ -117,46 +119,29 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
               </span>
             </div>
 
-            <div
-              ref={brandRef}
-              className="text-2xl md:text-3xl lg:text-4xl font-bold mb-2 text-white"
-              style={{ textShadow: "0 0 20px rgba(255, 255, 255, 0.3)" }}
-            >
+            <div ref={brandRef} className="font-display font-bold text-2xl md:text-3xl lg:text-4xl mb-2 text-white">
               USDFG
             </div>
 
-            <h1 ref={headlineRef} className="neocore-h1 mb-4 text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold leading-tight">
+            <h1
+              ref={headlineRef}
+              className="font-display font-bold text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl text-white leading-tight mb-6"
+            >
               <span className="block">
                 <span className="text-white">GAME. </span>
-                <span
-                  className="bg-gradient-to-r from-green-400 via-emerald-400 to-green-500 bg-clip-text text-transparent text-fill-transparent"
-                  style={{
-                    textShadow: "0 0 20px rgba(74, 222, 128, 0.4)",
-                    filter: "drop-shadow(0 0 8px rgba(74, 222, 128, 0.3))",
-                  }}
-                >
-                  EARN.
-                </span>
+                <span className="text-gradient">EARN.</span>
               </span>
-              <span
-                className="block bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent text-fill-transparent"
-                style={{
-                  textShadow: "0 0 20px rgba(251, 191, 36, 0.4)",
-                  filter: "drop-shadow(0 0 8px rgba(251, 191, 36, 0.3))",
-                }}
-              >
-                CONQUER.
-              </span>
+              <span className="block text-gradient">CONQUER.</span>
             </h1>
 
-            <p ref={subRef} className="neocore-body mb-4 max-w-2xl text-lg sm:text-xl text-white/70 leading-relaxed">
+            <p ref={subRef} className="font-body text-lg sm:text-xl text-white/70 max-w-2xl mb-8 leading-relaxed">
               Skill-Based Competitive Arena
             </p>
 
             <div ref={buttonsRef} className="flex flex-col sm:flex-row justify-start gap-4">
               <button
                 onClick={onExploreClick}
-                className="relative font-semibold text-base px-8 py-6 bg-gradient-to-r from-purple-600 to-amber-500 hover:from-purple-400 hover:to-amber-400 text-white border-0 overflow-hidden group rounded-lg transition-all"
+                className="relative font-display font-semibold text-base px-8 py-6 bg-gradient-to-r from-purple to-orange hover:from-purple-400 hover:to-orange-400 text-white border-0 overflow-hidden group rounded-lg transition-all"
               >
                 <span className="relative z-10 flex items-center gap-2">
                   EXPLORE PLATFORM
@@ -178,7 +163,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
               </button>
 
               <Link to="/whitepaper">
-                <button className="font-semibold text-base px-8 py-6 border-2 border-purple-500/50 text-white hover:bg-purple-500/20 hover:border-purple-500 rounded-lg transition-all flex items-center gap-2">
+                <button className="font-display font-semibold text-base px-8 py-6 border-2 border-purple/50 text-white hover:bg-purple/20 hover:border-purple rounded-lg transition-all flex items-center gap-2">
                   <svg
                     className="w-5 h-5"
                     fill="none"
@@ -222,20 +207,15 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
       </div>
 
       {/* Decorative Elements */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-[5]" />
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-void to-transparent z-[5]" />
 
       {/* Floating Orbs - Kimi Exact */}
       <div
-        className="absolute top-1/4 right-1/4 w-64 h-64 rounded-full blur-[100px] animate-pulse-glow-kimi"
-        style={{ background: "var(--kimi-purple)", opacity: 0.25 }}
+        className="absolute top-1/4 right-1/4 w-64 h-64 bg-purple/20 rounded-full blur-[100px] animate-pulse-glow"
       />
       <div
-        className="absolute bottom-1/3 right-1/3 w-48 h-48 rounded-full blur-[80px] animate-pulse-glow-kimi"
-        style={{
-          background: "var(--kimi-orange)",
-          opacity: 0.15,
-          animationDelay: "1s",
-        }}
+        className="absolute bottom-1/3 right-1/3 w-48 h-48 bg-orange/10 rounded-full blur-[80px] animate-pulse-glow"
+        style={{ animationDelay: "1s" }}
       />
     </section>
   );
