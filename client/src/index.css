@@ -69,6 +69,12 @@
   background-image: linear-gradient(135deg, gold, #fa0, gold);
 }
 
+/* Safari/iOS: ensure clipped gradient text renders consistently */
+.text-fill-transparent {
+  -webkit-text-fill-color: transparent;
+  text-fill-color: transparent;
+}
+
 /* Kimi gradient stop aliases used in their markup */
 .from-purple\/10 {
   --tw-gradient-from: rgba(126, 67, 255, 0.1) var(--tw-gradient-from-position);

@@ -103,7 +103,7 @@ const PlatformFeatures: React.FC = () => {
           <h2 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white mb-6">
             THE{" "}
             <span
-              className="bg-gradient-to-r from-green-400 via-emerald-400 to-green-500 bg-clip-text text-transparent"
+              className="bg-gradient-to-r from-green-400 via-emerald-400 to-green-500 bg-clip-text text-transparent text-fill-transparent"
               style={{
                 textShadow: "0 0 20px rgba(74, 222, 128, 0.4)",
                 filter: "drop-shadow(0 0 8px rgba(74, 222, 128, 0.3))",
@@ -113,7 +113,7 @@ const PlatformFeatures: React.FC = () => {
             </span>{" "}
             OF{" "}
             <span
-              className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent"
+              className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent text-fill-transparent"
               style={{
                 textShadow: "0 0 20px rgba(251, 191, 36, 0.4)",
                 filter: "drop-shadow(0 0 8px rgba(251, 191, 36, 0.3))",
