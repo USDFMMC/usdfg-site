@@ -77,6 +77,10 @@ const PlatformFeatures: React.FC = () => {
           }
         );
       });
+
+      // This section is mounted after an interaction (post-load), and images can shift layout.
+      // Force a refresh so card triggers don't get stuck at opacity: 0.
+      gsap.delayedCall(0.1, () => ScrollTrigger.refresh());
     }, sectionRef);
 
     return () => ctx.revert();
@@ -138,6 +142,7 @@ const PlatformFeatures: React.FC = () => {
                     src={feature.image}
                     alt={feature.title}
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    onLoad={() => ScrollTrigger.refresh()}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
                   
