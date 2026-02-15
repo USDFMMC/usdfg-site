@@ -97,20 +97,20 @@ const AdRotationBox: React.FC = () => {
   // If no ad images, show fallback win rate display
   if (adImages.length === 0 || !adImages[0]) {
     return (
-      <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
+      <div className="relative min-h-[92px] rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden flex flex-col items-center justify-center">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
         <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
         <div className="relative z-10">
-          <div className="text-lg mb-1">📈</div>
-          <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">+12.5%</div>
-          <div className="text-sm text-amber-400 mt-1 font-semibold">Win Rate</div>
+          <div className="text-base sm:text-lg mb-1 leading-none">📈</div>
+          <div className="text-base sm:text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)] leading-none">+12.5%</div>
+          <div className="text-[11px] sm:text-sm text-amber-400 mt-1 font-semibold leading-tight">Win Rate</div>
         </div>
       </div>
     );
   }
   
   return (
-    <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
+    <div className="relative min-h-[92px] rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden flex flex-col items-center justify-center">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-30" />
       <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
       
@@ -1154,11 +1154,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     if (!firestoreChallenges) return;
 
     const activeChallenges = firestoreChallenges.filter(
-      (c: any) =>
-        c.status === 'active' ||
-        c.status === 'pending_waiting_for_opponent' ||
-        c.status === 'creator_confirmation_required' ||
-        c.status === 'creator_funded'
+      (c: any) => {
+        const status = c.status ?? c.rawData?.status;
+        return (
+          status === 'active' ||
+          status === 'pending_waiting_for_opponent' ||
+          status === 'creator_confirmation_required' ||
+          status === 'creator_funded'
+        );
+      }
     );
 
     setActiveChallengesCount(activeChallenges.length);
@@ -4040,8 +4044,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     const currentWalletLower = (publicKey?.toString() || '').toLowerCase();
     // Always return a real array so .some() never runs on a number or object (Firestore can store players as count)
     const getPlayerList = (c: any): string[] => {
-      const raw = c?.players ?? c?.rawData?.players;
-      return Array.isArray(raw) ? raw : [];
+      // In this page we often normalize `players` to a COUNT (number) for UI,
+      // but participation checks need the underlying array from Firestore (`rawData.players`).
+      const playersTop = c?.players;
+      if (Array.isArray(playersTop)) return playersTop;
+      const playersRaw = c?.rawData?.players;
+      return Array.isArray(playersRaw) ? playersRaw : [];
     };
     const playerListIncludes = (c: any, walletLower: string): boolean => {
       const arr = getPlayerList(c);
@@ -4061,18 +4069,24 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const myChallengesMatch = !showMyChallenges || cw === currentWalletLower || ch === currentWalletLower || playerListIncludes(challenge, currentWalletLower);
       
       // Check if challenge is expired (normalize Timestamp to ms for comparison)
+      const status = (challenge.status ?? challenge.rawData?.status) as string | undefined;
       const expMs = challenge.expiresAt != null
         ? (typeof challenge.expiresAt === 'number' ? challenge.expiresAt : (challenge.expiresAt?.toMillis?.() ?? challenge.expiresAt?.toDate?.()?.getTime?.()))
         : null;
       const timerMs = challenge.rawData?.expirationTimer != null
         ? (typeof challenge.rawData.expirationTimer === 'number' ? challenge.rawData.expirationTimer : (challenge.rawData.expirationTimer?.toMillis?.() ?? challenge.rawData.expirationTimer?.toDate?.()?.getTime?.()))
         : null;
-      const isExpired = challenge.status === 'cancelled' || 
-        (expMs != null && expMs < now) ||
-        (timerMs != null && timerMs < now);
+      const timeExpired = (expMs != null && expMs < now) || (timerMs != null && timerMs < now);
+      // Only treat time as "expired" for pre-match states.
+      // Active matches may legitimately run past `expiresAt` if the backend didn't flip statuses promptly.
+      const isPreMatch =
+        status === 'pending_waiting_for_opponent' ||
+        status === 'creator_confirmation_required' ||
+        status === 'creator_funded';
+      const isExpired = status === 'cancelled' || (isPreMatch && timeExpired);
       
       // Also exclude completed and disputed challenges from joinable list
-      const isCompleted = challenge.status === 'completed' || challenge.status === 'disputed';
+      const isCompleted = status === 'completed' || status === 'disputed';
       
       // Only show joinable challenges (unless user wants to see their own challenges)
       // OR if admin viewing completed Founder Tournament (for payout)
@@ -5264,7 +5278,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         />
 
         {/* Live Data Tracker */}
-        <div className="container mx-auto px-4 py-2 w-full">
+        <div className="container mx-auto px-4 md:px-2 py-2 w-full">
           <div className="flex items-center justify-between text-sm w-full">
             <div className="flex items-center space-x-2 flex-shrink-0">
               <div className={`w-2 h-2 rounded-full ${!challengesLoading && !challengesError ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
@@ -5279,7 +5293,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         </div>
 
         {/* Main Content - constrained width on desktop for better density */}
-        <div className="container mx-auto px-2 py-1 sm:py-2 w-full max-w-6xl">
+        <div className="container mx-auto px-4 md:px-2 py-1 sm:py-2 w-full max-w-6xl">
           {/* Hero Section - tighter on desktop */}
           <div className="text-center neocore-section md:mb-2">
             {/* USDFG Price Ticker */}
@@ -5293,11 +5307,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white drop-shadow-[0_0_20px_rgba(255,215,130,0.3)]">
               Welcome to the <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-200">Arena</span>
             </h1>
-            <p className="relative z-10 block text-sm md:text-base max-w-2xl mx-auto text-white/70 mb-4 px-4 leading-relaxed opacity-100">
+            <p className="relative z-10 block text-sm md:text-base max-w-2xl mx-auto text-white/70 mb-4 px-0 leading-relaxed opacity-100">
               Compete in skill-based challenges, earn USDFG, and prove your gaming prowess against players worldwide.
             </p>
             
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-4">
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-2 px-0">
                   <button 
                     onClick={() => setShowCreateModal(true)}
                     className="elite-btn neocore-button px-2 sm:px-3 py-1 sm:py-1.5 w-full sm:w-auto text-xs sm:text-sm"
@@ -5360,41 +5374,41 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             )}
           </div>
 
-          {/* Quick Stats - compact on desktop */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3 md:mb-4">
-            <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
+          {/* Quick Stats - Kimi-like compact strip on mobile */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3 md:mb-4">
+            <div className="relative min-h-[92px] rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden flex flex-col items-center justify-center">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
               <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
               <div className="relative z-10">
-                <div className="text-lg mb-1">🏆</div>
-                <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">
+                <div className="text-base sm:text-lg mb-1 leading-none">🏆</div>
+                <div className="text-base sm:text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)] leading-none">
                   {activeChallengesCount.toLocaleString()}
                 </div>
-                <div className="text-sm text-amber-400 mt-1 font-semibold">Active Challenges</div>
+                <div className="text-[11px] sm:text-sm text-amber-400 mt-1 font-semibold leading-tight">Active Challenges</div>
               </div>
             </div>
             
-            <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
+            <div className="relative min-h-[92px] rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden flex flex-col items-center justify-center">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
               <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
               <div className="relative z-10">
-                <div className="text-lg mb-1">👥</div>
-                <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">
+                <div className="text-base sm:text-lg mb-1 leading-none">👥</div>
+                <div className="text-base sm:text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)] leading-none">
                   {arenaPlayersCount.toLocaleString()}
                 </div>
-                <div className="text-sm text-amber-400 mt-1 font-semibold">Join the arena</div>
+                <div className="text-[11px] sm:text-sm text-amber-400 mt-1 font-semibold leading-tight">Join the arena</div>
               </div>
             </div>
             
-            <div className="relative rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden">
+            <div className="relative min-h-[92px] rounded-lg bg-[#07080C]/95 border border-amber-500/30 p-2 text-center hover:border-amber-400/60 shadow-[0_0_40px_rgba(255,215,130,0.08)] hover:shadow-[0_0_60px_rgba(255,215,130,0.12)] transition-all overflow-hidden flex flex-col items-center justify-center">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,235,170,.08),transparent_70%)] opacity-60" />
               <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-amber-300/60 to-transparent animate-[borderPulse_3s_ease-in-out_infinite]" />
               <div className="relative z-10">
-                <div className="text-lg mb-1">⚡</div>
-                <div className="text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)]">
+                <div className="text-base sm:text-lg mb-1 leading-none">⚡</div>
+                <div className="text-base sm:text-lg font-semibold text-white drop-shadow-[0_0_10px_rgba(255,215,130,0.3)] leading-none">
                   {totalUSDFGRewarded.toLocaleString()}
                 </div>
-                <div className="text-sm text-amber-400 mt-1 font-semibold">USDFG Rewarded</div>
+                <div className="text-[11px] sm:text-sm text-amber-400 mt-1 font-semibold leading-tight">USDFG Rewarded</div>
               </div>
             </div>
             
@@ -5405,7 +5419,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           {/* Live Challenges Discovery Section - Category-based horizontal scrolling (id for #challenges anchor on mobile) */}
           <div id="challenges" className="relative mb-4 md:mb-6 scroll-mt-4">
             {/* Header - tighter gap on desktop */}
-            <div className="mb-2 md:mb-3 px-4 md:px-0 flex flex-wrap items-center gap-2">
+            <div className="mb-2 md:mb-3 px-0 md:px-0 flex flex-wrap items-center gap-2">
               <h1 className="text-lg md:text-2xl font-semibold text-white mb-0.5">Live Challenges</h1>
               {selectedCategoryFilter && (
                 <button
@@ -5734,7 +5748,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 <>
                   {completedFounderNeedingPayout.length > 0 && (
                     <section className="mb-4">
-                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-4 md:px-0">
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-0 md:px-0">
                         <h2 className="text-sm font-semibold tracking-wide text-amber-400">
                           Batch Founder Payout
                         </h2>
@@ -5747,21 +5761,21 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           {isAirdropping ? 'Sending…' : `Send all in one (${completedFounderNeedingPayout.length} tournament${completedFounderNeedingPayout.length === 1 ? '' : 's'}) — one SOL fee`}
                         </button>
                       </div>
-                      <p className="mb-2 px-4 md:px-0 text-xs text-white/50">
+                      <p className="mb-2 px-0 md:px-0 text-xs text-white/50">
                         One combined airdrop for all tournaments above — pay SOL fee once.
                       </p>
                     </section>
                   )}
                   {completedFounderForPayout.length > 0 && (
                     <section className="mb-6">
-                      <div className="mb-2 flex items-center justify-between px-4 md:px-0">
+                      <div className="mb-2 flex items-center justify-between px-0 md:px-0">
                         <h2 className="text-sm font-semibold tracking-wide text-purple-400">
                           Founder Payout
                         </h2>
                         <span className="text-xs text-white/45">Tap to open & send airdrop per tournament</span>
                       </div>
                       <div
-                        className="flex gap-3 overflow-x-auto pb-4 px-4 md:px-0 md:pb-2"
+                        className="flex gap-3 overflow-x-auto pb-4 px-0 md:px-0 md:pb-2"
                         style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-x', scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                       >
                         {completedFounderForPayout.map((challenge: any) => (
@@ -5780,8 +5794,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     if (items.length === 0 && selectedCategoryFilter === categoryTitle) {
                       return (
                         <section key={categoryTitle} className="mb-6">
-                          <h2 className={`text-sm font-semibold tracking-wide mb-3 px-4 md:px-0 ${categoryTitleClass(categoryTitle)}`}>{categoryTitle}</h2>
-                          <p className="text-sm text-white/50 px-4 md:px-0">No challenges in this category yet.</p>
+                          <h2 className={`text-sm font-semibold tracking-wide mb-3 px-0 md:px-0 ${categoryTitleClass(categoryTitle)}`}>{categoryTitle}</h2>
+                          <p className="text-sm text-white/50 px-0 md:px-0">No challenges in this category yet.</p>
                         </section>
                       );
                     }
@@ -5789,7 +5803,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     
                                 return (
                       <section key={categoryTitle} className="mb-6">
-                        <div className="mb-2 flex items-center justify-between px-4 md:px-0">
+                        <div className="mb-2 flex items-center justify-between px-0 md:px-0">
                           <h2 className={`text-sm font-semibold tracking-wide ${categoryTitleClass(categoryTitle)}`}>
                             {categoryTitle}
                           </h2>
@@ -5797,7 +5811,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                   </div>
 
                         <div 
-                          className="flex gap-3 overflow-x-auto pb-4 px-4 md:px-0 md:pb-2" 
+                          className="flex gap-3 overflow-x-auto pb-4 px-0 md:px-0 md:pb-2" 
                           style={{ 
                             WebkitOverflowScrolling: 'touch',
                             touchAction: 'pan-x',
@@ -5826,10 +5840,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                       : null;
                                     return fromExpiresAt ?? fromTimer ?? null;
                                   })();
-                                  const isExpired = challenge.status === 'cancelled' || (expMs != null && expMs < now);
+                                  const status = (challenge.status ?? challenge.rawData?.status) as string | undefined;
+                                  const timeExpired = expMs != null && expMs < now;
+                                  const isPreMatch =
+                                    status === 'pending_waiting_for_opponent' ||
+                                    status === 'creator_confirmation_required' ||
+                                    status === 'creator_funded';
+                                  const isExpired = status === 'cancelled' || (isPreMatch && timeExpired);
                                   if (isExpired) return;
 
-                                  const isCompletedOrDisputed = challenge.status === "completed" || challenge.status === "disputed";
+                                  const isCompletedOrDisputed = status === "completed" || status === "disputed";
                                   const payoutTriggered = !!challenge.rawData?.payoutTriggered;
                                   const creator = (challenge.creator ?? challenge.rawData?.creator) ?? '';
                                   const challenger = (challenge.challenger ?? challenge.rawData?.challenger) ?? '';
@@ -5923,7 +5943,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 </h2>
                 <p className="text-xs text-zinc-400 mt-1">{leaderboardSubtitle}</p>
                 
-                <div className="mt-4 flex items-center justify-center gap-2 px-6">
+                <div className="mt-4 flex items-center justify-center gap-2 px-4 md:px-6">
                   <button
                     type="button"
                     onClick={() => handleLeaderboardViewChange('individual')}
@@ -5951,7 +5971,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 </div>
                 
                 {/* Search Bar */}
-                <div className="mt-4 px-6">
+                <div className="mt-4 px-4 md:px-6">
                   <div className="relative">
                     <input
                       type="text"
@@ -5966,7 +5986,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                   </div>
                 </div>
               </div>
-              <div className="relative z-10 p-6">
+              <div className="relative z-10 p-4 md:p-6">
                 
                 {isLoadingLeaderboard ? (
                   <div className="flex justify-center items-center py-8">
