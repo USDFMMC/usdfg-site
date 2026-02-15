@@ -299,6 +299,8 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
 
   // Auto-fill when only creator is in 4/8/16 tournament (creator opens lobby; once per challenge)
   useEffect(() => {
+    // DEV/TEST ONLY: never auto-fill tournaments on production.
+    if (!isDevTestEnv) return;
     if (
       !isCreator ||
       ![4, 8, 16].includes(maxPlayers) ||
@@ -506,7 +508,12 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
               🗑️ Delete Tournament
             </button>
           )}
-          {isCreator && [4, 8, 16].includes(maxPlayers) && currentPlayers <= 1 && creatorWallet && isWaitingForPlayers && (
+          {isDevTestEnv &&
+            isCreator &&
+            [4, 8, 16].includes(maxPlayers) &&
+            currentPlayers <= 1 &&
+            creatorWallet &&
+            isWaitingForPlayers && (
             <button
               onClick={async () => {
                 setDevFillLoading(true);
@@ -724,15 +731,32 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
                 <div className="text-xs font-semibold text-white/80">{challengePlatform}</div>
               </div>
             </div>
-            {isDevTestEnv && (isCreator || isAdminViewer) && selectedMatch && selectedMatch.match.status !== "completed" && selectedMatch.match.player1 && selectedMatch.match.player2 && (
+            {((
+              // DEV/TEST: allow creator/admin to control bracket without real players.
+              (isDevTestEnv && (isCreator || isAdminViewer)) ||
+              // PROD: allow admin override for Founder tournaments so mock wallets don't block testing/ops.
+              (isAdminViewer && isFounderTournament)
+            ) &&
+              selectedMatch &&
+              selectedMatch.match.status !== "completed" &&
+              selectedMatch.match.player1 &&
+              selectedMatch.match.player2) && (
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[10px] uppercase text-white/50">Test:</span>
+                <span className="text-[10px] uppercase text-white/50">
+                  {isDevTestEnv ? "Test:" : "Admin override:"}
+                </span>
                 <button
                   type="button"
                   onClick={async (e) => {
                     e.stopPropagation();
                     const { match } = selectedMatch;
                     if (!match.player1) return;
+                    if (!isDevTestEnv && isAdminViewer) {
+                      const ok = window.confirm(
+                        `Advance winner for this match as admin?\n\nWinner: ${slotLabel(match.player1)}\n\nThis is an override for testing/ops and should only be used when mock wallets cannot submit results.`
+                      );
+                      if (!ok) return;
+                    }
                     setDevSetWinnerLoading(match.id);
                     try {
                       await advanceBracketWinner(challengeId, match.id, match.player1);
@@ -753,6 +777,12 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
                     e.stopPropagation();
                     const { match } = selectedMatch;
                     if (!match.player2) return;
+                    if (!isDevTestEnv && isAdminViewer) {
+                      const ok = window.confirm(
+                        `Advance winner for this match as admin?\n\nWinner: ${slotLabel(match.player2)}\n\nThis is an override for testing/ops and should only be used when mock wallets cannot submit results.`
+                      );
+                      if (!ok) return;
+                    }
                     setDevSetWinnerLoading(match.id);
                     try {
                       await advanceBracketWinner(challengeId, match.id, match.player2);

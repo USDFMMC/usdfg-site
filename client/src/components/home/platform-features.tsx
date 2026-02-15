@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useLayoutEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Swords, Trophy, BarChart3, ArrowRight } from "lucide-react";
 import gsap from "gsap";
@@ -36,48 +36,59 @@ const features = [
 const PlatformFeatures: React.FC = () => {
   const sectionRef = useRef<HTMLElement>(null);
   const titleRef = useRef<HTMLDivElement>(null);
+  const kickerRef = useRef<HTMLSpanElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const bitcoinRef = useRef<HTMLSpanElement>(null);
+  const gamingRef = useRef<HTMLSpanElement>(null);
+  const descRef = useRef<HTMLParagraphElement>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const ctx = gsap.context(() => {
-      // Title animation (Kimi exact pattern)
-      gsap.fromTo(
-        titleRef.current,
-        // Avoid pre-hiding. If ScrollTrigger fails to fire (mobile, reduced motion, SPA mount),
-        // we still want the section to be visible.
-        { y: 50 },
-        {
-          y: 0,
-          duration: 0.8,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: titleRef.current,
-            start: "top 80%",
-            toggleActions: "play none none reverse",
-          },
-        }
+      const root = sectionRef.current;
+      if (!root) return;
+
+      const cards = Array.from(
+        root.querySelectorAll<HTMLElement>("[data-platform-feature-card]")
       );
 
-      // Cards: each card triggers + reveals one-by-one (Kimi exact)
-      const cards = Array.from(sectionRef.current?.querySelectorAll<HTMLElement>("[data-platform-feature-card]") ?? []);
-      cards.forEach((card, index) => {
-        gsap.fromTo(
-          card,
-          // Avoid opacity: 0 so cards never get stuck invisible if triggers don't run.
-          { y: 80, rotateX: 15 },
-          {
-            y: 0,
-            rotateX: 0,
-            duration: 0.8,
-            delay: index * 0.2,
-            ease: "power3.out",
-            scrollTrigger: {
-              trigger: card,
-              start: "top 85%",
-              toggleActions: "play none none reverse",
-            },
-          }
-        );
+      // Kimi-style: pre-state + single trigger with stagger so reverse feels right.
+      // This section is mounted after an interaction (post-load), so we follow with refreshes.
+      const titleEls: (Element | null)[] = [
+        kickerRef.current,
+        headingRef.current,
+        bitcoinRef.current,
+        gamingRef.current,
+        descRef.current,
+      ];
+      gsap.set(titleEls.filter(Boolean), { opacity: 0, y: 24 });
+      gsap.set(cards, { opacity: 0, y: 44, rotateX: 10, transformPerspective: 1000 });
+
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: root,
+          start: "top 75%",
+          toggleActions: "play none none reverse",
+          invalidateOnRefresh: true,
+        },
       });
+
+      tl.to(kickerRef.current, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 0);
+      // Heading: reveal base, then accent words with a touch of stagger.
+      tl.to(headingRef.current, { opacity: 1, y: 0, duration: 0.65, ease: "power3.out" }, 0.06);
+      tl.to([bitcoinRef.current, gamingRef.current], { opacity: 1, y: 0, duration: 0.6, ease: "power3.out", stagger: 0.08 }, 0.12);
+      tl.to(descRef.current, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.18);
+      tl.to(
+        cards,
+        {
+          opacity: 1,
+          y: 0,
+          rotateX: 0,
+          duration: 0.75,
+          ease: "power3.out",
+          stagger: 0.12,
+        },
+        0.22
+      );
 
       // This section is mounted after an interaction (post-load), and images can shift layout.
       // Force a refresh so card triggers don't get stuck at opacity: 0.
@@ -95,15 +106,22 @@ const PlatformFeatures: React.FC = () => {
     >
       <div className="absolute inset-0 bg-gradient-radial-kimi opacity-50" />
       
-      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
+      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20 max-w-6xl mx-auto">
         {/* Section Header - Kimi Exact */}
         <div ref={titleRef} className="text-center mb-16 lg:mb-20">
-          <span className="inline-block font-body text-sm text-purple uppercase tracking-[0.3em] mb-4">
+          <span
+            ref={kickerRef}
+            className="inline-block font-body text-sm text-purple uppercase tracking-[0.3em] mb-4"
+          >
             The Platform
           </span>
-          <h2 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white mb-6">
+          <h2
+            ref={headingRef}
+            className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white mb-6"
+          >
             THE{" "}
             <span
+              ref={bitcoinRef}
               className="bg-gradient-to-r from-green-400 via-emerald-400 to-green-500 bg-clip-text text-transparent text-fill-transparent"
               style={{
                 textShadow: "0 0 20px rgba(74, 222, 128, 0.4)",
@@ -114,6 +132,7 @@ const PlatformFeatures: React.FC = () => {
             </span>{" "}
             OF{" "}
             <span
+              ref={gamingRef}
               className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent text-fill-transparent"
               style={{
                 textShadow: "0 0 20px rgba(251, 191, 36, 0.4)",
@@ -123,7 +142,10 @@ const PlatformFeatures: React.FC = () => {
               GAMING
             </span>
           </h2>
-          <p className="font-body text-lg text-white/60 max-w-2xl mx-auto">
+          <p
+            ref={descRef}
+            className="font-body text-lg text-white/60 max-w-2xl mx-auto"
+          >
             USDFG is a skill-based competition platform where players challenge each other directly, lock challenge assets on-chain, compete, and earn verified rewards through performance. Wallet-driven, non-custodial, and built for skill.
           </p>
         </div>
