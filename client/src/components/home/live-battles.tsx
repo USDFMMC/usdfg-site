@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Radio, Clock, Users, Eye, ChevronRight } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Clock, Eye, ChevronRight } from 'lucide-react';
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
@@ -127,40 +126,37 @@ const LiveBattles: React.FC = () => {
     return num.toString();
   };
 
+  const liveCount = matches.filter((m) => m.status === 'live').length;
+
   return (
     <section
       ref={sectionRef}
       id="matches"
-      className="relative py-24 lg:py-32 w-full"
+      className="relative py-16 lg:py-20 w-full"
     >
-      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20">
-        {/* Section Header */}
-        <div ref={titleRef} className="flex flex-col lg:flex-row lg:items-end lg:justify-between mb-12 lg:mb-16">
-          <div>
-            <span className="inline-flex items-center gap-2 font-body text-sm text-orange uppercase tracking-[0.3em] mb-4">
-              <Radio className="w-4 h-4 animate-live-pulse" />
-              Live Competition
+      <div className="relative z-10 w-full max-w-2xl mx-auto px-4 sm:px-6">
+        {/* Section Header - reference: single row, green dot + "X Live Now", "View All" + chevron */}
+        <div
+          ref={titleRef}
+          className="flex items-center justify-between mb-4"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0 animate-pulse" />
+            <span className="font-body text-sm font-medium text-white">
+              {liveCount} Live Now
             </span>
-            <h2 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-white">
-              ACTIVE <span className="text-gradient">CHALLENGES</span>
-            </h2>
           </div>
-          <div className="mt-4 lg:mt-0 flex items-center gap-4">
-            <div className="flex items-center gap-2 px-4 py-2 glass rounded-full border border-purple/30">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-live-pulse" />
-              <span className="font-body text-sm text-white/70">
-                {matches.filter((m) => m.status === 'live').length} Live Now
-              </span>
-            </div>
-            <button className="font-body text-sm text-white/70 hover:text-orange transition-colors flex items-center gap-1">
-              View All
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+          <button
+            type="button"
+            className="font-body text-sm text-purple-300 hover:text-purple-200 transition-colors flex items-center gap-0.5"
+          >
+            View All
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Matches List */}
-        <div ref={listRef} className="space-y-4">
+        {/* Matches List - uniform card height, consistent padding */}
+        <div ref={listRef} className="space-y-3">
           {matches.map((match) => (
             <div
               key={match.id}
@@ -170,140 +166,104 @@ const LiveBattles: React.FC = () => {
               }
             >
               <div
-                className={`relative glass border ${
+                className={`relative flex items-center min-h-[56px] px-4 py-3 rounded-xl border transition-all duration-300 cursor-pointer ${
                   match.status === 'live'
-                    ? 'border-orange-500/50'
-                    : 'border-purple-500/20 hover:border-purple-500/50'
-                } rounded-2xl overflow-hidden transition-all duration-500 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)] cursor-pointer`}
+                    ? 'border-orange-500/60 bg-orange-500/5 hover:border-orange-400/70'
+                    : 'border-white/10 bg-white/[0.03] hover:border-white/20'
+                }`}
               >
-                {/* Shine Effect - Kimi style */}
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                {/* Status: LIVE pill or clock + time */}
+                <div className="flex-shrink-0 w-[72px] sm:w-20 flex items-center gap-1.5">
+                  {match.status === 'live' ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-orange-500/90 text-white text-[10px] font-bold uppercase tracking-wide">
+                      LIVE
+                    </span>
+                  ) : (
+                    <>
+                      <Clock className="w-4 h-4 text-white/50 flex-shrink-0" />
+                      <span className="font-body text-sm text-white/90">
+                        {match.time}
+                      </span>
+                    </>
+                  )}
                 </div>
 
-                {/* Main Row */}
-                <div className="flex items-center p-4 sm:p-6">
-                  {/* Status Indicator */}
-                  <div className="flex-shrink-0 w-16 sm:w-24">
-                    {match.status === 'live' ? (
-                      <Badge className="bg-orange-500/20 text-orange-500 border-orange-500/50 animate-live-pulse">
-                        LIVE
-                      </Badge>
-                    ) : (
-                      <div className="flex items-center gap-1 text-white/50">
-                        <Clock className="w-4 h-4" />
-                        <span className="font-body text-sm">{match.time}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Teams */}
-                  <div className="flex-1 min-w-0 px-4">
-                    <div className="flex items-center justify-center gap-3 sm:gap-6">
-                      <span className="font-display font-semibold text-sm sm:text-lg text-white truncate">
-                        {match.team1}
-                      </span>
-                      <span className="flex-shrink-0 font-display font-bold text-xs sm:text-sm text-white/40">
-                        VS
-                      </span>
-                      <span className="font-display font-semibold text-sm sm:text-lg text-white truncate">
-                        {match.team2}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Game & Format */}
-                  <div className="flex-shrink-0 hidden sm:flex items-center gap-6">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`w-2 h-2 rounded-full bg-gradient-to-r ${
-                          gameColors[match.game] || 'from-purple-500 to-orange-500'
-                        }`}
-                      />
-                      <span className="font-body text-sm text-white/60">
-                        {match.game}
-                      </span>
-                    </div>
-                    <div className="font-body text-sm text-white/40">
-                      {match.format}
-                    </div>
-                  </div>
-
-                  {/* Mobile: Game only */}
-                  <div className="flex-shrink-0 sm:hidden">
-                    <div
-                      className={`w-2 h-2 rounded-full bg-gradient-to-r ${
-                        gameColors[match.game] || 'from-purple-500 to-orange-500'
-                      }`}
-                    />
-                  </div>
-
-                  {/* Expand Icon */}
-                  <div className="flex-shrink-0 ml-4">
-                    <ChevronRight
-                      className={`w-5 h-5 text-white/40 transition-transform duration-300 ${
-                        expandedId === match.id ? 'rotate-90' : ''
-                      }`}
-                    />
-                  </div>
+                {/* Teams: truncated with ellipsis */}
+                <div className="flex-1 min-w-0 flex items-center justify-center gap-2 sm:gap-3 px-2">
+                  <span className="font-display font-semibold text-sm text-white truncate max-w-[28%] sm:max-w-[120px]">
+                    {match.team1}
+                  </span>
+                  <span className="flex-shrink-0 font-body text-[10px] sm:text-xs text-white/50">
+                    VS
+                  </span>
+                  <span className="font-display font-semibold text-sm text-white truncate max-w-[28%] sm:max-w-[120px]">
+                    {match.team2}
+                  </span>
                 </div>
 
-                {/* Bottom Gradient - Kimi style */}
-                <div
-                  className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${
-                    gameColors[match.game] || "from-purple-500 to-orange-500"
-                  }`}
-                />
+                {/* Colored dot + chevron */}
+                <div className="flex-shrink-0 flex items-center gap-2">
+                  <div
+                    className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                      match.status === 'live'
+                        ? 'bg-blue-400'
+                        : 'bg-gradient-to-r ' + (gameColors[match.game] || 'from-purple-500 to-orange-500')
+                    }`}
+                  />
+                  <ChevronRight
+                    className={`w-5 h-5 text-white/40 flex-shrink-0 transition-transform duration-300 ${
+                      expandedId === match.id ? 'rotate-90' : ''
+                    }`}
+                  />
+                </div>
+              </div>
 
-                {/* Expanded Content */}
-                <div
-                  className={`overflow-hidden transition-all duration-300 ${
-                    expandedId === match.id ? 'max-h-32' : 'max-h-0'
-                  }`}
-                >
-                  <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-0 border-t border-purple-500/10">
-                    <div className="flex flex-wrap items-center justify-between gap-4 pt-4">
-                      <div className="flex items-center gap-6">
-                        {match.viewers && (
-                          <div className="flex items-center gap-2 text-white/60">
-                            <Eye className="w-4 h-4" />
-                            <span className="kimi-font-body text-sm">
-                              {formatViewers(match.viewers)} watching
-                            </span>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2 text-white/60">
-                          <Users className="w-4 h-4" />
-                          <span className="kimi-font-body text-sm">
-                            Skill-Based
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex gap-3">
-                        <button className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 kimi-font-body text-sm rounded-lg transition-colors">
-                          Watch Stream
-                        </button>
-                        <button className="px-4 py-2 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 kimi-font-body text-sm rounded-lg transition-colors">
-                          View Results
-                        </button>
-                      </div>
+              {/* Expanded row (optional detail) */}
+              <div
+                className={`overflow-hidden transition-all duration-300 ${
+                  expandedId === match.id ? 'max-h-28' : 'max-h-0'
+                }`}
+              >
+                <div className="px-4 py-3 border border-t-0 border-white/10 rounded-b-xl bg-white/[0.02]">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-4 text-white/60 text-xs">
+                      {match.viewers != null && (
+                        <span className="flex items-center gap-1">
+                          <Eye className="w-3.5 h-3.5" />
+                          {formatViewers(match.viewers)} watching
+                        </span>
+                      )}
+                      <span>{match.game}</span>
+                      <span>{match.format}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="px-3 py-1.5 bg-purple-500/20 text-purple-300 text-xs rounded-lg hover:bg-purple-500/30"
+                      >
+                        Watch
+                      </button>
+                      <button
+                        type="button"
+                        className="px-3 py-1.5 bg-orange-500/20 text-orange-300 text-xs rounded-lg hover:bg-orange-500/30"
+                      >
+                        View
+                      </button>
                     </div>
                   </div>
-                </div>
-
-                {/* Hover Glow */}
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-orange-500/5" />
                 </div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* View All Button */}
-        <div className="mt-8 text-center">
-          <button className="inline-flex items-center gap-2 px-6 py-3 kimi-glass border border-purple-500/30 rounded-full kimi-font-body text-white/70 hover:text-white hover:border-purple-500/60 transition-all">
-            View All Challenges
+        {/* View All Matches - reference: full-width, rounded, dark, white text + chevron */}
+        <div className="mt-6">
+          <button
+            type="button"
+            className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl font-body text-sm font-medium text-white bg-white/10 border border-white/10 hover:bg-white/15 hover:border-white/20 transition-all"
+          >
+            View All Matches
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
