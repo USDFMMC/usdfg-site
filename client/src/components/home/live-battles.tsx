@@ -16,53 +16,8 @@ interface Match {
   format: string;
 }
 
-const matches: Match[] = [
-  {
-    id: 1,
-    team1: 'Shadow Stalkers',
-    team2: 'Neon Vipers',
-    game: 'League of Legends',
-    status: 'live',
-    viewers: 45200,
-    format: 'Best of 3',
-  },
-  {
-    id: 2,
-    team1: 'Cyber Wolves',
-    team2: 'Phantom Squad',
-    game: 'Valorant',
-    status: 'upcoming',
-    time: '5 min',
-    format: 'Best of 5',
-  },
-  {
-    id: 3,
-    team1: 'Digital Dragons',
-    team2: 'Matrix Marines',
-    game: 'CS2',
-    status: 'upcoming',
-    time: '20 min',
-    format: 'First to 16',
-  },
-  {
-    id: 4,
-    team1: 'Quantum Queens',
-    team2: 'Titan Force',
-    game: 'Dota 2',
-    status: 'upcoming',
-    time: '45 min',
-    format: 'Best of 3',
-  },
-  {
-    id: 5,
-    team1: 'Storm Bringers',
-    team2: 'Void Walkers',
-    game: 'Rocket League',
-    status: 'upcoming',
-    time: '1h 15m',
-    format: 'Best of 5',
-  },
-];
+// Real matches come from your data source; no mock data.
+const matches: Match[] = [];
 
 const gameColors: Record<string, string> = {
   'League of Legends': 'from-blue-500 to-purple-500',
@@ -157,6 +112,11 @@ const LiveBattles: React.FC = () => {
 
         {/* Matches List - uniform card height, consistent padding */}
         <div ref={listRef} className="space-y-3">
+          {matches.length === 0 ? (
+            <div className="flex items-center justify-center py-10 px-4 rounded-xl border border-white/10 bg-white/[0.02]">
+              <p className="font-body text-sm text-white/50">No live matches right now. Check back soon or create a challenge.</p>
+            </div>
+          ) : null}
           {matches.map((match) => (
             <div
               key={match.id}
