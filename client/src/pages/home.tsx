@@ -30,7 +30,7 @@ const Home: React.FC = () => {
   };
 
   return (
-    <>
+    <div className="flex flex-col min-h-screen w-full">
       <Helmet>
         <title>USDFG.PRO – Skill-Based Crypto Gaming Platform | Game. Earn. Conquer.</title>
         <meta
@@ -95,46 +95,46 @@ const Home: React.FC = () => {
       </Helmet>
 
       <Navbar />
-      <div className="sticky top-16 lg:top-20 z-40">
+      <div className="sticky top-16 lg:top-20 z-40 shrink-0">
         <LiveActivityTicker />
       </div>
-      <main id="main-content" role="main" aria-label="Homepage Main Content" className="min-h-screen flex-1 relative overflow-hidden">
+      <main id="main-content" role="main" aria-label="Homepage Main Content" className="flex-1 min-h-screen relative overflow-x-hidden">
         {/* Kimi Galaxy Theme Background */}
         <KimiBackground includeGalaxy={true} />
         
-        <section aria-label="Hero Section" className="relative z-10">
+        <section aria-label="Hero Section" className="relative z-10 isolate">
           <HeroSection onExploreClick={handleExploreClick} />
         </section>
         
         {/* Content sections - mount only after "EXPLORE PLATFORM" so ScrollTrigger measures correctly */}
         {contentRevealed ? (
-          <div className="pointer-events-auto">
-            <section id="features" aria-label="Platform Features Section">
+          <div className="pointer-events-auto relative z-10 isolate flex flex-col">
+            <section id="features" aria-label="Platform Features Section" className="scroll-mt-24 lg:scroll-mt-28 shrink-0">
               <PlatformFeatures />
             </section>
-            <section aria-label="Live Battles Section">
+            <section aria-label="Live Battles Section" className="shrink-0">
               <LiveBattles />
             </section>
-            <section aria-label="Challenge System Section">
+            <section aria-label="Challenge System Section" className="shrink-0">
               <ChallengeSystem />
             </section>
-            <section id="leaderboard" aria-label="Leaderboard Preview Section">
+            <section id="leaderboard" aria-label="Leaderboard Preview Section" className="scroll-mt-24 lg:scroll-mt-28 shrink-0">
               <LeaderboardPreview />
             </section>
-            <section id="tokenomics" aria-label="Tokenomics Section">
+            <section id="tokenomics" aria-label="Tokenomics Section" className="scroll-mt-24 lg:scroll-mt-28 shrink-0">
               <Tokenomics />
             </section>
-            <section id="games" aria-label="Game Categories Section">
+            <section id="games" aria-label="Game Categories Section" className="scroll-mt-24 lg:scroll-mt-28 shrink-0">
               <GameCategories />
             </section>
-            <section aria-label="CTA Section">
+            <section aria-label="CTA Section" className="shrink-0">
               <CTASection />
             </section>
           </div>
         ) : null}
       </main>
       <Footer isRevealed={contentRevealed} />
-    </>
+    </div>
   );
 };
 

@@ -68,13 +68,13 @@ const Tokenomics: React.FC = () => {
           { y: 50 },
           {
             y: 0,
-            duration: 0.8,
             delay: index * 0.06,
-            ease: "power3.out",
+            ease: "none",
             scrollTrigger: {
               trigger: node,
-              start: "top 80%",
-              toggleActions: "play none none reverse",
+              start: "top 85%",
+              end: "top 35%",
+              scrub: 1,
             },
           }
         );
@@ -88,13 +88,13 @@ const Tokenomics: React.FC = () => {
           {
             y: 0,
             rotateX: 0,
-            duration: 0.8,
             delay: index * 0.12,
-            ease: "power3.out",
+            ease: "none",
             scrollTrigger: {
               trigger: card,
-              start: "top 80%",
-              toggleActions: "play none none reverse",
+              start: "top 85%",
+              end: "top 35%",
+              scrub: 1,
             },
           }
         );
@@ -107,12 +107,12 @@ const Tokenomics: React.FC = () => {
           { y: 50 },
           {
             y: 0,
-            duration: 0.8,
-            ease: "power3.out",
+            ease: "none",
             scrollTrigger: {
               trigger: infoRef.current,
-              start: "top 80%",
-              toggleActions: "play none none reverse",
+              start: "top 85%",
+              end: "top 35%",
+              scrub: 1,
             },
           }
         );

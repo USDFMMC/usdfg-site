@@ -71,7 +71,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
       <div className="absolute inset-0 z-[2] bg-kimi-dot-grid opacity-30 pointer-events-none" />
 
       {/* Content - Kimi structure: badge then headline (from HeroSection.kimi.tsx) */}
-      <div ref={contentRef} className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20 pt-20" style={{ willChange: "transform" }}>
+      <div ref={contentRef} className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20 pt-24 sm:pt-20" style={{ willChange: "transform" }}>
         <div className="w-full">
           <div className="flex flex-col items-start text-left max-w-4xl">
             {/* Badge – Kimi exact: glass, border-purple/30. Entrance: animate-in fade-in-0 zoom-in-95 + kimi-delay stagger */}

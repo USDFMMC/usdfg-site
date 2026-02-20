@@ -33,13 +33,13 @@ const CTASection: React.FC = () => {
           { y: 50 },
           {
             y: 0,
-            duration: 0.8,
             delay: index * 0.08,
-            ease: "power3.out",
+            ease: "none",
             scrollTrigger: {
               trigger: el,
-              start: "top 80%",
-              toggleActions: "play none none reverse",
+              start: "top 85%",
+              end: "top 35%",
+              scrub: 1,
             },
           }
         );

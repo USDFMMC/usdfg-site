@@ -1,0 +1,151 @@
+/**
+ * Kimi (Areigna) Presets – copied from _kimi reference
+ * Source: client/src/_kimi/assets/index-ayMPO7tf.css, HeroSection.kimi.tsx
+ * Use for Kimi-aligned styling across USDFG.
+ */
+
+/* ========== Kimi Design Tokens ========== */
+:root {
+  /* Kimi palette */
+  --kimi-void: #0a0215;
+  --kimi-void-light: #140521;
+  --kimi-purple: #7e43ff;
+  --kimi-orange: #ff7e3e;
+  --kimi-purple-10: rgba(126, 67, 255, 0.1);
+  --kimi-purple-5: rgba(126, 67, 255, 0.05);
+  /* Kimi glass */
+  --kimi-glass-bg: rgba(20, 5, 33, 0.7);
+  --kimi-glass-blur: 20px;
+  /* Kimi border */
+  --kimi-border-purple-30: #7e43ff4d;
+}
+
+/* ========== Kimi Typography ========== */
+.kimi-font-display,
+.font-display {
+  font-family: 'Oxanium', sans-serif;
+}
+.kimi-font-body,
+.font-body {
+  font-family: 'Rajdhani', sans-serif;
+}
+
+/* ========== Kimi Glass (from .glass in Kimi) ========== */
+.glass,
+.kimi-glass {
+  background: var(--kimi-glass-bg);
+  backdrop-filter: blur(var(--kimi-glass-blur));
+  -webkit-backdrop-filter: blur(var(--kimi-glass-blur));
+}
+
+/* ========== Kimi Gradients ========== */
+.text-gradient,
+.text-gradient-kimi-orange {
+  background: linear-gradient(135deg, #7e43ff, #ff7e3e);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ========== Kimi Enter Animation (from .animate-in, .fade-in-0, .zoom-in-95) ========== */
+@keyframes kimi-enter {
+  0% {
+    opacity: var(--tw-enter-opacity, 1);
+    transform: translate3d(
+      var(--tw-enter-translate-x, 0),
+      var(--tw-enter-translate-y, 0),
+      0
+    ) scale3d(
+      var(--tw-enter-scale, 1),
+      var(--tw-enter-scale, 1),
+      var(--tw-enter-scale, 1)
+    ) rotate(var(--tw-enter-rotate, 0));
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale3d(1, 1, 1) rotate(0);
+  }
+}
+
+.kimi-animate-in {
+  animation: kimi-enter 0.15s ease-out forwards;
+}
+.kimi-fade-in-0 {
+  --tw-enter-opacity: 0;
+}
+.kimi-zoom-in-95 {
+  --tw-enter-scale: 0.95;
+}
+
+/* ========== Kimi Pulse Glow (from .animate-pulse-glow) ========== */
+@keyframes kimi-pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px #7e43ff66;
+  }
+  50% {
+    box-shadow: 0 0 40px #7e43ffcc;
+  }
+}
+
+.kimi-animate-pulse-glow {
+  animation: kimi-pulse-glow 2s ease-in-out infinite;
+}
+
+/* ========== Kimi Float (from .animate-float) ========== */
+@keyframes kimi-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.kimi-animate-float {
+  animation: kimi-float 3s ease-in-out infinite;
+}
+
+/* ========== Kimi Live Pulse (from .animate-live-pulse) ========== */
+@keyframes kimi-live-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+}
+
+.kimi-animate-live-pulse {
+  animation: kimi-live-pulse 1.5s ease-in-out infinite;
+}
+
+/* ========== Kimi Stagger Delays ========== */
+.kimi-delay-0 { animation-delay: 0s; }
+.kimi-delay-1 { animation-delay: 0.1s; }
+.kimi-delay-2 { animation-delay: 0.2s; }
+.kimi-delay-3 { animation-delay: 0.3s; }
+.kimi-delay-4 { animation-delay: 0.4s; }
+.kimi-delay-5 { animation-delay: 0.5s; }
+.kimi-delay-6 { animation-delay: 0.6s; }
+
+/* ========== Kimi Dot Grid (hero background) ========== */
+.kimi-dot-grid {
+  background-image: radial-gradient(circle, #333 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+/* ========== Kimi Radial Glow ========== */
+.kimi-bg-gradient-radial {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(126, 67, 255, 0.1) 0%,
+    transparent 70%
+  );
+}
+
+/* ========== Kimi Hover Glow ========== */
+.kimi-hover-glow:hover {
+  box-shadow: 0 0 30px rgba(126, 67, 255, 0.5);
+}

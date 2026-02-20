@@ -410,7 +410,7 @@ function App() {
         <meta name="theme-color" content="#0c1222" />
       </Helmet>
 
-      <div className="min-h-screen flex flex-col relative overflow-hidden">
+      <div className="min-h-screen flex flex-col relative overflow-x-hidden">
         {/* Update Banner - shows when new version is available */}
         {showUpdateBanner && (
           <UpdateBanner onDismiss={() => setShowUpdateBanner(false)} />

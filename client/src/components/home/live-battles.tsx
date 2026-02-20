@@ -41,12 +41,12 @@ const LiveBattles: React.FC = () => {
         { y: 50 },
         {
           y: 0,
-          duration: 0.8,
-          ease: "power3.out",
+          ease: "none",
           scrollTrigger: {
             trigger: titleRef.current,
-            start: "top 80%",
-            toggleActions: "play none none reverse",
+            start: "top 85%",
+            end: "top 35%",
+            scrub: 1,
           },
         }
       );
@@ -58,13 +58,13 @@ const LiveBattles: React.FC = () => {
           { x: 40 },
           {
             x: 0,
-            duration: 0.6,
             stagger: 0.1,
-            ease: "power3.out",
+            ease: "none",
             scrollTrigger: {
               trigger: listRef.current,
-              start: "top 80%",
-              toggleActions: "play none none reverse",
+              start: "top 85%",
+              end: "top 35%",
+              scrub: 1,
             },
           }
         );

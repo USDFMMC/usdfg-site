@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Kimi presets – copied from _kimi reference (client/src/styles/kimi-presets.css) */
+@import "./styles/kimi-presets.css";
+
 /* Kimi palette (from _kimi reference) – use for backgrounds and effects */
 :root {
   --kimi-void: #0a0215;
@@ -448,6 +451,8 @@ html {
   touch-action: manipulation;
   /* Prevent text selection zoom on double-tap (iOS) */
   -webkit-touch-callout: none;
+  /* Scroll anchor offset so sections aren't hidden under sticky nav+ticker */
+  scroll-padding-top: 6.25rem; /* 100px = navbar + ticker */
 }
 
 body {

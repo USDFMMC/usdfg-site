@@ -111,13 +111,13 @@ const ChallengeSystem: React.FC = () => {
             { y: 50 },
             {
               y: 0,
-              duration: 0.8,
               delay: index * 0.06,
-              ease: "power3.out",
+              ease: "none",
               scrollTrigger: {
                 trigger: node,
-                start: "top 80%",
-                toggleActions: "play none none reverse",
+                start: "top 85%",
+                end: "top 35%",
+                scrub: 1,
               },
             }
           );
@@ -130,13 +130,13 @@ const ChallengeSystem: React.FC = () => {
           { y: 50 },
           {
             y: 0,
-            duration: 0.8,
             delay: index * 0.05,
-            ease: "power3.out",
+            ease: "none",
             scrollTrigger: {
               trigger: item,
               start: "top 90%",
-              toggleActions: "play none none reverse",
+              end: "top 40%",
+              scrub: 1,
             },
           }
         );
@@ -149,12 +149,12 @@ const ChallengeSystem: React.FC = () => {
           { y: 50 },
           {
             y: 0,
-            duration: 0.8,
-            ease: "power3.out",
+            ease: "none",
             scrollTrigger: {
               trigger: visualRef.current,
-              start: "top 80%",
-              toggleActions: "play none none reverse",
+              start: "top 85%",
+              end: "top 35%",
+              scrub: 1,
             },
           }
         );
@@ -166,12 +166,12 @@ const ChallengeSystem: React.FC = () => {
           {
             y: 0,
             rotateX: 0,
-            duration: 0.8,
-            ease: "power3.out",
+            ease: "none",
             scrollTrigger: {
               trigger: creatorCardRef.current,
-              start: "top 80%",
-              toggleActions: "play none none reverse",
+              start: "top 85%",
+              end: "top 35%",
+              scrub: 1,
             },
           }
         );

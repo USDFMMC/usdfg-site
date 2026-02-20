@@ -64,8 +64,9 @@ const PlatformFeatures: React.FC = () => {
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: root,
-          start: "top 80%",
-          toggleActions: "play none none reverse",
+          start: "top 85%",
+          end: "top 35%",
+          scrub: 1,
           invalidateOnRefresh: true,
         },
       });
