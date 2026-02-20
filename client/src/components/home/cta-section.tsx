@@ -134,13 +134,11 @@ const CTASection: React.FC = () => {
           >
             <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 via-purple-600/10 to-purple-600/0 opacity-0 hover:opacity-100 transition-opacity duration-300 rounded-lg" />
             <blockquote className="relative z-10 text-center text-white/80 italic font-medium text-base lg:text-lg leading-relaxed">
-              "I built USDFG to reward the ones who never begged for a seat. No
-              mercy. No reruns. If you're waiting for permission, you already
-              lost."
+              Built for verified competition.
               <br />
-              <span className="block mt-3 text-sm text-white/60">
-                — Hussein A.
-              </span>
+              Designed for performance.
+              <br />
+              Powered by your wallet.
             </blockquote>
           </div>
         </div>

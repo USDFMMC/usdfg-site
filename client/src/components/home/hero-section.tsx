@@ -13,32 +13,10 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
   const sectionRef = useRef<HTMLElement>(null);
   const bgRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const badgeRef = useRef<HTMLDivElement>(null);
-  const brandRef = useRef<HTMLDivElement>(null);
-  const headlineRef = useRef<HTMLHeadingElement>(null);
-  const subRef = useRef<HTMLParagraphElement>(null);
-  const buttonsRef = useRef<HTMLDivElement>(null);
-  const statsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      gsap.set(bgRef.current, { scale: 1.2, opacity: 0 });
-      gsap.set([badgeRef.current, brandRef.current, headlineRef.current, subRef.current, buttonsRef.current, statsRef.current], {
-        opacity: 0,
-        y: 24,
-      });
-
-      gsap
-        .timeline({ delay: 0.3 })
-        .to(bgRef.current, { scale: 1, opacity: 1, duration: 1.8, ease: "power3.out" })
-        .to(headlineRef.current, { opacity: 1, y: 0, duration: 1.0, ease: "power3.out" }, "-=1.2")
-        .to(brandRef.current, { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }, "-=0.6")
-        .to(badgeRef.current, { opacity: 1, y: 0, duration: 0.6, ease: "back.out(1.7)" }, "-=0.4")
-        .to(subRef.current, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, "-=0.3")
-        .to(buttonsRef.current, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, "-=0.3")
-        .to(statsRef.current, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, "-=0.2");
-
-      // Subtle parallax like Kimi
+      // Parallax on scroll (content + bg)
       gsap.to(contentRef.current, {
         y: -100,
         ease: "none",
@@ -83,29 +61,21 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
         <div className="absolute inset-0 bg-gradient-to-r from-void via-void/80 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-t from-void via-transparent to-void/50" />
         <div className="absolute inset-0 bg-purple/10" />
-        <div className="absolute inset-0 bg-gradient-radial-kimi opacity-70" />
+        {/* Kimi center radial glow */}
+        <div className="absolute inset-0 bg-gradient-radial-kimi opacity-80" />
+        {/* Kimi top spotlight (overhead stage lighting) */}
+        <div className="absolute inset-0 bg-kimi-spotlight pointer-events-none" />
       </div>
 
-      {/* Animated Grid Overlay - Kimi Exact */}
-      <div className="absolute inset-0 z-[2] opacity-20">
-        <div
-          className="w-full h-full"
-          style={{
-            backgroundImage: `
-              linear-gradient(rgba(126, 67, 255, 0.1) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(126, 67, 255, 0.1) 1px, transparent 1px)
-            `,
-            backgroundSize: "50px 50px",
-          }}
-        />
-      </div>
+      {/* Grid Overlay - Kimi dot grid (radial-gradient circle, #333, opacity-30) */}
+      <div className="absolute inset-0 z-[2] bg-kimi-dot-grid opacity-30 pointer-events-none" />
 
       {/* Content - Kimi structure: badge then headline (from HeroSection.kimi.tsx) */}
       <div ref={contentRef} className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20 pt-20" style={{ willChange: "transform" }}>
         <div className="w-full">
           <div className="flex flex-col items-start text-left max-w-4xl">
-            {/* Badge – Kimi exact: glass, border-purple/30, w-4 h-4 icon, font-body text-sm text-white/80. Icon: Kimi SVG (trophy) in Kimi orange. */}
-            <div ref={badgeRef} className="inline-flex items-center gap-2 px-4 py-2 mb-6 kimi-glass rounded-full border border-kimi-purple-30">
+            {/* Badge – Kimi exact: glass, border-purple/30. Entrance: animate-in fade-in-0 zoom-in-95 + kimi-delay stagger */}
+            <div className="animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 fill-mode-both duration-150 ease-out kimi-delay-0 inline-flex items-center gap-2 px-4 py-2 mb-6 kimi-glass rounded-full border border-kimi-purple-30">
               <img
                 src="/_kimi/hero-badge-icon.svg"
                 alt=""
@@ -119,13 +89,12 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
               </span>
             </div>
 
-            <div ref={brandRef} className="font-display font-bold text-2xl md:text-3xl lg:text-4xl mb-2 text-white">
+            <div className="animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 fill-mode-both duration-150 ease-out kimi-delay-1 font-display font-bold text-2xl md:text-3xl lg:text-4xl mb-2 text-white">
               USDFG
             </div>
 
             <h1
-              ref={headlineRef}
-              className="font-display font-bold text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl text-white leading-tight mb-6"
+              className="animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 fill-mode-both duration-150 ease-out kimi-delay-2 font-display font-bold text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl text-white leading-tight mb-6"
             >
               <span className="block">
                 <span className="text-white">GAME. </span>
@@ -150,11 +119,11 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
               </span>
             </h1>
 
-            <p ref={subRef} className="font-body text-lg sm:text-xl text-white/70 max-w-2xl mb-8 leading-relaxed">
+            <p className="animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 fill-mode-both duration-150 ease-out kimi-delay-3 font-body text-lg sm:text-xl text-white/70 max-w-2xl mb-8 leading-relaxed">
               Join the world's premier esports crypto ecosystem. Challenge players, manage tournaments, and turn your skill into rewards. The arena awaits your arrival.
             </p>
 
-            <div ref={buttonsRef} className="flex flex-col sm:flex-row justify-start gap-4">
+            <div className="animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 fill-mode-both duration-150 ease-out kimi-delay-4 flex flex-col sm:flex-row justify-start gap-4">
               <button
                 onClick={onExploreClick}
                 className="relative font-display font-semibold text-base px-8 py-6 bg-gradient-to-r from-purple to-orange hover:from-purple-400 hover:to-orange-400 text-white border-0 overflow-hidden group rounded-lg transition-all"
@@ -206,8 +175,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
 
             {/* Kimi stat strip (exact structure; USDFG metrics only) */}
             <div
-              ref={statsRef}
-              className="flex flex-nowrap gap-6 sm:flex-wrap sm:gap-8 md:gap-12"
+              className="animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 fill-mode-both duration-150 ease-out kimi-delay-5 flex flex-nowrap gap-6 sm:flex-wrap sm:gap-8 md:gap-12"
             >
               {stats.map((stat) => (
                 <div key={stat.label} className="w-1/3 min-w-0 text-left sm:w-auto">
@@ -222,16 +190,20 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
         </div>
       </div>
 
-      {/* Decorative Elements */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-void to-transparent z-[5]" />
-
-      {/* Floating Orbs - Kimi Exact */}
+      {/* Kimi floating orbs – ambient lighting (purple + orange, pulse-glow) */}
       <div
-        className="absolute top-1/4 right-1/4 w-64 h-64 bg-purple/20 rounded-full blur-[100px] animate-pulse-glow"
+        className="absolute top-1/4 right-1/4 w-64 h-64 bg-purple/25 rounded-full blur-[100px] animate-pulse-glow"
+        aria-hidden
       />
       <div
-        className="absolute bottom-1/3 right-1/3 w-48 h-48 bg-orange/10 rounded-full blur-[80px] animate-pulse-glow"
+        className="absolute bottom-1/3 right-1/3 w-48 h-48 bg-orange/15 rounded-full blur-[80px] animate-pulse-glow"
         style={{ animationDelay: "1s" }}
+        aria-hidden
+      />
+      <div
+        className="absolute top-1/2 left-1/4 w-48 h-48 bg-purple/15 rounded-full blur-[90px] animate-pulse-glow"
+        style={{ animationDelay: "0.5s" }}
+        aria-hidden
       />
     </section>
   );

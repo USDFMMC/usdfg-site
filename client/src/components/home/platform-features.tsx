@@ -13,7 +13,6 @@ const features = [
     description: "Get USDFG into your wallet, then choose your game, define the rules, and launch a challenge. No accounts, just player-owned flow. Lock challenge assets, compete, and verify results directly.",
     image: "/_kimi/feature-challenge.jpg",
     metric: "Player-Created",
-    color: "from-purple-500 to-purple-600",
   },
   {
     icon: Trophy,
@@ -21,7 +20,6 @@ const features = [
     description: "Results are confirmed by players. When both sides agree, rewards release automatically and are finalized on-chain. No randomness. No house. Just your skill and verified outcomes.",
     image: "/_kimi/feature-tournament.jpg",
     metric: "On-Chain",
-    color: "from-orange-500 to-orange-600",
   },
   {
     icon: BarChart3,
@@ -29,7 +27,6 @@ const features = [
     description: "View verified wins, match history, and progression tied directly to your wallet identity. Your record is your reputation. Every win is recorded on-chain. Only your skill matters.",
     image: "/_kimi/feature-warroom.jpg",
     metric: "Skill-Based",
-    color: "from-blue-500 to-blue-600",
   },
 ];
 
@@ -95,12 +92,12 @@ const PlatformFeatures: React.FC = () => {
     <section
       ref={sectionRef}
       id="platform"
-      className="relative py-24 lg:py-32 w-full"
+      className="relative py-24 lg:py-32 w-full overflow-hidden"
     >
       <div className="absolute inset-0 bg-gradient-radial-kimi opacity-50" />
       
-      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20 max-w-7xl mx-auto">
-        {/* Section Header - Kimi Exact */}
+      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-24 max-w-[1600px] mx-auto">
+        {/* Section Header - Kimi Exact (kimi-glass, kimi-purple/orange gradients) */}
         <div ref={titleRef} className="text-center mb-16 lg:mb-20">
           <span
             ref={kickerRef}
@@ -115,10 +112,10 @@ const PlatformFeatures: React.FC = () => {
             THE{" "}
             <span
               ref={bitcoinRef}
-              className="bg-gradient-to-r from-green-400 via-emerald-400 to-green-500 bg-clip-text text-transparent text-fill-transparent"
+              className="text-gradient-kimi-orange bg-clip-text text-transparent text-fill-transparent"
               style={{
-                textShadow: "0 0 20px rgba(74, 222, 128, 0.4)",
-                filter: "drop-shadow(0 0 8px rgba(74, 222, 128, 0.3))",
+                textShadow: "0 0 20px rgba(126, 67, 255, 0.4)",
+                filter: "drop-shadow(0 0 8px rgba(126, 67, 255, 0.3))",
               }}
             >
               BITCOIN
@@ -126,10 +123,10 @@ const PlatformFeatures: React.FC = () => {
             OF{" "}
             <span
               ref={gamingRef}
-              className="bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-400 bg-clip-text text-transparent text-fill-transparent"
+              className="text-gradient-kimi-orange bg-clip-text text-transparent text-fill-transparent"
               style={{
-                textShadow: "0 0 20px rgba(251, 191, 36, 0.4)",
-                filter: "drop-shadow(0 0 8px rgba(251, 191, 36, 0.3))",
+                textShadow: "0 0 20px rgba(255, 126, 62, 0.4)",
+                filter: "drop-shadow(0 0 8px rgba(255, 126, 62, 0.3))",
               }}
             >
               GAMING
@@ -143,46 +140,38 @@ const PlatformFeatures: React.FC = () => {
           </p>
         </div>
 
-        {/* Feature Cards - Kimi Arena: w-80 sm:w-96, h-48, p-6, gap-6 (Kimi exact) */}
-        <div className="flex justify-center gap-6 overflow-x-auto scrollbar-hide pb-4 -mx-4 sm:-mx-6 lg:-mx-12 xl:-mx-20 px-4 sm:px-6 lg:px-12 xl:px-20" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        {/* Feature Cards - Kimi presets */}
+        <div className="kimi-card-grid">
           {features.map((feature, index) => (
             <div
               key={index}
               data-platform-feature-card
-              className="group relative flex-shrink-0 w-80 sm:w-96"
+              className="kimi-card group relative"
             >
-              <div className="relative h-full glass border border-purple/20 rounded-2xl overflow-hidden transition-all duration-500 hover:border-purple/50 hover:shadow-glow">
-                {/* Image - Kimi Exact */}
-                <div className="relative h-48 overflow-hidden">
+              <div className="kimi-card-inner">
+                <div className="kimi-card-image relative overflow-hidden">
                   <img
                     src={feature.image}
                     alt={feature.title}
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                     onLoad={() => ScrollTrigger.refresh()}
                   />
-                  {/* Kimi Features.tsx:126 */}
                   <div className="absolute inset-0 bg-gradient-to-t from-void via-void/50 to-transparent" />
 
-                  {/* Icon Badge - Kimi Exact */}
-                  <div className="absolute top-4 left-4 w-12 h-12 flex items-center justify-center bg-purple/80 backdrop-blur-sm rounded-xl">
+                  <div className="absolute top-4 left-4 kimi-card-icon">
                     <feature.icon className="w-6 h-6 text-white" />
                   </div>
 
-                  {/* Metric Badge - Kimi Arena: dark transparent rectangular overlay */}
-                  <div className="absolute top-4 right-4 px-3 py-2 glass rounded-lg border border-purple/20">
-                    <span className="font-body text-xs font-medium text-white/90">
-                      {feature.metric}
-                    </span>
+                  <div className="absolute top-4 right-4 kimi-card-metric kimi-card-metric-stat">
+                    {feature.metric}
                   </div>
 
-                  {/* Scanline Hover - Kimi Exact */}
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
                     <div className="absolute inset-0 bg-gradient-to-b from-transparent via-purple/20 to-transparent h-4 animate-scanline" />
                   </div>
                 </div>
 
-                {/* Content - Kimi Exact */}
-                <div className="p-6">
+                <div className="kimi-card-content">
                   <h3 className="font-display font-bold text-xl text-white mb-3 group-hover:text-gradient transition-colors">
                     {feature.title}
                   </h3>
@@ -195,17 +184,9 @@ const PlatformFeatures: React.FC = () => {
                     className="inline-flex items-center gap-2 font-body text-sm text-purple hover:text-orange transition-colors group/link"
                   >
                     Explore Feature
-                    <ArrowRight className="w-4 h-4 group-hover/link:translate-x-1 group-hover/link:-translate-y-1 transition-transform" />
+                    <ArrowRight className="w-4 h-4 group-hover/link:translate-x-1 transition-transform" />
                   </a>
                 </div>
-
-                {/* Hover Glow - Kimi Exact */}
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
-                  <div className="absolute inset-0 bg-gradient-to-t from-purple/10 to-transparent" />
-                </div>
-
-                {/* Bottom Gradient Bar (USDFG accent) */}
-                <div className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${feature.color}`} />
               </div>
             </div>
           ))}

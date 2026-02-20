@@ -109,9 +109,8 @@ const GameCategories: React.FC = () => {
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
-      const scrollAmount = 400;
       scrollContainerRef.current.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        left: direction === 'left' ? -400 : 400,
         behavior: 'smooth',
       });
     }
@@ -128,7 +127,7 @@ const GameCategories: React.FC = () => {
         <div ref={titleRef} className="w-full px-4 sm:px-6 lg:px-12 xl:px-20 mb-12 lg:mb-16">
           <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <span className="inline-flex items-center gap-2 font-body text-sm text-orange uppercase tracking-[0.3em] mb-4">
+              <span className="inline-flex items-center gap-2 kimi-font-body text-sm text-[var(--kimi-orange)] uppercase tracking-[0.3em] mb-4">
                 <Gem className="w-4 h-4" />
                 Supported Genres
               </span>
@@ -139,13 +138,13 @@ const GameCategories: React.FC = () => {
             <div className="mt-4 lg:mt-0 flex items-center gap-3">
               <button
                 onClick={() => scroll('left')}
-                className="w-12 h-12 flex items-center justify-center glass border border-purple/30 rounded-full hover:border-purple-500/60 transition-colors"
+                className="w-12 h-12 flex items-center justify-center kimi-glass border border-kimi-purple-30 rounded-full hover:border-purple-500/60 transition-colors"
               >
                 <ChevronLeft className="w-5 h-5 text-white" />
               </button>
               <button
                 onClick={() => scroll('right')}
-                className="w-12 h-12 flex items-center justify-center glass border border-purple/30 rounded-full hover:border-purple-500/60 transition-colors"
+                className="w-12 h-12 flex items-center justify-center kimi-glass border border-kimi-purple-30 rounded-full hover:border-purple-500/60 transition-colors"
               >
                 <ChevronRight className="w-5 h-5 text-white" />
               </button>
@@ -153,23 +152,20 @@ const GameCategories: React.FC = () => {
           </div>
         </div>
 
-        {/* Carousel - Kimi sizes: card w-72/w-80, gap-6 (1.5rem), image h-48 (12rem), p-6, rounded-2xl; section py-24 lg:py-32, header mb-12 lg:mb-16 */}
         <div ref={carouselRef} className="relative">
           <div
             ref={scrollContainerRef}
-            className="flex gap-6 overflow-x-auto scrollbar-hide px-4 sm:px-6 lg:px-12 xl:px-20 pb-4"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            className="kimi-card-scroll scrollbar-hide px-4 sm:px-6 lg:px-12 xl:px-20 pb-4"
           >
             {games.map((game, index) => {
               const IconComponent = game.iconComponent;
               return (
                 <div
                   key={index}
-                  className="prize-card flex-shrink-0 w-80 sm:w-96 group"
+                  className="prize-card kimi-card group"
                 >
-                  <div className="relative h-full glass border border-purple/20 rounded-2xl overflow-hidden transition-all duration-500 hover:border-purple/50 hover:shadow-glow">
-                    {/* Image - Kimi Exact */}
-                    <div className="relative h-48 overflow-hidden">
+                  <div className="relative h-full kimi-card-inner">
+                    <div className="kimi-card-image relative overflow-hidden">
                       <img
                         src={game.image.replace('.png', '.webp')}
                         alt={game.alt}
@@ -185,42 +181,30 @@ const GameCategories: React.FC = () => {
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                       </div>
 
-                      {/* Icon Badge - Kimi Exact */}
-                      <div
-                        className="absolute top-4 left-4 w-12 h-12 flex items-center justify-center bg-purple/80 backdrop-blur-sm rounded-xl"
-                      >
+                      <div className="absolute top-4 left-4 kimi-card-icon">
                         <IconComponent className="w-6 h-6 text-white" />
                       </div>
 
-                      {/* Value Badge - Kimi Exact */}
-                      <div className="absolute top-4 right-4 px-4 py-2 glass rounded-full">
-                        <span className="font-display font-bold text-lg text-gradient">
-                          {game.metric}
-                        </span>
+                      <div className="absolute top-4 right-4 kimi-card-metric font-display font-bold text-base text-gradient">
+                        {game.metric}
                       </div>
                     </div>
 
-                    {/* Content - Kimi Exact */}
-                    <div className="p-6">
+                    <div className="kimi-card-content">
                       <h3 className="font-display font-bold text-xl text-white mb-2 group-hover:text-gradient transition-all">
                         {game.title}
                       </h3>
-                      <p className="font-body text-white/60 text-sm leading-relaxed">
+                      <p className="kimi-font-body text-white/60 text-sm leading-relaxed">
                         {game.challenges}
                       </p>
                     </div>
 
-                    {/* Bottom Gradient - Kimi Exact */}
-                    <div
-                      className={`absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r ${game.color}`}
-                    />
                   </div>
                 </div>
               );
             })}
           </div>
         </div>
-
       </div>
     </section>
   );
