@@ -177,7 +177,8 @@ const GameCategories: React.FC = () => {
                         loading="lazy"
                         decoding="async"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+                      {/* Kimi Features.tsx:126 - gradient overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-void via-void/50 to-transparent" />
                       
                       {/* Shine Effect - Kimi Exact */}
                       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">

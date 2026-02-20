@@ -73,7 +73,7 @@ const Tokenomics: React.FC = () => {
             ease: "power3.out",
             scrollTrigger: {
               trigger: node,
-              start: "top 85%",
+              start: "top 80%",
               toggleActions: "play none none reverse",
             },
           }
@@ -93,7 +93,7 @@ const Tokenomics: React.FC = () => {
             ease: "power3.out",
             scrollTrigger: {
               trigger: card,
-              start: "top 85%",
+              start: "top 80%",
               toggleActions: "play none none reverse",
             },
           }
@@ -111,7 +111,7 @@ const Tokenomics: React.FC = () => {
             ease: "power3.out",
             scrollTrigger: {
               trigger: infoRef.current,
-              start: "top 85%",
+              start: "top 80%",
               toggleActions: "play none none reverse",
             },
           }
@@ -140,7 +140,7 @@ const Tokenomics: React.FC = () => {
     <section
       ref={sectionRef}
       id="tokenomics"
-      className="py-12 lg:py-16 text-center relative overflow-hidden"
+      className="py-24 lg:py-32 text-center relative overflow-hidden"
     >
 
       <div ref={wrapperRef} className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
@@ -153,7 +153,7 @@ const Tokenomics: React.FC = () => {
 
         <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 max-w-5xl mx-auto mb-8 lg:mb-12">
           <div
-            className="token-card relative glass border border-purple-500/20 rounded-2xl p-6 text-center overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)] kimi-bottom-neon"
+            className="token-card relative glass border border-purple/20 rounded-2xl p-6 text-center overflow-hidden transition-all duration-500 hover:border-purple/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)] kimi-bottom-neon"
             style={
               {
                 "--neon-color": "rgba(126, 67, 255, 0.25)",
@@ -180,7 +180,7 @@ const Tokenomics: React.FC = () => {
             </div>
           </div>
           <div
-            className="token-card relative glass border border-purple-500/20 rounded-2xl p-6 text-center overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)] kimi-bottom-neon"
+            className="token-card relative glass border border-purple/20 rounded-2xl p-6 text-center overflow-hidden transition-all duration-500 hover:border-purple/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)] kimi-bottom-neon"
             style={
               {
                 "--neon-color": "rgba(126, 67, 255, 0.25)",
@@ -205,7 +205,7 @@ const Tokenomics: React.FC = () => {
             </div>
           </div>
           <div
-            className="token-card relative glass border border-purple-500/20 rounded-2xl p-6 text-center overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)] kimi-bottom-neon"
+            className="token-card relative glass border border-purple/20 rounded-2xl p-6 text-center overflow-hidden transition-all duration-500 hover:border-purple/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)] kimi-bottom-neon"
             style={
               {
                 "--neon-color": "rgba(126, 67, 255, 0.25)",
@@ -230,7 +230,7 @@ const Tokenomics: React.FC = () => {
             </div>
           </div>
           <div
-            className="token-card relative glass border border-purple-500/20 rounded-2xl p-6 text-center overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)] kimi-bottom-neon"
+            className="token-card relative glass border border-purple/20 rounded-2xl p-6 text-center overflow-hidden transition-all duration-500 hover:border-purple/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)] kimi-bottom-neon"
             style={
               {
                 "--neon-color": "rgba(126, 67, 255, 0.25)",

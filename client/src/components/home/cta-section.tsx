@@ -38,7 +38,7 @@ const CTASection: React.FC = () => {
             ease: "power3.out",
             scrollTrigger: {
               trigger: el,
-              start: "top 85%",
+              start: "top 80%",
               toggleActions: "play none none reverse",
             },
           }
@@ -78,7 +78,7 @@ const CTASection: React.FC = () => {
           {/* Kimi CTAs: Enter the Arena (gradient) + Learn More (outline) */}
           <div ref={ctasRef} className="cta-reveal flex flex-wrap items-center justify-center gap-4 mb-8">
             <Link to="/app" className="inline-block">
-              <button className="relative font-semibold text-base uppercase tracking-wide px-8 py-4 bg-gradient-to-r from-purple-500 to-orange-500 hover:from-purple-400 hover:to-orange-400 text-white border-0 overflow-hidden group rounded-lg transition-all kimi-font-body">
+              <button className="relative font-semibold text-base uppercase tracking-wide px-8 py-4 bg-gradient-to-r from-purple to-orange hover:opacity-95 text-white border-0 overflow-hidden group rounded-lg transition-all kimi-font-body">
                 <span className="relative z-10 flex items-center gap-2">
                   Enter the Arena
                   <span

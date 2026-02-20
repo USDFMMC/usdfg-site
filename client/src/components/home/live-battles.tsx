@@ -87,7 +87,7 @@ const LiveBattles: React.FC = () => {
     <section
       ref={sectionRef}
       id="matches"
-      className="relative py-16 lg:py-20 w-full"
+      className="relative py-24 lg:py-32 w-full"
     >
       <div className="relative z-10 w-full max-w-2xl mx-auto px-4 sm:px-6">
         {/* Section Header - reference: single row, green dot + "X Live Now", "View All" + chevron */}
@@ -167,7 +167,7 @@ const LiveBattles: React.FC = () => {
                     className={`w-2 h-2 rounded-full flex-shrink-0 ${
                       match.status === 'live'
                         ? 'bg-blue-400'
-                        : 'bg-gradient-to-r ' + (gameColors[match.game] || 'from-purple-500 to-orange-500')
+                        : 'bg-gradient-to-r ' + (gameColors[match.game] || 'from-purple to-orange')
                     }`}
                   />
                   <ChevronRight

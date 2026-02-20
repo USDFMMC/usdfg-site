@@ -61,32 +61,25 @@ const PlatformFeatures: React.FC = () => {
         descRef.current,
       ];
       gsap.set(titleEls.filter(Boolean), { opacity: 0, y: 24 });
-      gsap.set(cards, { opacity: 0, y: 44, rotateX: 10, transformPerspective: 1000 });
+      // Kimi Prizes card animation: y: 60, scale: 0.9 → y: 0, scale: 1, duration 0.6, stagger 0.15, start "top 80%"
+      gsap.set(cards, { y: 60, scale: 0.9 });
 
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: root,
-          start: "top 75%",
+          start: "top 80%",
           toggleActions: "play none none reverse",
           invalidateOnRefresh: true,
         },
       });
 
       tl.to(kickerRef.current, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 0);
-      // Heading: reveal base, then accent words with a touch of stagger.
       tl.to(headingRef.current, { opacity: 1, y: 0, duration: 0.65, ease: "power3.out" }, 0.06);
       tl.to([bitcoinRef.current, gamingRef.current], { opacity: 1, y: 0, duration: 0.6, ease: "power3.out", stagger: 0.08 }, 0.12);
       tl.to(descRef.current, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.18);
       tl.to(
         cards,
-        {
-          opacity: 1,
-          y: 0,
-          rotateX: 0,
-          duration: 0.75,
-          ease: "power3.out",
-          stagger: 0.12,
-        },
+        { y: 0, scale: 1, duration: 0.6, ease: "power3.out", stagger: 0.15 },
         0.22
       );
 
@@ -106,7 +99,7 @@ const PlatformFeatures: React.FC = () => {
     >
       <div className="absolute inset-0 bg-gradient-radial-kimi opacity-50" />
       
-      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20 max-w-6xl mx-auto">
+      <div className="relative z-10 w-full px-4 sm:px-6 lg:px-12 xl:px-20 max-w-7xl mx-auto">
         {/* Section Header - Kimi Exact */}
         <div ref={titleRef} className="text-center mb-16 lg:mb-20">
           <span
@@ -150,23 +143,24 @@ const PlatformFeatures: React.FC = () => {
           </p>
         </div>
 
-        {/* Feature Cards - Kimi Exact Structure with Images */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 perspective-1000">
+        {/* Feature Cards - Kimi Arena: w-80 sm:w-96, h-48, p-6, gap-6 (Kimi exact) */}
+        <div className="flex justify-center gap-6 overflow-x-auto scrollbar-hide pb-4 -mx-4 sm:-mx-6 lg:-mx-12 xl:-mx-20 px-4 sm:px-6 lg:px-12 xl:px-20" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {features.map((feature, index) => (
             <div
               key={index}
               data-platform-feature-card
-              className="group relative preserve-3d"
+              className="group relative flex-shrink-0 w-80 sm:w-96"
             >
               <div className="relative h-full glass border border-purple/20 rounded-2xl overflow-hidden transition-all duration-500 hover:border-purple/50 hover:shadow-glow">
                 {/* Image - Kimi Exact */}
-                <div className="relative h-48 sm:h-56 overflow-hidden">
+                <div className="relative h-48 overflow-hidden">
                   <img
                     src={feature.image}
                     alt={feature.title}
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                     onLoad={() => ScrollTrigger.refresh()}
                   />
+                  {/* Kimi Features.tsx:126 */}
                   <div className="absolute inset-0 bg-gradient-to-t from-void via-void/50 to-transparent" />
 
                   {/* Icon Badge - Kimi Exact */}
@@ -174,9 +168,9 @@ const PlatformFeatures: React.FC = () => {
                     <feature.icon className="w-6 h-6 text-white" />
                   </div>
 
-                  {/* Metric Badge - Kimi Exact */}
-                  <div className="absolute top-4 right-4 px-3 py-1 glass rounded-full">
-                    <span className="font-body text-xs text-white/80">
+                  {/* Metric Badge - Kimi Arena: dark transparent rectangular overlay */}
+                  <div className="absolute top-4 right-4 px-3 py-2 glass rounded-lg border border-purple/20">
+                    <span className="font-body text-xs font-medium text-white/90">
                       {feature.metric}
                     </span>
                   </div>
@@ -217,7 +211,7 @@ const PlatformFeatures: React.FC = () => {
           ))}
         </div>
 
-        {/* Bottom CTA (Kimi exact placement + sizing) */}
+        {/* Bottom CTA - Kimi Arena: "View All Features" style */}
         <div className="mt-16 text-center">
           <p className="font-body text-white/50 mb-4">
             Ready to experience the future of competitive gaming?
@@ -226,7 +220,7 @@ const PlatformFeatures: React.FC = () => {
             to="/app"
             className="inline-flex items-center gap-2 font-display font-semibold text-purple hover:text-orange transition-colors"
           >
-            Enter the Arena
+            View All Features
             <ArrowRight className="w-5 h-5" />
           </Link>
         </div>

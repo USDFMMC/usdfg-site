@@ -214,7 +214,7 @@ const LeaderboardPreview: React.FC = () => {
             ease: "power3.out",
             scrollTrigger: {
               trigger: listRef.current,
-              start: "top 85%",
+              start: "top 80%",
               toggleActions: "play none none reverse",
             },
           }
@@ -237,7 +237,7 @@ const LeaderboardPreview: React.FC = () => {
       case 3:
         return 'from-amber-600 via-amber-700 to-amber-800';
       default:
-        return 'from-purple-500 to-orange-500';
+        return 'from-purple to-orange';
     }
   };
 
@@ -295,8 +295,8 @@ const LeaderboardPreview: React.FC = () => {
               variant={leaderboardType === 'solo' ? "default" : "ghost"}
             className={`kimi-font-body px-4 py-2 text-xs font-semibold uppercase tracking-wide rounded-lg transition-all ${
                 leaderboardType === 'solo'
-                ? "bg-gradient-to-r from-purple-500 to-orange-500 text-white border-0 shadow-[0_0_15px_rgba(126,67,255,0.3)] hover:from-purple-400 hover:to-orange-400"
-                : "text-white/70 hover:text-white border border-purple-500/30 hover:border-purple-500/50 hover:bg-purple-500/10 bg-transparent"
+                ? "bg-gradient-to-r from-purple to-orange text-white border-0 shadow-[0_0_15px_rgba(126,67,255,0.3)] hover:opacity-95"
+                : "text-white/70 hover:text-white border border-purple/30 hover:border-purple/50 hover:bg-purple/10 bg-transparent"
               }`}
               onClick={() => setLeaderboardType('solo')}
             >
@@ -306,8 +306,8 @@ const LeaderboardPreview: React.FC = () => {
               variant={leaderboardType === 'team' ? "default" : "ghost"}
             className={`kimi-font-body px-4 py-2 text-xs font-semibold uppercase tracking-wide rounded-lg transition-all ${
                 leaderboardType === 'team'
-                ? "bg-gradient-to-r from-purple-500 to-orange-500 text-white border-0 shadow-[0_0_15px_rgba(126,67,255,0.3)] hover:from-purple-400 hover:to-orange-400"
-                : "text-white/70 hover:text-white border border-purple-500/30 hover:border-purple-500/50 hover:bg-purple-500/10 bg-transparent"
+                ? "bg-gradient-to-r from-purple to-orange text-white border-0 shadow-[0_0_15px_rgba(126,67,255,0.3)] hover:opacity-95"
+                : "text-white/70 hover:text-white border border-purple/30 hover:border-purple/50 hover:bg-purple/10 bg-transparent"
               }`}
               onClick={() => setLeaderboardType('team')}
             >
@@ -316,15 +316,15 @@ const LeaderboardPreview: React.FC = () => {
           </div>
 
           {/* Leaderboard Tabs */}
-        <div className="flex flex-wrap justify-center mb-8 border-b border-purple-500/30">
+        <div className="flex flex-wrap justify-center mb-8 border-b border-purple/30">
             {tabs.map((tab) => (
               <Button
                 key={tab.id}
                 variant={activeTab === tab.id ? "default" : "ghost"}
               className={`kimi-font-body rounded-none rounded-t-md font-semibold uppercase tracking-wide px-4 py-2 text-sm transition-all ${
                   activeTab === tab.id 
-                  ? "bg-gradient-to-r from-purple-500 to-orange-500 text-white border-0 shadow-[0_0_15px_rgba(126,67,255,0.3)] hover:from-purple-400 hover:to-orange-400" 
-                  : "text-white/70 hover:text-white border border-transparent hover:border-purple-500/30 bg-transparent"
+                  ? "bg-gradient-to-r from-purple to-orange text-white border-0 shadow-[0_0_15px_rgba(126,67,255,0.3)] hover:opacity-95" 
+                  : "text-white/70 hover:text-white border border-transparent hover:border-purple/30 bg-transparent"
                 }`}
                 onClick={() => setActiveTab(tab.id)}
               >
@@ -438,7 +438,7 @@ const LeaderboardPreview: React.FC = () => {
                               Streak {player.winStreak}
                             </span>
                           </div>
-                          <p className="kimi-font-display font-bold text-xl sm:text-2xl lg:text-3xl bg-gradient-to-r from-purple-400 to-orange-400 bg-clip-text text-transparent">
+                          <p className="kimi-font-display font-bold text-xl sm:text-2xl lg:text-3xl text-gradient-kimi-orange">
                             {formatUSDFG(player.gains)}
                           </p>
                           <p className="kimi-font-body text-xs text-white/50">USDFG</p>
@@ -465,9 +465,9 @@ const LeaderboardPreview: React.FC = () => {
             {/* All Players List - Shows complete stats including top 3 */}
             {allPlayersForTable.length > 0 && (
               <div ref={listRef} className="max-w-4xl mx-auto">
-                <div className="kimi-glass border border-purple-500/20 rounded-2xl overflow-hidden">
+                <div className="kimi-glass border border-purple/20 rounded-2xl overflow-hidden">
                   {/* Header - USDFG Original Stats */}
-                  <div className="flex items-center px-4 sm:px-6 py-4 border-b border-purple-500/10 bg-purple-600/5">
+                  <div className="flex items-center px-4 sm:px-6 py-4 border-b border-purple/10 bg-purple/5">
                     <div className="w-12 sm:w-16 kimi-font-body text-xs text-white/50 uppercase">
                       Rank
                     </div>
@@ -504,7 +504,7 @@ const LeaderboardPreview: React.FC = () => {
                       return (
                         <div
                           key={player.wallet}
-                          className="list-item group flex items-center px-4 sm:px-6 py-4 hover:bg-purple-600/5 transition-colors cursor-pointer"
+                          className="list-item group flex items-center px-4 sm:px-6 py-4 hover:bg-purple/5 transition-colors cursor-pointer"
                         >
                           <div className="w-12 sm:w-16 flex items-center gap-2">
                             <span className="kimi-font-display font-bold text-lg text-white/60">
@@ -602,7 +602,7 @@ const LeaderboardPreview: React.FC = () => {
                             </span>
                           </div>
                           <div className="w-24 text-right">
-                            <span className="kimi-font-display font-semibold text-sm sm:text-base bg-gradient-to-r from-purple-400 to-orange-400 bg-clip-text text-transparent">
+                            <span className="kimi-font-display font-semibold text-sm sm:text-base text-gradient-kimi-orange">
                               {formatUSDFG(player.gains)}
                             </span>
                           </div>
@@ -714,7 +714,7 @@ const LeaderboardPreview: React.FC = () => {
                           <h3 className="kimi-font-display font-bold text-sm sm:text-lg text-white mb-1">
                             {team.teamName}
                           </h3>
-                          <p className="kimi-font-display font-bold text-xl sm:text-2xl lg:text-3xl bg-gradient-to-r from-purple-400 to-orange-400 bg-clip-text text-transparent">
+                          <p className="kimi-font-display font-bold text-xl sm:text-2xl lg:text-3xl text-gradient-kimi-orange">
                             {formatUSDFG(team.gains)}
                           </p>
                           <p className="kimi-font-body text-xs text-white/50">USDFG</p>
@@ -739,8 +739,8 @@ const LeaderboardPreview: React.FC = () => {
             {/* Teams List - Shows all teams including top 3 */}
             {allTeamsForTable.length > 0 && (
               <div ref={listRef} className="max-w-4xl mx-auto">
-                <div className="kimi-glass border border-purple-500/20 rounded-2xl overflow-hidden">
-                  <div className="flex items-center px-4 sm:px-6 py-4 border-b border-purple-500/10 bg-purple-600/5">
+                <div className="kimi-glass border border-purple/20 rounded-2xl overflow-hidden">
+                  <div className="flex items-center px-4 sm:px-6 py-4 border-b border-purple/10 bg-purple/5">
                     <div className="w-12 sm:w-16 kimi-font-body text-xs text-white/50 uppercase">Rank</div>
                     <div className="flex-1 kimi-font-body text-xs text-white/50 uppercase">Team</div>
                     <div className="hidden sm:block w-24 text-right kimi-font-body text-xs text-white/50 uppercase">Win Rate</div>
@@ -753,7 +753,7 @@ const LeaderboardPreview: React.FC = () => {
                     return (
                         <div
                         key={team.teamKey}
-                          className="list-item group flex items-center px-4 sm:px-6 py-4 hover:bg-purple-600/5 transition-colors cursor-pointer"
+                          className="list-item group flex items-center px-4 sm:px-6 py-4 hover:bg-purple/5 transition-colors cursor-pointer"
                         >
                           <div className="w-12 sm:w-16 flex items-center gap-2">
                             <span className="kimi-font-display font-bold text-lg text-white/60">#{team.rank}</span>
@@ -787,7 +787,7 @@ const LeaderboardPreview: React.FC = () => {
                             <span className="kimi-font-body text-sm text-white/70">{team.members}</span>
                           </div>
                           <div className="w-24 text-right">
-                            <span className="kimi-font-display font-semibold text-sm sm:text-base bg-gradient-to-r from-purple-400 to-orange-400 bg-clip-text text-transparent">{formatUSDFG(team.gains)}</span>
+                            <span className="kimi-font-display font-semibold text-sm sm:text-base text-gradient-kimi-orange">{formatUSDFG(team.gains)}</span>
                           </div>
                         </div>
                       );

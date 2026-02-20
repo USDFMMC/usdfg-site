@@ -116,7 +116,7 @@ const ChallengeSystem: React.FC = () => {
               ease: "power3.out",
               scrollTrigger: {
                 trigger: node,
-                start: "top 85%",
+                start: "top 80%",
                 toggleActions: "play none none reverse",
               },
             }
@@ -153,7 +153,7 @@ const ChallengeSystem: React.FC = () => {
             ease: "power3.out",
             scrollTrigger: {
               trigger: visualRef.current,
-              start: "top 85%",
+              start: "top 80%",
               toggleActions: "play none none reverse",
             },
           }
@@ -170,7 +170,7 @@ const ChallengeSystem: React.FC = () => {
             ease: "power3.out",
             scrollTrigger: {
               trigger: creatorCardRef.current,
-              start: "top 85%",
+              start: "top 80%",
               toggleActions: "play none none reverse",
             },
           }
@@ -191,13 +191,13 @@ const ChallengeSystem: React.FC = () => {
   // Render
   // -----------------------------
   return (
-    <section ref={sectionRef} className="py-12 lg:py-16 relative overflow-hidden">
+    <section ref={sectionRef} className="py-24 lg:py-32 relative overflow-hidden">
 
       <div ref={wrapperRef} className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-12 xl:px-20">
         {/* Rules / Explainer */}
         <Card
           ref={rulesCardRef}
-          className="relative max-w-4xl mx-auto glass border border-purple/30 rounded-2xl transition-all duration-300 hover:border-purple-500/50 hover:shadow-[0_0_40px_rgba(126,67,255,0.18)] kimi-bottom-neon"
+          className="relative max-w-4xl mx-auto glass border border-purple/30 rounded-2xl transition-all duration-300 hover:border-purple/50 hover:shadow-[0_0_40px_rgba(126,67,255,0.18)] kimi-bottom-neon"
           style={
             {
               "--neon-color": "rgba(126, 67, 255, 0.25)",
@@ -313,7 +313,7 @@ const ChallengeSystem: React.FC = () => {
         {/* --- Challenge creator (mock) --- */}
         <Card
           ref={creatorCardRef}
-          className="relative max-w-4xl mx-auto glass border border-purple-500/20 rounded-2xl overflow-hidden transition-all duration-500 hover:border-purple-500/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)] kimi-bottom-neon mt-8"
+          className="relative max-w-4xl mx-auto glass border border-purple/20 rounded-2xl overflow-hidden transition-all duration-500 hover:border-purple/50 hover:shadow-[0_0_30px_rgba(126,67,255,0.25)] kimi-bottom-neon mt-8"
           style={{ 
           '--neon-color': 'rgba(168, 85, 247, 0.3)',
           '--neon-hover-color': 'rgba(168, 85, 247, 0.5)',
@@ -507,7 +507,7 @@ Unclear or unfair custom rules may be rejected.`}
               {/* CTA (disabled placeholder) */}
               <div className="text-center">
                 <a
-                  className="inline-block px-6 py-3 bg-gradient-to-r from-purple-600/60 to-amber-500/60 border border-purple-500/30 rounded-lg text-white hover:from-purple-500/60 hover:to-amber-400/60 flex items-center gap-2 transition-all duration-200 text-sm font-semibold mx-auto"
+                  className="inline-block px-6 py-3 bg-gradient-to-r from-purple-600/60 to-amber-500/60 border border-purple/30 rounded-lg text-white hover:from-purple-500/60 hover:to-amber-400/60 flex items-center gap-2 transition-all duration-200 text-sm font-semibold mx-auto"
                   title="Launch real challenges from the full platform"
                   style={{ pointerEvents: "none", opacity: 0.6, cursor: "not-allowed" }}
                 >

@@ -161,9 +161,9 @@
   background: linear-gradient(
     to top,
     transparent 0%,
-    var(--neon-color, rgba(168, 85, 247, 0.3)) 20%,
-    var(--neon-color, rgba(168, 85, 247, 0.5)) 50%,
-    var(--neon-color, rgba(168, 85, 247, 0.3)) 80%,
+    var(--neon-color, rgba(126, 67, 255, 0.3)) 20%,
+    var(--neon-color, rgba(126, 67, 255, 0.5)) 50%,
+    var(--neon-color, rgba(126, 67, 255, 0.3)) 80%,
     transparent 100%
   );
   opacity: 0.4;
@@ -180,9 +180,9 @@
   background: linear-gradient(
     to top,
     transparent 0%,
-    var(--neon-hover-color, rgba(168, 85, 247, 0.5)) 20%,
-    var(--neon-hover-color, rgba(168, 85, 247, 0.7)) 50%,
-    var(--neon-hover-color, rgba(168, 85, 247, 0.5)) 80%,
+    var(--neon-hover-color, rgba(126, 67, 255, 0.5)) 20%,
+    var(--neon-hover-color, rgba(126, 67, 255, 0.7)) 50%,
+    var(--neon-hover-color, rgba(126, 67, 255, 0.5)) 80%,
     transparent 100%
   );
 }
