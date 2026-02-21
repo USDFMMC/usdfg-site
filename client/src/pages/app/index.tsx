@@ -4132,14 +4132,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       );
       const participantSeesCompleted = isParticipant && isCompleted && categoryMatch && gameMatch;
       
+      // If user is participant in ACTIVE or creator_funded challenge, ALWAYS show it (so they can find their in-progress match)
+      const participantInActive = isParticipant && (status === 'active' || status === 'creator_funded');
       // If showing "My Challenges", show all their challenges regardless of status
       // OR if admin viewing completed Founder Tournament
       // OR if admin viewing expired Founder Tournament/Challenge (so they can open and delete manually; show even when category/game filter applied)
       // OR if user is participant in completed challenge (so they can re-open lobby to chat/mic)
       // Otherwise show joinable OR completed (so completed challenges don't "disappear" from the list)
-      const shouldShow = showMyChallenges 
+      const shouldShow = participantInActive || (showMyChallenges 
         ? (categoryMatch && gameMatch && myChallengesMatch) 
-        : (adminSeesExpiredFounder || (categoryMatch && gameMatch && (isJoinable || isCompleted || adminShouldSeeCompletedFounderTournament || participantSeesCompleted)));
+        : (adminSeesExpiredFounder || (categoryMatch && gameMatch && (isJoinable || isCompleted || adminShouldSeeCompletedFounderTournament || participantSeesCompleted))));
       
       return shouldShow;
       } catch (err) {
