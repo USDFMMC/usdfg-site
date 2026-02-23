@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import LetterGlitch from '@/components/effects/LetterGlitch';
 
 interface PasswordFormProps {
@@ -42,7 +43,16 @@ const PasswordForm: React.FC<PasswordFormProps> = ({ onSuccess }) => {
       
       {/* Password Form */}
       <div className="relative z-10 flex flex-col items-center neocore-panel p-8 backdrop-blur-md bg-black/40 border border-amber-500/30">
-        <h1 className="neocore-h2 mb-4 text-amber-300">Enter Arena Password</h1>
+        <h1 className="neocore-h2 mb-2 text-amber-300">USDFG Arena – Early Access</h1>
+        <p className="neocore-body text-white/70 text-center mb-6 max-w-md">
+          The browser arena is currently in private testing while we finalize competitive systems and verification logic.
+        </p>
+        <Link
+          to="/"
+          className="mb-4 text-sm text-amber-400/90 hover:text-amber-300 underline underline-offset-2 transition-colors"
+        >
+          Return to Homepage
+        </Link>
         <input
           type="password"
           value={password}
