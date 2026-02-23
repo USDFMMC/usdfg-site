@@ -14,6 +14,7 @@ import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
 import Whitepaper from "@/pages/whitepaper";
 import DisputeConsole from "@/pages/admin/DisputeConsole";
+import KimiRedirect from "@/pages/KimiRedirect";
 import { Helmet } from "react-helmet";
 import { startVersionMonitoring } from "@/lib/version";
 import UpdateBanner from "@/components/ui/UpdateBanner";
@@ -51,6 +52,9 @@ function RoutesWithLogging() {
         <Route path="/admin" element={<Navigate to="/admin/disputes" replace />} />
         <Route path="/admin/disputes" element={<DisputeConsole />} />
         
+        {/* Kimi design reference (Areigna) - full-page redirect */}
+        <Route path="/kimi" element={<KimiRedirect />} />
+
         {/* Legacy redirects for backwards compatibility */}
         <Route path="/home" element={<Navigate to="/" replace />} />
         <Route path="/login" element={<Navigate to="/" replace />} />

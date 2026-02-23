@@ -698,16 +698,16 @@ body {
   }
   
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Chakra Petch', sans-serif;
+    font-family: 'Oxanium', sans-serif;
   }
   
   body, p, span, div, a, button {
-    font-family: 'Exo 2', 'Arial', sans-serif;
+    font-family: 'Rajdhani', sans-serif;
   }
   
-  /* NeoCore Typography */
+  /* NeoCore Typography - aligned with Kimi/USDFG (Oxanium/Rajdhani) */
   .neocore-h1 {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'Oxanium', sans-serif;
     font-size: 3.2rem;
     font-weight: 700;
     letter-spacing: -0.02em;
@@ -716,7 +716,7 @@ body {
   }
   
   .neocore-h2 {
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'Oxanium', sans-serif;
     font-size: 1.8rem;
     font-weight: 600;
     color: #cfcfcf;
@@ -724,13 +724,13 @@ body {
   }
   
   .neocore-body {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Rajdhani', sans-serif;
     color: #8a8a8a;
     line-height: 1.6;
   }
   
   .neocore-button {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Rajdhani', sans-serif;
     font-size: 0.9rem;
     font-weight: 700;
     text-transform: uppercase;

@@ -4,6 +4,22 @@ import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { VitePWA } from "vite-plugin-pwa";
 
+// Serve Kimi reference at /_kimi and /_kimi/ by rewriting to /_kimi/index.html
+const kimiPlugin = {
+  name: "kimi-reference",
+  configureServer(server: any) {
+    const handler = (req: any, _res: any, next: any) => {
+      const url = req.url?.split("?")[0] || "";
+      if (url === "/_kimi" || url === "/_kimi/") {
+        req.url = "/_kimi/index.html" + (req.url?.includes("?") ? "?" + req.url.split("?")[1] : "");
+      }
+      next();
+    };
+    // Prepend so this runs before SPA fallback
+    (server.middlewares as any).stack.unshift({ route: "", handle: handler });
+  },
+};
+
 export default defineConfig(async () => {
   // Conditionally import cartographer plugin only when needed
   const cartographerPlugin = 
@@ -13,6 +29,7 @@ export default defineConfig(async () => {
 
   return {
   plugins: [
+    kimiPlugin,
     react({
       // Optimize React refresh for better HMR
       fastRefresh: true,
