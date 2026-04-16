@@ -195,12 +195,11 @@ export default defineConfig(async () => {
   },
   server: {
     port: 5173,
-    host: 'localhost', // Use localhost for consistent HTTP and WebSocket connections
-    strictPort: false, // Allow Vite to use a different port if 5173 is busy
+    // true = listen on 0.0.0.0 so http://127.0.0.1:PORT and LAN work; fixes some “can’t open local” cases
+    host: true,
+    strictPort: false,
     hmr: {
-      host: 'localhost', // Match server host for consistent WebSocket connection
       protocol: 'ws',
-      // Don't specify port - let Vite use the same port as the dev server
     },
     headers: {
       "Cache-Control": "public, max-age=31536000, immutable",
