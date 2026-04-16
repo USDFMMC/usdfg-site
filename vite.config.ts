@@ -1,213 +1,30 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import path from "path";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
-import { VitePWA } from "vite-plugin-pwa";
+import path from "path"
+import react from "@vitejs/plugin-react"
+import { defineConfig } from "vite"
+import { inspectAttr } from 'kimi-plugin-inspect-react'
+import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
-// Serve Kimi reference at /_kimi and /_kimi/ by rewriting to /_kimi/index.html
-const kimiPlugin = {
-  name: "kimi-reference",
-  configureServer(server: any) {
-    const handler = (req: any, _res: any, next: any) => {
-      const url = req.url?.split("?")[0] || "";
-      if (url === "/_kimi" || url === "/_kimi/") {
-        req.url = "/_kimi/index.html" + (req.url?.includes("?") ? "?" + req.url.split("?")[1] : "");
-      }
-      next();
-    };
-    // Prepend so this runs before SPA fallback
-    (server.middlewares as any).stack.unshift({ route: "", handle: handler });
-  },
-};
-
-export default defineConfig(async () => {
-  // Conditionally import cartographer plugin only when needed
-  const cartographerPlugin = 
-    process.env.NODE_ENV !== "production" && process.env.REPL_ID !== undefined
-      ? (await import("@replit/vite-plugin-cartographer")).cartographer()
-      : null;
-
-  return {
-  plugins: [
-    kimiPlugin,
-    react({
-      // Optimize React refresh for better HMR
-      fastRefresh: true,
-    }),
-    runtimeErrorOverlay(),
-    VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'robots.txt', 'sitemap.xml'],
-      manifest: {
-        name: 'USDFG Arena - Gaming Platform',
-        short_name: 'USDFG Arena',
-        description: 'Skill-based crypto gaming platform. Compete, earn $USDFG, and prove your gaming prowess.',
-        theme_color: '#0B0F1A',
-        background_color: '#0B0F1A',
-        display: 'standalone',
-        orientation: 'portrait-primary',
-        scope: '/',
-        start_url: '/app',
-        icons: [
-          {
-            src: '/assets/usdfgtoken.png',
-            sizes: '144x144',
-            type: 'image/png',
-            purpose: 'any maskable'
-          },
-          {
-            src: '/assets/usdfgtoken.png',
-            sizes: '192x192',
-            type: 'image/png',
-            purpose: 'any'
-          },
-          {
-            src: '/assets/usdfgtoken.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any'
-          }
-        ]
-      },
-      workbox: {
-        // Exclude large image files from precaching (they'll be cached at runtime)
-        globPatterns: ['**/*.{js,css,html,ico,svg,woff,woff2}'],
-        // Exclude large PNG/WebP files from precaching
-        globIgnores: [
-          '**/usdfg-og-banner*.png',
-          '**/trophies/*.png',
-          '**/categories/*.png',
-          '**/ads/*.webp',
-          '**/ads/*.png'
-        ],
-        // Increase file size limit for precaching (for other assets)
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
-        // Don't cache JS bundles aggressively - ensure fresh code loads
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/.*\.(js|css)$/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'js-css-cache',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 // 24 hours
-              }
-            }
-          },
-          {
-            // Cache large images at runtime (not precached)
-            urlPattern: /\.(png|jpg|jpeg|svg|webp)$/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'static-assets-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
-              }
-            }
-          },
-          {
-            urlPattern: /\.(woff|woff2|ttf|eot)$/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'fonts-cache',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
-              }
-            }
-          }
-        ]
-      },
-      devOptions: {
-        enabled: false // Disable in dev to avoid conflicts
-      }
-    }),
-      ...(cartographerPlugin ? [cartographerPlugin] : []),
-  ],
-  define: {
-    global: 'globalThis',
+// https://vite.dev/config/
+export default defineConfig({
+  base: './',
+  build: {
+    target: ['es2020', 'firefox90', 'chrome90', 'safari14'],
   },
   optimizeDeps: {
-    esbuildOptions: {
-      define: {
-        global: 'globalThis',
-      },
-    },
     include: [
-      'react',
-      'react-dom',
-      'react-router-dom',
-      'firebase/app',
-      'firebase/firestore',
       '@solana/web3.js',
       '@solana/wallet-adapter-base',
       '@solana/wallet-adapter-react',
       '@solana/wallet-adapter-react-ui',
       '@solana/wallet-adapter-phantom',
       '@solana/wallet-adapter-solflare',
-      '@solana-mobile/wallet-adapter-mobile',
-    ],
-    exclude: [
-      '@coral-xyz/borsh',
-      '@coral-xyz/anchor',
+      'borsh',
     ],
   },
+  plugins: [nodePolyfills({ include: ['stream'], globals: { Buffer: true, process: true } }), inspectAttr(), react()],
   resolve: {
     alias: {
-      "@db": path.resolve(import.meta.dirname, "db"),
-      "@": path.resolve(import.meta.dirname, "client", "src"),
-      "@shared": path.resolve(import.meta.dirname, "shared"),
-      "@assets": path.resolve(import.meta.dirname, "attached_assets"),
+      '@': path.resolve(__dirname, './src'),
     },
   },
-  root: path.resolve(import.meta.dirname, "client"),
-  publicDir: path.resolve(import.meta.dirname, "client", "public"), // ✅ explicitly set public directory
-  build: {
-    outDir: path.resolve(import.meta.dirname, "dist"), // ✅ output directly to dist/
-    emptyOutDir: true,
-    sourcemap: false,
-    minify: "esbuild", // Use esbuild instead of terser to avoid lexical declaration errors
-    chunkSizeWarningLimit: 2500, // vendor chunk is large; avoid noisy warning
-    commonjsOptions: {
-      transformMixedEsModules: true,
-      strictRequires: false, // Set to false to allow hoisting and prevent TDZ errors
-      esmExternals: true,
-      // Ensure proper hoisting of requires
-      requireReturnsDefault: 'auto',
-    },
-    rollupOptions: {
-      // Prevent circular dependency issues by using exports-only
-      preserveEntrySignatures: 'exports-only',
-      output: {
-        // Use ES module format for better tree-shaking and module isolation
-        format: 'es',
-        // Use var instead of const/let to avoid TDZ "can't access lexical declaration before initialization"
-        generatedCode: {
-          constBindings: false,
-          objectShorthand: true,
-        },
-        chunkFileNames: 'assets/[name]-[hash].js',
-        entryFileNames: 'assets/[name]-[hash].js',
-      },
-    },
-  },
-  server: {
-    port: 5173,
-    host: 'localhost', // Use localhost for consistent HTTP and WebSocket connections
-    strictPort: false, // Allow Vite to use a different port if 5173 is busy
-    hmr: {
-      host: 'localhost', // Match server host for consistent WebSocket connection
-      protocol: 'ws',
-      // Don't specify port - let Vite use the same port as the dev server
-    },
-    headers: {
-      "Cache-Control": "public, max-age=31536000, immutable",
-      "X-Content-Type-Options": "nosniff",
-      "X-Frame-Options": "DENY",
-      "X-XSS-Protection": "1; mode=block",
-    },
-  },
-  };
 });

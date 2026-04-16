@@ -1,7 +1,16 @@
-temp-contract/
-dist/
+# Dependencies
+node_modules
+
+# Build output
+dist
+
+# Logs / OS junk
 *.log
 .DS_Store
-node_modules/
+
+# Local env (do not commit secrets)
+.env.local
+
+# Legacy/ops artifacts (keep out of git)
+temp-contract/
 wallets/authority.json
-# Cloudflare Pages Build

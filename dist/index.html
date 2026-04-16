@@ -1,138 +1,24 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, minimum-scale=1.0, user-scalable=yes, viewport-fit=cover" />
-    <title>USDFG.PRO – Skill-Based Crypto Gaming Platform | Game. Earn. Conquer.</title>
-    <meta name="description" content="USDFG.PRO is the elite, skill-based crypto gaming platform. Compete in verified challenges, earn $USDFG, and prove your skill. No gambling. No chance. 100% on-chain rewards." />
-    <!-- Open Graph / Facebook -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>USDFG — Skill-Based Esports Arena</title>
+    <meta name="description" content="USDFG is a skill-based esports competition platform where players create challenges, compete on-chain, and earn verified rewards through performance. Wallet-based. Non-custodial." />
+    <meta property="og:title" content="USDFG — Skill-Based Esports Arena" />
+    <meta property="og:description" content="USDFG is a skill-based esports competition platform where players create challenges, compete on-chain, and earn verified rewards through performance. Wallet-based. Non-custodial." />
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="USDFG.PRO" />
-    <meta property="og:title" content="USDFG" />
-    <meta property="og:description" content="Skill-Based Competitive Arena&#10;GAME. EARN. CONQUER." />
-    <meta property="og:image" content="https://usdfg.pro/assets/usdfg-token.png?v=27" />
-    <meta property="og:image:secure_url" content="https://usdfg.pro/assets/usdfg-token.png?v=27" />
-    <meta property="og:image:type" content="image/png" />
-    <meta property="og:image:width" content="1024" />
-    <meta property="og:image:height" content="1024" />
-    <meta property="og:image:alt" content="USDFG" />
-    <meta property="og:url" content="https://usdfg.pro/" />
-    
-    <!-- Twitter -->
+    <meta property="og:image" content="./usdfglogo.png" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="USDFG" />
-    <meta name="twitter:description" content="Skill-Based Competitive Arena&#10;GAME. EARN. CONQUER." />
-    <meta name="twitter:image" content="https://usdfg.pro/assets/usdfg-token.png?v=27" />
-    <meta name="twitter:image:alt" content="USDFG" />
-    <link rel="icon" type="image/png" href="/assets/usdfgtoken.png" />
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#0B0F1A" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="USDFG Arena" />
-    <link rel="apple-touch-icon" href="/assets/usdfgtoken.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;700&family=Chakra+Petch:wght@700&family=Oxanium:wght@300;400;500;600;700;800&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script>
-      // Prevent zoom on mobile - ensure viewport is set correctly
-      (function() {
-        const setViewport = () => {
-          const viewport = document.querySelector('meta[name="viewport"]');
-          if (viewport) {
-            viewport.setAttribute('content', 
-              'width=device-width, initial-scale=1.0, maximum-scale=5.0, minimum-scale=1.0, user-scalable=yes, viewport-fit=cover'
-            );
-          }
-        };
-        
-        // Set immediately on load
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', setViewport);
-        } else {
-          setViewport();
-        }
-        
-        // Re-set on orientation change
-        window.addEventListener('orientationchange', () => {
-          setTimeout(setViewport, 100);
-        });
-        
-        // Prevent double-tap zoom on iOS
-        let lastTouchEnd = 0;
-        document.addEventListener('touchend', function(event) {
-          const now = Date.now();
-          if (now - lastTouchEnd <= 300) {
-            event.preventDefault();
-          }
-          lastTouchEnd = now;
-        }, false);
-      })();
-      
-      // Simple Buffer polyfill for Solana web3.js
-      if (typeof globalThis.Buffer === 'undefined') {
-        globalThis.Buffer = {
-          from: (data, encoding) => new Uint8Array(new TextEncoder().encode(data)),
-          isBuffer: () => false,
-          alloc: (size) => new Uint8Array(size),
-          concat: (arrays) => {
-            const totalLength = arrays.reduce((sum, arr) => sum + arr.length, 0);
-            const result = new Uint8Array(totalLength);
-            let offset = 0;
-            for (const arr of arrays) {
-              result.set(arr, offset);
-              offset += arr.length;
-            }
-            return result;
-          }
-        };
-      }
-    </script>
-    <script type="module" crossorigin src="/assets/index-B_0G-v4X.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-CHBNQcdv.css">
-  <link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
+    <meta name="twitter:title" content="USDFG — Skill-Based Esports Arena" />
+    <meta name="twitter:description" content="Skill-based esports competition. On-chain verification. Fixed supply. Non-custodial." />
+    <meta name="twitter:image" content="./usdfglogo.png" />
+    <link rel="icon" type="image/png" href="./usdfglogo.png" />
+    <link rel="apple-touch-icon" href="./usdfglogo.png" />
+    <script type="module" crossorigin src="./assets/index-Dt-f0C1E.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DbrnuxFh.css">
+  </head>
   <body>
     <div id="root"></div>
-    <script>
-      // Crosshair functionality - runs after DOM loads
-      document.addEventListener('DOMContentLoaded', () => {
-        let horizontal, vertical;
-
-        const initCrosshair = () => {
-          horizontal = document.querySelector('.crosshair-horizontal');
-          vertical = document.querySelector('.crosshair-vertical');
-        };
-
-        const handleMouseMove = (e) => {
-          if (horizontal && vertical) {
-            horizontal.style.opacity = '0.6';
-            vertical.style.opacity = '0.6';
-            horizontal.style.top = e.clientY + 'px';
-            vertical.style.left = e.clientX + 'px';
-          }
-        };
-
-        const handleMouseLeave = () => {
-          if (horizontal && vertical) {
-            horizontal.style.opacity = '0';
-            vertical.style.opacity = '0';
-          }
-        };
-
-        // Initialize when component loads
-        const checkForCrosshair = () => {
-          if (document.querySelector('.crosshair-container')) {
-            initCrosshair();
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mouseleave', handleMouseLeave);
-          } else {
-            // Check again in 100ms if crosshair isn't ready yet
-            setTimeout(checkForCrosshair, 100);
-          }
-        };
-
-        checkForCrosshair();
-      });
-    </script>
   </body>
-</html> 
+</html>

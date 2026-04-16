@@ -1,8 +1,0 @@
-# Cloudflare Pages headers (if using Cloudflare)
-# Note: Cloudflare Pages uses Functions for routing, not _redirects
-
-# For Cloudflare Pages, routing is handled via:
-# 1. Functions/_middleware.ts (for routing)
-# 2. Or _routes.json (for static routing)
-
-# Headers are set in netlify.toml or via Cloudflare Workers

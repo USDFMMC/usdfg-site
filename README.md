@@ -1,79 +1,67 @@
-# USDFG (United We Stand Divided We Fall Gaming)
+# USDFG
 
-A skill-based digital competition platform built on the Solana blockchain.
+Non-custodial, skill-based esports arena: players create challenges, compete, and settle rewards with **Solana** on-chain logic while **Firestore** holds off-chain state (lobbies, chat, tournaments, profiles).
 
-## Project Overview
+## Requirements
 
-USDFG is a modern web application that provides a platform for skill-based digital competitions. The platform is powered by the $USDFG token on the Solana blockchain.
+- Node.js 20+ (recommended)
+- npm 10+
+- A Solana wallet (e.g. Phantom) for local testing
+- Firebase project (for Firestore / Auth as configured in the app)
 
-## Tech Stack
+## Setup
 
-- **Frontend**: React, TypeScript, TailwindCSS, Radix UI
-- **Backend**: Express.js, TypeScript
-- **Database**: Neon Database (PostgreSQL)
-- **Blockchain**: Solana
-- **Authentication**: Passport.js
-- **ORM**: Drizzle
+```bash
+git clone <repository-url>
+cd KIMI2USDFG
+npm install
+```
 
-## Current Status
+## Environment
 
-The project is actively maintained by Hussein Ali, the founder of USDFG. This is a solo development project focused on building a secure and scalable skill-based competition platform.
+Copy the example file and fill in values (placeholders only in repo; use your own keys locally):
+
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local` with your Firebase and RPC values. The app may still read Firebase from `src/lib/firebase/config.ts` depending on your branch; align env usage with your deployment policy.
+
+Variables in `.env.example`:
+
+- `VITE_FIREBASE_*` — Firebase web client config
+- `VITE_SOLANA_RPC_ENDPOINT` — Solana JSON-RPC URL for transactions and reads
 
 ## Development
 
-### Prerequisites
-
-- Node.js (Latest LTS version)
-- PostgreSQL
-- Solana CLI tools
-- pnpm (recommended) or npm
-
-### Setup
-
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   pnpm install
-   ```
-3. Set up environment variables (see `.env.example`)
-4. Run database migrations:
-   ```bash
-   pnpm db:push
-   ```
-5. Start development server:
-   ```bash
-   pnpm dev
-   ```
-
-## Project Structure
-
-```
-├── client/                 # Frontend code
-├── server/                # Backend code
-├── db/                    # Database related files
-└── shared/               # Shared types/utilities
+```bash
+npm run dev
 ```
 
-## Contributing
+Open the app (default Vite URL, e.g. `http://localhost:5173`). Arena routes live under `/app`.
 
-This is currently a solo development project. All contributions and changes are managed by the founder.
+## Production build
 
-## License
+```bash
+npm run build
+```
 
-This project is proprietary. All rights reserved.
+Output is written to `dist/`. Lint:
 
-The source code, game structure, smart contract logic, platform UI, and token ecosystem of USDFG.PRO are proprietary.
+```bash
+npm run lint
+```
 
-You may not copy, modify, distribute, host, or reuse any part of this project in any form, including derivative works, without express written permission from the project founder.
+## Deploy
 
-Use of this code or platform without authorization will result in legal action.
+Hosting is configured for **Firebase Hosting** in `firebase.json` (SPA rewrite to `index.html`, `public` build output is `dist`). Deploy with the Firebase CLI after `npm run build`, using your Firebase project and rules in `firestore.rules`.
 
-This software is not open source and may not be licensed or sublicensed by any third party.
+## Architecture (short)
 
-See LICENSE file for full details.
+- **Non-custodial**: entry and payouts go through Solana programs / PDAs as implemented in `src/lib/chain/`.
+- **Firestore**: challenge list, lobbies, chat, voice signaling, tournaments, trust reviews, etc. (`src/lib/firebase/`).
+- **Solana**: funding, join, cancel, claim, and admin dispute resolution flows (`src/lib/chain/contract.ts` and related).
 
-## Contact
+## Admin
 
-- Founder: founder@usdfg.pro
-- Support: support@usdfg.pro
-- Twitter: [@USDFGAMING](https://twitter.com/USDFGAMING) 
+Dispute console route: `/admin/disputes` (Firebase Auth + admin allowlist as implemented in the app).
