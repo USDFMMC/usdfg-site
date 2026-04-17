@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Send } from "lucide-react";
 import { collection, addDoc, query, where, onSnapshot, orderBy, limit, serverTimestamp } from "firebase/firestore";
-import { db } from "../../lib/firebase/config";
+import { auth, db } from "../../lib/firebase/config";
 
 const linkRegex = /(https?:\/\/[^\s]+)/g;
 
@@ -97,6 +97,15 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
 
     setSending(true);
     try {
+      // Firestore rules require wallet custom claim to match sender wallet.
+      const walletLower = (currentWallet || "").toLowerCase();
+      const tokenResult = await auth.currentUser?.getIdTokenResult();
+      const claimedWallet = (tokenResult?.claims as any)?.wallet;
+      if (!walletLower || typeof claimedWallet !== "string" || claimedWallet.toLowerCase() !== walletLower) {
+        onAppToast?.("Verifying identity… please wait a moment and try again.", "info", "Identity");
+        return;
+      }
+
       await addDoc(collection(db, "challenge_chats"), {
         challengeId,
         text: input.trim(),
