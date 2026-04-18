@@ -1,6 +1,5 @@
-import { useLocation } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import ArenaApp from './ArenaApp';
 import PasswordForm from '@/components/PasswordForm';
 
 export default function ArenaRoute() {
@@ -43,5 +42,5 @@ export default function ArenaRoute() {
     return <PasswordForm onSuccess={() => setHasAccess(true)} />;
   }
 
-  return <ArenaApp />;
+  return <Outlet />;
 }

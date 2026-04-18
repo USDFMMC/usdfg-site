@@ -5,6 +5,7 @@ import { inspectAttr } from 'kimi-plugin-inspect-react'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
 // https://vite.dev/config/
+// Root-relative base so built JS/CSS resolve as /assets/* on deep links (e.g. /admin/disputes).
 export default defineConfig({
   base: '/',
   build: {
