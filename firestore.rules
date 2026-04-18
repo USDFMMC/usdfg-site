@@ -1,16 +1,10 @@
 rules_version = '2';
 
-// =============================================================================
-// Aligned with original USDFG architecture (usdfg-site style)
 // -----------------------------------------------------------------------------
-// - Every read/write requires Firebase Authentication (request.auth != null).
-//   Anonymous sign-in counts as authenticated; unauthenticated clients cannot access data.
-// - We do NOT enforce Solana wallet identity or challenge participant logic here.
-//   Challenge integrity, payouts, and admin actions on escrow rely on client checks +
-//   on-chain programs (e.g. resolveAdminChallengeOnChain). ADMIN_WALLET gating stays in app code.
-// - DisputeConsole: Firebase email users listed in `admins/{uid}` use isAdmin() for audit log.
-// - Chat: immutable (no update/delete) to avoid accidental destructive patterns; creates require auth + schema keys.
-// =============================================================================
+// Auth: anonymous sign-in counts as authenticated for general data.
+// Admin console: custom token claims admin + wallet (see Cloud Function verifyAdmin).
+// Do NOT lock `challenges` to admins only — normal gameplay requires participant writes.
+// -----------------------------------------------------------------------------
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -19,14 +13,17 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Firebase admin (DisputeConsole): document at admins/{firebaseUid} with active !== false (checked in app).
+    function hasAdminClaim() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    // Legacy name kept for audit / admin_logs; same as hasAdminClaim
     function isAdmin() {
-      return isSignedIn() &&
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      return hasAdminClaim();
     }
 
     // --------------------------------------------------------------------------
-    // challenges — auth only; no wallet / participant rules in Firestore
+    // challenges — signed-in users (NOT admin-only; app gameplay)
     // --------------------------------------------------------------------------
     match /challenges/{challengeId} {
       allow get, list: if isSignedIn();
@@ -34,7 +31,14 @@ service cloud.firestore {
     }
 
     // --------------------------------------------------------------------------
-    // challenge_chats — auth to read/write messages; documents immutable (no update/delete)
+    // Optional admin-only collection (if used). Production disputes use `challenges`.
+    // --------------------------------------------------------------------------
+    match /disputes/{id} {
+      allow read, write: if hasAdminClaim();
+    }
+
+    // --------------------------------------------------------------------------
+    // challenge_chats
     // --------------------------------------------------------------------------
     match /challenge_chats/{chatId} {
       allow get, list: if isSignedIn();
@@ -58,17 +62,12 @@ service cloud.firestore {
     match /tournament_disputes/{disputeId} {
       allow get, list: if request.auth != null;
       allow create: if request.auth != null;
-
-      // Allow authenticated updates so client-side tournament dispute resolution works.
-      // This matches the current hybrid architecture where Firestore is a state/UI layer,
-      // while security/authority is enforced by app logic and on-chain rules.
       allow update: if request.auth != null;
-
       allow delete: if false;
     }
 
     // --------------------------------------------------------------------------
-    // player_stats — auth only (doc id is wallet string; not validated in rules)
+    // player_stats
     // --------------------------------------------------------------------------
     match /player_stats/{wallet} {
       allow get, list: if isSignedIn();
@@ -188,21 +187,40 @@ service cloud.firestore {
     }
 
     // --------------------------------------------------------------------------
-    // admins — client read only if caller has an admins profile; no client writes
+    // _rate_limits — Cloud Functions only (verifyAdmin / createAdminNonce)
+    // --------------------------------------------------------------------------
+    match /_rate_limits/{id} {
+      allow read, write: if false;
+    }
+
+    // --------------------------------------------------------------------------
+    // admins — document ID = normalized wallet; only Admin SDK / backend
     // --------------------------------------------------------------------------
     match /admins/{adminId} {
-      allow read: if isSignedIn() &&
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      allow read, write: if false;
+    }
+
+    // --------------------------------------------------------------------------
+    // admin_auth_nonces — Cloud Function only
+    // --------------------------------------------------------------------------
+    match /admin_auth_nonces/{nonceId} {
+      allow read, write: if false;
+    }
+
+    // --------------------------------------------------------------------------
+    // admin_logs — written by Cloud Functions; optional client read for tooling
+    // --------------------------------------------------------------------------
+    match /admin_logs/{logId} {
+      allow read: if hasAdminClaim();
       allow write: if false;
     }
 
     // --------------------------------------------------------------------------
-    // admin_audit_log — DisputeConsole (Firebase admins only)
+    // admin_audit_log — Cloud Functions (Admin SDK) only
     // --------------------------------------------------------------------------
     match /admin_audit_log/{logId} {
       allow read: if isAdmin();
-      allow create: if isAdmin();
-      allow update, delete: if false;
+      allow write: if false;
     }
   }
 }

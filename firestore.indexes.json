@@ -1,0 +1,13 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "admin_auth_nonces",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "address", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

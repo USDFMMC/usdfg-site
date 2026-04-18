@@ -25,11 +25,13 @@ function App() {
         <Route path="*" element={<NotFoundPage />} />
       </Route>
 
-      <Route path="/admin/*" element={<AdminLayout />}>
+      <Route path="/console-7x9a/*" element={<AdminLayout />}>
         <Route index element={<Navigate to="disputes" replace />} />
         <Route path="disputes" element={<DisputeConsole />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
+
+      <Route path="/admin/*" element={<Navigate to="/" replace />} />
 
       <Route path="/whitepaper" element={<WhitepaperPage />} />
       <Route path="/privacy" element={<PrivacyPolicyPage />} />

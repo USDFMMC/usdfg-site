@@ -1,110 +1,70 @@
 import React, { useState, useEffect } from 'react';
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
-import { auth } from '@/lib/firebase/config';
 import type { ChallengeData } from '@/lib/firebase/firestore';
 import {
-  isAdmin,
-  getDisputedChallenges,
   listenToDisputedChallenges,
-  resolveAdminChallenge,
   listenToTournamentDisputes,
-  resolveTournamentMatchDispute,
   type TournamentMatchDispute,
 } from '@/lib/firebase/firestore';
 import { resolveAdminChallengeOnChain } from '@/lib/chain/contract';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import { signInAnonymously, signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase/config';
+import {
+  finalizeAdminChallengeOnServer,
+  finalizeAdminTournamentOnServer,
+} from '@/lib/firebase/adminApi';
+import { normalizeAddress } from '@/utils/normalizeAddress';
 
 const DisputeConsole: React.FC = () => {
-  const [user, setUser] = useState<any>(null);
-  const [isAdminUser, setIsAdminUser] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [disputedChallenges, setDisputedChallenges] = useState<ChallengeData[]>([]);
   const [tournamentDisputes, setTournamentDisputes] = useState<TournamentMatchDispute[]>([]);
   const [resolving, setResolving] = useState<string | null>(null);
-  
+
   const { connection } = useConnection();
   const wallet = useWallet();
+  const { publicKey, connected } = wallet;
 
-  // Check auth state
+  const walletAddress = publicKey?.toString();
+  const addressNorm = normalizeAddress(walletAddress);
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
-      if (firebaseUser) {
-        const admin = await isAdmin(firebaseUser.uid);
-        setIsAdminUser(admin);
-        if (!admin) {
-          setError('You are not authorized to access this page');
-          await signOut(auth);
-        }
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  // Listen to disputed challenges
-  useEffect(() => {
-    if (!isAdminUser) return;
+    if (!connected || !addressNorm) return;
 
     const unsubscribe = listenToDisputedChallenges((challenges) => {
       setDisputedChallenges(challenges);
     });
 
     return () => unsubscribe();
-  }, [isAdminUser]);
+  }, [connected, addressNorm]);
 
-  // Listen to disputed tournament matches
   useEffect(() => {
-    if (!isAdminUser) return;
+    if (!connected || !addressNorm) return;
     const unsubscribe = listenToTournamentDisputes((disputes) => {
       setTournamentDisputes(disputes);
     });
     return () => unsubscribe();
-  }, [isAdminUser]);
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const admin = await isAdmin(userCredential.user.uid);
-      
-      if (!admin) {
-        await signOut(auth);
-        setError('You are not authorized to access this page');
-        setIsAdminUser(false);
-      } else {
-        setIsAdminUser(true);
-      }
-    } catch (err: any) {
-      setError(err.message || 'Login failed');
-      setIsAdminUser(false);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [connected, addressNorm]);
 
   const handleLogout = async () => {
-    await signOut(auth);
-    setUser(null);
-    setIsAdminUser(false);
+    try {
+      await signOut(auth);
+      await signInAnonymously(auth);
+    } catch {
+      /* ignore */
+    }
+    await wallet.disconnect();
     setDisputedChallenges([]);
   };
 
   const handleResolve = async (challengeId: string, winnerWallet: string) => {
-    if (!user || !isAdminUser) {
-      setError('You must be logged in as an admin');
+    if (!publicKey) {
+      setError('Wallet required');
       return;
     }
 
-    if (!wallet.connected || !wallet.publicKey) {
+    if (!wallet.connected) {
       setError('Please connect your wallet to resolve disputes');
       return;
     }
@@ -113,7 +73,6 @@ const DisputeConsole: React.FC = () => {
     setError(null);
 
     try {
-      // First, call on-chain instruction
       console.log('🔗 Calling resolve_admin on-chain...');
       const txSignature = await resolveAdminChallengeOnChain(
         wallet,
@@ -124,104 +83,53 @@ const DisputeConsole: React.FC = () => {
 
       console.log('✅ On-chain resolution successful:', txSignature);
 
-      // Then update Firestore
-      await resolveAdminChallenge(
+      await finalizeAdminChallengeOnServer({
         challengeId,
         winnerWallet,
-        user.uid,
-        user.email || 'unknown',
-        txSignature
-      );
+        onChainTx: txSignature,
+      });
 
       console.log('✅ Dispute resolved successfully');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('❌ Error resolving dispute:', err);
-      setError(err.message || 'Failed to resolve dispute');
+      setError(err instanceof Error ? err.message : 'Failed to resolve dispute');
     } finally {
       setResolving(null);
     }
   };
 
-  const handleResolveTournamentDispute = async (dispute: TournamentMatchDispute, winnerWallet: string) => {
-    if (!user || !isAdminUser) {
-      setError('You must be logged in as an admin');
+  const handleResolveTournamentDispute = async (
+    dispute: TournamentMatchDispute,
+    winnerWallet: string
+  ) => {
+    if (!publicKey) {
+      setError('Wallet required');
       return;
     }
     setResolving(dispute.id || `${dispute.challengeId}:${dispute.matchId}`);
     setError(null);
     try {
-      await resolveTournamentMatchDispute(
-        dispute.challengeId,
-        dispute.matchId,
+      await finalizeAdminTournamentOnServer({
+        challengeId: dispute.challengeId,
+        matchId: dispute.matchId,
         winnerWallet,
-        user.uid,
-        user.email || 'unknown'
-      );
-    } catch (err: any) {
+      });
+    } catch (err: unknown) {
       console.error('❌ Error resolving tournament dispute:', err);
-      setError(err.message || 'Failed to resolve tournament dispute');
+      setError(
+        err instanceof Error ? err.message : 'Failed to resolve tournament dispute'
+      );
     } finally {
       setResolving(null);
     }
   };
 
-  if (loading) {
+  if (!connected || !publicKey) {
     return (
-      <div className="min-h-screen bg-[#0B0F1A] flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
-      </div>
-    );
-  }
-
-  if (!user || !isAdminUser) {
-    return (
-      <div className="min-h-screen bg-[#0B0F1A] flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-[#1a1f2e] rounded-lg p-8 border border-cyan-500/20">
-          <h1 className="text-2xl font-bold text-white mb-6 text-center">
-            Admin Dispute Console
-          </h1>
-          
-          {error && (
-            <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded text-red-300 text-sm">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2 bg-[#0f1419] border border-gray-600 rounded text-white focus:outline-none focus:border-cyan-500"
-                required
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2 bg-[#0f1419] border border-gray-600 rounded text-white focus:outline-none focus:border-cyan-500"
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-2 bg-cyan-500 hover:bg-cyan-600 text-white font-semibold rounded transition"
-            >
-              Login
-            </button>
-          </form>
-        </div>
+      <div className="min-h-screen bg-[#0B0F1A] flex flex-col items-center justify-center p-4 gap-6">
+        <h1 className="text-2xl font-bold text-white text-center">Admin Dispute Console</h1>
+        <p className="text-gray-400 text-center max-w-md">Connect your Solana wallet to continue.</p>
+        <WalletMultiButton />
       </div>
     );
   }
@@ -234,30 +142,19 @@ const DisputeConsole: React.FC = () => {
           <div className="flex items-center gap-4">
             {wallet.connected && (
               <span className="text-sm text-gray-400">
-                Wallet: {wallet.publicKey?.toString().slice(0, 8)}...{wallet.publicKey?.toString().slice(-6)}
+                Wallet: {wallet.publicKey?.toString().slice(0, 8)}...
+                {wallet.publicKey?.toString().slice(-6)}
               </span>
             )}
             <WalletMultiButton />
-            <span className="text-gray-400">{user.email}</span>
             <button
               onClick={handleLogout}
               className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded border border-red-500/50 transition"
             >
-              Logout
+              Disconnect
             </button>
           </div>
         </div>
-
-        {!wallet.connected && (
-          <div className="mb-4 p-4 bg-yellow-500/20 border border-yellow-500/50 rounded text-yellow-300">
-            <div className="flex items-center justify-between">
-              <span>⚠️ Please connect your wallet to resolve disputes</span>
-              <div className="ml-4">
-                <WalletMultiButton />
-              </div>
-            </div>
-          </div>
-        )}
 
         {error && (
           <div className="mb-4 p-4 bg-red-500/20 border border-red-500/50 rounded text-red-300">
@@ -293,12 +190,12 @@ const DisputeConsole: React.FC = () => {
                       Challenge: {challenge.game || 'Unknown Game'}
                     </h3>
                     <div className="text-sm text-gray-400">
-                      Entry Fee: {challenge.entryFee} USDFG | Created: {challenge.createdAt?.toDate().toLocaleString()}
+                      Entry Fee: {challenge.entryFee} USDFG | Created:{' '}
+                      {challenge.createdAt?.toDate().toLocaleString()}
                     </div>
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-4 mb-4">
-                    {/* Player 1 */}
                     <div className="bg-[#0f1419] rounded p-4">
                       <div className="font-semibold text-white mb-2">
                         Player A: {player1?.slice(0, 8)}...{player1?.slice(-6)}
@@ -317,7 +214,6 @@ const DisputeConsole: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Player 2 */}
                     <div className="bg-[#0f1419] rounded p-4">
                       <div className="font-semibold text-white mb-2">
                         Player B: {player2?.slice(0, 8)}...{player2?.slice(-6)}
@@ -360,7 +256,8 @@ const DisputeConsole: React.FC = () => {
         )}
 
         <div className="mt-10 mb-4 text-gray-400">
-          {tournamentDisputes.length} disputed tournament match{tournamentDisputes.length !== 1 ? 'es' : ''}
+          {tournamentDisputes.length} disputed tournament match
+          {tournamentDisputes.length !== 1 ? 'es' : ''}
         </div>
 
         {tournamentDisputes.length === 0 ? (
@@ -375,14 +272,13 @@ const DisputeConsole: React.FC = () => {
               return (
                 <div key={key} className="bg-[#1a1f2e] rounded-lg p-6 border border-gray-700">
                   <div className="mb-3">
-                    <h3 className="text-xl font-semibold text-white">
-                      Tournament Match Dispute
-                    </h3>
+                    <h3 className="text-xl font-semibold text-white">Tournament Match Dispute</h3>
                     <div className="mt-1 text-sm text-gray-400">
                       Challenge: {d.challengeId} · Match: {d.matchId} · Round {d.round}
                     </div>
                     <div className="mt-1 text-xs text-gray-500">
-                      Created: {(d.createdAt as any)?.toDate?.().toLocaleString?.() || '—'}
+                      Created:{' '}
+                      {(d.createdAt as { toDate?: () => Date })?.toDate?.()?.toLocaleString?.() || '—'}
                     </div>
                   </div>
 
