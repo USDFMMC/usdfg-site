@@ -14,9 +14,6 @@ import RightSidePanel from "@/components/ui/RightSidePanel";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
-import { useAuth } from "@/hooks/useAuth";
-import { auth } from "@/lib/firebase/config";
-import { setWalletClaimCallable } from "@/lib/firebase/functions";
 import ParticleBackground from "@/components/ParticleBackground";
 import type {
   ChallengeData,
@@ -275,13 +272,6 @@ const ArenaHome: React.FC = () => {
   
   // Use stored public key if adapter doesn't have one
   const effectivePublicKey = publicKey || (storedPhantomPublicKey ? new PublicKey(storedPhantomPublicKey) : null);
-  const walletAddress = effectivePublicKey?.toString() ?? null;
-
-  const { user: firebaseUser, loading: authLoading } = useAuth();
-  const [walletClaimReady, setWalletClaimReady] = useState(false);
-  const [walletClaimLinking, setWalletClaimLinking] = useState(false);
-
-  const identityReady = !authLoading && !!firebaseUser && !!walletAddress && walletClaimReady;
 
   // CRITICAL: Handle Phantom deep link return on same page (Smithii-style)
   // Phantom returns to /app with query params, we decrypt and restore session here
@@ -785,57 +775,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     },
     []
   );
-
-  // Link connected wallet to Firebase custom claim `wallet` (required by Firestore rules).
-  useEffect(() => {
-    let cancelled = false;
-
-    const ensureWalletClaim = async () => {
-      if (!firebaseUser || !walletAddress) {
-        setWalletClaimReady(false);
-        return;
-      }
-
-      const walletLower = walletAddress.toLowerCase();
-
-      try {
-        const tokenResult = await auth.currentUser?.getIdTokenResult();
-        const existing = (tokenResult?.claims as any)?.wallet;
-        if (typeof existing === "string" && existing.toLowerCase() === walletLower) {
-          if (!cancelled) setWalletClaimReady(true);
-          return;
-        }
-
-        if (!cancelled) setWalletClaimLinking(true);
-        await setWalletClaimCallable({ walletAddress });
-        await auth.currentUser?.getIdToken(true);
-
-        const refreshed = await auth.currentUser?.getIdTokenResult();
-        const claimed = (refreshed?.claims as any)?.wallet;
-        const ok = typeof claimed === "string" && claimed.toLowerCase() === walletLower;
-
-        if (!cancelled) {
-          setWalletClaimReady(ok);
-          if (!ok) {
-            showAppToast("Wallet identity could not be verified. Please reconnect and try again.", "error", "Identity");
-          }
-        }
-      } catch (err: any) {
-        console.error("[Identity] Failed to set wallet claim:", err);
-        if (!cancelled) {
-          setWalletClaimReady(false);
-          showAppToast("Identity verification failed. Please try reconnecting your wallet.", "error", "Identity");
-        }
-      } finally {
-        if (!cancelled) setWalletClaimLinking(false);
-      }
-    };
-
-    void ensureWalletClaim();
-    return () => {
-      cancelled = true;
-    };
-  }, [firebaseUser, walletAddress, showAppToast]);
 
   const requestAppConfirm = useCallback(
     (opts: {
@@ -2093,15 +2032,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       return;
     }
 
-    if (!identityReady || walletClaimLinking) {
-      showAppToast(
-        "Connect your wallet and wait for identity verification before creating a challenge.",
-        "warning",
-        "Identity"
-      );
-      return;
-    }
-
     setIsCreatingChallenge(true);
     try {
       const result = await runCreateChallengeFlow({
@@ -2425,10 +2355,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     const walletAddr = publicKey?.toString() || null;
     if (!walletAddr) {
       showAppToast("Please connect your wallet first.", "warning", "Wallet");
-      return;
-    }
-    if (!identityReady || walletClaimLinking) {
-      showAppToast("Verifying identity… please wait a moment and try again.", "info", "Identity");
       return;
     }
 

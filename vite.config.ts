@@ -6,7 +6,7 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: './',
+  base: '/',
   build: {
     target: ['es2020', 'firefox90', 'chrome90', 'safari14'],
   },

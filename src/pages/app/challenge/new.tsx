@@ -11,18 +11,12 @@ import { useChallenges } from "@/hooks/useChallenges";
 import { runCreateChallengeFlow } from "@/lib/challenges/createChallengeFlow";
 import { getWalletScopedValue, PROFILE_STORAGE_KEYS } from "@/lib/storage/profile";
 import ElegantNotification from "@/components/ui/ElegantNotification";
-import { useAuth } from "@/hooks/useAuth";
-import { auth } from "@/lib/firebase/config";
-import { setWalletClaimCallable } from "@/lib/firebase/functions";
 
 const CreateChallenge: React.FC = () => {
   const navigate = useNavigate();
   const wallet = useWallet();
   const { publicKey, connected: isConnected } = wallet;
   const { challenges: firestoreChallenges } = useChallenges();
-  const { user: firebaseUser, loading: authLoading } = useAuth();
-  const [walletClaimReady, setWalletClaimReady] = useState(false);
-  const [walletClaimLinking, setWalletClaimLinking] = useState(false);
 
   const [usdfgPrice] = useState<number>(0.15);
   const [userGamerTag, setUserGamerTag] = useState<string>("");
@@ -60,47 +54,6 @@ const CreateChallenge: React.FC = () => {
     setUserGamerTag(tag || "");
   }, [publicKey]);
 
-  // Ensure wallet custom claim is set for this Firebase user (required by Firestore rules).
-  useEffect(() => {
-    let cancelled = false;
-
-    const run = async () => {
-      const walletAddress = publicKey?.toString() ?? null;
-      if (!firebaseUser || !walletAddress) {
-        setWalletClaimReady(false);
-        return;
-      }
-      const walletLower = walletAddress.toLowerCase();
-
-      try {
-        const tokenResult = await auth.currentUser?.getIdTokenResult();
-        const existing = (tokenResult?.claims as any)?.wallet;
-        if (typeof existing === "string" && existing.toLowerCase() === walletLower) {
-          if (!cancelled) setWalletClaimReady(true);
-          return;
-        }
-
-        if (!cancelled) setWalletClaimLinking(true);
-        await setWalletClaimCallable({ walletAddress });
-        await auth.currentUser?.getIdToken(true);
-        const refreshed = await auth.currentUser?.getIdTokenResult();
-        const claimed = (refreshed?.claims as any)?.wallet;
-        const ok = typeof claimed === "string" && claimed.toLowerCase() === walletLower;
-        if (!cancelled) setWalletClaimReady(ok);
-      } catch (e) {
-        console.error("[Identity] Failed to set wallet claim:", e);
-        if (!cancelled) setWalletClaimReady(false);
-      } finally {
-        if (!cancelled) setWalletClaimLinking(false);
-      }
-    };
-
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [firebaseUser, publicKey]);
-
   const handleConnect = async () => {
     try {
       const walletToConnect =
@@ -124,10 +77,6 @@ const CreateChallenge: React.FC = () => {
 
   const handleCreateChallenge = async (challengeData: Record<string, unknown>) => {
     if (isCreatingChallenge) return;
-    if (authLoading || !firebaseUser || !publicKey || !isConnected || walletClaimLinking || !walletClaimReady) {
-      showAppToast("Connect your wallet and wait for identity verification before creating a challenge.", "warning", "Identity");
-      return;
-    }
 
     setIsCreatingChallenge(true);
     try {

@@ -1,7 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
-import { getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCacuEPoqLi5_FYOCnbaz8RPz7HKeF8WZI",
@@ -12,10 +11,9 @@ const firebaseConfig = {
   appId: "1:10599746981:web:97ce124f98f9b96872c4c"
 };
 
-export const app = initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const functions = getFunctions(app);
 
 // Ensure a Firebase user exists before Firestore traffic (rules use request.auth).
 // Email/password admin sessions replace this user; sign-out returns to unauthenticated

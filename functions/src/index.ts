@@ -1,2 +1,0 @@
-export { setWalletClaim } from "./setWalletClaim";
-
