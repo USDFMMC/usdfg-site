@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import Landing from './pages/Landing';
 import ArenaRoute from './pages/ArenaRoute';
 import ArenaApp from './pages/ArenaApp';
@@ -12,10 +12,24 @@ import DisputeConsole from './pages/admin/DisputeConsole';
 import NotFoundPage from './pages/NotFoundPage';
 import AdminLayout from './layouts/AdminLayout';
 
+/**
+ * Admin layout routes use `/*` on the parent so React Router v7 matches nested paths
+ * like `/console-7x9a/disputes` (layout + child). Without the splat, the parent may not
+ * match deep links and the catch-all can behave incorrectly.
+ */
 function App() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
+      <Route path="/home" element={<Landing />} />
+
+      <Route path="/console-7x9a/*" element={<AdminLayout />}>
+        <Route path="disputes" element={<DisputeConsole />} />
+      </Route>
+
+      <Route path="/admin/*" element={<AdminLayout />}>
+        <Route path="disputes" element={<DisputeConsole />} />
+      </Route>
 
       <Route path="/app/*" element={<ArenaRoute />}>
         <Route index element={<ArenaApp />} />
@@ -25,18 +39,10 @@ function App() {
         <Route path="*" element={<NotFoundPage />} />
       </Route>
 
-      <Route path="/console-7x9a/*" element={<AdminLayout />}>
-        <Route index element={<Navigate to="disputes" replace />} />
-        <Route path="disputes" element={<DisputeConsole />} />
-        <Route path="*" element={<NotFoundPage />} />
-      </Route>
-
-      <Route path="/admin/*" element={<Navigate to="/" replace />} />
-
       <Route path="/whitepaper" element={<WhitepaperPage />} />
       <Route path="/privacy" element={<PrivacyPolicyPage />} />
       <Route path="/terms" element={<TermsOfServicePage />} />
-      <Route path="/home" element={<Navigate to="/" replace />} />
+
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
