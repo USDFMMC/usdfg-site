@@ -32,6 +32,14 @@ function isClientSessionStale(): boolean {
   return Date.now() - n > ADMIN_SESSION_MS;
 }
 
+async function safeSignInAnonymously(): Promise<void> {
+  try {
+    await signInAnonymously(auth);
+  } catch (error) {
+    console.error("Auth failed", error);
+  }
+}
+
 type Phase =
   | "idle"
   | "checking"
@@ -43,8 +51,7 @@ type Phase =
  * Wallet proof + Firestore allowlist via createAdminNonce → sign → verifyAdmin → custom token.
  */
 export function useAdminWalletAuth() {
-  const { publicKey, connecting, signMessage, disconnect, connected } =
-    useWallet();
+  const { publicKey, connecting, signMessage, connected } = useWallet();
   const [phase, setPhase] = useState<Phase>("idle");
 
   const address = useMemo(
@@ -71,9 +78,9 @@ export function useAdminWalletAuth() {
           const u = auth.currentUser;
           if (u && !u.isAnonymous) {
             await signOut(auth);
-            await signInAnonymously(auth);
+            await safeSignInAnonymously();
           } else if (!u) {
-            await signInAnonymously(auth);
+            await safeSignInAnonymously();
           }
         }
 
@@ -100,25 +107,20 @@ export function useAdminWalletAuth() {
           }
           if (id.claims.admin && claimWallet && claimWallet !== address) {
             await signOut(auth);
-            await signInAnonymously(auth).catch(() => undefined);
+            await safeSignInAnonymously();
           }
         }
 
         if (!signMessage) {
           clearAdminSessionStorage();
           if (!cancelled) setPhase("unauthorized");
-          try {
-            await disconnect();
-          } catch {
-            /* ignore */
-          }
           return;
         }
 
         if (!cancelled) setPhase("verifying");
 
         if (!auth.currentUser) {
-          await signInAnonymously(auth);
+          await safeSignInAnonymously();
         }
 
         const nonceRes = await invokeAdminCallableWithRefresh<
@@ -157,24 +159,13 @@ export function useAdminWalletAuth() {
       } catch {
         clearAdminSessionStorage();
         if (!cancelled) setPhase("unauthorized");
-        try {
-          await disconnect();
-        } catch {
-          /* ignore */
-        }
-        try {
-          await signOut(auth);
-          await signInAnonymously(auth);
-        } catch {
-          /* ignore */
-        }
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [address, connected, connecting, disconnect, publicKey, signMessage]);
+  }, [address, connected, connecting, publicKey, signMessage]);
 
   useEffect(() => {
     if (phase !== "verified") return;

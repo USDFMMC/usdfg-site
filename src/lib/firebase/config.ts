@@ -3,13 +3,29 @@ import { getFirestore } from "firebase/firestore";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { getFunctions } from "firebase/functions";
 
+/**
+ * Cloudflare Pages: set all `VITE_FIREBASE_*` in Project → Settings → Environment variables
+ * (Production / Preview). Source: Firebase Console → Project settings → Your apps → Web app.
+ * No baked-in fallbacks — missing vars yield empty strings at build time.
+ */
+if (import.meta.env.PROD && !import.meta.env.VITE_FIREBASE_API_KEY?.trim()) {
+  console.error(
+    "[Firebase] Production build has no VITE_FIREBASE_API_KEY. Set all VITE_FIREBASE_* in Cloudflare Pages and redeploy."
+  );
+}
+
+console.log("FIREBASE CONFIG:", {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+});
+
 const firebaseConfig = {
-  apiKey: "AIzaSyCacuEPoqLi5_FYOCnbaz8RPz7HKeF8WZI",
-  authDomain: "usdfg-app.firebaseapp.com",
-  projectId: "usdfg-app",
-  storageBucket: "usdfg-app.firebasestorage.app",
-  messagingSenderId: "10599746981",
-  appId: "1:10599746981:web:97ce124f98f9b96872c4c"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 const app = initializeApp(firebaseConfig);
@@ -22,10 +38,12 @@ export const functions = getFunctions(app, "us-central1");
 // Ensure a Firebase user exists before Firestore traffic (rules use request.auth).
 // Email/password admin sessions replace this user; sign-out returns to unauthenticated
 // and we sign in anonymously again.
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
   if (!user) {
-    signInAnonymously(auth).catch((err: unknown) => {
-      console.error("[Firebase Auth] Anonymous sign-in failed:", err);
-    });
+    try {
+      await signInAnonymously(auth);
+    } catch (error) {
+      console.error("Anonymous auth failed", error);
+    }
   }
 });
