@@ -8,8 +8,10 @@ dist/
 *.log
 .DS_Store
 
-# Local env (do not commit secrets)
+# Env files (do not commit secrets / Firebase keys)
+.env
 .env.local
+.env.*.local
 
 # Legacy/ops artifacts (keep out of git)
 temp-contract/
