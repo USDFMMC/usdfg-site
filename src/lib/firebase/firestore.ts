@@ -17,9 +17,10 @@ import {
   increment,
   arrayUnion,
   arrayRemove,
-  serverTimestamp
+  serverTimestamp,
+  deleteField
 } from 'firebase/firestore';
-import { db } from './config';
+import { db, auth } from './config';
 import { getExplorerTxUrl } from '../chain/explorer';
 
 // Test Firestore connection
@@ -36,6 +37,7 @@ export async function testFirestoreConnection() {
 
 // Collection references
 const usersCollection = collection(db, 'users');
+/** Lobby lock documents (site uses `user_locks`, not `users`, for lock state). */
 const userLocksCollection = collection(db, 'user_locks');
 const lockNotificationsCollection = collection(db, 'lock_notifications');
 
@@ -86,6 +88,16 @@ export interface ChallengeData {
   teamOnly?: boolean;                 // For team challenges: true = only teams can accept, false = open to anyone (defaults to false)
   /** Snapshot of raw Firestore fields for UI helpers (optional on stored docs) */
   rawData?: Record<string, any>;
+  /** Firebase Auth UID of the creator (paired with creator / creatorWallet). */
+  createdByUid?: string | null;
+  /** Explicit copy of creator wallet for hybrid identity reads. */
+  creatorWallet?: string | null;
+  /** Firebase Auth UID of opponent / challenger when known. */
+  opponentUid?: string | null;
+  /** Opponent / challenger wallet (mirrors challenger when set). */
+  opponentWallet?: string | null;
+  /** Parallel to players: Firebase UIDs where known (same length as players when written by merge). */
+  playersUid?: (string | null)[];
   creatorTag?: string;
   cancelRequests?: string[];
   prizeClaimedAt?: Timestamp;
@@ -126,6 +138,189 @@ export interface ChallengeData {
   platform?: string;                  // Platform (PS5, PC, Xbox, etc.) for display
   // REMOVED: rules, mode, creatorTag, solanaAccountId, cancelRequests
   // These are not needed for leaderboard and increase storage costs unnecessarily
+}
+
+// --- Challenge hybrid identity (wallet <-> Firebase UID) for challenges/{id} writes ---
+
+function walletEq(a?: string | null, b?: string | null): boolean {
+  if (!a || !b) return false;
+  return a.toLowerCase() === b.toLowerCase();
+}
+
+function updatesTouchHybridParticipants(updates: Record<string, unknown>): boolean {
+  return Object.keys(updates).some(
+    (k) =>
+      k === 'creator' ||
+      k === 'challenger' ||
+      k === 'pendingJoiner' ||
+      k === 'players' ||
+      k === 'playersUid' ||
+      k === 'createdByUid' ||
+      k === 'creatorWallet' ||
+      k === 'opponentUid' ||
+      k === 'opponentWallet'
+  );
+}
+
+/** Never replace an existing uid/wallet hybrid field with null/undefined from a partial update. */
+function stripNullUndefinedIdentityOverwrites(
+  current: Record<string, unknown> | undefined,
+  updates: Record<string, unknown>
+): void {
+  if (!current) return;
+  const keys = ['createdByUid', 'creatorWallet', 'opponentUid', 'opponentWallet', 'playersUid'] as const;
+  for (const k of keys) {
+    const next = updates[k];
+    if ((next === null || next === undefined) && current[k] != null && current[k] !== undefined) {
+      delete updates[k];
+    }
+  }
+}
+
+function buildPlayersUidAligned(
+  players: string[],
+  base: Record<string, unknown>,
+  actingWallet?: string | null,
+  actingUid?: string | null
+): (string | null)[] {
+  const curPlayers = (base.players as string[] | undefined) || [];
+  const curUids = (base.playersUid as (string | null)[] | undefined) || [];
+  const uidByWallet = new Map<string, string | null>();
+
+  const register = (w?: string | null, u?: string | null) => {
+    if (!w) return;
+    const key = w.toLowerCase();
+    if (u && uidByWallet.has(key) && uidByWallet.get(key) && uidByWallet.get(key) !== u) {
+      return;
+    }
+    if (u) uidByWallet.set(key, u);
+    else if (!uidByWallet.has(key)) uidByWallet.set(key, null);
+  };
+
+  for (let i = 0; i < curPlayers.length; i++) {
+    const w = curPlayers[i];
+    const u = curUids[i];
+    if (w && u) register(w, u);
+  }
+
+  const creator = (base.creator as string) || '';
+  register(creator, (base.createdByUid as string) || null);
+  const creatorWallet = (base.creatorWallet as string) || creator;
+  register(creatorWallet, (base.createdByUid as string) || null);
+
+  const challenger = (base.challenger as string) || '';
+  const oppUid = (base.opponentUid as string) || null;
+  register(challenger, oppUid);
+  const oppW =
+    (base.opponentWallet as string) || challenger || (base.pendingJoiner as string) || '';
+  if (oppW) register(oppW, oppUid);
+
+  const pending = (base.pendingJoiner as string) || '';
+  if (pending && !challenger) {
+    register(pending, oppUid);
+  }
+
+  if (actingWallet && actingUid) {
+    register(actingWallet, actingUid);
+  }
+
+  const usedUids = new Set<string>();
+  return players.map((w) => {
+    let uid = uidByWallet.get(w.toLowerCase()) ?? null;
+    if (uid && usedUids.has(uid)) {
+      uid = null;
+    }
+    if (uid) usedUids.add(uid);
+    return uid;
+  });
+}
+
+export type ChallengeWriteContext = {
+  /** Latest snapshot fields used to merge hybrid identity (avoid wiping uids/wallets). */
+  currentData?: ChallengeData | Record<string, unknown>;
+  actingWallet?: string | null;
+  actingUid?: string | null;
+  /** Caller manages hybrid clears (e.g. deleteField); skip merge but still log. */
+  skipParticipantHybridMerge?: boolean;
+};
+
+/**
+ * Single choke point for challenge document updates: logs CHALLENGE WRITE and merges uid+wallet fields
+ * whenever participant-related keys are present.
+ */
+export async function writeChallengeFields(
+  challengeId: string,
+  updates: Record<string, any>,
+  ctx?: ChallengeWriteContext
+): Promise<void> {
+  const challengeRef = doc(db, 'challenges', challengeId);
+  const originalTouches = updatesTouchHybridParticipants(updates);
+  const out: Record<string, any> = { ...updates };
+  let current = ctx?.currentData as Record<string, unknown> | undefined;
+  if (current === undefined && originalTouches) {
+    const s = await getDoc(challengeRef);
+    current = s.exists() ? (s.data() as Record<string, unknown>) : undefined;
+  }
+
+  stripNullUndefinedIdentityOverwrites(current, out);
+
+  const authUid = auth.currentUser?.uid ?? null;
+  const actingUid =
+    ctx?.actingUid ?? (ctx?.actingWallet && authUid ? authUid : null);
+
+  if (ctx?.skipParticipantHybridMerge) {
+    console.log('CHALLENGE WRITE:', {
+      challengeId,
+      uid: ctx?.actingUid ?? authUid,
+      wallet: ctx?.actingWallet ?? null,
+    });
+    await updateDoc(challengeRef, out);
+    return;
+  }
+
+  if (originalTouches) {
+    const creator = ((out.creator ?? current?.creator) as string) || '';
+    if (creator) {
+      out.creatorWallet = creator;
+      const existingC =
+        (out.createdByUid as string) ||
+        (current?.createdByUid as string) ||
+        (actingUid && walletEq(creator, ctx?.actingWallet) ? actingUid : null) ||
+        null;
+      if (existingC) out.createdByUid = existingC;
+    }
+
+    const oppW =
+      (
+        (out.challenger ??
+          out.pendingJoiner ??
+          out.opponentWallet ??
+          current?.challenger ??
+          current?.pendingJoiner ??
+          current?.opponentWallet) as string
+      )?.trim() || '';
+    if (oppW) {
+      out.opponentWallet = oppW;
+      const existingO =
+        (out.opponentUid as string) ||
+        (current?.opponentUid as string) ||
+        (actingUid && walletEq(oppW, ctx?.actingWallet) ? actingUid : null) ||
+        null;
+      if (existingO) out.opponentUid = existingO;
+    }
+
+    if (out.players && Array.isArray(out.players)) {
+      const eff = { ...(current || {}), ...out } as Record<string, unknown>;
+      out.playersUid = buildPlayersUidAligned(out.players as string[], eff, ctx?.actingWallet, actingUid);
+    }
+  }
+
+  console.log('CHALLENGE WRITE:', {
+    challengeId,
+    uid: ctx?.actingUid ?? authUid,
+    wallet: ctx?.actingWallet ?? null,
+  });
+  await updateDoc(challengeRef, out);
 }
 
 export type TournamentStage = 'waiting_for_players' | 'round_in_progress' | 'awaiting_results' | 'completed';
@@ -441,7 +636,7 @@ export const resolveTournamentMatchDispute = async (
     }
   }
 
-  await updateDoc(challengeRef, updates);
+  await writeChallengeFields(challengeId, updates, { currentData: data });
 
   // Mark dispute resolved (best-effort; disputeId may be missing for older conflicts)
   if (disputeId) {
@@ -612,7 +807,7 @@ export const submitTournamentMatchResult = async (
           'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
           updatedAt: serverTimestamp(),
         };
-        await updateDoc(challengeRef, updates);
+        await writeChallengeFields(challengeId, updates);
         console.log('✅ Match result submitted, waiting for opponent...', {
           player1Result: match.player1Result,
           player2Result: match.player2Result
@@ -636,7 +831,7 @@ export const submitTournamentMatchResult = async (
         'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
         updatedAt: serverTimestamp(),
       };
-      await updateDoc(challengeRef, updates);
+      await writeChallengeFields(challengeId, updates);
       console.log('✅ Match result submitted, waiting for opponent...', {
         player1Result: match.player1Result,
         player2Result: match.player2Result
@@ -700,7 +895,7 @@ export const submitTournamentMatchResult = async (
         'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
         updatedAt: serverTimestamp(),
       };
-      await updateDoc(challengeRef, updates);
+      await writeChallengeFields(challengeId, updates);
       await postChallengeSystemMessage(challengeId, `🔴 Tournament match ${matchId} is disputed (both players claimed win). Admin review required.`);
       return;
     } else if (!player1Won && !player2Won) {
@@ -725,7 +920,7 @@ export const submitTournamentMatchResult = async (
         'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket }).bracket,
         updatedAt: serverTimestamp(),
       };
-      await updateDoc(challengeRef, updates);
+      await writeChallengeFields(challengeId, updates);
       await postChallengeSystemMessage(challengeId, `🔴 Tournament match ${matchId} is disputed (both players claimed loss). Admin review required.`);
       return;
     }
@@ -802,7 +997,7 @@ export const submitTournamentMatchResult = async (
         updatedAt: serverTimestamp(),
       };
       
-      await updateDoc(challengeRef, updates);
+      await writeChallengeFields(challengeId, updates);
       console.log('✅ Tournament completed! Champion:', winnerWallet, '- Reward claiming enabled');
       console.log('💰 Prize pool:', prizePool, 'USDFG');
       console.log('📊 Final tournament state:', {
@@ -955,7 +1150,7 @@ export const submitTournamentMatchResult = async (
       }
     }
 
-    await updateDoc(challengeRef, updates);
+    await writeChallengeFields(challengeId, updates);
     console.log('✅ Both players submitted - winner advanced to next round:', winnerWallet);
     console.log('✅ Tournament state updated:', {
       currentRound: updates['tournament.currentRound'] || tournament.currentRound,
@@ -1089,7 +1284,10 @@ export const joinTournament = async (
       updates.status = 'active';
     }
 
-    await updateDoc(challengeRef, updates);
+    await writeChallengeFields(challengeId, updates, {
+      currentData: data,
+      actingWallet: playerWallet,
+    });
     console.log(`✅ Player ${playerWallet.slice(0, 8)}... joined tournament. ${updatedPlayers.length}/${maxPlayers} players`);
   } catch (error) {
     console.error('❌ Error joining tournament:', error);
@@ -1135,13 +1333,17 @@ export const devFillTournamentWithTestPlayers = async (
   const seededBracket = seedPlayersIntoBracket(bracket, players);
   const finalBracket = activateRoundMatches(seededBracket, 1);
 
-  await updateDoc(challengeRef, {
-    players,
-    'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket: finalBracket }).bracket,
-    'tournament.stage': 'round_in_progress',
-    status: 'active',
-    updatedAt: serverTimestamp(),
-  });
+  await writeChallengeFields(
+    challengeId,
+    {
+      players,
+      'tournament.bracket': sanitizeTournamentState({ ...tournament, bracket: finalBracket }).bracket,
+      'tournament.stage': 'round_in_progress',
+      status: 'active',
+      updatedAt: serverTimestamp(),
+    },
+    { currentData: data }
+  );
   console.log(`✅ [DEV] Filled tournament with ${players.length} test players (creator + ${testPlayerAddresses.length} test)`);
 };
 
@@ -1226,7 +1428,7 @@ export const advanceBracketWinner = async (
         updatedAt: serverTimestamp(),
       };
       
-      await updateDoc(challengeRef, updates);
+      await writeChallengeFields(challengeId, updates);
       console.log('✅ Tournament completed! Champion:', winnerWallet, '- Reward claiming enabled');
       return;
     }
@@ -1279,7 +1481,7 @@ export const advanceBracketWinner = async (
       updates['tournament.bracket'] = sanitizeTournamentState({ ...tournament, bracket: updatedBracket }).bracket;
     }
 
-    await updateDoc(challengeRef, updates);
+    await writeChallengeFields(challengeId, updates);
     console.log('✅ Winner advanced to next round:', winnerWallet);
   } catch (error) {
     console.error('❌ Error advancing bracket winner:', error);
@@ -1353,7 +1555,7 @@ export const markTournamentMatchLoser = async (
       updatedAt: serverTimestamp(),
     };
 
-    await updateDoc(challengeRef, updates);
+    await writeChallengeFields(challengeId, updates);
     console.log('✅ Loser marked in tournament match:', loserWallet);
   } catch (error) {
     console.error('❌ Error marking tournament match loser:', error);
@@ -1475,6 +1677,15 @@ export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'cr
     if (!challengePayload.createdAt) {
       throw new Error("CreatedAt timestamp is required");
     }
+
+    const creatorUid = auth.currentUser?.uid ?? null;
+    challengePayload.creatorWallet = challengePayload.creator;
+    if (creatorUid) {
+      challengePayload.createdByUid = creatorUid;
+    }
+    challengePayload.playersUid = initialPlayers.map((w) =>
+      creatorUid && walletEq(w, challengePayload.creator) ? creatorUid : null
+    );
     
     console.log("🔥 Adding challenge to Firestore with payload:", {
       creator: challengePayload.creator,
@@ -1486,6 +1697,11 @@ export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'cr
     });
     
     const docRef = await addDoc(collection(db, "challenges"), challengePayload);
+    console.log('CHALLENGE WRITE:', {
+      challengeId: docRef.id,
+      uid: creatorUid,
+      wallet: creatorWallet,
+    });
     
     // If eligible, create/update player stats with trophy flag
     if (shouldAwardOgFirst1k) {
@@ -1568,8 +1784,7 @@ export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'cr
 
 export const updateChallenge = async (challengeId: string, updates: Partial<ChallengeData>) => {
   try {
-    const challengeRef = doc(db, 'challenges', challengeId);
-    await updateDoc(challengeRef, updates);
+    await writeChallengeFields(challengeId, updates as Record<string, any>);
     console.log('✅ Challenge updated:', challengeId);
   } catch (error) {
     console.error('❌ Error updating challenge:', error);
@@ -1586,7 +1801,7 @@ export const updateChallengeStatus = async (challengeId: string, status: 'pendin
     const wasDisputed = currentSnap.exists() && currentSnap.data()?.status === 'disputed';
     const isResolvingDispute = wasDisputed && (status === 'completed' || status === 'cancelled');
     
-    await updateDoc(challengeRef, { 
+    await writeChallengeFields(challengeId, { 
       status,
       updatedAt: Timestamp.now()
     });
@@ -1840,7 +2055,10 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
       updatedAt: serverTimestamp(),
     };
 
-    await updateDoc(challengeRef, updates);
+    await writeChallengeFields(challengeId, updates, {
+      currentData: data,
+      actingWallet: wallet,
+    });
     
     // CRITICAL: Verify the update was applied
     const verifySnap = await getDoc(challengeRef);
@@ -1852,7 +2070,7 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
       if (verifiedData.status !== 'creator_confirmation_required') {
         console.error('❌ Status update failed! Expected creator_confirmation_required, got:', verifiedData.status);
         // Force update again
-        await updateDoc(challengeRef, { status: 'creator_confirmation_required' });
+        await writeChallengeFields(challengeId, { status: 'creator_confirmation_required' });
       }
     }
 
@@ -1938,7 +2156,10 @@ export const creatorFund = async (challengeId: string, wallet: string) => {
       updatedAt: serverTimestamp(),
     };
 
-    await updateDoc(challengeRef, updates);
+    await writeChallengeFields(challengeId, updates, {
+      currentData: data,
+      actingWallet: wallet,
+    });
     
     console.log('✅ Creator funded successfully:', challengeId);
     return true;
@@ -2035,7 +2256,10 @@ export const joinerFund = async (challengeId: string, wallet: string) => {
       console.log('⏰ Challenge is full! Result submission phase started (2-hour deadline)');
       }
 
-    await updateDoc(challengeRef, updates);
+    await writeChallengeFields(challengeId, updates, {
+      currentData: data,
+      actingWallet: wallet,
+    });
     
     console.log('✅ Joiner funded successfully. Challenge is now ACTIVE:', challengeId);
     return true;
@@ -2076,9 +2300,14 @@ export const revertCreatorTimeout = async (challengeId: string): Promise<boolean
       challenger: null, // Clear challenger field to allow new users to join
       creatorFundingDeadline: null,
       updatedAt: serverTimestamp(),
+      opponentWallet: deleteField(),
+      opponentUid: deleteField(),
     };
 
-    await updateDoc(challengeRef, updates);
+    await writeChallengeFields(challengeId, updates, {
+      currentData: data,
+      skipParticipantHybridMerge: true,
+    });
 
     console.log('✅ Creator timeout - challenge reverted to pending:', challengeId);
     return true;
@@ -2123,13 +2352,20 @@ export const revertJoinerTimeout = async (challengeId: string): Promise<boolean>
       joinerFundingDeadline: null,
       fundedByCreatorAt: null,
       updatedAt: serverTimestamp(),
+      players: [data.creator],
+      playersUid: data.createdByUid ? [data.createdByUid] : [null],
+      opponentWallet: deleteField(),
+      opponentUid: deleteField(),
     };
 
-    await updateDoc(challengeRef, updates);
+    await writeChallengeFields(challengeId, updates, {
+      currentData: data,
+      skipParticipantHybridMerge: true,
+    });
     
     console.log('✅ Joiner timeout - challenge reverted to pending (creator refunded on-chain):', challengeId);
     return true;
-      } catch (error) {
+  } catch (error) {
     console.error('❌ Error reverting joiner timeout:', error);
     return false;
   }
@@ -2255,13 +2491,12 @@ export async function recordFounderChallengeReward(
     }
 
     // Update challenge to mark reward as transferred and set actual challenge reward
-    const challengeRef = doc(db, 'challenges', challengeId);
-    await updateDoc(challengeRef, {
+    await writeChallengeFields(challengeId, {
       payoutTriggered: true,
       prizePool: amount, // Update with actual amount transferred
       payoutTimestamp: Timestamp.now(),
       updatedAt: Timestamp.now(),
-    });
+    }, { actingWallet: wallet });
 
     console.log(`✅ Recorded Founder Challenge reward: ${wallet.slice(0,8)}... received ${amount} USDFG from challenge ${challengeId}${txSignature ? ` (tx: ${txSignature.slice(0,8)}...)` : ''}`);
   } catch (error) {
@@ -2281,12 +2516,22 @@ export function listenActiveForCreator(creator: string, cb: (active: any[]) => v
 }
 
 export async function addChallengeDoc(data: any) {
-  const docRef = await addDoc(collection(db, "challenges"), {
+  const uid = auth.currentUser?.uid ?? null;
+  const creator = data.creator || data.creatorWallet;
+  const players = Array.isArray(data.players) && data.players.length ? data.players : creator ? [creator] : [];
+  const payload: Record<string, any> = {
     ...data,
     status: "active",
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
-  });
+  };
+  if (creator) {
+    payload.creatorWallet = creator;
+    if (uid) payload.createdByUid = uid;
+    payload.playersUid = players.map((w: string) => (uid && walletEq(w, creator) ? uid : null));
+  }
+  const docRef = await addDoc(collection(db, "challenges"), payload);
+  console.log('CHALLENGE WRITE:', { challengeId: docRef.id, uid, wallet: creator ?? null });
   console.log('✅ Challenge document created with ID:', docRef.id);
   return docRef.id;
 }
@@ -2523,10 +2768,14 @@ export const submitChallengeResult = async (
       ...(proofImageData && { proofImageData }), // Only include if provided
     };
 
-    await updateDoc(challengeRef, {
-      results,
-      updatedAt: Timestamp.now(),
-    });
+    await writeChallengeFields(
+      challengeId,
+      {
+        results,
+        updatedAt: Timestamp.now(),
+      },
+      { currentData: data, actingWallet: wallet }
+    );
 
     console.log('✅ Result submitted:', { challengeId, wallet, didWin });
 
@@ -2546,10 +2795,14 @@ export const submitChallengeResult = async (
           autoDetermined: true // Flag to indicate this was auto-determined
         };
         
-        await updateDoc(challengeRef, {
-          results,
-          updatedAt: Timestamp.now(),
-        });
+        await writeChallengeFields(
+          challengeId,
+          {
+            results,
+            updatedAt: Timestamp.now(),
+          },
+          { currentData: data, actingWallet: wallet }
+        );
         
         console.log('✅ Auto-marked opponent as winner');
         
@@ -2702,15 +2955,17 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     console.log(`Player 1 (${player1.slice(0,8)}...): didWin=${player1Won}`);
     console.log(`Player 2 (${player2.slice(0,8)}...): didWin=${player2Won}`);
 
-    const challengeRef = doc(db, "challenges", challengeId);
-
     // Case 1: Both claim they won → Dispute (KEEP CHAT for evidence)
     if (player1Won && player2Won) {
-      await updateDoc(challengeRef, {
-        status: 'disputed',
-        winner: null,
-        updatedAt: Timestamp.now(),
-      });
+      await writeChallengeFields(
+        challengeId,
+        {
+          status: 'disputed',
+          winner: null,
+          updatedAt: Timestamp.now(),
+        },
+        { currentData: data }
+      );
       console.log('🔴 DISPUTE: Both players claim they won');
       // Keep chat messages for dispute resolution - admin may need them
       await cleanupChallengeData(challengeId, true); // true = isDispute
@@ -2719,11 +2974,15 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
 
     // Case 2: Both claim they lost → FORFEIT (delete chat - no dispute)
     if (!player1Won && !player2Won) {
-      await updateDoc(challengeRef, {
-        status: 'completed',
-        winner: 'forfeit', // Special value: both players forfeit, no refund
-        updatedAt: Timestamp.now(),
-      });
+      await writeChallengeFields(
+        challengeId,
+        {
+          status: 'completed',
+          winner: 'forfeit', // Special value: both players forfeit, no refund
+          updatedAt: Timestamp.now(),
+        },
+        { currentData: data }
+      );
       console.log('⚠️ FORFEIT: Both players claim they lost - Suspicious collusion detected, both lose challenge amounts');
       // Delete chat - no dispute, no need to keep
       await cleanupChallengeData(challengeId, false); // false = not dispute
@@ -2734,11 +2993,15 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     const winner = player1Won ? player1 : player2;
     const loser = player1Won ? player2 : player1;
     
-    await updateDoc(challengeRef, {
-      status: 'completed',
-      winner: normalizeWinnerWallet(winner),
-      updatedAt: Timestamp.now(),
-    });
+    await writeChallengeFields(
+      challengeId,
+      {
+        status: 'completed',
+        winner: normalizeWinnerWallet(winner),
+        updatedAt: Timestamp.now(),
+      },
+      { currentData: data }
+    );
     console.log('🏆 WINNER DETERMINED:', winner);
     // Delete chat messages - clear winner, no dispute resolution needed
     await cleanupChallengeData(challengeId, false); // false = not dispute
@@ -2783,13 +3046,17 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     }
     
     // Mark challenge as ready for winner to claim (Player pays gas, not admin!)
-    await updateDoc(challengeRef, {
-      status: 'completed', // Keep status as completed!
-      needsPayout: true,
-      payoutTriggered: false,
-      canClaim: true,
-      updatedAt: Timestamp.now(),
-    });
+    await writeChallengeFields(
+      challengeId,
+      {
+        status: 'completed', // Keep status as completed!
+        needsPayout: true,
+        payoutTriggered: false,
+        canClaim: true,
+        updatedAt: Timestamp.now(),
+      },
+      { currentData: data }
+    );
     
     console.log('💰 Challenge reward ready for claim:', prizePool, 'USDFG to', winner);
     console.log('✅ Winner can now claim their reward (they pay gas, not you!)');
@@ -2883,7 +3150,9 @@ export const syncChallengeStatus = async (challengeId: string, challengePDA: str
 
       if (Object.keys(updates).length > 0) {
         updates.updatedAt = Timestamp.now();
-        await updateDoc(challengeRef, updates);
+        await writeChallengeFields(challengeId, updates, {
+          currentData: currentData as ChallengeData,
+        });
         console.log(`🔄 Synced challenge fields from chain:`, {
           challengeId,
           fromStatus: currentData.status,
@@ -2903,12 +3172,10 @@ export const syncChallengeStatus = async (challengeId: string, challengePDA: str
  */
 export const startResultSubmissionPhase = async (challengeId: string): Promise<void> => {
   try {
-    const challengeRef = doc(db, "challenges", challengeId);
-    
     // Set deadline to 2 hours from now
     const deadline = Timestamp.fromDate(new Date(Date.now() + 2 * 60 * 60 * 1000));
     
-    await updateDoc(challengeRef, {
+    await writeChallengeFields(challengeId, {
       resultDeadline: deadline,
       status: 'active',
       updatedAt: Timestamp.now(),
@@ -2947,11 +3214,15 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
     
     // Case 1: No one submitted → FORFEIT (no refund to prevent exploitation)
     if (submittedCount === 0) {
-      await updateDoc(challengeRef, {
-        status: 'completed',
-        winner: 'forfeit', // Special value indicating both players forfeited
-        updatedAt: Timestamp.now(),
-      });
+      await writeChallengeFields(
+        challengeId,
+        {
+          status: 'completed',
+          winner: 'forfeit', // Special value indicating both players forfeited
+          updatedAt: Timestamp.now(),
+        },
+        { currentData: data }
+      );
       console.log('⚠️ DEADLINE PASSED: No results submitted - FORFEIT (no refund)');
       return;
     }
@@ -2963,20 +3234,28 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
       
       if (didTheyClaimWin) {
         // They claimed they won → They win by default
-        await updateDoc(challengeRef, {
-          status: 'completed',
-          winner: normalizeWinnerWallet(submittedWallet),
-          updatedAt: Timestamp.now(),
-        });
+        await writeChallengeFields(
+          challengeId,
+          {
+            status: 'completed',
+            winner: normalizeWinnerWallet(submittedWallet),
+            updatedAt: Timestamp.now(),
+          },
+          { currentData: data }
+        );
         console.log('🏆 DEADLINE PASSED: Winner by default (opponent no-show):', submittedWallet);
       } else {
         // They claimed they lost → The OTHER player wins by default
         const opponentWallet = data.players?.find((p: string) => p !== submittedWallet);
-        await updateDoc(challengeRef, {
-          status: 'completed',
-          winner: opponentWallet ? normalizeWinnerWallet(opponentWallet) : 'tie',
-          updatedAt: Timestamp.now(),
-        });
+        await writeChallengeFields(
+          challengeId,
+          {
+            status: 'completed',
+            winner: opponentWallet ? normalizeWinnerWallet(opponentWallet) : 'tie',
+            updatedAt: Timestamp.now(),
+          },
+          { currentData: data }
+        );
         console.log('🏆 DEADLINE PASSED: Opponent wins (player admitted defeat, opponent no-show):', opponentWallet);
       }
     }
@@ -3058,12 +3337,16 @@ export const requestCancelChallenge = async (
     // If both players agreed (all players requested cancel)
     if (challenge.players && newCancelRequests.length === challenge.players.length) {
       console.log('✅ Both players agreed to cancel - Cancelling challenge and refunding');
-      await updateDoc(challengeRef, {
-        status: 'cancelled',
-        cancelRequests: newCancelRequests,
-        winner: 'cancelled',
-        updatedAt: Timestamp.now(),
-      });
+      await writeChallengeFields(
+        challengeId,
+        {
+          status: 'cancelled',
+          cancelRequests: newCancelRequests,
+          winner: 'cancelled',
+          updatedAt: Timestamp.now(),
+        },
+        { currentData: challenge, actingWallet: walletAddress }
+      );
       
       // Send system message to chat
       await addDoc(collection(db, 'challenge_chats'), {
@@ -3075,10 +3358,14 @@ export const requestCancelChallenge = async (
     } else {
       // Just one player requested so far
       console.log('⏳ Cancel requested, waiting for other player to agree');
-      await updateDoc(challengeRef, {
-        cancelRequests: newCancelRequests,
-        updatedAt: Timestamp.now(),
-      });
+      await writeChallengeFields(
+        challengeId,
+        {
+          cancelRequests: newCancelRequests,
+          updatedAt: Timestamp.now(),
+        },
+        { currentData: challenge, actingWallet: walletAddress }
+      );
       
       // Send system message to chat notifying opponent
       const shortWallet = walletAddress.slice(0, 8) + '...' + walletAddress.slice(-4);
@@ -4916,14 +5203,18 @@ export async function claimChallengePrize(
           challengeId,
           data.winner!
         );
-        await updateDoc(challengeRef, {
-          payoutTriggered: true,
-          prizeClaimedAt: Timestamp.now(),
-          adminResolutionTx: signature,
-          payoutSignature: signature,
-          payoutTimestamp: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        });
+        await writeChallengeFields(
+          challengeId,
+          {
+            payoutTriggered: true,
+            prizeClaimedAt: Timestamp.now(),
+            adminResolutionTx: signature,
+            payoutSignature: signature,
+            payoutTimestamp: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          },
+          { currentData: data, actingWallet: callerAddress }
+        );
         const explorerUrl = getExplorerTxUrl(signature);
         if (explorerUrl) {
           await postChallengeSystemMessage(challengeId, `🏆 Reward claimed on-chain: ${explorerUrl}`);
@@ -4947,13 +5238,17 @@ export async function claimChallengePrize(
       );
     
       // Update Firestore to mark reward as claimed
-      await updateDoc(challengeRef, {
-        payoutTriggered: true,
-        prizeClaimedAt: Timestamp.now(), // Mark as claimed for unclaimed reward filter
-        payoutSignature: signature,
-        payoutTimestamp: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-      });
+      await writeChallengeFields(
+        challengeId,
+        {
+          payoutTriggered: true,
+          prizeClaimedAt: Timestamp.now(), // Mark as claimed for unclaimed reward filter
+          payoutSignature: signature,
+          payoutTimestamp: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        },
+        { currentData: data, actingWallet: callerAddress }
+      );
 
       const explorerUrl = getExplorerTxUrl(signature);
       if (explorerUrl) {
@@ -4992,12 +5287,15 @@ export async function acknowledgeFounderTournamentPayout(
   challengeId: string,
   wallet: string
 ): Promise<void> {
-  const challengeRef = doc(db, 'challenges', challengeId);
   const normalized = wallet.toLowerCase();
-  await updateDoc(challengeRef, {
-    founderPayoutAcknowledgedBy: arrayUnion(normalized),
-    updatedAt: serverTimestamp()
-  });
+  await writeChallengeFields(
+    challengeId,
+    {
+      founderPayoutAcknowledgedBy: arrayUnion(normalized),
+      updatedAt: serverTimestamp(),
+    },
+    { actingWallet: wallet }
+  );
 }
 
 /**
@@ -5005,11 +5303,10 @@ export async function acknowledgeFounderTournamentPayout(
  * Hides the Claim button for all participants and removes from unclaimed list.
  */
 export async function markFounderPayoutSent(challengeId: string): Promise<void> {
-  const challengeRef = doc(db, 'challenges', challengeId);
-  await updateDoc(challengeRef, {
+  await writeChallengeFields(challengeId, {
     founderPayoutSentAt: serverTimestamp(),
     payoutTriggered: true,
-    updatedAt: serverTimestamp()
+    updatedAt: serverTimestamp(),
   });
 }
 
@@ -5130,17 +5427,21 @@ export const resolveAdminChallenge = async (
     }
     
     // Update challenge (include canClaim in first write so winner can claim even if stats update fails)
-    await updateDoc(challengeRef, {
-      status: 'completed',
-      winner: normalizeWinnerWallet(winnerWallet),
-      resolvedBy: adminUid,
-      resolvedAt: Timestamp.now(),
-      adminResolutionTx: onChainTx || null,
-      updatedAt: Timestamp.now(),
-      needsPayout: true,
-      payoutTriggered: false,
-      canClaim: true,
-    });
+    await writeChallengeFields(
+      challengeId,
+      {
+        status: 'completed',
+        winner: normalizeWinnerWallet(winnerWallet),
+        resolvedBy: adminUid,
+        resolvedAt: Timestamp.now(),
+        adminResolutionTx: onChainTx || null,
+        updatedAt: Timestamp.now(),
+        needsPayout: true,
+        payoutTriggered: false,
+        canClaim: true,
+      },
+      { currentData: challengeData, actingWallet: winnerWallet, actingUid: adminUid }
+    );
 
     // Audit log requires Firebase Auth admin (DisputeConsole). Skip when resolving from lobby (Solana wallet only).
     const isLobbyResolve = adminUid === 'lobby' || (typeof adminEmail === 'string' && adminEmail.startsWith('wallet:'));

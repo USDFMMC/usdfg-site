@@ -2905,11 +2905,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           fundingSignature = result.signature;
           
           // Update Firestore with PDA
-          const { updateDoc, doc } = await import('firebase/firestore');
-          const { db } = await import('@/lib/firebase/config');
-          await updateDoc(doc(db, 'challenges', challenge.id), {
-            pda: challengePDA
-          });
+          const { writeChallengeFields } = await import('@/lib/firebase/firestore');
+          await writeChallengeFields(
+            challenge.id,
+            { pda: challengePDA },
+            { actingWallet: publicKey?.toString?.() ?? null }
+          );
           console.log('✅ Challenge PDA created:', challengePDA);
         } catch (createError: any) {
           console.error('❌ Error creating challenge PDA:', createError);
