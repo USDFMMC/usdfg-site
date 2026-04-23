@@ -66,6 +66,7 @@ export function useBindWalletToFirebaseUser(): void {
         if (cancelled) return;
 
         if (!userSnap.exists()) {
+          console.log("WRITING USER DOC:", uid);
           await setDoc(userRef, {
             walletAddress,
             createdAt: serverTimestamp(),
@@ -75,6 +76,7 @@ export function useBindWalletToFirebaseUser(): void {
           const existing =
             typeof data?.walletAddress === "string" ? data.walletAddress : "";
           if (!existing) {
+            console.log("WRITING USER DOC:", uid);
             await updateDoc(userRef, {
               walletAddress,
             });

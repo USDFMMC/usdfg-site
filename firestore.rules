@@ -2,26 +2,114 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
     // Canonical user
     match /users/{uid} {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == uid;
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == uid;
     }
 
     // Wallet index
     match /usersByWallet/{wallet} {
-      allow read: if true;
+      allow read: if isSignedIn();
 
-      allow create: if request.auth != null
+      allow create: if isSignedIn()
         && request.resource.data.uid == request.auth.uid
         && !exists(/databases/$(database)/documents/usersByWallet/$(wallet));
 
       allow update, delete: if false;
     }
 
-    // Temporary read access for dev
-    match /{document=**} {
-      allow read: if true;
+    // User lock state (keyed by walletAddress; identity checked via usersByWallet index)
+    match /user_locks/{wallet} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
+        && exists(/databases/$(database)/documents/usersByWallet/$(wallet))
+        && get(/databases/$(database)/documents/usersByWallet/$(wallet)).data.uid == request.auth.uid;
+    }
+
+    // challenges — gameplay
+    match /challenges/{challengeId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    // challenge chat messages
+    match /challenge_chats/{chatId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    // voice signaling
+    match /voice_signals/{signalId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    // tournament disputes
+    match /tournament_disputes/{disputeId} {
+      allow read, create, update: if isSignedIn();
+      allow delete: if false;
+    }
+
+    // player stats
+    match /player_stats/{wallet} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    // lock notifications (friendly match request/accept/cancel)
+    match /lock_notifications/{matchId} {
+      allow read, create, update: if isSignedIn();
+      allow delete: if false;
+    }
+
+    // challenge notifications
+    match /challenge_notifications/{notificationId} {
+      allow read, create, update: if isSignedIn();
+      allow delete: if false;
+    }
+
+    // teams
+    match /teams/{teamId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    // trust reviews
+    match /trust_reviews/{reviewId} {
+      allow read, create, delete: if isSignedIn();
+      allow update: if false;
+    }
+
+    // founder rewards
+    match /founder_rewards/{rewardId} {
+      allow read, create, delete: if isSignedIn();
+      allow update: if false;
+    }
+
+    // friendly matches
+    match /friendly_matches/{matchId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    // free claims
+    match /free_claims/{claimId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    // misc stats
+    match /stats/{statId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    // challenge lobbies + subcollections
+    match /challenge_lobbies/{challengeId} {
+      allow read, create, update, delete: if isSignedIn();
+
+      match /{subcollection=**}/{docId} {
+        allow read, create, update, delete: if isSignedIn();
+      }
     }
   }
 }

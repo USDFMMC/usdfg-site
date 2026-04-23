@@ -36,6 +36,7 @@ export async function testFirestoreConnection() {
 
 // Collection references
 const usersCollection = collection(db, 'users');
+const userLocksCollection = collection(db, 'user_locks');
 const lockNotificationsCollection = collection(db, 'lock_notifications');
 
 export async function postChallengeSystemMessage(challengeId: string, text: string): Promise<void> {
@@ -3592,7 +3593,7 @@ export async function ensureUserLockDocument(userId: string): Promise<void> {
   if (!userId) return;
 
   try {
-    const userRef = doc(db, 'users', userId);
+    const userRef = doc(userLocksCollection, userId);
     const snapshot = await getDoc(userRef);
 
     if (!snapshot.exists()) {
@@ -3622,7 +3623,7 @@ export async function setUserCurrentLock(userId: string, opponentId: string | nu
 
   try {
     const normalizedOpponentId = opponentId ? opponentId.toLowerCase() : null;
-    const userRef = doc(db, 'users', userId);
+    const userRef = doc(userLocksCollection, userId);
     await setDoc(userRef, {
       currentLock: normalizedOpponentId,
       lockUpdatedAt: serverTimestamp(),
@@ -3815,8 +3816,8 @@ export async function clearMutualLock(userA: string, userB: string): Promise<voi
 
   try {
     const batch = writeBatch(db);
-    const userARef = doc(db, 'users', userA);
-    const userBRef = doc(db, 'users', userB);
+    const userARef = doc(userLocksCollection, userA);
+    const userBRef = doc(userLocksCollection, userB);
 
     batch.set(userARef, {
       currentLock: null,
