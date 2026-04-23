@@ -9,12 +9,14 @@ import App from './App.tsx'
 import SolanaWalletProvider from './providers/SolanaWalletProvider.tsx'
 import { queryClient } from './lib/queryClient'
 import { Toaster } from '@/components/ui/toaster'
+import BindWalletIdentity from '@/components/BindWalletIdentity'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <SolanaWalletProvider>
         <BrowserRouter>
+          <BindWalletIdentity />
           <App />
           <Toaster />
         </BrowserRouter>

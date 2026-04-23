@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
+import { getAuth, onAuthStateChanged, signInAnonymously } from "firebase/auth";
 import { getFunctions } from "firebase/functions";
 
 /**
@@ -30,20 +30,17 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export { app };
+
 export const auth = getAuth(app);
+
+signInAnonymously(auth).catch((err) => {
+  console.error("ANON AUTH ERROR:", err);
+});
+
+onAuthStateChanged(auth, (user) => {
+  console.log("AUTH USER:", user);
+});
+
 export const db = getFirestore(app);
 /** Callable functions (must match Cloud Functions region deployment). */
 export const functions = getFunctions(app, "us-central1");
-
-// Ensure a Firebase user exists before Firestore traffic (rules use request.auth).
-// Email/password admin sessions replace this user; sign-out returns to unauthenticated
-// and we sign in anonymously again.
-onAuthStateChanged(auth, async (user) => {
-  if (!user) {
-    try {
-      await signInAnonymously(auth);
-    } catch (error) {
-      console.error("Anonymous auth failed", error);
-    }
-  }
-});

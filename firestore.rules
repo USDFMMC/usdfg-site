@@ -1,226 +1,27 @@
 rules_version = '2';
-
-// -----------------------------------------------------------------------------
-// Auth: anonymous sign-in counts as authenticated for general data.
-// Admin console: custom token claims admin + wallet (see Cloud Function verifyAdmin).
-// Do NOT lock `challenges` to admins only — normal gameplay requires participant writes.
-// -----------------------------------------------------------------------------
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isSignedIn() {
-      return request.auth != null;
+    // Canonical user
+    match /users/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
     }
 
-    function hasAdminClaim() {
-      return isSignedIn() && request.auth.token.admin == true;
-    }
+    // Wallet index
+    match /usersByWallet/{wallet} {
+      allow read: if true;
 
-    // Legacy name kept for audit / admin_logs; same as hasAdminClaim
-    function isAdmin() {
-      return hasAdminClaim();
-    }
-
-    // --------------------------------------------------------------------------
-    // challenges — signed-in users (NOT admin-only; app gameplay)
-    // --------------------------------------------------------------------------
-    match /challenges/{challengeId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    // --------------------------------------------------------------------------
-    // Optional admin-only collection (if used). Production disputes use `challenges`.
-    // --------------------------------------------------------------------------
-    match /disputes/{id} {
-      allow read, write: if hasAdminClaim();
-    }
-
-    // --------------------------------------------------------------------------
-    // challenge_chats
-    // --------------------------------------------------------------------------
-    match /challenge_chats/{chatId} {
-      allow get, list: if isSignedIn();
-
-      allow create: if isSignedIn() &&
-        request.resource.data.keys().hasAll(['challengeId', 'text', 'sender', 'timestamp']);
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && !exists(/databases/$(database)/documents/usersByWallet/$(wallet));
 
       allow update, delete: if false;
     }
 
-    // --------------------------------------------------------------------------
-    // voice_signals
-    // --------------------------------------------------------------------------
-    match /voice_signals/{signalId} {
-      allow get, list, create, update, delete: if isSignedIn();
-    }
-
-    // --------------------------------------------------------------------------
-    // tournament_disputes
-    // --------------------------------------------------------------------------
-    match /tournament_disputes/{disputeId} {
-      allow get, list: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
-      allow delete: if false;
-    }
-
-    // --------------------------------------------------------------------------
-    // player_stats
-    // --------------------------------------------------------------------------
-    match /player_stats/{wallet} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    // --------------------------------------------------------------------------
-    // challenges_archive
-    // --------------------------------------------------------------------------
-    match /challenges_archive/{challengeId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    // --------------------------------------------------------------------------
-    // users
-    // --------------------------------------------------------------------------
-    match /users/{userId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    // --------------------------------------------------------------------------
-    // lock_notifications
-    // --------------------------------------------------------------------------
-    match /lock_notifications/{notificationId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    // --------------------------------------------------------------------------
-    // challenge_notifications
-    // --------------------------------------------------------------------------
-    match /challenge_notifications/{notificationId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    // --------------------------------------------------------------------------
-    // friendly_matches
-    // --------------------------------------------------------------------------
-    match /friendly_matches/{matchId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    // --------------------------------------------------------------------------
-    // free_claims
-    // --------------------------------------------------------------------------
-    match /free_claims/{claimId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    // --------------------------------------------------------------------------
-    // founder_rewards
-    // --------------------------------------------------------------------------
-    match /founder_rewards/{rewardId} {
-      allow get, list: if isSignedIn();
-      allow create, delete: if isSignedIn();
-      allow update: if false;
-    }
-
-    // --------------------------------------------------------------------------
-    // stats
-    // --------------------------------------------------------------------------
-    match /stats/{statId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    // --------------------------------------------------------------------------
-    // trust_reviews
-    // --------------------------------------------------------------------------
-    match /trust_reviews/{reviewId} {
-      allow get, list: if isSignedIn();
-      allow create, delete: if isSignedIn();
-      allow update: if false;
-    }
-
-    // --------------------------------------------------------------------------
-    // teams
-    // --------------------------------------------------------------------------
-    match /teams/{teamId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    // --------------------------------------------------------------------------
-    // challenge_lobbies
-    // --------------------------------------------------------------------------
-    match /challenge_lobbies/{challengeId} {
-      match /spectators/{wallet} {
-        allow get, list: if isSignedIn();
-        allow create, update, delete: if isSignedIn();
-      }
-
-      match /voice_controls/{wallet} {
-        allow get, list: if isSignedIn();
-        allow create, update, delete: if isSignedIn();
-      }
-
-      match /mic_requests/{wallet} {
-        allow get, list: if isSignedIn();
-        allow create, update, delete: if isSignedIn();
-      }
-
-      match /voice_state/{docId} {
-        allow get, list: if isSignedIn();
-        allow create, update, delete: if isSignedIn();
-      }
-
-      match /stats/{statId} {
-        allow get, list: if isSignedIn();
-        allow create, update, delete: if isSignedIn();
-      }
-    }
-
-    // --------------------------------------------------------------------------
-    // _rate_limits — Cloud Functions only (verifyAdmin / createAdminNonce)
-    // --------------------------------------------------------------------------
-    match /_rate_limits/{id} {
-      allow read, write: if false;
-    }
-
-    // --------------------------------------------------------------------------
-    // admins — document ID = normalized wallet; only Admin SDK / backend
-    // --------------------------------------------------------------------------
-    match /admins/{adminId} {
-      allow read, write: if false;
-    }
-
-    // --------------------------------------------------------------------------
-    // admin_auth_nonces — Cloud Function only
-    // --------------------------------------------------------------------------
-    match /admin_auth_nonces/{nonceId} {
-      allow read, write: if false;
-    }
-
-    // --------------------------------------------------------------------------
-    // admin_logs — written by Cloud Functions; optional client read for tooling
-    // --------------------------------------------------------------------------
-    match /admin_logs/{logId} {
-      allow read: if hasAdminClaim();
-      allow write: if false;
-    }
-
-    // --------------------------------------------------------------------------
-    // admin_audit_log — Cloud Functions (Admin SDK) only
-    // --------------------------------------------------------------------------
-    match /admin_audit_log/{logId} {
-      allow read: if isAdmin();
-      allow write: if false;
+    // Temporary read access for dev
+    match /{document=**} {
+      allow read: if true;
     }
   }
 }
