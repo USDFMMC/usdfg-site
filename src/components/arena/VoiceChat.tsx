@@ -107,6 +107,10 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
   const recoveryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recoveryAttemptedRef = useRef(false);
   const iceCandidatesAddedRef = useRef<Set<string>>(new Set());
+  // Perfect negotiation (glare-safe renegotiation)
+  const makingOfferRef = useRef(false);
+  const ignoreOfferRef = useRef(false);
+  const hasOfferedRef = useRef(false);
   const [needTapToHear, setNeedTapToHear] = useState(false);
 
   // Use refs to track initialization and prevent unnecessary re-initialization
@@ -243,6 +247,8 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
 
       let pc = peerConnection.current;
       if (!pc || pc.connectionState === 'closed' || pc.connectionState === 'failed') {
+        // New PC/session: allow the offerer to offer once again.
+        hasOfferedRef.current = false;
         // Create peer connection with optimized STUN and TURN servers
         const configuration: RTCConfiguration = {
           iceServers: [
@@ -382,10 +388,39 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
           return;
         }
         
-        const data = snapshot.data();
-        if (!data) return;
+        const data = snapshot.data() || {};
 
         try {
+          const sortedWallets = [...participants].map((p) => p?.toLowerCase()).filter(Boolean).sort();
+          const amOfferer = sortedWallets.length === 0 || (currentWallet && currentWallet.toLowerCase() === sortedWallets[0]);
+          // Non-offerer is "polite" and will roll back on collisions
+          const isPolite = !amOfferer;
+
+          const renegotiate = async () => {
+            if (!pc) return;
+            if (pc.signalingState !== "stable") {
+              console.log("Skipping renegotiation, not stable");
+              return;
+            }
+            if (makingOfferRef.current) return;
+            if (hasOfferedRef.current) {
+              console.log("Offer already created, skipping");
+              return;
+            }
+            try {
+              makingOfferRef.current = true;
+              await pc.setLocalDescription(await pc.createOffer());
+              hasOfferedRef.current = true;
+              await setDoc(signalRef, {
+                offer: pc.localDescription,
+                offerFrom: currentWallet,
+                timestamp: Date.now(),
+              }, { merge: true });
+            } finally {
+              makingOfferRef.current = false;
+            }
+          };
+
           // Check for offer from other player (initial or renegotiation e.g. after approved spectator adds mic)
           // Skip if we already answered this exact offer (prevents loop when our own write triggers onSnapshot)
           const offerAlreadyProcessed = pc.currentRemoteDescription?.sdp === data.offer?.sdp;
@@ -393,22 +428,51 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
             const isRenegotiation = !!pc.currentRemoteDescription;
             if (isRenegotiation) console.log("📞 Renegotiation: received new offer, creating answer...");
             else console.log("📞 Received offer, creating answer...");
-            await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+
+            // 1) Only handle offers in valid state
+            if (pc.signalingState !== "stable" && pc.signalingState !== "have-remote-offer") {
+              console.warn("Skipping offer due to invalid signaling state:", pc.signalingState);
+              return;
+            }
+
+            const description = new RTCSessionDescription(data.offer);
+
+            // 3) Collision guard (glare)
+            const makingOffer = makingOfferRef.current;
+            const offerCollision =
+              description.type === "offer" &&
+              (makingOffer || pc.signalingState !== "stable");
+
+            const ignoreOffer = !isPolite && offerCollision;
+            if (ignoreOffer) {
+              console.log("Ignoring offer due to glare");
+              return;
+            }
+
+            if (offerCollision) {
+              await pc.setLocalDescription({ type: "rollback" } as any);
+            }
+
+            await pc.setRemoteDescription(description);
+
+            // 2) Ensure createAnswer ALWAYS runs before setLocalDescription
             const answer = await pc.createAnswer();
+            // 6) Hard guard before setLocalDescription
+            if (!answer) {
+              console.error("No answer created, skipping setLocalDescription");
+              return;
+            }
             await pc.setLocalDescription(answer);
             await setDoc(signalRef, {
-              answer,
+              answer: pc.localDescription,
               answerFrom: currentWallet,
               timestamp: Date.now()
             }, { merge: true });
           }
           // Check for answer from other player (only if we created the offer)
           else if (data.answer && data.answerFrom !== currentWallet && data.offerFrom === currentWallet) {
-            if (pc.signalingState === 'have-local-offer' && !pc.currentRemoteDescription) {
+            if (pc.signalingState === 'have-local-offer') {
               console.log("✅ Received answer, setting remote description...");
-              await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-            } else if (pc.signalingState === 'have-local-offer') {
-              console.log("✅ Renegotiation: received answer, setting remote description...");
               await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
             }
           }
@@ -433,6 +497,18 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
               }
             }
           }
+
+          // If we just became able to publish (e.g. mic enabled), kick off negotiation if we're stable.
+          // Only the deterministic offerer initiates; collisions are still handled above.
+          if (pc.signalingState !== "stable") return;
+          if (
+            amOfferer &&
+            !data.offer &&
+            !hasOfferedRef.current
+          ) {
+            hasOfferedRef.current = true;
+            await renegotiate();
+          }
         } catch (error) {
           console.error("❌ Error handling WebRTC signal:", error);
         }
@@ -451,33 +527,8 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
       unsubscribeSignalRef.current = unsubscribe;
 
       await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Deterministic offerer: only the peer with lowest wallet (case-insensitive) creates the offer
-      const sortedWallets = [...participants].map((p) => p?.toLowerCase()).filter(Boolean).sort();
-      const amOfferer = sortedWallets.length === 0 || (currentWallet && currentWallet.toLowerCase() === sortedWallets[0]);
-
-      const { getDoc } = await import("firebase/firestore");
-      const signalSnap = await getDoc(signalRef);
-      const signalData = signalSnap.data();
-
-      if (!signalData?.offer) {
-        if (amOfferer) {
-          console.log("[Voice] Creating offer (offerer by deterministic rule)");
-          setStatus("Creating offer, waiting for opponent...");
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          await setDoc(signalRef, {
-            offer,
-            offerFrom: currentWallet,
-            timestamp: Date.now()
-          }, { merge: true });
-        } else {
-          setStatus("Waiting for opponent to create offer...");
-        }
-      } else if (signalData.offerFrom !== currentWallet) {
-        console.log("[Voice] Offer already exists from opponent, will answer when ready");
-        setStatus("Found opponent, connecting...");
-      }
+      // Offer creation is single-sourced via renegotiation path (glare-safe).
+      // Status/UI updates are driven by connection state + remote tracks.
 
     } catch (error) {
       console.error("❌ Voice chat init failed:", error);
@@ -532,6 +583,8 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
       unsubscribeSignalRef.current();
       unsubscribeSignalRef.current = null;
     }
+    // New session will need a fresh offer decision.
+    hasOfferedRef.current = false;
 
     const validChallengeId = memoizedChallengeId || challengeId;
     if (deleteSignalsDoc && validChallengeId && validChallengeId.trim() !== '') {
@@ -668,11 +721,39 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
         localStream.current = stream;
         const pc = peerConnection.current;
         if (pc) {
+          // 5) Mic toggle fix: add track first, then renegotiate after short delay
           stream.getTracks().forEach((track) => pc.addTrack(track, stream));
           const signalRef = doc(db, "voice_signals", challengeId!);
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          await setDoc(signalRef, { offer, offerFrom: currentWallet, timestamp: Date.now() }, { merge: true });
+          setTimeout(() => {
+            if (!peerConnection.current) return;
+            const pcNow = peerConnection.current;
+            if (pcNow.signalingState !== "stable") {
+              console.log("Skipping renegotiation, not stable");
+              return;
+            }
+            if (makingOfferRef.current) return;
+            if (hasOfferedRef.current) {
+              console.log("Offer already created, skipping");
+              return;
+            }
+            // Only the deterministic offerer should initiate
+            const sortedWallets = [...participants].map((p) => p?.toLowerCase()).filter(Boolean).sort();
+            const amOfferer = sortedWallets.length === 0 || (currentWallet && currentWallet.toLowerCase() === sortedWallets[0]);
+            if (!amOfferer) return;
+            (async () => {
+              try {
+                makingOfferRef.current = true;
+                const offer = await pcNow.createOffer();
+                await pcNow.setLocalDescription(offer);
+                hasOfferedRef.current = true;
+                await setDoc(signalRef, { offer, offerFrom: currentWallet, timestamp: Date.now() }, { merge: true });
+              } catch (e) {
+                console.error("❌ renegotiation after mic enable failed:", e);
+              } finally {
+                makingOfferRef.current = false;
+              }
+            })();
+          }, 150);
         }
         setConnected(true);
         setMuted(false);
