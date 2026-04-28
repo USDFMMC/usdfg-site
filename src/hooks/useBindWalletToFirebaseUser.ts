@@ -21,6 +21,8 @@ import { auth, db } from "@/lib/firebase/config";
  * - createdAt is only set on first creation.
  */
 export function useBindWalletToFirebaseUser(): void {
+  console.log("BIND HOOK START");
+
   const wallet = useWallet();
   const { connected, publicKey } = wallet;
 
@@ -33,11 +35,17 @@ export function useBindWalletToFirebaseUser(): void {
 
   useEffect(() => {
     return onAuthStateChanged(auth, (user) => {
+      console.log("AUTH READY:", user?.uid);
       setUid(user?.uid ?? null);
     });
   }, []);
 
   useEffect(() => {
+    console.log("WALLET:", walletAddress);
+  }, [walletAddress]);
+
+  useEffect(() => {
+    console.log("ATTEMPT BIND:", { uid, walletAddress });
     if (!uid || !walletAddress) return;
 
     let cancelled = false;

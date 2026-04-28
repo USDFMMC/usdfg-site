@@ -31,7 +31,6 @@ import {
   expirePendingChallenge,
   cleanupExpiredChallenge,
   submitChallengeResult,
-  startResultSubmissionPhase,
   getLeaderboardPlayers,
   getLeaderboardTeams,
   getTotalUSDFGRewarded,
@@ -60,12 +59,15 @@ import {
   submitTournamentMatchResult,
   deleteChallenge,
   joinTournament,
+  verifyPaidTournamentEscrowAndActivate,
   testFirestoreConnection,
+  isParticipantWallet,
+  walletsEqual,
 } from "@/lib/firebase/firestore";
 import { Timestamp } from "firebase/firestore";
 import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
-import { ADMIN_WALLET, USDFG_MINT, PROGRAM_ID, SEEDS } from '@/lib/chain/config';
+import { ADMIN_WALLET, USDFG_MINT, PROGRAM_ID, SEEDS, CHALLENGE_CONFIG } from '@/lib/chain/config';
 import { getExplorerTxUrl } from '@/lib/chain/explorer';
 import { PublicKey, Transaction } from '@solana/web3.js';
 import { createAssociatedTokenAccountInstruction, createTransferInstruction, getAccount, getAssociatedTokenAddress } from '@solana/spl-token';
@@ -1108,8 +1110,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     // Clear challenge-specific modals and state
     if (selectedChallenge) {
       // Check if the selected challenge is for the current wallet
-      const isMyChallenge = selectedChallenge.creator === publicKey.toString() || 
-                             selectedChallenge.players?.includes(publicKey.toString());
+      const isMyChallenge =
+        walletsEqual(selectedChallenge.creator, publicKey.toString()) ||
+        isParticipantWallet(selectedChallenge.players, publicKey.toString());
       if (!isMyChallenge) {
         // Challenge belongs to a different wallet - clear it
         setSelectedChallenge(null);
@@ -1238,7 +1241,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       return;
     }
     
-    const currentWallet = publicKey.toString().toLowerCase();
+    const currentWallet = publicKey.toString();
     
     // Check firestoreChallenges for completed challenges with unclaimed rewards
     const unclaimed = firestoreChallenges.filter((challenge: any) => {
@@ -1248,7 +1251,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const payoutTriggered = challenge.rawData?.payoutTriggered || challenge.payoutTriggered;
       const founderPayoutSentAt = challenge.founderPayoutSentAt ?? challenge.rawData?.founderPayoutSentAt;
       const founderPayoutAcknowledgedBy = challenge.founderPayoutAcknowledgedBy ?? challenge.rawData?.founderPayoutAcknowledgedBy ?? [];
-      const userWon = winner && winner.toLowerCase() === currentWallet.toLowerCase();
+      const userWon =
+        !!winner &&
+        winner !== 'forfeit' &&
+        winner !== 'tie' &&
+        walletsEqual(winner, currentWallet);
       
       // Reward is claimed if either prizeClaimedAt exists OR payoutTriggered is true
       let isClaimed = prizeClaimedAt || payoutTriggered;
@@ -1257,7 +1264,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const isTournament = format === 'tournament';
       if (isTournament && userWon) {
         if (founderPayoutSentAt) isClaimed = true;
-        else if (Array.isArray(founderPayoutAcknowledgedBy) && founderPayoutAcknowledgedBy.some((w: string) => w.toLowerCase() === currentWallet.toLowerCase())) isClaimed = true;
+        else if (
+          Array.isArray(founderPayoutAcknowledgedBy) &&
+          founderPayoutAcknowledgedBy.some((w: string) => walletsEqual(w, currentWallet))
+        )
+          isClaimed = true;
       }
       
       return status === 'completed' && userWon && !isClaimed;
@@ -1608,7 +1619,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   useEffect(() => {
     if (!publicKey || !firestoreChallenges || !isConnected) return;
     
-    const currentWallet = publicKey.toString().toLowerCase();
+    const currentWallet = publicKey.toString();
     
     // Check for tournament challenges where user is a participant
     const myTournamentChallenges = firestoreChallenges.filter((challenge: any) => {
@@ -1617,9 +1628,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       const playersRaw = challenge.players;
       const players = Array.isArray(playersRaw) ? playersRaw : [];
-      const isParticipant = players.some((player: string) => 
-        player && player.toLowerCase() === currentWallet
-      );
+      const isParticipant = isParticipantWallet(players, currentWallet);
       
       return isParticipant;
     });
@@ -1756,16 +1765,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   useEffect(() => {
     if (!publicKey || !firestoreChallenges || !isConnected) return;
     
-    const currentWallet = publicKey.toString().toLowerCase();
+    const currentWallet = publicKey.toString();
     
     // Find challenges where user is a participant and status is active/funded
     const myActiveChallenges = firestoreChallenges.filter((challenge: any) => {
       // Check players array (actual participant list) or creator
       const playersRaw = challenge.players;
       const playersArray = Array.isArray(playersRaw) ? playersRaw : [];
-      const isParticipant = playersArray.some((player: string) => 
-        player && player.toLowerCase() === currentWallet
-      ) || challenge.creator?.toLowerCase() === currentWallet;
+      const isParticipant =
+        isParticipantWallet(playersArray, currentWallet) ||
+        walletsEqual(challenge.creator, currentWallet);
       
       const status = challenge.status || challenge.rawData?.status;
       const isActive = status === 'active' || 
@@ -1783,7 +1792,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   useEffect(() => {
     if (!publicKey || !firestoreChallenges || !isConnected) return;
     
-    const currentWallet = publicKey.toString().toLowerCase();
+    const currentWallet = publicKey.toString();
     
     const myInProgressChallenges = firestoreChallenges.filter((challenge: any) => {
       // Skip tournament challenges (handled separately above)
@@ -1794,9 +1803,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       const playersRaw = challenge.players;
       const players = Array.isArray(playersRaw) ? playersRaw : [];
-      const isParticipant = players.some((player: string) => 
-        player && player.toLowerCase() === currentWallet
-      );
+      const isParticipant = isParticipantWallet(players, currentWallet);
       
       return isParticipant;
     });
@@ -1806,7 +1813,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const challenge = myInProgressChallenges[0];
       
       const results = (challenge as any).results || {};
-      const hasSubmitted = currentWallet && results[currentWallet];
+      const hasSubmitted =
+        !!currentWallet &&
+        Object.keys(results).some((k) => walletsEqual(k, currentWallet));
       
       if (hasSubmitted) {
         return; // Don't auto-open if you already submitted
@@ -1814,7 +1823,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       // Check if opponent already submitted a loss (making current player auto-winner)
       const playersForResult = Array.isArray(challenge.players) ? challenge.players : [];
-      const opponentWallet = playersForResult.find((p: string) => p && p.toLowerCase() !== currentWallet);
+      const opponentWallet = playersForResult.find((p: string) => p && !walletsEqual(p, currentWallet));
       const opponentResult = opponentWallet && results[opponentWallet];
       
       if (opponentResult && opponentResult.didWin === false) {
@@ -2541,9 +2550,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       return;
     }
 
-    const currentWallet = publicKey.toString().toLowerCase();
+    const pk = publicKey.toString();
     const challengerWallet = challenge.rawData?.challenger || challenge.challenger;
-    const isChallenger = challengerWallet && challengerWallet.toLowerCase() === currentWallet;
+    const isChallenger = challengerWallet && walletsEqual(challengerWallet, pk);
     
     if (!isChallenger) {
       showAppToast("Only the challenger who expressed intent can fund the challenge.", "warning", "Cannot fund");
@@ -2723,9 +2732,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       throw new Error('Please connect your wallet first.');
     }
 
-    const currentWallet = publicKey.toString().toLowerCase();
+    const pk = publicKey.toString();
     const creatorWallet = getChallengeCreator(challenge);
-    if (!creatorWallet || creatorWallet.toLowerCase() !== currentWallet) {
+    if (!creatorWallet || !walletsEqual(creatorWallet, pk)) {
       throw new Error('Only the challenge creator can edit the amount.');
     }
 
@@ -3096,9 +3105,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 return;
               }
               // Check if player already submitted
-              const currentWalletLower = publicKey.toString().toLowerCase();
-              const isPlayer1 = match.player1?.toLowerCase() === currentWalletLower;
-              const isPlayer2 = match.player2?.toLowerCase() === currentWalletLower;
+              const pk = publicKey.toString();
+              const isPlayer1 = match.player1 && walletsEqual(match.player1, pk);
+              const isPlayer2 = match.player2 && walletsEqual(match.player2, pk);
               const existingResult = isPlayer1 ? match.player1Result : (isPlayer2 ? match.player2Result : undefined);
               const opponentResult = isPlayer1 ? match.player2Result : (isPlayer2 ? match.player1Result : undefined);
               const opponentSubmitted = opponentResult !== undefined;
@@ -3221,7 +3230,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Standard challenge - proceed with trust review flow
       // Get opponent wallet - find from players array
       const playersArray = selectedChallenge.rawData?.players || (Array.isArray(selectedChallenge.players) ? selectedChallenge.players : []);
-      const opponentWallet = playersArray.find((p: string) => p?.toLowerCase() !== publicKey.toBase58().toLowerCase());
+      const opponentWallet = playersArray.find((p: string) => p && !walletsEqual(p, publicKey.toBase58()));
       
       // Store the match result for later submission with trust review
       const matchResult = { 
@@ -3309,7 +3318,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Fallback: try to find opponent from selectedChallenge if not stored
       if (!opponentWallet && selectedChallenge) {
         const playersArray = selectedChallenge.rawData?.players || (Array.isArray(selectedChallenge.players) ? selectedChallenge.players : []);
-        opponentWallet = playersArray.find((p: string) => p?.toLowerCase() !== publicKey.toBase58().toLowerCase());
+        opponentWallet = playersArray.find((p: string) => p && !walletsEqual(p, publicKey.toBase58()));
       }
       
       if (opponentWallet) {
@@ -3404,7 +3413,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                   // Challenge completed - update challenge data
                   setSelectedChallenge(refreshed);
                   const winner = refreshed.winner || refreshed.rawData?.winner;
-                  const isActualWinner = winner && winner.toLowerCase() === publicKey.toBase58().toLowerCase();
+                  const isActualWinner = winner && walletsEqual(winner, publicKey.toBase58());
                   
                   if (!isActualWinner && !autoWon) {
                     // Player claimed win but isn't the actual winner - close victory modal
@@ -3549,8 +3558,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           
           // Get players array - handle both rawData and challenge.players formats
           const playersArray = challenge.rawData?.players || (Array.isArray(challenge.players) ? challenge.players : []);
-          const currentWallet = publicKey.toString().toLowerCase();
-          const opponentWallet = Array.isArray(playersArray) ? playersArray.find((p: string) => p?.toLowerCase() !== currentWallet) : null;
+          const pk = publicKey.toString();
+          const opponentWallet = Array.isArray(playersArray)
+            ? playersArray.find((p: string) => p && !walletsEqual(p, pk))
+            : null;
           const opponentName = opponentWallet ? `${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}` : 'Opponent';
           
           // Set up pending match result as if they won (which they did)
@@ -3926,15 +3937,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   };
 
   const isChallengeOwner = (challenge: any) => {
-    const currentWallet = publicKey?.toString()?.toLowerCase() || null;
-    const challengeCreator = challenge.creator?.toString()?.toLowerCase() || null;
-    
-    // Must have both wallet addresses to compare
-    if (!currentWallet || !challengeCreator) {
-      return false;
-    }
-    
-    return currentWallet === challengeCreator;
+    const w = publicKey?.toString() || null;
+    const challengeCreator = challenge.creator?.toString() || null;
+    if (!w || !challengeCreator) return false;
+    return walletsEqual(w, challengeCreator);
   };
 
   // Check if a challenge is a Founder Challenge (admin-created with 0 entry fee)
@@ -3955,7 +3961,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   // Wrapped in try/catch so malformed challenge data (e.g. players not an array) never crashes the page for any wallet
   const filteredChallenges = useMemo(() => {
     const now = Date.now();
-    const currentWalletLower = (publicKey?.toString() || '').toLowerCase();
+    const connectedWallet = publicKey?.toString() || '';
     // Always return a real array so .some() never runs on a number or object (Firestore can store players as count)
     const getPlayerList = (c: any): string[] => {
       // In this page we often normalize `players` to a COUNT (number) for UI,
@@ -3965,10 +3971,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const playersRaw = c?.rawData?.players;
       return Array.isArray(playersRaw) ? playersRaw : [];
     };
-    const playerListIncludes = (c: any, walletLower: string): boolean => {
-      const arr = getPlayerList(c);
-      if (!Array.isArray(arr)) return false;
-      return arr.some((p: string) => (p || '').toLowerCase() === walletLower);
+    const playerListIncludes = (c: any, wallet: string): boolean => {
+      return isParticipantWallet(getPlayerList(c), wallet);
     };
 
     return challenges.filter(challenge => {
@@ -3978,9 +3982,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Filter by game
       const gameMatch = filterGame === 'All' || challenge.game === filterGame;
       // Filter by "My Challenges" toggle (creator OR challenger OR in players so loser can see their challenges)
-      const cw = (challenge.creator ?? challenge.rawData?.creator ?? '').toLowerCase();
-      const ch = (challenge.challenger ?? challenge.rawData?.challenger ?? '').toLowerCase();
-      const myChallengesMatch = !showMyChallenges || cw === currentWalletLower || ch === currentWalletLower || playerListIncludes(challenge, currentWalletLower);
+      const myChallengesMatch =
+        !showMyChallenges ||
+        walletsEqual(challenge.creator ?? challenge.rawData?.creator, connectedWallet) ||
+        walletsEqual(challenge.challenger ?? challenge.rawData?.challenger, connectedWallet) ||
+        playerListIncludes(challenge, connectedWallet);
       
       // Check if challenge is expired (normalize Timestamp to ms for comparison)
       const status = (challenge.status ?? challenge.rawData?.status) as string | undefined;
@@ -4019,27 +4025,27 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const isJoinable = !isExpired && !isCompleted;
       
       // Check if this is a completed Founder Tournament that admin should see
-      const isAdmin = publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
-      
+      const isAdmin = !!publicKey && walletsEqual(publicKey.toString(), ADMIN_WALLET.toString());
+
       // Check format from both challenge and rawData
       const challengeFormat = challenge.format || challenge.rawData?.format;
       const isTournamentFormat = challengeFormat === 'tournament' || challenge.tournament || challenge.rawData?.tournament;
-      
+
       // Check founder tournament properties from both challenge and rawData
       const entryFee = challenge.entryFee ?? challenge.rawData?.entryFee ?? 0;
       const founderParticipantReward = challenge.founderParticipantReward ?? challenge.rawData?.founderParticipantReward ?? 0;
       const founderWinnerBonus = challenge.founderWinnerBonus ?? challenge.rawData?.founderWinnerBonus ?? 0;
       const creatorWallet = challenge.creator ?? challenge.rawData?.creator ?? '';
       const tournamentStage = challenge.tournament?.stage ?? challenge.rawData?.tournament?.stage;
-      
-      const isFounderTournament = isTournamentFormat && 
-        creatorWallet?.toLowerCase() === ADMIN_WALLET.toString().toLowerCase() &&
+
+      const isFounderTournament = isTournamentFormat &&
+        walletsEqual(creatorWallet, ADMIN_WALLET.toString()) &&
         (entryFee === 0 || entryFee < 0.000000001) &&
         (founderParticipantReward > 0 || founderWinnerBonus > 0);
-      
-      const isFounderChallenge = !isTournamentFormat && 
+
+      const isFounderChallenge = !isTournamentFormat &&
         !(challenge.pda ?? challenge.rawData?.pda) &&
-        creatorWallet?.toLowerCase() === ADMIN_WALLET.toString().toLowerCase() &&
+        walletsEqual(creatorWallet, ADMIN_WALLET.toString()) &&
         (entryFee === 0 || entryFee < 0.000000001);
       
       const isFounderTournamentOrChallenge = isFounderTournament || isFounderChallenge;
@@ -4049,13 +4055,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const adminSeesExpiredFounder = isAdmin && isFounderTournamentOrChallenge && isExpired;
       
       // Show completed/disputed challenges to participants so they can re-open lobby (chat/mic)
-      const currentWalletStr = publicKey?.toString()?.toLowerCase() || '';
-      const challengerWallet = (challenge.challenger ?? challenge.rawData?.challenger ?? '').toLowerCase();
-      const isParticipant = currentWalletStr && (
-        (creatorWallet?.toLowerCase() === currentWalletStr) ||
-        challengerWallet === currentWalletStr ||
-        playerListIncludes(challenge, currentWalletStr)
-      );
+      const isParticipant =
+        !!connectedWallet &&
+        (walletsEqual(creatorWallet, connectedWallet) ||
+          walletsEqual(challenge.challenger ?? challenge.rawData?.challenger, connectedWallet) ||
+          playerListIncludes(challenge, connectedWallet));
       const participantSeesCompleted = isParticipant && isCompleted && categoryMatch && gameMatch;
       
       // If user is participant in ACTIVE or creator_funded challenge, ALWAYS show it (so they can find their in-progress match)
@@ -4094,12 +4098,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       players = Array.from(set);
     }
     const unique = Array.from(new Map(players.filter(Boolean).map((p: string) => [p.toLowerCase(), p])).values()) as string[];
-    const champion = ((tournament?.champion ?? '') as string).toLowerCase();
+    const championRaw = (tournament?.champion ?? '') as string;
     const founderPart = Number(raw.founderParticipantReward ?? 0);
     const founderWin = Number(raw.founderWinnerBonus ?? 0);
     return unique.map((wallet: string) => {
       let amount = founderPart > 0 ? founderPart : 0;
-      if (champion && wallet.toLowerCase() === champion) amount += founderWin > 0 ? founderWin : 0;
+      if (championRaw && walletsEqual(wallet, championRaw)) amount += founderWin > 0 ? founderWin : 0;
       return { wallet, amount };
     }).filter((entry: { wallet: string; amount: number }) => entry.amount > 0);
   }, []);
@@ -4328,13 +4332,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   // Check if user has active challenge (for button disable logic)
   // EXCLUDE completed, cancelled, disputed, and expired challenges
   // Use Firestore data directly for most reliable status check
-  const isAdminUser = currentWallet && currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+  const isAdminUser = currentWallet && walletsEqual(currentWallet, ADMIN_WALLET.toString());
   const hasActiveChallenge = !isAdminUser && currentWallet && firestoreChallenges.some((fc: any) => {
-    // Check if user created this challenge
-    const isCreator = fc.creator === currentWallet;
-    
-    // Check if user is a participant in this challenge
-    const isParticipant = Array.isArray(fc.players) && fc.players.includes(currentWallet);
+    const isCreator = walletsEqual(fc.creator, currentWallet);
+    const isParticipant = isParticipantWallet(fc.players, currentWallet);
     
     if (!isCreator && !isParticipant) return false; // Not relevant to this user
     
@@ -5907,21 +5908,21 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                   const payoutTriggered = !!challenge.rawData?.payoutTriggered;
                                   const creator = (challenge.creator ?? challenge.rawData?.creator) ?? '';
                                   const challenger = (challenge.challenger ?? challenge.rawData?.challenger) ?? '';
-                                  const currentWalletLower = (publicKey?.toString() ?? '').toLowerCase();
+                                  const pk = publicKey?.toString() ?? '';
                                   const playersList = Array.isArray(challenge.players) ? challenge.players : (Array.isArray(challenge.rawData?.players) ? challenge.rawData.players : []);
-                                  const isParticipant = currentWalletLower && (
-                                    creator?.toLowerCase() === currentWalletLower ||
-                                    challenger?.toLowerCase() === currentWalletLower ||
-                                    playersList.some((p: string) => (p || '').toLowerCase() === currentWalletLower)
-                                  );
-                                  const isAdmin = !!publicKey && publicKey.toString().toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
+                                  const isParticipant =
+                                    !!pk &&
+                                    (walletsEqual(creator, pk) ||
+                                      walletsEqual(challenger, pk) ||
+                                      isParticipantWallet(playersList, pk));
+                                  const isAdmin = !!publicKey && walletsEqual(publicKey.toString(), ADMIN_WALLET.toString());
                                   const fmt = challenge.format || challenge.rawData?.format;
                                   const isTournament = fmt === 'tournament' || !!challenge.tournament || !!challenge.rawData?.tournament;
                                   const fee = challenge.entryFee ?? challenge.rawData?.entryFee ?? 0;
                                   const founderPart = challenge.founderParticipantReward ?? challenge.rawData?.founderParticipantReward ?? 0;
                                   const founderWin = challenge.founderWinnerBonus ?? challenge.rawData?.founderWinnerBonus ?? 0;
                                   const isFounderTournament = isTournament &&
-                                    creator?.toLowerCase() === ADMIN_WALLET.toString().toLowerCase() &&
+                                    walletsEqual(creator, ADMIN_WALLET.toString()) &&
                                     (fee === 0 || fee < 1e-9) &&
                                     (founderPart > 0 || founderWin > 0);
                                   if (isCompletedOrDisputed || payoutTriggered) {
@@ -6858,6 +6859,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                         showAppToast("Please connect your wallet first.", "warning", "Wallet");
                         return;
                       }
+                      if (!connection) {
+                        showAppToast("Solana connection not ready.", "error", "Wallet");
+                        return;
+                      }
+                      if (!signTransaction) {
+                        showAppToast("Wallet does not support signing transactions.", "error", "Wallet");
+                        return;
+                      }
                       const currentChallenge = selectedChallenge?.rawData || selectedChallenge;
                       const creatorWallet = currentChallenge?.creator || '';
                       const entryFeeValue = Number(currentChallenge?.entryFee ?? 0);
@@ -6876,7 +6885,32 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           return;
                         }
                       }
-                      await joinTournament(challengeId, publicKey.toString());
+                      const isPaidTournament =
+                        !isFounderTournament && entryFeeValue > CHALLENGE_CONFIG.MIN_ENTRY_FEE;
+                      if (isPaidTournament) {
+                        const pda =
+                          getChallengePDA(currentChallenge) ||
+                          getChallengePDA({ ...currentChallenge, id: challengeId });
+                        if (!pda) {
+                          showAppToast(
+                            "This paid tournament has no on-chain PDA. Complete on-chain setup before joining.",
+                            "error",
+                            "Join failed"
+                          );
+                          return;
+                        }
+                        const { transferTournamentEntryFee } = await import("@/lib/chain/contract");
+                        await transferTournamentEntryFee(
+                          { signTransaction, publicKey },
+                          connection,
+                          pda,
+                          entryFeeValue
+                        );
+                      }
+                      const { becameFull } = await joinTournament(challengeId, publicKey.toString());
+                      if (becameFull && isPaidTournament) {
+                        await verifyPaidTournamentEscrowAndActivate(challengeId, connection);
+                      }
                     }}
                     onClaimPrize={handleClaimPrize}
                     onCancelChallenge={handleCancelChallenge}

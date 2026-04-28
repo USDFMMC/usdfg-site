@@ -21,6 +21,7 @@ import {
   deleteField
 } from 'firebase/firestore';
 import { db, auth } from './config';
+import { CHALLENGE_CONFIG } from '../chain/config';
 import { getExplorerTxUrl } from '../chain/explorer';
 
 // Test Firestore connection
@@ -140,11 +141,32 @@ export interface ChallengeData {
   // These are not needed for leaderboard and increase storage costs unnecessarily
 }
 
+/** Normalize winner / wallet fields for storage and comparisons (special literals unchanged). */
+export function normalizeWinnerWallet(w: string): string {
+  if (w === 'forfeit' || w === 'tie' || w === 'cancelled') return w;
+  return w.toLowerCase();
+}
+
+export function walletsEqual(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  return normalizeWinnerWallet(a) === normalizeWinnerWallet(b);
+}
+
+export function isParticipantWallet(players: string[] | undefined, wallet: string): boolean {
+  const w = normalizeWinnerWallet(wallet);
+  return (players || []).some((p) => normalizeWinnerWallet(p) === w);
+}
+
+/** Solana tx signatures are base58 ~87–88 chars; used only for fallback repair when signature exists but flags lag. */
+function looksLikeSolanaTxSignature(s: string): boolean {
+  const t = (s || '').trim();
+  return t.length >= 80 && t.length <= 120;
+}
+
 // --- Challenge hybrid identity (wallet <-> Firebase UID) for challenges/{id} writes ---
 
 function walletEq(a?: string | null, b?: string | null): boolean {
-  if (!a || !b) return false;
-  return a.toLowerCase() === b.toLowerCase();
+  return walletsEqual(a, b);
 }
 
 function updatesTouchHybridParticipants(updates: Record<string, unknown>): boolean {
@@ -189,7 +211,7 @@ function buildPlayersUidAligned(
 
   const register = (w?: string | null, u?: string | null) => {
     if (!w) return;
-    const key = w.toLowerCase();
+    const key = normalizeWinnerWallet(w);
     if (u && uidByWallet.has(key) && uidByWallet.get(key) && uidByWallet.get(key) !== u) {
       return;
     }
@@ -263,6 +285,19 @@ export async function writeChallengeFields(
   }
 
   stripNullUndefinedIdentityOverwrites(current, out);
+
+  const effEntryFee = Number(
+    (out.entryFee !== undefined ? out.entryFee : (current as Record<string, unknown> | undefined)?.entryFee) ?? 0
+  );
+  const effPdaRaw = out.pda !== undefined ? out.pda : (current as Record<string, unknown> | undefined)?.pda;
+  const effPda = typeof effPdaRaw === 'string' ? effPdaRaw.trim() : '';
+  if (out.status === 'active' && effEntryFee > CHALLENGE_CONFIG.MIN_ENTRY_FEE) {
+    if (!effPda || effPda.length < 32) {
+      throw new Error(
+        'Cannot mark a paid challenge as active without an on-chain PDA. Fund escrow on-chain first.'
+      );
+    }
+  }
 
   const authUid = auth.currentUser?.uid ?? null;
   const actingUid =
@@ -1166,10 +1201,67 @@ export const submitTournamentMatchResult = async (
 /**
  * Join a tournament by adding a player to the tournament and filling the next available bracket slot
  */
+/**
+ * After paid tournament fills, call with Connection to verify escrow (joiner deposits) then set status active.
+ */
+export async function verifyPaidTournamentEscrowAndActivate(
+  challengeId: string,
+  connection: import('@solana/web3.js').Connection
+): Promise<boolean> {
+  const challengeRef = doc(db, 'challenges', challengeId);
+  const snap = await getDoc(challengeRef);
+  if (!snap.exists()) return false;
+
+  const data = snap.data() as ChallengeData;
+  const entryFee = Number(data.entryFee ?? 0);
+  if (entryFee <= CHALLENGE_CONFIG.MIN_ENTRY_FEE) return false;
+
+  const format = data.format || (data.tournament ? 'tournament' : 'standard');
+  if (format !== 'tournament' || !data.tournament) return false;
+
+  const maxPlayers = data.tournament.maxPlayers || data.maxPlayers || 0;
+  const players = Array.isArray(data.players) ? data.players : [];
+  if (!maxPlayers || players.length < maxPlayers) return false;
+
+  const pda = typeof data.pda === 'string' ? data.pda.trim() : '';
+  if (!pda || pda.length < 32) {
+    throw new Error('Paid tournament cannot activate without challenge PDA');
+  }
+
+  const { PublicKey } = await import('@solana/web3.js');
+  const { getAccount } = await import('@solana/spl-token');
+  const { PROGRAM_ID, USDFG_MINT, SEEDS } = await import('../chain/config');
+
+  const challengePk = new PublicKey(pda);
+  const [escrowTokenAccountPDA] = PublicKey.findProgramAddressSync(
+    [SEEDS.ESCROW_WALLET, challengePk.toBuffer(), USDFG_MINT.toBuffer()],
+    PROGRAM_ID
+  );
+
+  const escrowAcct = await getAccount(connection, escrowTokenAccountPDA);
+  const escrowLamports = Number(escrowAcct.amount);
+  const joinerSlots = Math.max(0, players.length - 1);
+  const minLamports = Math.floor(entryFee * Math.pow(10, 9)) * joinerSlots;
+  if (escrowLamports < minLamports) {
+    throw new Error(
+      `Tournament escrow underfunded: need at least ${(minLamports / Math.pow(10, 9)).toFixed(9)} USDFG from joiners, have ${(escrowLamports / Math.pow(10, 9)).toFixed(9)} USDFG`
+    );
+  }
+
+  if (data.status === 'active') return true;
+
+  await writeChallengeFields(
+    challengeId,
+    { status: 'active', updatedAt: serverTimestamp() },
+    { currentData: data }
+  );
+  return true;
+}
+
 export const joinTournament = async (
   challengeId: string,
   playerWallet: string
-): Promise<void> => {
+): Promise<{ becameFull: boolean }> => {
   try {
     const challengeRef = doc(db, 'challenges', challengeId);
     const snap = await getDoc(challengeRef);
@@ -1279,8 +1371,10 @@ export const joinTournament = async (
       updatedAt: serverTimestamp(),
     };
 
-    // If tournament is full, update status to active
-    if (isFull) {
+    // Paid tournaments: escrow must be verified on-chain before status becomes active (see verifyPaidTournamentEscrowAndActivate).
+    const entryFee = Number(data.entryFee ?? 0);
+    const isPaid = entryFee > CHALLENGE_CONFIG.MIN_ENTRY_FEE;
+    if (isFull && !isPaid) {
       updates.status = 'active';
     }
 
@@ -1289,6 +1383,7 @@ export const joinTournament = async (
       actingWallet: playerWallet,
     });
     console.log(`✅ Player ${playerWallet.slice(0, 8)}... joined tournament. ${updatedPlayers.length}/${maxPlayers} players`);
+    return { becameFull: isFull };
   } catch (error) {
     console.error('❌ Error joining tournament:', error);
     throw error;
@@ -1310,6 +1405,10 @@ export const devFillTournamentWithTestPlayers = async (
   if (!snap.exists()) throw new Error('Challenge not found');
 
   const data = snap.data() as ChallengeData;
+  const entryFeeDev = Number(data.entryFee ?? 0);
+  if (entryFeeDev > CHALLENGE_CONFIG.MIN_ENTRY_FEE) {
+    throw new Error('devFillTournamentWithTestPlayers is only allowed for free (entry fee ~ 0) tournaments');
+  }
   const tournament = data.tournament;
   const format = data.format || (data.tournament ? 'tournament' : 'standard');
   if (format !== 'tournament' || !tournament?.bracket) {
@@ -2208,7 +2307,7 @@ export const joinerFund = async (challengeId: string, wallet: string) => {
     let newPlayers: string[];
     if (data.players && Array.isArray(data.players) && data.players.length > 0) {
       // Players array exists and has data - add challenger if not already included
-      if (!data.players.includes(wallet)) {
+      if (!isParticipantWallet(data.players, wallet)) {
         newPlayers = [...data.players, wallet];
       } else {
         newPlayers = data.players;
@@ -2219,12 +2318,12 @@ export const joinerFund = async (challengeId: string, wallet: string) => {
     }
     
     // Ensure creator is always in the array (in case it was missing)
-    if (!newPlayers.includes(data.creator)) {
+    if (!newPlayers.some((p) => walletsEqual(p, data.creator))) {
       newPlayers = [data.creator, ...newPlayers];
     }
     
     // Ensure challenger is in the array
-    if (!newPlayers.includes(wallet)) {
+    if (!isParticipantWallet(newPlayers, wallet)) {
       newPlayers = [...newPlayers, wallet];
     }
     
@@ -2491,12 +2590,22 @@ export async function recordFounderChallengeReward(
     }
 
     // Update challenge to mark reward as transferred and set actual challenge reward
-    await writeChallengeFields(challengeId, {
-      payoutTriggered: true,
-      prizePool: amount, // Update with actual amount transferred
-      payoutTimestamp: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    }, { actingWallet: wallet });
+    const founderPayoutSig =
+      txSignature && looksLikeSolanaTxSignature(String(txSignature).trim())
+        ? String(txSignature).trim()
+        : 'founder-off-chain';
+    await writeChallengeFields(
+      challengeId,
+      {
+        payoutSignature: founderPayoutSig,
+        payoutTriggered: true,
+        prizeClaimedAt: Timestamp.now(),
+        prizePool: amount, // Update with actual amount transferred
+        payoutTimestamp: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      },
+      { actingWallet: wallet }
+    );
 
     console.log(`✅ Recorded Founder Challenge reward: ${wallet.slice(0,8)}... received ${amount} USDFG from challenge ${challengeId}${txSignature ? ` (tx: ${txSignature.slice(0,8)}...)` : ''}`);
   } catch (error) {
@@ -2521,7 +2630,7 @@ export async function addChallengeDoc(data: any) {
   const players = Array.isArray(data.players) && data.players.length ? data.players : creator ? [creator] : [];
   const payload: Record<string, any> = {
     ...data,
-    status: "active",
+    status: data.status ?? 'pending_waiting_for_opponent',
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
   };
@@ -2751,7 +2860,7 @@ export const submitChallengeResult = async (
     const data = snap.data() as ChallengeData;
     
     // Verify player is part of this challenge
-    if (!data.players || !data.players.includes(wallet)) {
+    if (!data.players || !isParticipantWallet(data.players, wallet)) {
       throw new Error("You are not part of this challenge");
     }
 
@@ -2782,7 +2891,7 @@ export const submitChallengeResult = async (
     // CRITICAL FIX: Only auto-determine winner if player submitted "I lost"
     // If player claims "I won", we MUST wait for opponent to submit
     if (!didWin && data.players && data.players.length === 2) {
-      const opponentWallet = data.players.find((p: string) => p !== wallet);
+      const opponentWallet = data.players.find((p: string) => !walletsEqual(p, wallet));
       
       if (opponentWallet && !results[opponentWallet]) {
         // Opponent hasn't submitted yet - automatically mark them as winner
@@ -3135,18 +3244,8 @@ export const syncChallengeStatus = async (challengeId: string, challengePDA: str
         updates.status = firestoreStatus;
       }
 
-      // If on-chain is Completed, payout was triggered. Ensure Firestore reflects that even
-      // if the client failed to write payoutTriggered/prizeClaimedAt after a successful on-chain claim.
-      if (firestoreStatus === 'completed') {
-        const payoutTriggered = currentData.payoutTriggered === true;
-        const prizeClaimedAt = currentData.prizeClaimedAt;
-        if (!payoutTriggered) {
-          updates.payoutTriggered = true;
-        }
-        if (!prizeClaimedAt) {
-          updates.prizeClaimedAt = Timestamp.now();
-        }
-      }
+      // Do not infer payoutTriggered / prizeClaimedAt from the on-chain status byte alone — it can
+      // desync from actual SPL movement. Payout flags are set only by claimChallengePrize (or repair paths).
 
       if (Object.keys(updates).length > 0) {
         updates.updatedAt = Timestamp.now();
@@ -3172,15 +3271,26 @@ export const syncChallengeStatus = async (challengeId: string, challengePDA: str
  */
 export const startResultSubmissionPhase = async (challengeId: string): Promise<void> => {
   try {
-    // Set deadline to 2 hours from now
+    const challengeRef = doc(db, 'challenges', challengeId);
+    const snap = await getDoc(challengeRef);
+    if (!snap.exists()) {
+      throw new Error('Challenge not found');
+    }
+    const data = snap.data() as ChallengeData;
+    if (data.status !== 'active') {
+      throw new Error(`startResultSubmissionPhase requires status active; got ${data.status}`);
+    }
     const deadline = Timestamp.fromDate(new Date(Date.now() + 2 * 60 * 60 * 1000));
-    
-    await writeChallengeFields(challengeId, {
-      resultDeadline: deadline,
-      status: 'active',
-      updatedAt: Timestamp.now(),
-    });
-    
+
+    await writeChallengeFields(
+      challengeId,
+      {
+        resultDeadline: deadline,
+        updatedAt: Timestamp.now(),
+      },
+      { currentData: data }
+    );
+
     console.log('⏰ Result submission phase started. Deadline:', deadline.toDate());
   } catch (error) {
     console.error('❌ Error starting result submission phase:', error);
@@ -3239,6 +3349,9 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
           {
             status: 'completed',
             winner: normalizeWinnerWallet(submittedWallet),
+            needsPayout: true,
+            payoutTriggered: false,
+            canClaim: true,
             updatedAt: Timestamp.now(),
           },
           { currentData: data }
@@ -3246,12 +3359,18 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
         console.log('🏆 DEADLINE PASSED: Winner by default (opponent no-show):', submittedWallet);
       } else {
         // They claimed they lost → The OTHER player wins by default
-        const opponentWallet = data.players?.find((p: string) => p !== submittedWallet);
+        const opponentWallet = data.players?.find((p: string) => !walletsEqual(p, submittedWallet));
+        const winnerField = opponentWallet ? normalizeWinnerWallet(opponentWallet) : 'tie';
         await writeChallengeFields(
           challengeId,
           {
             status: 'completed',
-            winner: opponentWallet ? normalizeWinnerWallet(opponentWallet) : 'tie',
+            winner: winnerField,
+            ...(winnerField !== 'tie' && {
+              needsPayout: true,
+              payoutTriggered: false,
+              canClaim: true,
+            }),
             updatedAt: Timestamp.now(),
           },
           { currentData: data }
@@ -3285,7 +3404,7 @@ export const requestCancelChallenge = async (
     const challenge = challengeSnap.data() as ChallengeData;
     
     // Check if user is a participant
-    if (!challenge.players?.includes(walletAddress)) {
+    if (!isParticipantWallet(challenge.players, walletAddress)) {
       throw new Error('Only participants can request cancellation');
     }
     
@@ -3293,7 +3412,7 @@ export const requestCancelChallenge = async (
     const cancelRequests = challenge.cancelRequests || [];
     
     // If user already requested, check if we need to resend notification
-    if (cancelRequests.includes(walletAddress)) {
+    if (cancelRequests.some((w) => walletsEqual(w, walletAddress))) {
       console.log('⚠️ User already requested cancellation - checking chat for notification');
       
       // Check if system message was already sent
@@ -3412,12 +3531,6 @@ function sanitizeDisplayName(name: string | undefined): string | undefined {
   const sanitized = name.trim().slice(0, 20);
   
   return sanitized || undefined;
-}
-
-/** Normalize winner field for storage so profile earnings query works regardless of URL casing. */
-function normalizeWinnerWallet(w: string): string {
-  if (w === 'forfeit' || w === 'tie' || w === 'cancelled') return w;
-  return w.toLowerCase();
 }
 
 export interface PlayerStats {
@@ -5091,12 +5204,40 @@ export async function claimChallengePrize(
       throw new Error('❌ Challenge not found in Firestore');
     }
     
-    const data = snap.data() as ChallengeData;
-    
-    // CRITICAL: Idempotency guard - prevent double claiming
-    if (data.payoutTriggered || data.prizeClaimedAt) {
+    let data = snap.data() as ChallengeData;
+
+    const payoutSigRaw = data.payoutSignature;
+    const hasPayoutSignature =
+      payoutSigRaw != null && String(payoutSigRaw).trim() !== '';
+
+    // True idempotency key: any non-empty payoutSignature means a payout was already executed — never send again.
+    if (hasPayoutSignature) {
+      const sigTrim = String(payoutSigRaw).trim();
+      if (looksLikeSolanaTxSignature(sigTrim) && (!data.payoutTriggered || !data.prizeClaimedAt)) {
+        const acting = typeof data.winner === 'string' ? data.winner : undefined;
+        await writeChallengeFields(
+          challengeId,
+          {
+            payoutTriggered: true,
+            prizeClaimedAt: data.prizeClaimedAt ?? Timestamp.now(),
+            payoutTimestamp: data.payoutTimestamp ?? Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          },
+          { currentData: data, actingWallet: acting }
+        );
+      }
+      console.log('✅ payoutSignature already set — idempotent return (no chain)');
+      return;
+    }
+
+    if (data.payoutTriggered === true) {
       console.log('✅ Reward already claimed - idempotent check passed');
-      return; // Already claimed, return success
+      return;
+    }
+
+    if (data.prizeClaimedAt) {
+      console.log('✅ Reward already claimed (prizeClaimedAt) — idempotent');
+      return;
     }
     
     // Validate challenge is ready for claim
@@ -5158,7 +5299,7 @@ export async function claimChallengePrize(
     }
     
     const callerAddress = winnerWallet.publicKey.toString();
-    if (!data.winner || callerAddress.toLowerCase() !== data.winner.toLowerCase()) {
+    if (!data.winner || !walletsEqual(callerAddress, data.winner)) {
       throw new Error('❌ Only the winner can claim the reward');
     }
     
@@ -5171,10 +5312,18 @@ export async function claimChallengePrize(
     if (!claimable) {
       throw new Error('❌ Challenge is not ready for claim yet');
     }
-    
-    // Prevent duplicate claims
-    if (data.payoutTriggered) {
-      throw new Error('⚠️  Reward already claimed');
+
+    // Re-fetch immediately before chain to reduce double-send race (another tab / retry)
+    const preChainSnap = await getDoc(challengeRef);
+    if (!preChainSnap.exists()) {
+      throw new Error('❌ Challenge not found in Firestore');
+    }
+    data = preChainSnap.data() as ChallengeData;
+    const concurrentSig =
+      data.payoutSignature != null && String(data.payoutSignature).trim() !== '';
+    if (concurrentSig || data.payoutTriggered === true) {
+      console.log('✅ Claim completed by concurrent request — idempotent');
+      return;
     }
     
     console.log('✅ Validation passed - calling smart contract...');
@@ -5203,19 +5352,22 @@ export async function claimChallengePrize(
           challengeId,
           data.winner!
         );
+        // Persist signature + flags in one write immediately after confirmed on-chain success
         await writeChallengeFields(
           challengeId,
           {
+            payoutSignature: signature,
             payoutTriggered: true,
             prizeClaimedAt: Timestamp.now(),
-            adminResolutionTx: signature,
-            payoutSignature: signature,
             payoutTimestamp: Timestamp.now(),
+            adminResolutionTx: signature,
             updatedAt: Timestamp.now(),
           },
           { currentData: data, actingWallet: callerAddress }
         );
-        const explorerUrl = getExplorerTxUrl(signature);
+        const explorerUrl = looksLikeSolanaTxSignature(signature)
+          ? getExplorerTxUrl(signature)
+          : null;
         if (explorerUrl) {
           await postChallengeSystemMessage(challengeId, `🏆 Reward claimed on-chain: ${explorerUrl}`);
         }
@@ -5236,21 +5388,33 @@ export async function claimChallengePrize(
         challengePDA,
         winnerCanonical
       );
-    
-      // Update Firestore to mark reward as claimed
-      await writeChallengeFields(
-        challengeId,
-        {
-          payoutTriggered: true,
-          prizeClaimedAt: Timestamp.now(), // Mark as claimed for unclaimed reward filter
-          payoutSignature: signature,
-          payoutTimestamp: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        },
-        { currentData: data, actingWallet: callerAddress }
-      );
 
-      const explorerUrl = getExplorerTxUrl(signature);
+      const completionPatch =
+        signature === 'already-processed'
+          ? {
+              payoutSignature: 'already-processed',
+              payoutTriggered: true,
+              prizeClaimedAt: Timestamp.now(),
+              payoutTimestamp: Timestamp.now(),
+              updatedAt: Timestamp.now(),
+            }
+          : {
+              payoutSignature: signature,
+              payoutTriggered: true,
+              prizeClaimedAt: Timestamp.now(),
+              payoutTimestamp: Timestamp.now(),
+              updatedAt: Timestamp.now(),
+            };
+
+      await writeChallengeFields(challengeId, completionPatch, {
+        currentData: data,
+        actingWallet: callerAddress,
+      });
+
+      const explorerUrl =
+        typeof signature === 'string' && looksLikeSolanaTxSignature(signature)
+          ? getExplorerTxUrl(signature)
+          : null;
       if (explorerUrl) {
         await postChallengeSystemMessage(challengeId, `🏆 Reward claimed on-chain: ${explorerUrl}`);
       }
@@ -5420,9 +5584,9 @@ export const resolveAdminChallenge = async (
       throw new Error(`Challenge is not in dispute. Current status: ${challengeData.status}`);
     }
     
-    // Verify winner is one of the players
+    // Verify winner is one of the players (normalized casing)
     const players = challengeData.players || [];
-    if (!players.includes(winnerWallet)) {
+    if (!isParticipantWallet(players, winnerWallet)) {
       throw new Error('Winner must be one of the challenge participants');
     }
     

@@ -1,6 +1,10 @@
 import { ADMIN_WALLET } from "@/lib/chain/config";
 import { extractGameFromTitle, getGameCategory } from "@/lib/gameAssets";
-import type { TournamentState } from "@/lib/firebase/firestore";
+import {
+  isParticipantWallet,
+  walletsEqual,
+  type TournamentState,
+} from "@/lib/firebase/firestore";
 
 /** Minimal challenge row for the “one active challenge” guard (matches prior page logic). */
 export interface FirestoreChallengeForCreateGuard {
@@ -186,8 +190,8 @@ async function runCreateChallengeFlowCore(options: {
       : 0;
 
   const existingActive = firestoreChallenges.find((fc) => {
-    const isCreator = fc.creator === currentWallet;
-    const isParticipant = Array.isArray(fc.players) && fc.players.includes(currentWallet);
+    const isCreator = walletsEqual(fc.creator, currentWallet);
+    const isParticipant = isParticipantWallet(fc.players, currentWallet);
     const status = fc.status || fc.rawData?.status || "unknown";
     const isActive =
       status === "active" ||

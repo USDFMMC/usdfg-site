@@ -10,6 +10,7 @@
 import { Connection, PublicKey, Keypair, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction, TransactionInstruction, VersionedTransaction } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } from '@solana/spl-token';
 import { PROGRAM_ID, USDFG_MINT, SEEDS, usdfgToLamports } from './config';
+import { normalizeWinnerWallet } from '../firebase/firestore';
 
 /**
  * Convert a number to a little-endian 8-byte buffer (replaces BN)
@@ -1082,7 +1083,7 @@ export async function cancelChallenge(
  * ✅ Challenge must be in-progress
  * ✅ Reentrancy protection in smart contract
  * 
- * @param callerWallet - Wallet signing the transaction (winner or admin)
+ * @param callerWallet - Winner's wallet (must sign; enforced before send)
  * @param connection - Solana connection
  * @param challengePDA - Challenge account address
  * @param winnerAddress - Winner's wallet address
@@ -1113,6 +1114,10 @@ export async function resolveChallenge(
 
   const caller = new PublicKey(callerWallet.publicKey.toString());
   const challengeAddress = new PublicKey(challengePDA);
+
+  if (!caller.equals(winnerPubkey)) {
+    throw new Error('❌ resolve_challenge must be signed by the winner wallet');
+  }
   
   console.log('✅ Caller wallet verified:', caller.toString());
   
@@ -1382,7 +1387,7 @@ export async function transferTournamentEntryFee(
 /**
  * Admin Resolve Challenge (for dispute resolution)
  * Only works if challenge is in dispute status
- * @param wallet - Admin wallet (must be connected)
+ * @param wallet - Connected signer (admin console uses admin wallet; winner claim path uses winner wallet — program enforces authority)
  * @param connection - Solana connection
  * @param challengeId - Challenge ID (Firestore ID, not PDA)
  * @param winnerWallet - Winner wallet address
@@ -1418,9 +1423,9 @@ export async function resolveAdminChallengeOnChain(
   const winnerPubkey = new PublicKey(winnerWallet);
   const caller = new PublicKey(wallet.publicKey.toString());
   
-  // Verify winner is one of the players
+  // Verify winner is one of the players (case-insensitive vs stored Firestore strings)
   const players = challenge.players || [];
-  if (!players.includes(winnerWallet)) {
+  if (!players.some((p) => normalizeWinnerWallet(p || '') === normalizeWinnerWallet(winnerWallet))) {
     throw new Error('❌ Winner must be one of the challenge participants');
   }
 

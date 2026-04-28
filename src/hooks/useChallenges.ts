@@ -1,6 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import type { ChallengeData } from '@/lib/firebase/firestore';
 import { listenToChallenges, fetchChallenges, listenToUserChallenges } from '@/lib/firebase/firestore';
+import { auth } from '@/lib/firebase/config';
+
+function challengeParticipantUidMatches(challenge: ChallengeData, uid: string | null): boolean {
+  if (!uid) return false;
+  if (challenge.createdByUid === uid) return true;
+  if (challenge.opponentUid === uid) return true;
+  const pu = challenge.playersUid;
+  if (Array.isArray(pu) && pu.includes(uid)) return true;
+  return false;
+}
 
 export const useChallenges = () => {
   const [challenges, setChallenges] = useState<ChallengeData[]>([]);
@@ -26,6 +36,9 @@ export const useChallenges = () => {
       for (const challenge of newChallenges) {
         const challengeId = challenge.id;
         if (!challengeId) continue;
+
+        const uid = auth.currentUser?.uid ?? null;
+        if (!challengeParticipantUidMatches(challenge, uid)) continue;
 
         const challengePDA = (challenge.rawData as any)?.pda || (challenge as any).pda;
         if (!challengePDA) continue;
@@ -65,6 +78,10 @@ export const useChallenges = () => {
           for (const challenge of initialChallenges) {
             const challengeId = challenge.id;
             if (!challengeId) continue;
+
+            const uid = auth.currentUser?.uid ?? null;
+            if (!challengeParticipantUidMatches(challenge, uid)) continue;
+
             const challengePDA = (challenge.rawData as any)?.pda || (challenge as any).pda;
             if (!challengePDA) continue;
             if (inFlightSyncRef.current.has(challengeId)) continue;

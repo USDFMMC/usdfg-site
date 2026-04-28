@@ -6,6 +6,59 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    /** Active admin doc at admins/{auth.uid} (used by client isAdmin / dispute console). */
+    function isAdminUser() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.active != false;
+    }
+
+    /** Do not allow changing creator UID once set (UID-only integrity). */
+    function challengeCreatedByUidUnchanged() {
+      return !('createdByUid' in resource.data)
+        || request.resource.data.createdByUid == resource.data.createdByUid;
+    }
+
+    /** UID-only: creator or known opponent on the stored document. */
+    function isChallengeParticipant() {
+      return isSignedIn()
+        && (
+          resource.data.createdByUid == request.auth.uid
+          || resource.data.opponentUid == request.auth.uid
+        );
+    }
+
+    /** Tournament / multi-slot: already listed as a participant UID. */
+    function isListedInPlayersUid() {
+      return isSignedIn()
+        && resource.data.playersUid is list
+        && request.auth.uid in resource.data.playersUid;
+    }
+
+    /**
+     * First opponent bind: writeChallengeFields sets opponentUid in the same update as join intent
+     * (resource.opponentUid was unset; createdByUid unchanged).
+     */
+    function isOpponentUidFirstBind() {
+      return isSignedIn()
+        && request.resource.data.createdByUid == resource.data.createdByUid
+        && request.auth.uid != resource.data.createdByUid
+        && (!('opponentUid' in resource.data) || resource.data.opponentUid == null)
+        && request.resource.data.opponentUid == request.auth.uid;
+    }
+
+    /** On-chain PDA: set once; never change (escrow identity lock). */
+    function challengePdaImmutableAfterSet() {
+      return resource.data.pda == null
+        || request.resource.data.pda == resource.data.pda;
+    }
+
+    /** Payout tx id: set once; never change (idempotency / no double-claim swap). */
+    function challengePayoutSignatureImmutable() {
+      return request.resource.data.payoutSignature == resource.data.payoutSignature
+        || resource.data.payoutSignature == null;
+    }
+
     // Canonical user
     match /users/{uid} {
       allow read: if isSignedIn();
@@ -31,9 +84,26 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/usersByWallet/$(wallet)).data.uid == request.auth.uid;
     }
 
-    // challenges — gameplay
+    // challenges — gameplay (UID-only; no wallet checks in rules)
     match /challenges/{challengeId} {
-      allow read, create, update, delete: if isSignedIn();
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && request.resource.data.createdByUid == request.auth.uid;
+
+      allow update: if isSignedIn()
+        && (
+          isChallengeParticipant()
+          || isListedInPlayersUid()
+          || isOpponentUidFirstBind()
+          // Dispute console: admin may update while challenge is disputed (resolveAdminChallenge).
+          || (isAdminUser() && resource.data.status == 'disputed')
+        )
+        && challengePdaImmutableAfterSet()
+        && challengePayoutSignatureImmutable();
+
+      // Client deletes disabled; use Admin SDK / scheduled functions if cleanup is required.
+      allow delete: if false;
     }
 
     // challenge chat messages
