@@ -2384,6 +2384,20 @@ export const revertCreatorTimeout = async (challengeId: string): Promise<boolean
     }
 
     const data = snap.data() as ChallengeData;
+    if (!data) return false;
+    const status = data.status;
+    if (status !== "creator_confirmation_required" && status !== "creator_funded") {
+      console.log("Skipping revert — invalid state:", status);
+      return false;
+    }
+    if (data.creatorFundingDeadline && Date.now() < data.creatorFundingDeadline.toMillis()) {
+      console.log("Skipping revert — deadline not reached");
+      return false;
+    }
+    if (data.pendingJoiner || (data as any).opponentWallet) {
+      console.log("Skipping revert — challenger already joined");
+      return false;
+    }
     
     // Only revert if in creator_confirmation_required state and deadline passed
     if (data.status !== 'creator_confirmation_required') {
@@ -2432,6 +2446,20 @@ export const revertJoinerTimeout = async (challengeId: string): Promise<boolean>
     }
 
     const data = snap.data() as ChallengeData;
+    if (!data) return false;
+    const status = data.status;
+    if (status !== "creator_confirmation_required" && status !== "creator_funded") {
+      console.log("Skipping revert — invalid state:", status);
+      return false;
+    }
+    if (data.creatorFundingDeadline && Date.now() < data.creatorFundingDeadline.toMillis()) {
+      console.log("Skipping revert — deadline not reached");
+      return false;
+    }
+    if (data.pendingJoiner || (data as any).opponentWallet) {
+      console.log("Skipping revert — challenger already joined");
+      return false;
+    }
     
     // Only revert if in creator_funded state and deadline passed
     if (data.status !== 'creator_funded') {
@@ -3186,28 +3214,28 @@ export const syncChallengeStatus = async (challengeId: string, challengePDA: str
     const data = accountInfo.data;
     const statusByte = data[8 + 32 + 33 + 8]; // Skip discriminator (8), creator (32), challenger Option (33), entry_fee (8), then status
     
-    let firestoreStatus: string;
+    let onChainStatus: string;
     switch (statusByte) {
       case 0: // PendingWaitingForOpponent
-        firestoreStatus = 'pending_waiting_for_opponent';
+        onChainStatus = 'pending_waiting_for_opponent';
         break;
       case 1: // CreatorConfirmationRequired
-        firestoreStatus = 'creator_confirmation_required';
+        onChainStatus = 'creator_confirmation_required';
         break;
       case 2: // CreatorFunded
-        firestoreStatus = 'creator_funded';
+        onChainStatus = 'creator_funded';
         break;
       case 3: // Active (was InProgress)
-        firestoreStatus = 'active';
+        onChainStatus = 'active';
         break;
       case 4: // Completed
-        firestoreStatus = 'completed';
+        onChainStatus = 'completed';
         break;
       case 5: // Cancelled
-        firestoreStatus = 'cancelled';
+        onChainStatus = 'cancelled';
         break;
       case 6: // Disputed
-        firestoreStatus = 'disputed';
+        onChainStatus = 'disputed';
         break;
       default:
         console.log('Unknown on-chain status:', statusByte);
@@ -3220,18 +3248,43 @@ export const syncChallengeStatus = async (challengeId: string, challengePDA: str
     
     if (snap.exists()) {
       const currentData = snap.data();
+      const currentStatus = currentData.status as string | undefined;
       
       // Don't overwrite 'completed' status with 'active' from on-chain
       // This happens because Firestore marks as completed when both submit, but on-chain is still Active
-      if (currentData.status === 'completed' && firestoreStatus === 'active') {
+      if (currentStatus === 'completed' && onChainStatus === 'active') {
         console.log(`⏭️  Skipping sync: Firestore is 'completed', on-chain is 'active' (waiting for claim)`);
+        return;
+      }
+      
+      // Never downgrade join/fund states due to stale chain reads.
+      if (currentStatus === "creator_confirmation_required" && onChainStatus === "pending_waiting_for_opponent") {
+        console.log("Skipping downgrade from join state");
+        return;
+      }
+      if (currentStatus === "creator_funded" && onChainStatus !== "active") {
+        console.log("Skipping downgrade from funded state");
+        return;
+      }
+
+      const statusOrder: Record<string, number> = {
+        pending_waiting_for_opponent: 0,
+        creator_confirmation_required: 1,
+        creator_funded: 2,
+        active: 3,
+        completed: 4,
+      };
+      const currentRank = currentStatus ? statusOrder[currentStatus] : undefined;
+      const chainRank = statusOrder[onChainStatus];
+      // Only allow forward progression for known statuses.
+      if (currentRank !== undefined && chainRank !== undefined && chainRank <= currentRank) {
         return;
       }
 
       const updates: any = {};
 
-      if (currentData.status !== firestoreStatus) {
-        updates.status = firestoreStatus;
+      if (currentStatus !== onChainStatus) {
+        updates.status = onChainStatus;
       }
 
       // Do not infer payoutTriggered / prizeClaimedAt from the on-chain status byte alone — it can
