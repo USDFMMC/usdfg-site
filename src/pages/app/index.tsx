@@ -2844,8 +2844,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   const handleCreatorFund = async (challenge: any) => {
     console.log("PARENT FUND HANDLER", challenge.id);
 
-    const { creatorFundOnChain } = await import('@/lib/chain/contract');
-    console.log("creatorFundOnChain:", creatorFundOnChain);
+    const { creatorFund } = await import('@/lib/chain/contract');
 
     const challengePDA = challenge?.pda || challenge?.rawData?.pda;
     const entryFee = challenge?.entryFee ?? challenge?.rawData?.entryFee;
@@ -2864,7 +2863,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       throw new Error("Wallet not ready for funding");
     }
 
-    const signature = await creatorFundOnChain(
+    const signature = await creatorFund(
       { signTransaction: wallet.signTransaction, publicKey },
       connection,
       challengePDA,
@@ -2883,7 +2882,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       { actingWallet: publicKey.toString(), currentData: challenge }
     );
 
-    return { signature };
+    return;
   };
 
   const handleDirectCreatorFund = async (challenge: any) => {
