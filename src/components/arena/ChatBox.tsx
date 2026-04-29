@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Send } from "lucide-react";
-import { collection, addDoc, query, where, onSnapshot, orderBy, limit, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, query, onSnapshot, orderBy, limit, serverTimestamp } from "firebase/firestore";
 import { db } from "../../lib/firebase/config";
 
 const linkRegex = /(https?:\/\/[^\s]+)/g;
@@ -41,6 +41,9 @@ interface ChatBoxProps {
   onAppToast?: (message: string, type?: "info" | "warning" | "error" | "success", title?: string) => void;
 }
 
+// Prevent duplicate realtime listeners for the same lobby challenge chat.
+const activeChatListeners = new Set<string>();
+
 export const ChatBox: React.FC<ChatBoxProps> = ({
   challengeId,
   currentWallet,
@@ -65,13 +68,18 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
       setMessages([]);
       return;
     }
+    if (activeChatListeners.has(challengeId)) {
+      console.warn("ChatBox duplicate mount detected, skipping listener:", challengeId);
+      return;
+    }
+    activeChatListeners.add(challengeId);
 
-    const messagesRef = collection(db, "challenge_chats");
+    // Store chat under the challenge lobby to avoid composite-index requirements.
+    const messagesRef = collection(db, "challenge_lobbies", challengeId, "challenge_chats");
     // Realtime listener (keep last ~200 messages for performance).
-    // We query descending + reverse to display oldest→newest.
+    // Query descending + reverse to display oldest→newest.
     const q = query(
       messagesRef,
-      where("challengeId", "==", challengeId),
       orderBy("timestamp", "desc"),
       limit(200)
     );
@@ -89,7 +97,10 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      activeChatListeners.delete(challengeId);
+    };
   }, [challengeId]);
 
   const sendMessage = async () => {
@@ -97,8 +108,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
 
     setSending(true);
     try {
-      await addDoc(collection(db, "challenge_chats"), {
-        challengeId,
+      await addDoc(collection(db, "challenge_lobbies", challengeId, "challenge_chats"), {
         text: input.trim(),
         sender: currentWallet,
         timestamp: serverTimestamp(),

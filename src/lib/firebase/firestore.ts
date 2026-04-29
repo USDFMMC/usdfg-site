@@ -47,8 +47,7 @@ export async function postChallengeSystemMessage(challengeId: string, text: stri
     return;
   }
   try {
-    await addDoc(collection(db, 'challenge_chats'), {
-      challengeId,
+    await addDoc(collection(db, 'challenge_lobbies', challengeId, 'challenge_chats'), {
       text,
       sender: 'SYSTEM',
       timestamp: Timestamp.now(),
@@ -1977,7 +1976,8 @@ export const listenToUserChallenges = (userId: string, callback: (challenges: Ch
  */
 export const listenToRecentChallenges = (
   maxCount: number,
-  callback: (challenges: ChallengeData[]) => void
+  callback: (challenges: ChallengeData[]) => void,
+  onError?: (error: unknown) => void
 ) => {
   const q = query(
     collection(db, 'challenges'),
@@ -1992,13 +1992,14 @@ export const listenToRecentChallenges = (
     callback(challenges);
   }, (error) => {
     console.error('❌ Recent challenges listener error:', error);
+    onError?.(error);
   });
 };
 
 // One-time fetch operations
 export const fetchChallenges = async (): Promise<ChallengeData[]> => {
   try {
-    const q = query(collection(db, "challenges"), orderBy('createdAt', 'desc'));
+    const q = query(collection(db, "challenges"), orderBy('createdAt', 'desc'), limit(100));
     const snapshot = await getDocs(q);
     
     const challenges = snapshot.docs.map(doc => ({

@@ -14,6 +14,9 @@ interface VoiceChatProps {
   spectators?: string[]; // List of spectator wallets
 }
 
+// Prevent multiple VoiceChat realtime stacks for the same challenge.
+const activeVoiceChatMounts = new Set<string>();
+
 const VoiceChatComponent: React.FC<VoiceChatProps> = ({ 
   challengeId, 
   currentWallet,
@@ -113,6 +116,11 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
   const hasOfferedRef = useRef(false);
   const [needTapToHear, setNeedTapToHear] = useState(false);
 
+  useEffect(() => {
+    if (!challengeId || !challengeId.trim()) return;
+    console.log("VoiceChat mounted:", challengeId);
+  }, [challengeId]);
+
   // Use refs to track initialization and prevent unnecessary re-initialization
   const initializedRef = useRef(false);
   const currentChallengeIdRef = useRef<string>('');
@@ -159,8 +167,14 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
   // Initialize voice chat when we can connect (participant, approved spectator, or pre-match spectator listening)
   useEffect(() => {
     if ((initializedRef.current && currentChallengeIdRef.current === memoizedChallengeId) || initInProgressRef.current) return;
+    if (!memoizedChallengeId || memoizedChallengeId.trim() === '') return;
+    if (activeVoiceChatMounts.has(memoizedChallengeId)) {
+      console.warn("VoiceChat duplicate mount detected, skipping init:", memoizedChallengeId);
+      return;
+    }
     if (!canConnect) return;
 
+    activeVoiceChatMounts.add(memoizedChallengeId);
     initInProgressRef.current = true;
     initializedRef.current = true;
     currentChallengeIdRef.current = memoizedChallengeId;
@@ -170,6 +184,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
     });
 
     return () => {
+      activeVoiceChatMounts.delete(memoizedChallengeId);
       if (currentChallengeIdRef.current !== memoizedChallengeId) {
         removeSpeaker(memoizedChallengeId, currentWallet).catch(() => {});
         cleanup(true);
