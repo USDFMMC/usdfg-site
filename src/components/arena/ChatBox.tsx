@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Send } from "lucide-react";
-import { collection, addDoc, query, onSnapshot, orderBy, limit, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, query, onSnapshot, orderBy, limit, serverTimestamp, getDocs } from "firebase/firestore";
 import { db } from "../../lib/firebase/config";
 
 const linkRegex = /(https?:\/\/[^\s]+)/g;
@@ -83,6 +83,8 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
       orderBy("timestamp", "desc"),
       limit(200)
     );
+    let quotaRetryUsed = false;
+    let quotaRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
     const unsubscribe = onSnapshot(
       q,
@@ -92,12 +94,38 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
           .reverse();
         setMessages(next);
       },
-      (error) => {
+      async (error) => {
+        if ((error as any)?.code === 'resource-exhausted') {
+          console.warn('[Firestore] quota hit — switching to fail-soft mode');
+          if (quotaRetryTimer) {
+            clearTimeout(quotaRetryTimer);
+            quotaRetryTimer = null;
+          }
+          unsubscribe();
+          activeChatListeners.delete(challengeId);
+          try {
+            const fallbackSnap = await getDocs(q);
+            const next: Message[] = fallbackSnap.docs
+              .map((doc) => ({ id: doc.id, ...doc.data() } as Message))
+              .reverse();
+            setMessages(next);
+          } catch {
+            // fail-soft: keep existing chat UI/messages
+          }
+          if (!quotaRetryUsed) {
+            quotaRetryUsed = true;
+            quotaRetryTimer = setTimeout(() => {
+              setMessages((prev) => prev);
+            }, 4000);
+          }
+          return;
+        }
         console.error("❌ Chat realtime error:", error);
       }
     );
 
     return () => {
+      if (quotaRetryTimer) clearTimeout(quotaRetryTimer);
       unsubscribe();
       activeChatListeners.delete(challengeId);
     };

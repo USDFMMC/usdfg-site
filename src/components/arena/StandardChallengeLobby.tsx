@@ -16,8 +16,7 @@ import {
   getChallengeChallenger,
   isChallengeChallenger,
   getCreatorFundingDeadline,
-  isCreatorFundingDeadlineExpired,
-  resolveUserRole
+  isCreatorFundingDeadlineExpired
 } from "@/lib/utils/challenge-helpers";
 
 interface StandardChallengeLobbyProps {
@@ -336,10 +335,27 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const voiceChatChallengeId = challengeId;
   const voiceChatCurrentWallet = currentWallet || "";
 
-  // CRITICAL: Resolve user role deterministically - do not render CTAs until role is resolved
+  // Wallet-first role detection (UI must not depend on UID binding).
+  const creatorWallet = getChallengeValue<string>('creatorWallet', '') || getChallengeValue<string>('creator', '') || '';
+  const challengerWallet = getChallengeValue<string | null>('challenger', null);
+  const opponentWalletField = getChallengeValue<string | null>('opponentWallet', null);
+  const pendingJoinerWallet = getChallengeValue<string | null>('pendingJoiner', null);
+
   const userRole = useMemo(() => {
-    return resolveUserRole(activeChallenge, currentWallet);
-  }, [activeChallenge, currentWallet]);
+    if (!currentWallet) return 'spectator';
+    const cw = currentWallet.toLowerCase();
+    const creatorW = (creatorWallet || '').toLowerCase();
+    const opponentW = (opponentWalletField || '').toLowerCase();
+    const challengerW = (challengerWallet || '').toLowerCase();
+    const pendingW = (pendingJoinerWallet || '').toLowerCase();
+    const playerSet = new Set((players || []).map((p: string) => (p || '').toLowerCase()));
+
+    if (creatorW && cw === creatorW) return 'creator';
+    if ((opponentW && cw === opponentW) || (challengerW && cw === challengerW)) return 'challenger';
+    if (pendingW && cw === pendingW) return 'pending_joiner';
+    if (playerSet.has(cw)) return 'player';
+    return 'spectator';
+  }, [currentWallet, creatorWallet, opponentWalletField, challengerWallet, pendingJoinerWallet, players]);
   
   // CRITICAL: Do not render any CTAs if role is not yet resolved (shouldn't happen, but safety check)
   const isRoleResolved = userRole !== null && userRole !== undefined;
@@ -530,23 +546,19 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
   const statusDisplay = getStatusDisplay();
   
-  // CRITICAL: Use resolved role for all participant checks (deterministic)
-  // Also check if user is challenger by wallet even if role says pending_joiner (for creator_funded state)
-  const isCreator = userRole === 'creator';
-  const challengerWallet = getChallengeValue<string | null>('challenger', null);
-  const pendingJoinerWallet = getChallengeValue<string | null>('pendingJoiner', null);
-  const isChallengerByWallet = currentWallet && challengerWallet && challengerWallet.toLowerCase() === currentWallet.toLowerCase();
-  const isPendingJoinerByWallet = currentWallet && pendingJoinerWallet && pendingJoinerWallet.toLowerCase() === currentWallet.toLowerCase();
+  // Wallet-based participant checks (independent from UID binding)
+  const isCreator = !!(currentWallet && creatorWallet && creatorWallet.toLowerCase() === currentWallet.toLowerCase());
+  const isChallengerByWallet = !!(currentWallet && (
+    (opponentWalletField && opponentWalletField.toLowerCase() === currentWallet.toLowerCase()) ||
+    (challengerWallet && challengerWallet.toLowerCase() === currentWallet.toLowerCase())
+  ));
+  const isPendingJoinerByWallet = !!(currentWallet && pendingJoinerWallet && pendingJoinerWallet.toLowerCase() === currentWallet.toLowerCase());
   
   // If status is creator_funded and user is the challenger (by wallet), treat them as challenger
-  const isChallenger = userRole === 'challenger' || (status === 'creator_funded' && isChallengerByWallet);
-  const isPendingJoiner = userRole === 'pending_joiner' && !isChallenger;
+  const isChallenger = isChallengerByWallet || (status === 'creator_funded' && isChallengerByWallet) || userRole === 'challenger';
+  const isPendingJoiner = isPendingJoinerByWallet && !isChallenger;
   const isPlayer = userRole === 'player';
-  const isParticipant = userRole !== 'spectator';
-  
-  // Get wallet addresses for participant count calculation
-  const creatorWallet = getChallengeValue<string>('creator', '') || '';
-  // challengerWallet and pendingJoinerWallet already defined above
+  const isParticipant = isCreator || isChallenger || isPendingJoiner || isPlayer;
   
   const maxPlayers = getChallengeValue('maxPlayers', 2);
   const format = getChallengeValue('format', activeChallenge.rawData?.tournament ? 'tournament' : 'standard') as string;
@@ -704,6 +716,51 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const canCreatorCancel = ctaState.showCancel;
   const canSubmitResult = ctaState.showSubmit;
   const canClaimPrize = ctaState.showClaim;
+
+  console.log("FUND UI CHECK", {
+    status,
+    isCreator,
+    currentWallet,
+    creatorWallet
+  });
+
+  const handleFundChallenge = async () => {
+    console.log("FUND BUTTON CLICKED", {
+      challengeId: activeChallenge?.id,
+      wallet: currentWallet
+    });
+
+    if (!onCreatorFund) {
+      console.error('onCreatorFund handler not provided');
+      onAppToast?.("Funding handler not available. Please refresh the page.", "error", "Setup error");
+      return;
+    }
+
+    try {
+      const challengePDA = (activeChallenge as any)?.pda || (activeChallenge as any)?.rawData?.pda || null;
+      console.log("CALLING ON-CHAIN FUND");
+      console.log("PDA:", challengePDA);
+
+      const result: any = await onCreatorFund(activeChallenge);
+      const signature = result?.signature ?? result?.txid ?? result ?? 'ok';
+      console.log("FUND TX SUCCESS", signature);
+
+      if (challengePDA) {
+        await writeChallengeFields(
+          activeChallenge.id,
+          {
+            status: 'creator_funded',
+            pda: challengePDA,
+            updatedAt: Timestamp.now(),
+          },
+          { currentData: activeChallenge, actingWallet: currentWallet || undefined }
+        );
+      }
+    } catch (error: any) {
+      console.error('Failed to fund challenge:', error);
+      onAppToast?.(error.message || "Failed to fund challenge. Please try again.", "error", "Funding failed");
+    }
+  };
   
   // Reward claimed check (for display) - must match Firestore fields written on claim (prizeClaimedAt, payoutTriggered)
   const prizeClaimedAtDisplay = activeChallenge.rawData?.prizeClaimedAt ?? activeChallenge.prizeClaimedAt;
@@ -1120,7 +1177,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       </div>
 
       {/* Creator Fund Button - Show if creator needs to fund */}
-      {canCreatorFund && (
+      {status === 'creator_confirmation_required' && isCreator === true && canCreatorFund && (
         <div className="rounded-lg border border-white/10 bg-[#07080C]/95 p-2.5 ring-1 ring-purple-500/10" style={{ display: 'block' }}>
           <div className="text-center">
             <div className="text-xs font-semibold text-white mb-1.5">
@@ -1153,17 +1210,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
               onClick={async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                if (onCreatorFund) {
-                  try {
-                    await onCreatorFund(activeChallenge);
-                  } catch (error: any) {
-                    console.error('Failed to fund challenge:', error);
-                    onAppToast?.(error.message || "Failed to fund challenge. Please try again.", "error", "Funding failed");
-                  }
-                } else {
-                  console.error('onCreatorFund handler not provided');
-                  onAppToast?.("Funding handler not available. Please refresh the page.", "error", "Setup error");
-                }
+                await handleFundChallenge();
               }}
               disabled={isCreatorFunding}
               className={`w-full rounded-md bg-gradient-to-r from-purple-500 to-orange-500 hover:brightness-110 text-white px-3 py-2 text-xs font-semibold transition-all shadow-[0_0_10px_rgba(124,58,237,0.22)] border border-white/10 mb-1 ${
@@ -1408,7 +1455,30 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                 e.stopPropagation();
                 if (onJoinChallenge) {
                   try {
+                    // Force immediate local UI transition while Firestore listener catches up.
+                    if (currentWallet) {
+                      setLiveChallenge((prev: any) => ({
+                        ...(prev || activeChallenge),
+                        status: 'creator_confirmation_required',
+                        pendingJoiner: currentWallet,
+                        rawData: {
+                          ...((prev?.rawData || activeChallenge?.rawData || {})),
+                          status: 'creator_confirmation_required',
+                          pendingJoiner: currentWallet,
+                        },
+                      }));
+                    }
                     await onJoinChallenge(activeChallenge);
+                    // Force refresh from source of truth after join success.
+                    if (activeChallenge?.id) {
+                      const refreshed = await fetchChallengeById(activeChallenge.id);
+                      if (refreshed) {
+                        setLiveChallenge({
+                          ...refreshed,
+                          rawData: refreshed.rawData || refreshed,
+                        });
+                      }
+                    }
                   } catch (error: any) {
                     console.error('Failed to join challenge:', error);
                     onAppToast?.(error.message || "Failed to join challenge. Please try again.", "error", "Join failed");

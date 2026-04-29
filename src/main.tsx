@@ -14,11 +14,7 @@ import UpdateBanner from '@/components/ui/UpdateBanner'
 import { startVersionMonitoring } from '@/lib/version'
 
 function AppShell() {
-  const [showUpdateBanner, setShowUpdateBanner] = useState(() => {
-    if (typeof window === 'undefined') return false
-    const params = new URLSearchParams(window.location.search)
-    return params.get('showUpdateBanner') === '1'
-  })
+  const [showUpdateBanner, setShowUpdateBanner] = useState(false)
 
   useEffect(() => {
     const stopMonitoring = startVersionMonitoring(() => setShowUpdateBanner(true))

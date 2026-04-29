@@ -2151,6 +2151,7 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
     const updates: any = {
       status: 'creator_confirmation_required',
       pendingJoiner: wallet,
+      opponentWallet: wallet,
       creatorFundingDeadline,
       updatedAt: serverTimestamp(),
     };
@@ -2702,15 +2703,12 @@ export async function cleanupCompletedChallenge(id: string) {
     // First, clean up all chat messages for this challenge
     console.log('🗑️ Cleaning up chat messages for challenge:', id);
     const chatQuery = query(
-      collection(db, 'challenge_chats'),
-      where('challengeId', '==', id)
+      collection(db, 'challenge_lobbies', id, 'challenge_chats')
     );
     const chatSnapshot = await getDocs(chatQuery);
     
     // Delete all chat messages
-    const chatDeletePromises = chatSnapshot.docs.map(docSnapshot => 
-      deleteDoc(doc(db, 'challenge_chats', docSnapshot.id))
-    );
+    const chatDeletePromises = chatSnapshot.docs.map((docSnapshot) => deleteDoc(docSnapshot.ref));
     await Promise.all(chatDeletePromises);
     console.log(`🗑️ Deleted ${chatSnapshot.size} chat messages for challenge:`, id);
     
@@ -2779,14 +2777,11 @@ export async function cleanupExpiredChallenge(id: string) {
     // 1. Clean up all chat messages for this challenge
     console.log('🗑️ Cleaning up chat messages for expired challenge:', id);
     const chatQuery = query(
-      collection(db, 'challenge_chats'),
-      where('challengeId', '==', id)
+      collection(db, 'challenge_lobbies', id, 'challenge_chats')
     );
     const chatSnapshot = await getDocs(chatQuery);
     
-    const chatDeletePromises = chatSnapshot.docs.map(docSnapshot => 
-      deleteDoc(doc(db, 'challenge_chats', docSnapshot.id))
-    );
+    const chatDeletePromises = chatSnapshot.docs.map((docSnapshot) => deleteDoc(docSnapshot.ref));
     await Promise.all(chatDeletePromises);
     console.log(`🗑️ Deleted ${chatSnapshot.size} chat messages for expired challenge:`, id);
     
@@ -2962,14 +2957,11 @@ export async function cleanupChatMessages(challengeId: string): Promise<void> {
     console.log('🗑️ Cleaning up chat messages for resolved challenge:', challengeId);
     
     const chatQuery = query(
-      collection(db, 'challenge_chats'),
-      where('challengeId', '==', challengeId)
+      collection(db, 'challenge_lobbies', challengeId, 'challenge_chats')
     );
     const chatSnapshot = await getDocs(chatQuery);
     
-    const chatDeletePromises = chatSnapshot.docs.map(docSnapshot => 
-      deleteDoc(doc(db, 'challenge_chats', docSnapshot.id))
-    );
+    const chatDeletePromises = chatSnapshot.docs.map((docSnapshot) => deleteDoc(docSnapshot.ref));
     await Promise.all(chatDeletePromises);
     console.log(`🗑️ Deleted ${chatSnapshot.size} chat messages after dispute resolution:`, challengeId);
   } catch (error) {
@@ -3014,14 +3006,11 @@ async function cleanupChallengeData(challengeId: string, isDispute: boolean = fa
     // Only delete chat messages if NOT a dispute (need chat for dispute resolution)
     if (!isDispute) {
       const chatQuery = query(
-        collection(db, 'challenge_chats'),
-        where('challengeId', '==', challengeId)
+        collection(db, 'challenge_lobbies', challengeId, 'challenge_chats')
       );
       const chatSnapshot = await getDocs(chatQuery);
       
-      const chatDeletePromises = chatSnapshot.docs.map(docSnapshot => 
-        deleteDoc(doc(db, 'challenge_chats', docSnapshot.id))
-      );
+      const chatDeletePromises = chatSnapshot.docs.map((docSnapshot) => deleteDoc(docSnapshot.ref));
       await Promise.all(chatDeletePromises);
       console.log(`🗑️ Deleted ${chatSnapshot.size} chat messages for challenge:`, challengeId);
     } else {
@@ -3419,8 +3408,7 @@ export const requestCancelChallenge = async (
       // Check if system message was already sent
       console.log('🔍 Checking for existing system messages...');
       const chatQuery = query(
-        collection(db, 'challenge_chats'),
-        where('challengeId', '==', challengeId),
+        collection(db, 'challenge_lobbies', challengeId, 'challenge_chats'),
         where('sender', '==', 'SYSTEM')
       );
       const chatSnap = await getDocs(chatQuery);
@@ -3437,8 +3425,7 @@ export const requestCancelChallenge = async (
         // Send system message if it wasn't sent before
         console.log('📨 Resending system message to chat (was missing)');
         const shortWallet = walletAddress.slice(0, 8) + '...' + walletAddress.slice(-4);
-        const chatDoc = await addDoc(collection(db, 'challenge_chats'), {
-          challengeId,
+        const chatDoc = await addDoc(collection(db, 'challenge_lobbies', challengeId, 'challenge_chats'), {
           text: `🚫 ${shortWallet} requested to cancel the challenge. Click "Agree to Cancel" button if you agree.`,
           sender: 'SYSTEM',
           timestamp: Timestamp.now(), // Use Timestamp.now() instead of serverTimestamp() for immediate visibility
@@ -3469,8 +3456,7 @@ export const requestCancelChallenge = async (
       );
       
       // Send system message to chat
-      await addDoc(collection(db, 'challenge_chats'), {
-        challengeId,
+      await addDoc(collection(db, 'challenge_lobbies', challengeId, 'challenge_chats'), {
         text: '🤝 Both players agreed to cancel. Challenge cancelled, challenge amounts will be returned.',
         sender: 'SYSTEM',
         timestamp: Timestamp.now(),
@@ -3490,8 +3476,7 @@ export const requestCancelChallenge = async (
       // Send system message to chat notifying opponent
       const shortWallet = walletAddress.slice(0, 8) + '...' + walletAddress.slice(-4);
       console.log('📨 Sending system message to chat:', challengeId);
-      const chatDoc = await addDoc(collection(db, 'challenge_chats'), {
-        challengeId,
+      const chatDoc = await addDoc(collection(db, 'challenge_lobbies', challengeId, 'challenge_chats'), {
         text: `🚫 ${shortWallet} requested to cancel the challenge. Click "Agree to Cancel" button if you agree.`,
         sender: 'SYSTEM',
         timestamp: Timestamp.now(), // Use Timestamp.now() instead of serverTimestamp() for immediate visibility

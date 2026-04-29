@@ -91,6 +91,7 @@ export const useChallenges = () => {
         for (const challenge of newChallenges) {
           const challengeId = challenge.id;
           if (!challengeId) continue;
+          console.log("CHALLENGE SNAPSHOT", challenge.id, challenge.status, challenge.pendingJoiner);
 
           if (!challengeParticipantUidMatches(challenge, authUid)) continue;
 
@@ -115,7 +116,13 @@ export const useChallenges = () => {
           })();
         }
       },
-      () => {
+      (err) => {
+        if ((err as any)?.code === 'resource-exhausted') {
+          console.warn('[Firestore] quota hit — switching to fail-soft mode');
+          setError(null);
+          setLoading(false);
+          return;
+        }
         setError('Failed to load challenges');
         setLoading(false);
       }

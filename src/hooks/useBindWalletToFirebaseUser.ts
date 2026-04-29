@@ -10,6 +10,8 @@ import {
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase/config";
 
+const walletBindBlocked = new Set<string>();
+
 /**
  * Binds the currently connected wallet address to the current Firebase UID.
  * Writes to:
@@ -47,6 +49,7 @@ export function useBindWalletToFirebaseUser(): void {
   useEffect(() => {
     console.log("ATTEMPT BIND:", { uid, walletAddress });
     if (!uid || !walletAddress) return;
+    if (walletBindBlocked.has(walletAddress)) return;
 
     let cancelled = false;
 
@@ -62,7 +65,8 @@ export function useBindWalletToFirebaseUser(): void {
           const data = walletSnap.data() as { uid?: unknown } | undefined;
           const linkedUid = typeof data?.uid === "string" ? data.uid : "";
           if (linkedUid !== uid) {
-            console.error("Wallet already linked to another user");
+            walletBindBlocked.add(walletAddress);
+            console.warn("Wallet already linked to another user");
             return;
           }
         }

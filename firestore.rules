@@ -59,6 +59,22 @@ service cloud.firestore {
         || resource.data.payoutSignature == null;
     }
 
+    function isJoinIntentUpdate() {
+      return isSignedIn()
+        && resource.data.status == "pending_waiting_for_opponent"
+        && request.resource.data.status == "creator_confirmation_required"
+        && request.resource.data.pendingJoiner != null
+        && request.resource.data.opponentWallet == request.resource.data.pendingJoiner
+        && request.resource.data.pendingJoiner != resource.data.creatorWallet
+        && resource.data.pendingJoiner == null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'pendingJoiner',
+          'opponentWallet',
+          'creatorFundingDeadline'
+        ]);
+    }
+
     // Canonical user
     match /users/{uid} {
       allow read: if isSignedIn();
@@ -96,6 +112,7 @@ service cloud.firestore {
           isChallengeParticipant()
           || isListedInPlayersUid()
           || isOpponentUidFirstBind()
+          || isJoinIntentUpdate()
           // Dispute console: admin may update while challenge is disputed (resolveAdminChallenge).
           || (isAdminUser() && resource.data.status == 'disputed')
         )

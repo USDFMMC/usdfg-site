@@ -2469,42 +2469,57 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       }
       
       // Express intent in Firestore first
-      await expressJoinIntent(challenge.id, walletAddr);
-      
-      // CRITICAL: Immediately update the challenge in state for instant UI update
-      // This ensures creator sees the update immediately without waiting for Firestore listener
-      const optimisticUpdate = {
-        ...challenge,
-        status: 'creator_confirmation_required',
+      console.log("JOIN WRITE PAYLOAD", {
+        challengeId: challenge.id,
+        wallet: walletAddr,
+        status: "creator_confirmation_required",
         pendingJoiner: walletAddr,
-        creatorFundingDeadline: { toMillis: () => Date.now() + (5 * 60 * 1000) }, // 5 minutes from now
-        rawData: {
-          ...(challenge.rawData || challenge),
-          status: 'creator_confirmation_required',
-          pendingJoiner: walletAddr,
-          creatorFundingDeadline: { toMillis: () => Date.now() + (5 * 60 * 1000) }
-        }
-      };
-      
-      // Update selectedChallenge immediately for instant UI feedback
-      setSelectedChallenge({
-        id: optimisticUpdate.id,
-        title: optimisticUpdate.title || extractGameFromTitle(optimisticUpdate.title || '') || "Challenge",
-        ...optimisticUpdate,
-        rawData: optimisticUpdate.rawData || optimisticUpdate
+        opponentWallet: walletAddr,
       });
-      
-      // Also update in firestoreChallenges array if it exists
-      if (firestoreChallenges) {
-        const updatedChallenges = firestoreChallenges.map((c: any) => 
-          c.id === challenge.id ? optimisticUpdate : c
-        );
-        // Trigger a re-render by updating a state that depends on firestoreChallenges
-        // The real-time listener will sync the actual data shortly
+      try {
+        const res = await expressJoinIntent(challenge.id, walletAddr);
+        console.log("JOIN WRITE SUCCESS", { challengeId: challenge.id, wallet: walletAddr, res });
+      } catch (error) {
+        console.error("JOIN WRITE FAILED", error);
+        throw error;
       }
-      
+      // DEBUG: Disable optimistic UI so we can inspect real backend state only.
+      // const optimisticUpdate = {
+      //   ...challenge,
+      //   status: 'creator_confirmation_required',
+      //   pendingJoiner: walletAddr,
+      //   creatorFundingDeadline: { toMillis: () => Date.now() + (5 * 60 * 1000) }, // 5 minutes from now
+      //   rawData: {
+      //     ...(challenge.rawData || challenge),
+      //     status: 'creator_confirmation_required',
+      //     pendingJoiner: walletAddr,
+      //     creatorFundingDeadline: { toMillis: () => Date.now() + (5 * 60 * 1000) }
+      //   }
+      // };
+      //
+      // setSelectedChallenge({
+      //   id: optimisticUpdate.id,
+      //   title: optimisticUpdate.title || extractGameFromTitle(optimisticUpdate.title || '') || "Challenge",
+      //   ...optimisticUpdate,
+      //   rawData: optimisticUpdate.rawData || optimisticUpdate
+      // });
+      //
+      // if (firestoreChallenges) {
+      //   const updatedChallenges = firestoreChallenges.map((c: any) =>
+      //     c.id === challenge.id ? optimisticUpdate : c
+      //   );
+      // }
+
+      // Read-after-write validation
+      const fresh = await fetchChallengeById(challenge.id);
+      console.log("POST-JOIN FETCH", {
+        status: fresh?.status,
+        pendingJoiner: (fresh as any)?.pendingJoiner,
+        opponentWallet: (fresh as any)?.opponentWallet,
+      });
+
       // Fetch fresh data to ensure we have the latest (real-time listener will also update)
-      const updatedChallenge = await fetchChallengeById(challenge.id);
+      const updatedChallenge = fresh || await fetchChallengeById(challenge.id);
       if (updatedChallenge) {
         setSelectedChallenge({
           id: updatedChallenge.id,
@@ -2526,6 +2541,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       });
       setShowStandardLobby(true);
     } catch (err: any) {
+      if ((err as any)?.code) {
+        console.error("JOIN WRITE FAILED CODE", (err as any).code);
+      }
+      console.error("JOIN WRITE FAILED FULL", err);
       console.error("❌ Express join intent failed:", err);
       const errorMessage = err.message || err.toString() || 'Failed to express join intent. Please try again.';
       showAppToast("Failed to express join intent: " + errorMessage, "error", "Join failed");
@@ -2822,6 +2841,51 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   };
 
   // Handle direct creator funding from ChallengeDetailSheet
+  const handleCreatorFund = async (challenge: any) => {
+    console.log("PARENT FUND HANDLER", challenge.id);
+
+    const { creatorFundOnChain } = await import('@/lib/chain/contract');
+    console.log("creatorFundOnChain:", creatorFundOnChain);
+
+    const challengePDA = challenge?.pda || challenge?.rawData?.pda;
+    const entryFee = challenge?.entryFee ?? challenge?.rawData?.entryFee;
+    const tokenMint = challenge?.tokenMint || challenge?.rawData?.tokenMint;
+
+    if (!challengePDA) {
+      throw new Error("Missing PDA for funding");
+    }
+    if (!entryFee || entryFee <= 0) {
+      throw new Error("Missing or invalid entryFee for funding");
+    }
+    if (!tokenMint) {
+      throw new Error("Missing tokenMint for funding");
+    }
+    if (!publicKey || !connection || !wallet.signTransaction) {
+      throw new Error("Wallet not ready for funding");
+    }
+
+    const signature = await creatorFundOnChain(
+      { signTransaction: wallet.signTransaction, publicKey },
+      connection,
+      challengePDA,
+      entryFee
+    );
+
+    console.log("PARENT FUND SUCCESS", signature);
+
+    const { writeChallengeFields } = await import('@/lib/firebase/firestore');
+    await writeChallengeFields(
+      challenge.id,
+      {
+        status: "creator_funded",
+        pda: challengePDA,
+      },
+      { actingWallet: publicKey.toString(), currentData: challenge }
+    );
+
+    return { signature };
+  };
+
   const handleDirectCreatorFund = async (challenge: any) => {
     // CRITICAL: Disable button immediately on click to prevent double-submission
     if (isCreatorFunding === challenge.id) {
@@ -7002,7 +7066,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     onSubmitResult={handleSubmitResult}
                     onClaimPrize={handleClaimPrize}
                     onJoinChallenge={handleDirectJoinerExpressIntent}
-                    onCreatorFund={handleDirectCreatorFund}
+                    onCreatorFund={handleCreatorFund}
                     onJoinerFund={handleDirectJoinerFund}
                     onCancelChallenge={handleCancelChallenge}
                     onAppToast={showAppToast}

@@ -395,6 +395,8 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
       }
       
       // Store unsubscribe function for cleanup
+      let quotaRetryUsed = false;
+      let quotaRetryTimer: ReturnType<typeof setTimeout> | null = null;
       const unsubscribe = onSnapshot(signalRef, async (snapshot) => {
         // Check if challengeId is still valid (in case it changed)
         const currentChallengeId = memoizedChallengeId; // Capture in closure
@@ -528,6 +530,20 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
           console.error("❌ Error handling WebRTC signal:", error);
         }
       }, (error) => {
+        if ((error as any)?.code === 'resource-exhausted') {
+          console.warn('[Firestore] quota hit — switching to fail-soft mode');
+          unsubscribe();
+          unsubscribeSignalRef.current = null;
+          if (!quotaRetryUsed) {
+            quotaRetryUsed = true;
+            quotaRetryTimer = setTimeout(() => {
+              // One safe retry path: re-init signaling stack once.
+              if (!initializedRef.current) return;
+              setReinitKey((k) => k + 1);
+            }, 4000);
+          }
+          return;
+        }
         // Handle snapshot errors (e.g., permission denied, invalid path)
         if (error.code === 'invalid-argument' || error.message.includes('segments')) {
           console.error("❌ Invalid Firestore path - challengeId may be empty:", error);
@@ -544,6 +560,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
       await new Promise(resolve => setTimeout(resolve, 100));
       // Offer creation is single-sourced via renegotiation path (glare-safe).
       // Status/UI updates are driven by connection state + remote tracks.
+      if (quotaRetryTimer) clearTimeout(quotaRetryTimer);
 
     } catch (error) {
       console.error("❌ Voice chat init failed:", error);
