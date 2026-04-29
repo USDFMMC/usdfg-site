@@ -23,17 +23,36 @@ export const checkForUpdates = async (): Promise<boolean> => {
     if (!response.ok) return false;
     
     const html = await response.text();
-    
-    // Check if the HTML contains different script bundles (new version)
-    const currentScripts = Array.from(document.querySelectorAll('script[src*="index-"]'))
-      .map(script => (script as HTMLScriptElement).src);
-    
-    const hasNewVersion = currentScripts.some(src => {
-      const filename = src.split('/').pop() || '';
-      return !html.includes(filename);
-    });
-    
-    return hasNewVersion;
+
+    // Compare current loaded module asset filenames against the latest index.html assets.
+    // This is more reliable than matching only "index-*.js".
+    const currentAssets = new Set(
+      Array.from(document.querySelectorAll('script[type="module"][src], link[rel="stylesheet"][href]'))
+        .map((el) => {
+          const raw = el instanceof HTMLScriptElement ? el.src : (el as HTMLLinkElement).href;
+          const withoutQuery = raw.split('?')[0];
+          return withoutQuery.split('/').pop() || '';
+        })
+        .filter(Boolean)
+    );
+
+    const latestAssets = new Set(
+      Array.from(html.matchAll(/(?:src|href)=["']([^"']+)["']/g))
+        .map((m) => m[1] || '')
+        .filter((u) => /\/assets\/.+\.(?:js|css)$/.test(u))
+        .map((u) => {
+          const withoutQuery = u.split('?')[0];
+          return withoutQuery.split('/').pop() || '';
+        })
+        .filter(Boolean)
+    );
+
+    if (currentAssets.size === 0 || latestAssets.size === 0) return false;
+
+    for (const filename of currentAssets) {
+      if (!latestAssets.has(filename)) return true;
+    }
+    return false;
   } catch (error) {
     console.error('❌ Version check failed:', error);
     return false;
