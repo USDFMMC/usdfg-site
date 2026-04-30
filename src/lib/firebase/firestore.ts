@@ -2394,18 +2394,13 @@ export const revertCreatorTimeout = async (challengeId: string): Promise<boolean
       console.log("Skipping revert — deadline not reached");
       return false;
     }
-    if (data.pendingJoiner || (data as any).opponentWallet) {
-      console.log("Skipping revert — challenger already joined");
+    // Only revert if NO join ever happened
+    if (
+      data.pendingJoiner !== null ||
+      (data as any).opponentWallet !== undefined
+    ) {
+      console.log("Skipping revert — join detected");
       return false;
-    }
-    
-    // Only revert if in creator_confirmation_required state and deadline passed
-    if (data.status !== 'creator_confirmation_required') {
-      return false;
-    }
-    
-    if (!data.creatorFundingDeadline || data.creatorFundingDeadline.toMillis() > Date.now()) {
-      return false; // Deadline not expired yet
     }
     
     // Revert to pending state - clear ALL joiner-related fields to allow new users to join
@@ -2418,6 +2413,24 @@ export const revertCreatorTimeout = async (challengeId: string): Promise<boolean
       opponentWallet: deleteField(),
       opponentUid: deleteField(),
     };
+
+    // Critical: re-check latest doc to avoid stale reads overriding a valid join
+    const latestSnap = await getDoc(challengeRef);
+    const latest = latestSnap.data() as ChallengeData | undefined;
+    if (!latest) return false;
+    if (
+      latest.pendingJoiner !== null ||
+      (latest as any).opponentWallet !== undefined
+    ) {
+      console.log("Abort revert — fresh data shows join");
+      return false;
+    }
+
+    // Final safety guard: ensure status hasn't changed since initial read
+    if (latest.status !== "creator_confirmation_required") {
+      console.log("Abort revert — status changed");
+      return false;
+    }
 
     await writeChallengeFields(challengeId, updates, {
       currentData: data,
@@ -2456,8 +2469,12 @@ export const revertJoinerTimeout = async (challengeId: string): Promise<boolean>
       console.log("Skipping revert — deadline not reached");
       return false;
     }
-    if (data.pendingJoiner || (data as any).opponentWallet) {
-      console.log("Skipping revert — challenger already joined");
+    // Only revert if NO join ever happened
+    if (
+      data.pendingJoiner !== null ||
+      (data as any).opponentWallet !== undefined
+    ) {
+      console.log("Skipping revert — join detected");
       return false;
     }
     
@@ -2486,6 +2503,24 @@ export const revertJoinerTimeout = async (challengeId: string): Promise<boolean>
       opponentWallet: deleteField(),
       opponentUid: deleteField(),
     };
+
+    // Critical: re-check latest doc to avoid stale reads overriding a valid join
+    const latestSnap = await getDoc(challengeRef);
+    const latest = latestSnap.data() as ChallengeData | undefined;
+    if (!latest) return false;
+    if (
+      latest.pendingJoiner !== null ||
+      (latest as any).opponentWallet !== undefined
+    ) {
+      console.log("Abort revert — fresh data shows join");
+      return false;
+    }
+
+    // Final safety guard: ensure status hasn't changed since initial read
+    if (latest.status !== "creator_funded") {
+      console.log("Abort revert — status changed");
+      return false;
+    }
 
     await writeChallengeFields(challengeId, updates, {
       currentData: data,
