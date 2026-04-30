@@ -134,6 +134,10 @@ export interface ChallengeData {
   tournament?: TournamentState;       // Tournament metadata when format === 'tournament'
   // Reward claim fields
   canClaim?: boolean;                 // Whether winner can claim reward
+  needsPayout?: boolean;               // When true, winner may claim escrow (cleared after successful claim)
+  payoutStatus?: 'pending' | 'processing' | 'paid';
+  payoutLastError?: string;
+  payoutErrorAt?: Timestamp;
   payoutTriggered?: boolean;          // Whether reward has been claimed
   payoutSignature?: string;            // Transaction signature of reward claim
   payoutTimestamp?: Timestamp;        // When reward was claimed
@@ -5394,6 +5398,8 @@ export async function claimChallengePrize(
             payoutTriggered: true,
             prizeClaimedAt: data.prizeClaimedAt ?? Timestamp.now(),
             payoutTimestamp: data.payoutTimestamp ?? Timestamp.now(),
+            payoutStatus: 'paid',
+            needsPayout: false,
             updatedAt: Timestamp.now(),
           },
           { currentData: data, actingWallet: acting }
@@ -5410,6 +5416,11 @@ export async function claimChallengePrize(
 
     if (data.prizeClaimedAt) {
       console.log('✅ Reward already claimed (prizeClaimedAt) — idempotent');
+      return;
+    }
+
+    if (data.payoutStatus === 'paid') {
+      console.log('✅ Reward already paid (payoutStatus) — idempotent');
       return;
     }
     
@@ -5492,40 +5503,52 @@ export async function claimChallengePrize(
       throw new Error('❌ Challenge not found in Firestore');
     }
     data = preChainSnap.data() as ChallengeData;
+
+    const hasPayoutSigForStuck =
+      data.payoutSignature != null && String(data.payoutSignature).trim() !== '';
+    if (data.payoutStatus === 'processing' && !hasPayoutSigForStuck) {
+      await updateDoc(challengeRef, { payoutStatus: 'pending' });
+      data = { ...data, payoutStatus: 'pending' } as ChallengeData;
+    }
+
     const concurrentSig =
       data.payoutSignature != null && String(data.payoutSignature).trim() !== '';
     if (concurrentSig || data.payoutTriggered === true) {
       console.log('✅ Claim completed by concurrent request — idempotent');
       return;
     }
-    
-    console.log('✅ Validation passed - calling smart contract...');
-    console.log('   Winner:', data.winner);
-    console.log('   Challenge Reward:', data.prizePool, 'USDFG');
-    console.log('   Challenge PDA:', challengePDA);
-    
-    // ✅ REMOVED: Expiration check for reward claims
-    // Winners can claim rewards ANYTIME after challenge completion (no expiration).
-    // Once both players submit results and challenge is completed in Firestore,
-    // the winner should be able to claim their reward whenever they want.
-    // The dispute_timer only prevents joining expired challenges, not claiming rewards.
-    
-    // Admin-resolved dispute: on-chain state is still "both claimed win". Use resolve_admin with winner as signer (winner pays gas).
-    // Normal completion: use resolve_challenge with winner as signer (winner pays gas).
-    const isAdminResolvedDispute = !!(data as any).resolvedBy;
-    const winnerCanonical = callerAddress;
 
-    if (isAdminResolvedDispute) {
-      const { resolveAdminChallengeOnChain } = await import('../chain/contract');
-      console.log('🚀 Winner claiming after admin resolution (winner pays gas)...');
-      try {
+    if (data.payoutStatus === 'paid') {
+      console.log('✅ Reward already paid (payoutStatus) — idempotent');
+      return;
+    }
+
+    if (!data.needsPayout) {
+      throw new Error('Payout not available or already processed');
+    }
+
+    await updateDoc(challengeRef, { payoutStatus: 'processing' });
+
+    try {
+      console.log('✅ Validation passed - calling smart contract...');
+      console.log('   Winner:', data.winner);
+      console.log('   Challenge Reward:', data.prizePool, 'USDFG');
+      console.log('   Challenge PDA:', challengePDA);
+
+      // Admin-resolved dispute: on-chain state is still "both claimed win". Use resolve_admin with winner as signer (winner pays gas).
+      // Normal completion: use resolve_challenge with winner as signer (winner pays gas).
+      const isAdminResolvedDispute = !!(data as any).resolvedBy;
+      const winnerCanonical = callerAddress;
+
+      if (isAdminResolvedDispute) {
+        const { resolveAdminChallengeOnChain } = await import('../chain/contract');
+        console.log('🚀 Winner claiming after admin resolution (winner pays gas)...');
         const signature = await resolveAdminChallengeOnChain(
           winnerWallet,
           connection,
           challengeId,
           data.winner!
         );
-        // Persist signature + flags in one write immediately after confirmed on-chain success
         await writeChallengeFields(
           challengeId,
           {
@@ -5533,6 +5556,8 @@ export async function claimChallengePrize(
             payoutTriggered: true,
             prizeClaimedAt: Timestamp.now(),
             payoutTimestamp: Timestamp.now(),
+            payoutStatus: 'paid',
+            needsPayout: false,
             adminResolutionTx: signature,
             updatedAt: Timestamp.now(),
           },
@@ -5546,21 +5571,38 @@ export async function claimChallengePrize(
         }
         console.log('✅ REWARD CLAIMED (admin-resolved dispute)!');
         return;
+      }
+
+      const { resolveChallenge } = await import('../chain/contract');
+      console.log('🚀 Winner calling smart contract to release escrow...');
+      console.log('   Note: Reward claims have NO expiration - winners can claim anytime!');
+      let signature: string;
+      try {
+        signature = await resolveChallenge(
+          winnerWallet,
+          connection,
+          challengePDA,
+          winnerCanonical
+        );
       } catch (contractError: any) {
+        if (
+          contractError.message?.includes('ChallengeExpired') ||
+          contractError.message?.includes('6005') ||
+          contractError.logs?.some(
+            (log: string) => log.includes('ChallengeExpired') || log.includes('Challenge has expired')
+          )
+        ) {
+          console.error(
+            '⚠️ Old contract version detected - still has expiration check. Please redeploy with updated contract.'
+          );
+          const expiredError = new Error(
+            '❌ Old contract version detected. Please contact support to redeploy the contract without expiration check for reward claims.'
+          );
+          expiredError.name = 'ChallengeExpired';
+          throw expiredError;
+        }
         throw contractError;
       }
-    }
-
-    const { resolveChallenge } = await import('../chain/contract');
-    console.log('🚀 Winner calling smart contract to release escrow...');
-    console.log('   Note: Reward claims have NO expiration - winners can claim anytime!');
-    try {
-      const signature = await resolveChallenge(
-        winnerWallet,
-        connection,
-        challengePDA,
-        winnerCanonical
-      );
 
       const completionPatch =
         signature === 'already-processed'
@@ -5569,6 +5611,8 @@ export async function claimChallengePrize(
               payoutTriggered: true,
               prizeClaimedAt: Timestamp.now(),
               payoutTimestamp: Timestamp.now(),
+              payoutStatus: 'paid',
+              needsPayout: false,
               updatedAt: Timestamp.now(),
             }
           : {
@@ -5576,6 +5620,8 @@ export async function claimChallengePrize(
               payoutTriggered: true,
               prizeClaimedAt: Timestamp.now(),
               payoutTimestamp: Timestamp.now(),
+              payoutStatus: 'paid',
+              needsPayout: false,
               updatedAt: Timestamp.now(),
             };
 
@@ -5591,23 +5637,17 @@ export async function claimChallengePrize(
       if (explorerUrl) {
         await postChallengeSystemMessage(challengeId, `🏆 Reward claimed on-chain: ${explorerUrl}`);
       }
-      
+
       console.log('✅ REWARD CLAIMED!');
       console.log('   Transaction:', signature);
       console.log('   Winner received:', data.prizePool, 'USDFG');
-    } catch (contractError: any) {
-      // Handle specific smart contract errors
-      // Note: ChallengeExpired should no longer occur for reward claims since we removed the check
-      // But keep this handler for backwards compatibility with old deployed contracts
-      if (contractError.message?.includes('ChallengeExpired') || 
-          contractError.message?.includes('6005') ||
-          contractError.logs?.some((log: string) => log.includes('ChallengeExpired') || log.includes('Challenge has expired'))) {
-        console.error('⚠️ Old contract version detected - still has expiration check. Please redeploy with updated contract.');
-        const expiredError = new Error('❌ Old contract version detected. Please contact support to redeploy the contract without expiration check for reward claims.');
-        expiredError.name = 'ChallengeExpired';
-        throw expiredError;
-      }
-      throw contractError;
+    } catch (err) {
+      await updateDoc(challengeRef, {
+        payoutStatus: 'pending',
+        payoutLastError: String(err ?? 'unknown_error'),
+        payoutErrorAt: Timestamp.now(),
+      });
+      throw err;
     }
     
   } catch (error) {

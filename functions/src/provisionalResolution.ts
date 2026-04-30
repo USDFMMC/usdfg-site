@@ -175,6 +175,7 @@ async function processOneChallenge(ref: DocumentReference): Promise<void> {
       winner: winnerNorm,
       needsStats: true,
       needsPayout: true,
+      payoutStatus: "pending",
       payoutTriggered: false,
       canClaim: true,
       updatedAt: FieldValue.serverTimestamp(),

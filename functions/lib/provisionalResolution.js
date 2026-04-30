@@ -184,6 +184,7 @@ async function processOneChallenge(ref) {
             winner: winnerNorm,
             needsStats: true,
             needsPayout: true,
+            payoutStatus: "pending",
             payoutTriggered: false,
             canClaim: true,
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
