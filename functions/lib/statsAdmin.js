@@ -1,5 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.updatePlayerStatsAdmin = updatePlayerStatsAdmin;
+exports.updateTeamStatsAdmin = updateTeamStatsAdmin;
 exports.applyStatsAfterDisputeResolution = applyStatsAfterDisputeResolution;
 const firestore_1 = require("firebase-admin/firestore");
 function normalizeWinnerWallet(w) {

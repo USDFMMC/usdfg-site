@@ -27,7 +27,7 @@ const Footer = () => {
       { name: 'Help Center', href: '#' },
       { name: 'Terms of Service', to: '/terms' },
       { name: 'Privacy Policy', to: '/privacy' },
-      { name: 'Cookie Policy', href: '#' },
+      { name: 'Cookie Policy', to: '/cookie-policy' },
     ],
   };
 
@@ -212,12 +212,12 @@ const Footer = () => {
             >
               Privacy
             </Link>
-            <a
-              href="#"
+            <Link
+              to="/cookie-policy"
               className="font-body text-sm text-white/40 hover:text-white/70 transition-colors"
             >
-              Cookies
-            </a>
+              Cookie Policy
+            </Link>
           </div>
         </div>
       </div>

@@ -1799,7 +1799,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const format = challenge.format || (challenge.tournament ? 'tournament' : 'standard');
       if (format === 'tournament') return false;
       
-      if (challenge.status !== 'active') return false;
+      const st = challenge.status || challenge.rawData?.status;
+      if (st !== 'active' && st !== 'awaiting_auto_resolution') return false;
       
       const playersRaw = challenge.players;
       const players = Array.isArray(playersRaw) ? playersRaw : [];
@@ -1825,11 +1826,19 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const playersForResult = Array.isArray(challenge.players) ? challenge.players : [];
       const opponentWallet = playersForResult.find((p: string) => p && !walletsEqual(p, currentWallet));
       const opponentResult = opponentWallet && results[opponentWallet];
-      
-      if (opponentResult && opponentResult.didWin === false) {
-        // Opponent submitted loss - current player is automatically the winner
-        // Skip result submission, go straight to review
-        console.log('🎯 Opponent submitted loss - you won automatically! Going straight to review...');
+      const challengeStatus = challenge.status || challenge.rawData?.status;
+      const winner = (challenge as any).winner ?? (challenge as any).rawData?.winner;
+      const userIsDeclaredWinner =
+        !!winner && typeof winner === "string" && walletsEqual(winner, currentWallet);
+
+      if (
+        opponentResult &&
+        opponentResult.didWin === false &&
+        challengeStatus === "completed" &&
+        userIsDeclaredWinner
+      ) {
+        // Only after finalization: never treat provisional loss (awaiting_auto_resolution) as a win
+        console.log("🎯 Match finalized with you as winner — opening trust review...");
         
         const opponentName = opponentWallet ? `${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}` : 'Opponent';
         
@@ -1862,9 +1871,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         setShowTournamentLobby(false);
       }
       
-      // Open standard lobby for active challenges only (completed challenges with rewards handled separately)
+      // Open standard lobby for active or provisional-resolution challenges
       const status = challenge.status || challenge.rawData?.status;
-      if (status === 'active') {
+      if (status === 'active' || status === 'awaiting_auto_resolution') {
       setSelectedChallenge({
         id: challenge.id,
         title: (challenge as any).title || extractGameFromTitle((challenge as any).title || '') || "Challenge",
@@ -3436,9 +3445,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         setShowStandardLobby(true);
       }
       
-      // Show Victory Modal immediately for wins (optimistic UI)
-      // If dispute detected later, we'll update the UI via challenge listener
-      if (didWin || autoWon) {
+      // Show Victory Modal only for real wins — not during provisional loss (awaiting_auto_resolution)
+      const showVictoryForWin = (didWin && isCompleted) || (Boolean(autoWon) && isCompleted);
+      if (showVictoryForWin) {
         const opponentName = opponentWallet 
           ? `${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}`
           : undefined;
@@ -3472,6 +3481,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     "warning",
                     "Dispute"
                   );
+                } else if (refreshedStatus === 'awaiting_auto_resolution' && autoWon) {
+                  setShowVictoryModal(false);
+                  setVictoryModalData(null);
+                  setSelectedChallenge(refreshed);
                 } else if (refreshedStatus === 'completed') {
                   // Challenge completed - update challenge data
                   setSelectedChallenge(refreshed);

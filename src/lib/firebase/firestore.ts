@@ -18,7 +18,8 @@ import {
   arrayUnion,
   arrayRemove,
   serverTimestamp,
-  deleteField
+  deleteField,
+  runTransaction
 } from 'firebase/firestore';
 import { db, auth } from './config';
 import { CHALLENGE_CONFIG } from '../chain/config';
@@ -70,6 +71,7 @@ export interface ChallengeData {
     | 'creator_confirmation_required'
     | 'creator_funded'
     | 'active'
+    | 'awaiting_auto_resolution'
     | 'in-progress'
     | 'completed'
     | 'cancelled'
@@ -113,6 +115,18 @@ export interface ChallengeData {
     }
   };
   resultDeadline?: Timestamp;         // 2 hours after match starts
+  /** After a loss-only report; opponent may still submit before resolveAfter. */
+  provisionalWinner?: string | null;
+  lossReportedBy?: string | null;
+  resolveAfter?: Timestamp | null;
+  finalizedAt?: Timestamp | null;
+  statsApplied?: boolean;
+  needsStats?: boolean;
+  resolutionMeta?: {
+    type: string;
+    triggeredBy?: string;
+    triggeredAt: Timestamp;
+  };
   // UI fields (minimal for display)
   players?: string[];                 // Array of player wallets
   maxPlayers?: number;                // Maximum players allowed
@@ -1890,7 +1904,7 @@ export const updateChallenge = async (challengeId: string, updates: Partial<Chal
   }
 };
 
-export const updateChallengeStatus = async (challengeId: string, status: 'pending_waiting_for_opponent' | 'creator_confirmation_required' | 'creator_funded' | 'active' | 'completed' | 'cancelled' | 'disputed' | 'expired') => {
+export const updateChallengeStatus = async (challengeId: string, status: 'pending_waiting_for_opponent' | 'creator_confirmation_required' | 'creator_funded' | 'active' | 'awaiting_auto_resolution' | 'completed' | 'cancelled' | 'disputed' | 'expired') => {
   try {
     const challengeRef = doc(db, 'challenges', challengeId);
     
@@ -2895,6 +2909,17 @@ export async function archiveChallenge(id: string) {
 // RESULT SUBMISSION SYSTEM
 // ============================================
 
+function challengeHasResultForWallet(data: ChallengeData, wallet: string): boolean {
+  const r = data.results;
+  if (!r) return false;
+  return Object.keys(r).some((k) => walletsEqual(k, wallet) && r[k] != null);
+}
+
+function canonicalPlayerKey(players: string[], wallet: string): string {
+  const hit = players.find((p) => walletsEqual(p, wallet));
+  return hit || wallet;
+}
+
 /**
  * Submit a player's result for a challenge
  * @param challengeId - The challenge ID
@@ -2923,14 +2948,97 @@ export const submitChallengeResult = async (
       throw new Error("You are not part of this challenge");
     }
 
-    // Check if player already submitted
-    if (data.results && data.results[wallet]) {
+    if (challengeHasResultForWallet(data, wallet)) {
       throw new Error("You have already submitted your result");
     }
 
-    // Add result with optional proof image
-    const results = data.results || {};
-    results[wallet] = {
+    const players = data.players || [];
+
+    // 2-player loss: single atomic write (results + provisional) — race-safe, idempotent
+    const canAtomicProvisionalLoss =
+      !didWin &&
+      players.length === 2 &&
+      (data.status === 'active' || data.status === 'in-progress') &&
+      !data.lossReportedBy;
+
+    if (canAtomicProvisionalLoss) {
+      await runTransaction(db, async (transaction) => {
+        const s = await transaction.get(challengeRef);
+        if (!s.exists()) {
+          throw new Error("Challenge not found");
+        }
+        const d = s.data() as ChallengeData;
+        const pl = d.players || [];
+
+        if (pl.length !== 2) {
+          throw new Error("Result submission is only supported for two-player challenges in this flow");
+        }
+        if (!isParticipantWallet(pl, wallet)) {
+          throw new Error("You are not part of this challenge");
+        }
+
+        const st = d.status;
+        if (st === 'completed' || st === 'disputed' || st === 'cancelled' || st === 'expired') {
+          throw new Error(`Cannot submit result: challenge is ${st}`);
+        }
+        if (st === 'awaiting_auto_resolution') {
+          if (challengeHasResultForWallet(d, wallet)) {
+            return;
+          }
+          throw new Error(
+            "This challenge is already awaiting resolution from a loss report. Please refresh and try again."
+          );
+        }
+        if (d.lossReportedBy) {
+          if (walletsEqual(d.lossReportedBy, wallet) && challengeHasResultForWallet(d, wallet)) {
+            return;
+          }
+          throw new Error("A loss has already been reported for this challenge.");
+        }
+        if (st !== 'active' && st !== 'in-progress') {
+          throw new Error(`Cannot submit loss in status: ${st}`);
+        }
+
+        if (challengeHasResultForWallet(d, wallet)) {
+          return;
+        }
+
+        const opponentWallet = pl.find((p: string) => !walletsEqual(p, wallet));
+        if (!opponentWallet) {
+          throw new Error("Could not resolve opponent wallet");
+        }
+
+        const selfKey = canonicalPlayerKey(pl, wallet);
+        const results = { ...(d.results || {}) };
+        const nowTs = Timestamp.now();
+        results[selfKey] = {
+          didWin: false,
+          submittedAt: nowTs,
+          ...(proofImageData && { proofImageData }),
+        };
+
+        transaction.update(challengeRef, {
+          results,
+          status: 'awaiting_auto_resolution',
+          provisionalWinner: opponentWallet,
+          lossReportedBy: selfKey,
+          resolveAfter: Timestamp.fromMillis(nowTs.toMillis() + 120000),
+          updatedAt: nowTs,
+          resolutionMeta: {
+            type: 'loss_auto_resolution',
+            triggeredBy: wallet,
+            triggeredAt: nowTs,
+          },
+        });
+      });
+      console.log('✅ Result submitted (provisional loss, atomic):', { challengeId, wallet });
+      return;
+    }
+
+    // Add result with optional proof image (non-atomic-loss paths: wins, >2 players, second loss while awaiting, etc.)
+    const results = { ...(data.results || {}) };
+    const keySelf = canonicalPlayerKey(players, wallet);
+    results[keySelf] = {
       didWin,
       submittedAt: Timestamp.now(),
       ...(proofImageData && { proofImageData }), // Only include if provided
@@ -2947,45 +3055,36 @@ export const submitChallengeResult = async (
 
     console.log('✅ Result submitted:', { challengeId, wallet, didWin });
 
-    // CRITICAL FIX: Only auto-determine winner if player submitted "I lost"
-    // If player claims "I won", we MUST wait for opponent to submit
-    if (!didWin && data.players && data.players.length === 2) {
-      const opponentWallet = data.players.find((p: string) => !walletsEqual(p, wallet));
-      
-      if (opponentWallet && !results[opponentWallet]) {
-        // Opponent hasn't submitted yet - automatically mark them as winner
-        console.log(`🎯 Player ${wallet.slice(0, 8)}... submitted loss - automatically marking ${opponentWallet.slice(0, 8)}... as winner`);
-        
-        // Add automatic win result for opponent
-        results[opponentWallet] = {
-          didWin: true,
-          submittedAt: Timestamp.now(),
-          autoDetermined: true // Flag to indicate this was auto-determined
-        };
-        
-        await writeChallengeFields(
-          challengeId,
-          {
-            results,
-            updatedAt: Timestamp.now(),
-          },
-          { currentData: data, actingWallet: wallet }
-        );
-        
-        console.log('✅ Auto-marked opponent as winner');
-        
-        // Now both players have "submitted" (one manually, one auto), determine winner
-        const updatedSnap = await getDoc(challengeRef);
-        const updatedData = updatedSnap.data() as ChallengeData;
-        await determineWinner(challengeId, updatedData);
-        return; // Exit early since we've already determined winner
-      }
-    }
-
     // CRITICAL FIX: Re-fetch from Firestore to get the actual current state
     // Don't use local results object - it might be stale
       const updatedSnap = await getDoc(challengeRef);
       const updatedData = updatedSnap.data() as ChallengeData;
+
+    if (updatedData.status === 'awaiting_auto_resolution') {
+      const currentResults = updatedData.results || {};
+      const currentPlayers = updatedData.players || [];
+      const bothSubmitted =
+        currentPlayers.length === 2 &&
+        currentPlayers.every((p: string) => currentResults[p] !== undefined);
+      if (bothSubmitted) {
+        await writeChallengeFields(
+          challengeId,
+          {
+            status: 'active',
+            provisionalWinner: deleteField(),
+            lossReportedBy: deleteField(),
+            resolveAfter: deleteField(),
+            updatedAt: Timestamp.now(),
+          },
+          { currentData: updatedData, actingWallet: wallet }
+        );
+        const finalSnap = await getDoc(challengeRef);
+        const finalData = finalSnap.data() as ChallengeData;
+        await determineWinner(challengeId, finalData);
+      }
+      return;
+    }
+
     const currentResults = updatedData.results || {};
     const currentPlayers = updatedData.players || [];
     

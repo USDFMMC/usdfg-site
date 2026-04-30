@@ -5,7 +5,7 @@ function normalizeWinnerWallet(w: string): string {
   return w.toLowerCase();
 }
 
-async function updatePlayerStatsAdmin(
+export async function updatePlayerStatsAdmin(
   db: Firestore,
   wallet: string,
   result: "win" | "loss",
@@ -96,7 +96,7 @@ async function updatePlayerStatsAdmin(
   });
 }
 
-async function updateTeamStatsAdmin(
+export async function updateTeamStatsAdmin(
   db: Firestore,
   teamId: string,
   result: "win" | "loss",

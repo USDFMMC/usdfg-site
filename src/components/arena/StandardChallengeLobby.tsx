@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { ChatBox } from "./ChatBox";
 import { VoiceChat } from "./VoiceChat";
 import { Camera, Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
-import { getPlayerStats, fetchChallengeById, resolveAdminChallenge, approveMicRequest, denyMicRequest, approveMicRequestReplace, MAX_VOICE_SPEAKERS, writeChallengeFields } from "@/lib/firebase/firestore";
+import { getPlayerStats, fetchChallengeById, resolveAdminChallenge, approveMicRequest, denyMicRequest, approveMicRequestReplace, MAX_VOICE_SPEAKERS, writeChallengeFields, walletsEqual } from "@/lib/firebase/firestore";
 import { collection, doc, setDoc, deleteDoc, updateDoc, onSnapshot, query, where, serverTimestamp, Timestamp, getDocs, getDoc, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import { ADMIN_WALLET } from "@/lib/chain/config";
@@ -691,7 +691,19 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     
     // Submit result: participant + active + enough players + not submitted
     const hasEnoughPlayers = players.length >= 2 || (creatorWallet && challengerWallet);
-    if (isParticipant && status === 'active' && hasEnoughPlayers && !hasAlreadySubmitted) {
+    const lossReportedBy = getChallengeValue<string | null>('lossReportedBy', null);
+    const canSubmitDuringAwaitingResolution =
+      status === 'awaiting_auto_resolution' &&
+      !!lossReportedBy &&
+      !!currentWallet &&
+      !walletsEqual(currentWallet, lossReportedBy) &&
+      !hasAlreadySubmitted;
+    if (
+      isParticipant &&
+      hasEnoughPlayers &&
+      !hasAlreadySubmitted &&
+      (status === 'active' || canSubmitDuringAwaitingResolution)
+    ) {
       state.showSubmit = true;
     }
     
@@ -1663,7 +1675,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       )}
 
       {/* Show message if already submitted */}
-      {hasAlreadySubmitted && status === 'active' && isParticipant && (
+      {hasAlreadySubmitted && (status === 'active' || status === 'awaiting_auto_resolution') && isParticipant && (
         <div className="rounded-lg border border-green-400/30 bg-green-500/10 p-2.5 text-center text-xs text-green-100">
           <div className="text-sm font-semibold text-white mb-0.5">
             ✅ Result Submitted

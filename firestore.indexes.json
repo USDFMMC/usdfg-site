@@ -7,6 +7,14 @@
         { "fieldPath": "address", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "challenges",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "resolveAfter", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

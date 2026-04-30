@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.pruneStaleAdminNonces = exports.finalizeAdminTournamentDispute = exports.finalizeAdminChallengeDispute = exports.verifyAdmin = exports.createAdminNonce = void 0;
+exports.finalizeProvisionalChallengeResolutions = exports.pruneStaleAdminNonces = exports.finalizeAdminTournamentDispute = exports.finalizeAdminChallengeDispute = exports.verifyAdmin = exports.createAdminNonce = void 0;
 const admin = __importStar(require("firebase-admin"));
 admin.initializeApp();
 var createAdminNonceHandler_1 = require("./createAdminNonceHandler");
@@ -46,4 +46,6 @@ var finalizeTournament_1 = require("./finalizeTournament");
 Object.defineProperty(exports, "finalizeAdminTournamentDispute", { enumerable: true, get: function () { return finalizeTournament_1.finalizeAdminTournamentDispute; } });
 var pruneAdminNonces_1 = require("./pruneAdminNonces");
 Object.defineProperty(exports, "pruneStaleAdminNonces", { enumerable: true, get: function () { return pruneAdminNonces_1.pruneStaleAdminNonces; } });
+var provisionalResolution_1 = require("./provisionalResolution");
+Object.defineProperty(exports, "finalizeProvisionalChallengeResolutions", { enumerable: true, get: function () { return provisionalResolution_1.finalizeProvisionalChallengeResolutions; } });
 //# sourceMappingURL=index.js.map

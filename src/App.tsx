@@ -5,6 +5,7 @@ import ArenaApp from './pages/ArenaApp';
 import WhitepaperPage from './pages/WhitepaperPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsOfServicePage from './pages/TermsOfServicePage';
+import CookiePolicyPage from './pages/CookiePolicyPage';
 import CreateChallenge from './pages/app/challenge/new';
 import PlayerProfile from './pages/app/profile/[address]';
 import CategoryDetailPage from './pages/app/category/[category]';
@@ -42,6 +43,7 @@ function App() {
       <Route path="/whitepaper" element={<WhitepaperPage />} />
       <Route path="/privacy" element={<PrivacyPolicyPage />} />
       <Route path="/terms" element={<TermsOfServicePage />} />
+      <Route path="/cookie-policy" element={<CookiePolicyPage />} />
 
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
