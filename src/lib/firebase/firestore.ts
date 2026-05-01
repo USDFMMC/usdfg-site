@@ -5898,32 +5898,51 @@ export async function claimChallengePrize(
     if (!data.winner || data.winner === 'forfeit' || data.winner === 'tie') {
       throw new Error('❌ No valid winner to pay out');
     }
-    
-    // Check if this is a Founder Tournament (admin-created tournament with 0 entry fee and founder rewards)
-    const entryFee = data.entryFee || 0;
-    const creatorWallet = data.creator || '';
+
+    const rawData = (data as any).rawData as Partial<ChallengeData> | undefined;
+    const format = data.format ?? rawData?.format;
+    const isTournament =
+      format === 'tournament' ||
+      data.tournament != null ||
+      rawData?.tournament != null;
+
+    // Standard (non-tournament) escrow claims: require payout gate — never apply founder-tournament rules here.
+    if (!isTournament) {
+      const isAdminResolved = !!(data as any).resolvedBy && data.status === 'completed';
+
+      const payoutReady =
+        data.needsPayout === true ||
+        isAdminResolved;
+      if (!payoutReady) {
+        throw new Error('❌ Prize payout is not enabled for this challenge yet.');
+      }
+    }
+
+    // Founder Tournament (platform airdrop): only when this document is actually a tournament.
+    const entryFee = data.entryFee || rawData?.entryFee || 0;
+    const creatorWallet = data.creator || rawData?.creator || '';
     const isFree = entryFee === 0 || entryFee < 0.000000001;
-    const isTournament = data.format === 'tournament';
-    
-    // Import ADMIN_WALLET to check if creator is admin
     const { ADMIN_WALLET } = await import('../chain/config');
     const isAdminCreator = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
-    const founderParticipantReward = data.founderParticipantReward || 0;
-    const founderWinnerBonus = data.founderWinnerBonus || 0;
-    
-    // Check if this is specifically a Founder Tournament (not a regular Founder Challenge)
-    const isFounderTournament = isTournament && 
-      isAdminCreator && 
-      isFree && 
-      (founderParticipantReward > 0 || founderWinnerBonus > 0);
-    
+    const founderParticipantReward =
+      data.founderParticipantReward ?? rawData?.founderParticipantReward ?? 0;
+    const founderWinnerBonus = data.founderWinnerBonus ?? rawData?.founderWinnerBonus ?? 0;
+
+    let isFounderTournament = false;
+    if (isTournament) {
+      isFounderTournament =
+        isAdminCreator &&
+        isFree &&
+        (founderParticipantReward > 0 || founderWinnerBonus > 0);
+    }
+
     if (isFounderTournament) {
       // Founder Tournament rewards are distributed by the platform after the tournament concludes
       throw new Error('🏆 This is a Founder Tournament. Rewards are distributed by the platform after the tournament concludes. No action is required from you.');
     }
-    
-    // Check if this is a regular Founder Challenge (non-tournament)
-    const isFounderChallenge = !data.pda && (isFree || isAdminCreator);
+
+    // Regular Founder Challenge (non-tournament, no on-chain PDA) — manual founder payout, not this claim path.
+    const isFounderChallenge = !isTournament && !data.pda && (isFree || isAdminCreator);
     
     if (isFounderChallenge) {
       // Founder Challenge rewards are transferred manually by the founder, not via smart contract

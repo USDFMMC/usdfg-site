@@ -113,7 +113,12 @@ export function useChallengeExpiry(challenges: any[]) {
           // Check if this is a Founder Tournament or Founder Challenge
           const entryFee = challenge.entryFee || 0;
           const isFree = entryFee === 0 || entryFee < 0.000000001;
-          const isTournament = challenge.format === 'tournament';
+          const raw = challenge.rawData;
+          const format = challenge.format ?? raw?.format;
+          const isTournament =
+            format === 'tournament' ||
+            challenge.tournament != null ||
+            raw?.tournament != null;
           const founderParticipantReward = challenge.founderParticipantReward || 0;
           const founderWinnerBonus = challenge.founderWinnerBonus || 0;
           

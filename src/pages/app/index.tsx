@@ -3824,7 +3824,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const entryFeeNum = Number(data.entryFee ?? 0);
       const creatorWalletClaim = data.creator || '';
       const isFreeClaim = entryFeeNum === 0 || entryFeeNum < 0.000000001;
-      const isTournamentClaim = data.format === 'tournament' || !!challenge.tournament;
+      const formatClaim =
+        data.format ?? challenge.format ?? challenge.rawData?.format;
+      const isTournamentClaim =
+        formatClaim === 'tournament' ||
+        challenge.tournament != null ||
+        challenge.rawData?.tournament != null ||
+        (data as { tournament?: unknown }).tournament != null;
       const isAdminCreatorClaim = creatorWalletClaim && creatorWalletClaim.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
       const founderParticipantRewardNum = Number(data.founderParticipantReward ?? 0);
       const founderWinnerBonusNum = Number(data.founderWinnerBonus ?? 0);
