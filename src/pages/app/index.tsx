@@ -5019,8 +5019,22 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
     const canCreatorFund = status === 'creator_confirmation_required' && !isDeadlineExpired;
     
-    // Status pill for detail sheet
+    // Status pill for detail sheet (lifecycle before capacity — never let FULL override completed / disputed / in-progress / awaiting_auto_resolution)
     const StatusPillDetail = ({ status, isOwner, players, capacity }: { status: string; isOwner: boolean; players: number; capacity: number }) => {
+      if (status === "completed") {
+        return (
+          <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-neutral-700/30 text-neutral-300 border-neutral-600/30">
+            COMPLETED
+          </span>
+        );
+      }
+      if (status === "disputed") {
+        return (
+          <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-red-500/20 text-red-300 border-red-500/30">
+            DISPUTED
+          </span>
+        );
+      }
       if (status === "pending_waiting_for_opponent") {
         return (
           <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-emerald-500/20 text-emerald-200 border-emerald-500/30 ring-1 ring-emerald-400/20">
@@ -5039,6 +5053,20 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         return (
           <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-purple-500/15 text-purple-100 border-purple-500/35 ring-1 ring-purple-400/25">
             {isOwner ? 'CONFIRM' : 'LIVE'}
+          </span>
+        );
+      }
+      if (status === "in-progress") {
+        return (
+          <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-green-500/20 text-green-300 border-green-500/30">
+            LIVE
+          </span>
+        );
+      }
+      if (status === "awaiting_auto_resolution") {
+        return (
+          <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-yellow-500/20 text-yellow-300 border-yellow-500/30">
+            RESOLVING
           </span>
         );
       }
