@@ -97,7 +97,8 @@ import {
   isChallengeActive,
   isChallengeWaitingForPlayers,
   isChallengeInProgress,
-  canCancelChallenge
+  canCancelChallenge,
+  isChallengeRewardClaimed,
 } from "@/lib/utils/challenge-helpers";
 import ElegantButton from "@/components/ui/ElegantButton";
 import ElegantModal from "@/components/ui/ElegantModal";
@@ -1322,8 +1323,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     const unclaimed = firestoreChallenges.filter((challenge: any) => {
       const status = challenge.status || challenge.rawData?.status;
       const winner = challenge.rawData?.winner || challenge.winner;
-      const prizeClaimedAt = challenge.rawData?.prizeClaimedAt || challenge.prizeClaimedAt;
-      const payoutTriggered = challenge.rawData?.payoutTriggered || challenge.payoutTriggered;
       const founderPayoutSentAt = challenge.founderPayoutSentAt ?? challenge.rawData?.founderPayoutSentAt;
       const founderPayoutAcknowledgedBy = challenge.founderPayoutAcknowledgedBy ?? challenge.rawData?.founderPayoutAcknowledgedBy ?? [];
       const userWon =
@@ -1332,8 +1331,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         winner !== 'tie' &&
         walletsEqual(winner, currentWallet);
       
-      // Reward is claimed if either prizeClaimedAt exists OR payoutTriggered is true
-      let isClaimed = prizeClaimedAt || payoutTriggered;
+      let isClaimed = isChallengeRewardClaimed(challenge);
       // Founder Tournament: also treat as "claimed" for this user if they acknowledged or founder sent airdrop
       const format = challenge.format || challenge.rawData?.format;
       const isTournament = format === 'tournament';
@@ -3840,28 +3838,35 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         }
       }
       
-      // Import the claimChallengePrize function
+      const beforeClaimed = isChallengeRewardClaimed(challenge);
       const { claimChallengePrize } = await import("@/lib/firebase/firestore");
-      
-      // Call the claim function
+
       await claimChallengePrize(challenge.id, wallet, connection);
-      
-      // Immediately remove this challenge from unclaimed list (optimistic update)
-      setUnclaimedPrizeChallenges(prev => 
-        prev.filter(c => c.id !== challenge.id)
-      );
-      
-      showAppToast("Reward claimed. Check your wallet for the USDFG tokens.", "success", "Claimed");
-      
-      // Refresh USDFG balance after successful reward claim
-      setTimeout(() => {
-        refreshUSDFGBalance().catch(() => {
-          // Silently handle errors
-        });
-      }, 2000); // Wait 2 seconds for transaction to confirm
-      
-      // The real-time listener will update the UI automatically
-      // But we've already optimistically removed it from the list above
+
+      const fresh = await fetchChallengeById(challenge.id);
+      if (!fresh) {
+        showAppToast("Could not refresh challenge data. Reloading…", "info", "Syncing");
+        window.location.reload();
+        return;
+      }
+      const afterClaimed = isChallengeRewardClaimed(fresh);
+
+      if (selectedChallenge?.id === challenge.id) {
+        setSelectedChallenge(mergeChallengeDataForModal(fresh, fresh));
+      }
+
+      if (!beforeClaimed && afterClaimed) {
+        setUnclaimedPrizeChallenges((prev) => prev.filter((c) => c.id !== challenge.id));
+        showAppToast("Reward claimed. Check your wallet for the USDFG tokens.", "success", "Claimed");
+        setTimeout(() => {
+          refreshUSDFGBalance().catch(() => {});
+        }, 2000);
+      } else {
+        showAppToast("This reward was already processed earlier.", "info", "Already processed");
+        if (afterClaimed) {
+          setUnclaimedPrizeChallenges((prev) => prev.filter((c) => c.id !== challenge.id));
+        }
+      }
     } catch (error) {
       console.error("❌ Failed to claim reward:", error);
       
@@ -4368,6 +4373,25 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       })
       .sort((a, b) => b.leaderboardScore - a.leaderboardScore);
   }, [topPlayers]);
+
+  const rankedTeamLeaderboard = useMemo(() => {
+    return topTeams
+      .map((team) => {
+        const trust = team.behaviorTrustScore ?? team.trustScore ?? 5;
+        const skillRaw = team.skillScore;
+        const skillForLb: number =
+          typeof skillRaw === 'number' && Number.isFinite(skillRaw) ? skillRaw : 100;
+        const skillLbInput = skillForLb > 0 ? skillForLb : 100;
+        const leaderboardScore =
+          (team.wins || 0) * 10 +
+          (team.totalEarned || 0) * 0.001 +
+          trust * 20 -
+          ((team.forfeits || 0) * 15) +
+          Math.log(skillLbInput) * 50;
+        return { ...team, leaderboardScore };
+      })
+      .sort((a, b) => b.leaderboardScore - a.leaderboardScore);
+  }, [topTeams]);
 
   /** Build payout recipients for a Founder Tournament (same logic as TournamentBracketView). */
   const getFounderTournamentRecipients = useCallback((challenge: any): { wallet: string; amount: number }[] => {
@@ -6382,7 +6406,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                   <div className="relative divide-y divide-white/10 rounded-xl border border-white/5 overflow-hidden">
                     {(() => {
                       if (isTeamsView) {
-                        const transformedTeams = topTeams.map((team, index) => ({
+                        const transformedTeams = rankedTeamLeaderboard.map((team, index) => ({
                           rank: index + 1,
                           name: team.teamName && team.teamName.trim().length > 0
                             ? team.teamName

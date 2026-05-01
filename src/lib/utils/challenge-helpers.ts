@@ -241,3 +241,25 @@ export function getChallengeFormat(challenge: any): 'standard' | 'tournament' {
 export function isTournamentChallenge(challenge: any): boolean {
   return getChallengeFormat(challenge) === 'tournament';
 }
+
+/**
+ * Unified payout/claim state (aligns with claimChallengePrize idempotency fields).
+ * Checks top-level and rawData for merged challenge objects used in the app.
+ */
+export function isChallengeRewardClaimed(challenge: any): boolean {
+  if (!challenge) return false;
+  const raw = challenge.rawData;
+  const prizeClaimedAt = challenge.prizeClaimedAt ?? raw?.prizeClaimedAt;
+  const payoutTriggered = challenge.payoutTriggered ?? raw?.payoutTriggered;
+  const payoutStatus = challenge.payoutStatus ?? raw?.payoutStatus;
+  const sigRaw = challenge.payoutSignature ?? raw?.payoutSignature;
+  const hasPayoutSignature = sigRaw != null && String(sigRaw).trim() !== '';
+  const legacy = !!(challenge.prizeClaimed ?? raw?.prizeClaimed);
+  return (
+    !!prizeClaimedAt ||
+    payoutTriggered === true ||
+    payoutStatus === 'paid' ||
+    hasPayoutSignature ||
+    legacy
+  );
+}

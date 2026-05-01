@@ -16,7 +16,8 @@ import {
   getChallengeChallenger,
   isChallengeChallenger,
   getCreatorFundingDeadline,
-  isCreatorFundingDeadlineExpired
+  isCreatorFundingDeadlineExpired,
+  isChallengeRewardClaimed
 } from "@/lib/utils/challenge-helpers";
 import { TrustBadge } from "@/lib/utils/trustDisplay";
 
@@ -792,10 +793,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     // Claim reward: participant + completed + won + not claimed
     const winner = getChallengeValue<string | null>('winner', null) as string | null;
     const userWon = currentWallet && winner && typeof winner === 'string' && winner.toLowerCase() === currentWallet.toLowerCase();
-    // Reward is claimed if Firestore has prizeClaimedAt, payoutTriggered, or legacy prizeClaimed
-    const prizeClaimedAt = activeChallenge.rawData?.prizeClaimedAt ?? activeChallenge.prizeClaimedAt;
-    const payoutTriggered = activeChallenge.rawData?.payoutTriggered ?? activeChallenge.payoutTriggered;
-    const prizeClaimed = !!(activeChallenge.rawData?.prizeClaimed ?? activeChallenge.prizeClaimed ?? prizeClaimedAt ?? payoutTriggered);
+    const prizeClaimed = isChallengeRewardClaimed(activeChallenge);
     if (isParticipant && status === 'completed' && userWon && !prizeClaimed) {
       state.showClaim = true;
     }
@@ -856,10 +854,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     }
   };
   
-  // Reward claimed check (for display) - must match Firestore fields written on claim (prizeClaimedAt, payoutTriggered)
-  const prizeClaimedAtDisplay = activeChallenge.rawData?.prizeClaimedAt ?? activeChallenge.prizeClaimedAt;
-  const payoutTriggeredDisplay = activeChallenge.rawData?.payoutTriggered ?? activeChallenge.payoutTriggered;
-  const prizeClaimed = !!(activeChallenge.rawData?.prizeClaimed ?? activeChallenge.prizeClaimed ?? prizeClaimedAtDisplay ?? payoutTriggeredDisplay);
+  const prizeClaimed = isChallengeRewardClaimed(activeChallenge);
   
   // Winner check (for display)
   const winner = getChallengeValue<string | null>('winner', null) as string | null;
@@ -2042,7 +2037,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                   console.error('Error claiming reward:', error);
                 }
               }}
-              disabled={isClaiming}
+              disabled={isClaiming || prizeClaimed}
               className="w-full rounded-md bg-gradient-to-r from-emerald-500/90 to-green-500/90 hover:from-emerald-600 hover:to-green-600 text-white px-3 py-2 text-xs font-semibold transition-all shadow-[0_0_10px_rgba(34,197,94,0.25)] border border-emerald-400/30 disabled:opacity-50 disabled:cursor-not-allowed mb-1"
             >
               {isClaiming ? (
@@ -2050,8 +2045,10 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                   <Loader2 className="w-3 h-3 animate-spin" />
                   Claiming… Confirm in wallet
                 </span>
+              ) : prizeClaimed ? (
+                "Claimed"
               ) : (
-                'Claim Reward'
+                "Claim Reward"
               )}
             </button>
             <div className="text-[10px] text-emerald-100/90 font-medium mb-1">
@@ -2067,8 +2064,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         </div>
       )}
 
-      {/* Reward Claimed Message */}
-      {canClaimPrize && prizeClaimed && (
+      {/* Reward Claimed Message (canClaimPrize is false once claimed, so key off win + completed) */}
+      {isParticipant && status === "completed" && userWon && prizeClaimed && (
         <div className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 p-2.5 text-center">
           <div className="text-xl mb-1.5">✅</div>
           <p className="text-xs font-semibold text-emerald-200">

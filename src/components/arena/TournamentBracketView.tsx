@@ -7,6 +7,7 @@ import { VoiceChat } from "./VoiceChat";
 import { ChatBox } from "./ChatBox";
 import { ADMIN_WALLET } from "@/lib/chain/config";
 import type { AppConfirmDialogOptions } from "@/components/ui/AppConfirmModal";
+import { isChallengeRewardClaimed } from "@/lib/utils/challenge-helpers";
 
 const isDevTestEnv =
   typeof window !== "undefined" &&
@@ -275,7 +276,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
 
   // Check if reward can be claimed (base; founder logic applied after isFounderTournament)
   const canClaim = challenge?.canClaim || challenge?.rawData?.canClaim;
-  const prizeClaimedBase = challenge?.prizeClaimed || challenge?.rawData?.prizeClaimed || challenge?.rawData?.prizeClaimedAt || challenge?.payoutTriggered;
+  const prizeClaimedBase = challenge ? isChallengeRewardClaimed(challenge) : false;
   const founderPayoutSentAt = challenge?.founderPayoutSentAt ?? challenge?.rawData?.founderPayoutSentAt;
   const founderPayoutAcknowledgedBy = challenge?.founderPayoutAcknowledgedBy ?? challenge?.rawData?.founderPayoutAcknowledgedBy ?? [];
   const userAcknowledgedFounder = Array.isArray(founderPayoutAcknowledgedBy) && currentWallet && founderPayoutAcknowledgedBy.some((w: string) => w.toLowerCase() === currentWallet.toLowerCase());
