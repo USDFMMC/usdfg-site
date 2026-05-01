@@ -2064,7 +2064,7 @@ export const fetchChallenges = async (): Promise<ChallengeData[]> => {
     return challenges;
   } catch (error) {
     console.error('❌ Error fetching challenges:', error);
-    return [];
+    throw error;
   }
 };
 

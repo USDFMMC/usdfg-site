@@ -279,6 +279,14 @@ const ArenaHome: React.FC = () => {
   // Use stored public key if adapter doesn't have one
   const effectivePublicKey = publicKey || (storedPhantomPublicKey ? new PublicKey(storedPhantomPublicKey) : null);
 
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // CRITICAL: Handle Phantom deep link return on same page (Smithii-style)
   // Phantom returns to /app with query params, we decrypt and restore session here
   useEffect(() => {
@@ -643,7 +651,12 @@ const ArenaHome: React.FC = () => {
   }, []);
 
   // Use Firestore real-time challenges (must be before any useEffect that uses firestoreChallenges)
-  const { challenges: firestoreChallenges, loading: challengesLoading, error: challengesError } = useChallenges();
+  const {
+    challenges: firestoreChallenges,
+    loading: challengesLoading,
+    error: challengesError,
+    refetchChallenges,
+  } = useChallenges();
 
   const [creatorClientStatsMap, setCreatorClientStatsMap] = useState<
     Record<string, { displayTrustScore: number; disputesWon: number; disputesLost: number }>
@@ -1242,6 +1255,24 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       setUserUsdfgBalance(0);
     }
   }, [isConnected, publicKey, connection]);
+
+  /** After claim, align list + wallet + trust readout without a full reload (realtime listener may lag). */
+  const resyncAfterClaimData = useCallback(async (): Promise<ChallengeData[] | null> => {
+    const challenges = await refetchChallenges();
+    await refreshUSDFGBalance().catch(() => {});
+    const w = effectivePublicKey?.toString();
+    if (w) {
+      try {
+        const stats = await getPlayerStats(w);
+        setCurrentUserDisplayTrust(
+          stats ? stats.displayTrustScore ?? computeDisplayTrustScore(stats) : 5
+        );
+      } catch {
+        /* ignore */
+      }
+    }
+    return challenges;
+  }, [refetchChallenges, refreshUSDFGBalance, effectivePublicKey]);
 
   // Fetch USDFG balance when wallet is connected (non-blocking, fail gracefully)
   useEffect(() => {
@@ -3823,10 +3854,23 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             const statusByte = data[8 + 32 + 33 + 8]; // Skip discriminator, creator, challenger, entry_fee, then status
             // Status 2 = Completed (already resolved)
             if (statusByte === 2) {
-              showAppToast("This reward has already been claimed. Refreshing the page to show the latest status.", "warning", "Already claimed");
-              setClaimingPrize(null);
-              // Force refresh the page to sync with on-chain state
-              window.location.reload();
+              showAppToast(
+                "This reward has already been claimed. Syncing latest state…",
+                "warning",
+                "Already claimed"
+              );
+              const list = await resyncAfterClaimData();
+              let synced: ChallengeData | null = null;
+              if (Array.isArray(list)) {
+                synced = list.find((c) => c.id === challenge.id) || null;
+              }
+              if (!synced) {
+                synced = await fetchChallengeById(challenge.id);
+              }
+              if (synced && selectedChallenge?.id === challenge.id) {
+                setSelectedChallenge(mergeChallengeDataForModal(synced, synced));
+              }
+              setUnclaimedPrizeChallenges((prev) => prev.filter((c) => c.id !== challenge.id));
               return;
             }
             
@@ -3843,29 +3887,49 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
       await claimChallengePrize(challenge.id, wallet, connection);
 
-      const fresh = await fetchChallengeById(challenge.id);
+      let fresh = await fetchChallengeById(challenge.id);
       if (!fresh) {
-        showAppToast("Could not refresh challenge data. Reloading…", "info", "Syncing");
-        window.location.reload();
+        showAppToast("Syncing latest state…", "info", "Syncing");
+        const list = await resyncAfterClaimData();
+        if (Array.isArray(list)) {
+          fresh = list.find((c) => c.id === challenge.id) || null;
+        }
+        if (!fresh) {
+          fresh = await fetchChallengeById(challenge.id);
+        }
+      }
+      if (!fresh) {
+        await new Promise((r) => setTimeout(r, 300));
+        const retryFresh = await fetchChallengeById(challenge.id);
+        if (isMountedRef.current) {
+          fresh = retryFresh;
+        }
+      }
+      if (!fresh) {
+        showAppToast("Challenge not found. Try again in a moment.", "info", "Syncing");
         return;
       }
-      const afterClaimed = isChallengeRewardClaimed(fresh);
 
-      if (selectedChallenge?.id === challenge.id) {
-        setSelectedChallenge(mergeChallengeDataForModal(fresh, fresh));
+      if (fresh) {
+        if (selectedChallenge && fresh.id === selectedChallenge.id) {
+          setSelectedChallenge(mergeChallengeDataForModal(fresh, fresh));
+        }
+        if (isChallengeRewardClaimed(fresh)) {
+          setUnclaimedPrizeChallenges((prev) =>
+            prev.filter((c) => c.id !== fresh.id)
+          );
+        }
       }
 
+      const afterClaimed = isChallengeRewardClaimed(fresh);
+
       if (!beforeClaimed && afterClaimed) {
-        setUnclaimedPrizeChallenges((prev) => prev.filter((c) => c.id !== challenge.id));
         showAppToast("Reward claimed. Check your wallet for the USDFG tokens.", "success", "Claimed");
         setTimeout(() => {
           refreshUSDFGBalance().catch(() => {});
         }, 2000);
       } else {
         showAppToast("This reward was already processed earlier.", "info", "Already processed");
-        if (afterClaimed) {
-          setUnclaimedPrizeChallenges((prev) => prev.filter((c) => c.id !== challenge.id));
-        }
       }
     } catch (error) {
       console.error("❌ Failed to claim reward:", error);
@@ -3885,8 +3949,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         errorMessage = "✅ This reward has already been claimed. Please refresh the page to see the latest status.";
         // Remove from unclaimed so the green button disappears
         setUnclaimedPrizeChallenges(prev => prev.filter(c => c.id !== challenge.id));
-        // Force refresh after a delay so UI shows "Reward claimed"
-        setTimeout(() => window.location.reload(), 2000);
+        await resyncAfterClaimData();
       } else if (errorMessage.includes("NotInProgress") || 
                  errorMessage.includes("not in progress")) {
         errorMessage = "❌ Challenge is not in progress. It may have already been completed or cancelled.";
