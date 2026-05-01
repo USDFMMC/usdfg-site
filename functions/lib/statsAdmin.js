@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.fetchSoloMatchSkillScores = fetchSoloMatchSkillScores;
 exports.updatePlayerStatsAdmin = updatePlayerStatsAdmin;
 exports.updateTeamStatsAdmin = updateTeamStatsAdmin;
 exports.applyStatsAfterDisputeResolution = applyStatsAfterDisputeResolution;
@@ -8,6 +9,40 @@ function normalizeWinnerWallet(w) {
     if (w === "forfeit" || w === "tie" || w === "cancelled")
         return w;
     return w.toLowerCase();
+}
+const DEFAULT_PLAYER_SKILL_SCORE = 100;
+const SKILL_SCORE_SOFT_CAP = 3000;
+function skillScoreFromStoredAdmin(data) {
+    const v = data?.skillScore;
+    return Number.isFinite(v) ? v : DEFAULT_PLAYER_SKILL_SCORE;
+}
+function clampSkillScoreWrite(n) {
+    return Math.max(0, Math.min(SKILL_SCORE_SOFT_CAP, n));
+}
+function skillScoreAfterWin(selfBefore, opponentSkill) {
+    let delta = 5;
+    if (opponentSkill > selfBefore)
+        delta += 3;
+    return Math.max(0, selfBefore + delta);
+}
+function skillScoreAfterLoss(selfBefore, opponentSkill) {
+    let delta = -2;
+    if (opponentSkill < selfBefore)
+        delta -= 3;
+    return Math.max(0, selfBefore + delta);
+}
+/** Pre-update skill for two participants (e.g. winner vs loser) using normalized player_stats doc ids. */
+async function fetchSoloMatchSkillScores(db, walletA, walletB) {
+    const keyA = normalizeWinnerWallet(walletA);
+    const keyB = normalizeWinnerWallet(walletB);
+    const [snapA, snapB] = await Promise.all([
+        db.collection("player_stats").doc(keyA).get(),
+        db.collection("player_stats").doc(keyB).get(),
+    ]);
+    return {
+        skillA: skillScoreFromStoredAdmin(snapA.exists ? snapA.data() : undefined),
+        skillB: skillScoreFromStoredAdmin(snapB.exists ? snapB.data() : undefined),
+    };
 }
 function behaviorTrustBaseFromSnap(data) {
     if (!data)
@@ -26,6 +61,7 @@ async function updatePlayerStatsAdmin(db, wallet, result, amountEarned, game, ca
     if (result === "forfeit") {
         const baseT = playerSnap.exists ? behaviorTrustBaseFromSnap(playerSnap.data()) : 5;
         const newBehavior = Math.max(0, baseT - 1);
+        const skillAfterForfeit = clampSkillScoreWrite(skillScoreFromStoredAdmin(playerSnap.exists ? playerSnap.data() : undefined) - 10);
         if (!playerSnap.exists) {
             await playerRef.set({
                 wallet: key,
@@ -38,6 +74,7 @@ async function updatePlayerStatsAdmin(db, wallet, result, amountEarned, game, ca
                 behaviorTrustScore: newBehavior,
                 trustReviews,
                 forfeits: 1,
+                skillScore: skillAfterForfeit,
                 ogFirst1k: false,
                 gameStats: {},
                 categoryStats: {},
@@ -49,6 +86,7 @@ async function updatePlayerStatsAdmin(db, wallet, result, amountEarned, game, ca
             forfeits: (currentStats.forfeits || 0) + 1,
             behaviorTrustScore: newBehavior,
             trustReviews,
+            skillScore: skillAfterForfeit,
             lastActive: firestore_1.Timestamp.now(),
         });
         return;
@@ -67,6 +105,17 @@ async function updatePlayerStatsAdmin(db, wallet, result, amountEarned, game, ca
     else if (result === "loss") {
         behaviorTrustScore = Math.max(0, behaviorTrustScore - 0.1);
     }
+    const selfSkillBefore = skillScoreFromStoredAdmin(playerSnap.exists ? playerSnap.data() : undefined);
+    const rawOpp = opts?.opponentSkillScore;
+    const opponentSkill = Number.isFinite(rawOpp) ? rawOpp : selfSkillBefore;
+    let newSkill = selfSkillBefore;
+    if (result === "win") {
+        newSkill = skillScoreAfterWin(selfSkillBefore, opponentSkill);
+    }
+    else if (result === "loss") {
+        newSkill = skillScoreAfterLoss(selfSkillBefore, opponentSkill);
+    }
+    const skillWrite = clampSkillScoreWrite(newSkill);
     if (!playerSnap.exists) {
         const docData = {
             wallet: key,
@@ -78,6 +127,7 @@ async function updatePlayerStatsAdmin(db, wallet, result, amountEarned, game, ca
             lastActive: firestore_1.Timestamp.now(),
             behaviorTrustScore,
             trustReviews,
+            skillScore: skillWrite,
             ogFirst1k: false,
             gameStats: {
                 [game]: {
@@ -134,6 +184,7 @@ async function updatePlayerStatsAdmin(db, wallet, result, amountEarned, game, ca
         lastActive: firestore_1.Timestamp.now(),
         behaviorTrustScore,
         trustReviews,
+        skillScore: skillWrite,
         gameStats,
         categoryStats,
     };
@@ -223,10 +274,15 @@ async function applyStatsAfterDisputeResolution(challengeData, winnerWalletRaw) 
         await updateTeamStatsAdmin(db, loser, "loss", 0, game, category);
     }
     else {
+        const { skillA: winnerSkill, skillB: loserSkill } = await fetchSoloMatchSkillScores(db, winnerWallet, loser);
         await updatePlayerStatsAdmin(db, winnerWallet, "win", prizePool, game, category, {
             resolutionType: "admin",
+            opponentSkillScore: loserSkill,
         });
-        await updatePlayerStatsAdmin(db, loser, "loss", 0, game, category, { resolutionType: "admin" });
+        await updatePlayerStatsAdmin(db, loser, "loss", 0, game, category, {
+            resolutionType: "admin",
+            opponentSkillScore: winnerSkill,
+        });
     }
 }
 //# sourceMappingURL=statsAdmin.js.map

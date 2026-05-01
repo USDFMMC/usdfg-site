@@ -4353,12 +4353,17 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         const trust = player.displayTrustScore ?? 5;
         const penalty =
           (player.disputesLost || 0) > (player.disputesWon || 0) * 2 ? 50 : 0;
+        const skillRaw = player.skillScore;
+        const skillForLb: number =
+          typeof skillRaw === 'number' && Number.isFinite(skillRaw) ? skillRaw : 100;
+        const skillLbInput = skillForLb > 0 ? skillForLb : 100;
         const leaderboardScore =
           player.wins * 10 +
           (player.totalEarned || 0) * 0.001 +
           trust * 20 -
           ((player.forfeits || 0) * 15) -
-          penalty;
+          penalty +
+          Math.log(skillLbInput) * 50;
         return { ...player, leaderboardScore };
       })
       .sort((a, b) => b.leaderboardScore - a.leaderboardScore);

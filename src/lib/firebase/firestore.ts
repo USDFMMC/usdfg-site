@@ -3995,10 +3995,15 @@ function calculateTrustScoreSync(wallet: string): { trustScore: number; trustRev
 }
 
 const DEFAULT_PLAYER_SKILL_SCORE = 100;
+const SKILL_SCORE_SOFT_CAP = 3000;
 
 function skillScoreFromStored(s: PlayerStats | null | undefined): number {
   const v = s?.skillScore;
-  return typeof v === 'number' && Number.isFinite(v) ? v : DEFAULT_PLAYER_SKILL_SCORE;
+  return Number.isFinite(v) ? (v as number) : DEFAULT_PLAYER_SKILL_SCORE;
+}
+
+function clampSkillScoreWrite(n: number): number {
+  return Math.max(0, Math.min(SKILL_SCORE_SOFT_CAP, n));
 }
 
 function skillScoreAfterWin(selfBefore: number, opponentSkill: number): number {
@@ -4096,6 +4101,17 @@ async function runWinLossStatsForChallenge(
     const rawLoserName = loserWallet === data.creator ? data.creatorTag : undefined;
     const winnerDisplayName = sanitizeDisplayName(rawWinnerName);
     const loserDisplayName = sanitizeDisplayName(rawLoserName);
+    const winnerRef = doc(db, 'player_stats', winnerWallet);
+    const loserRef = doc(db, 'player_stats', loserWallet);
+    const [winnerSnapPre, loserSnapPre] = await Promise.all([getDoc(winnerRef), getDoc(loserRef)]);
+    let winnerSkill = skillScoreFromStored(
+      winnerSnapPre.exists() ? (winnerSnapPre.data() as PlayerStats) : null
+    );
+    let loserSkill = skillScoreFromStored(
+      loserSnapPre.exists() ? (loserSnapPre.data() as PlayerStats) : null
+    );
+    if (!Number.isFinite(winnerSkill)) winnerSkill = DEFAULT_PLAYER_SKILL_SCORE;
+    if (!Number.isFinite(loserSkill)) loserSkill = DEFAULT_PLAYER_SKILL_SCORE;
     const wOk = await updatePlayerStats(
       winnerWallet,
       'win',
@@ -4103,7 +4119,7 @@ async function runWinLossStatsForChallenge(
       game,
       category,
       winnerDisplayName,
-      { resolutionType }
+      { resolutionType, opponentSkillScore: loserSkill }
     );
     const lOk = await updatePlayerStats(
       loserWallet,
@@ -4112,7 +4128,7 @@ async function runWinLossStatsForChallenge(
       game,
       category,
       loserDisplayName,
-      { resolutionType }
+      { resolutionType, opponentSkillScore: winnerSkill }
     );
     return wOk && lOk;
   } catch (e) {
@@ -4186,7 +4202,7 @@ async function updatePlayerStats(
       const s = playerSnap.exists() ? (playerSnap.data() as PlayerStats) : null;
       const baseT = s ? ((s.behaviorTrustScore ?? s.trustScore) || 5) : 5;
       const newBehaviorTrust = Math.max(0, baseT - 1);
-      const skillAfterForfeit = Math.max(0, skillScoreFromStored(s) - 10);
+      const skillAfterForfeit = clampSkillScoreWrite(skillScoreFromStored(s) - 10);
       if (!playerSnap.exists()) {
         const docPayload: Record<string, unknown> = {
           wallet,
@@ -4237,6 +4253,17 @@ async function updatePlayerStats(
       behaviorTrustScore = Math.max(0, behaviorTrustScore - 0.1);
     }
 
+    const playerSkill = skillScoreFromStored(s0);
+    const rawOpp = opts?.opponentSkillScore;
+    const opponentSkill = Number.isFinite(rawOpp) ? (rawOpp as number) : playerSkill;
+    let newSkill = playerSkill;
+    if (result === 'win') {
+      newSkill = skillScoreAfterWin(playerSkill, opponentSkill);
+    } else if (result === 'loss') {
+      newSkill = skillScoreAfterLoss(playerSkill, opponentSkill);
+    }
+    const skillWrite = clampSkillScoreWrite(newSkill);
+
     if (!playerSnap.exists()) {
       const newStats: Record<string, unknown> = {
         wallet,
@@ -4248,6 +4275,7 @@ async function updatePlayerStats(
         lastActive: Timestamp.now(),
         behaviorTrustScore,
         trustReviews,
+        skillScore: skillWrite,
         ogFirst1k: false,
         gameStats: {
           [game]: {
@@ -4313,6 +4341,7 @@ async function updatePlayerStats(
       lastActive: Timestamp.now(),
       behaviorTrustScore,
       trustReviews,
+      skillScore: skillWrite,
       gameStats,
       categoryStats,
     };

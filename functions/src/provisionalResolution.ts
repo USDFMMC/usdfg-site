@@ -1,7 +1,7 @@
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { FieldValue, getFirestore, Timestamp, type DocumentReference, type Firestore } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
-import { updatePlayerStatsAdmin, updateTeamStatsAdmin } from "./statsAdmin";
+import { fetchSoloMatchSkillScores, updatePlayerStatsAdmin, updateTeamStatsAdmin } from "./statsAdmin";
 
 function normalizeWinnerWallet(w: string): string {
   if (w === "forfeit" || w === "tie" || w === "cancelled") return w;
@@ -44,10 +44,19 @@ async function applyClearWinnerStats(
     await updateTeamStatsAdmin(db, winnerWallet, "win", prizePool, game, category);
     await updateTeamStatsAdmin(db, loserWallet, "loss", 0, game, category);
   } else {
+    const { skillA: winnerSkill, skillB: loserSkill } = await fetchSoloMatchSkillScores(
+      db,
+      winnerWallet,
+      loserWallet
+    );
     await updatePlayerStatsAdmin(db, winnerWallet, "win", prizePool, game, category, {
       resolutionType: "auto",
+      opponentSkillScore: loserSkill,
     });
-    await updatePlayerStatsAdmin(db, loserWallet, "loss", 0, game, category, { resolutionType: "auto" });
+    await updatePlayerStatsAdmin(db, loserWallet, "loss", 0, game, category, {
+      resolutionType: "auto",
+      opponentSkillScore: winnerSkill,
+    });
   }
 }
 

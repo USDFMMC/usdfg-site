@@ -627,6 +627,15 @@ export default function PlayerProfileModal({
           )}
           <p className="text-xs text-zinc-400">{player.wallet?.slice(0, 8)}...{player.wallet?.slice(-4)} • {rankTitle}</p>
           <TrustBadge score={Number.isFinite(integrity) ? integrity : 5} className="mt-1" />
+          <p className="text-xs text-zinc-500 mt-1">
+            Skill:{' '}
+            {Number.isFinite((player as { skillScore?: number }).skillScore)
+              ? (player as { skillScore?: number }).skillScore
+              : 100}
+          </p>
+          <span className="text-xs text-gray-400 mt-0.5 block text-center max-w-md mx-auto px-2">
+            Skill reflects match performance over time
+          </span>
           
           {/* Country Flag */}
           {isCurrentUser ? (

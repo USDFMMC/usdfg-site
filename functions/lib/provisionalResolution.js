@@ -69,10 +69,15 @@ async function applyClearWinnerStats(db, data, winnerWallet, loserWallet) {
         await (0, statsAdmin_1.updateTeamStatsAdmin)(db, loserWallet, "loss", 0, game, category);
     }
     else {
+        const { skillA: winnerSkill, skillB: loserSkill } = await (0, statsAdmin_1.fetchSoloMatchSkillScores)(db, winnerWallet, loserWallet);
         await (0, statsAdmin_1.updatePlayerStatsAdmin)(db, winnerWallet, "win", prizePool, game, category, {
             resolutionType: "auto",
+            opponentSkillScore: loserSkill,
         });
-        await (0, statsAdmin_1.updatePlayerStatsAdmin)(db, loserWallet, "loss", 0, game, category, { resolutionType: "auto" });
+        await (0, statsAdmin_1.updatePlayerStatsAdmin)(db, loserWallet, "loss", 0, game, category, {
+            resolutionType: "auto",
+            opponentSkillScore: winnerSkill,
+        });
     }
 }
 async function processOneChallenge(ref) {
