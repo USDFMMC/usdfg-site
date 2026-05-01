@@ -6041,6 +6041,7 @@ export async function claimChallengePrize(
     ensureWinnerInRoster(data);
 
     const STALE_MS = 2 * 60 * 1000;
+    const FORCE_STALE_MS = 5 * 60 * 1000;
     if (
       data.payoutStatus === 'processing' &&
       !data.payoutSignature &&
@@ -6104,25 +6105,54 @@ export async function claimChallengePrize(
       }
       const d = snap.data() as ChallengeData;
 
-      if (d.payoutSignature || d.payoutStatus === 'paid') {
+      const hasSig =
+        d.payoutSignature != null && String(d.payoutSignature).trim() !== '';
+
+      if (hasSig) {
+        console.log('✅ Payout already completed (signature present)');
+        if (d.payoutStatus !== 'paid') {
+          tx.update(challengeRef, {
+            payoutStatus: 'paid',
+          });
+        }
         return 'done' as const;
       }
 
-      const isStaleProcessing =
+      if (d.payoutStatus === 'paid') {
+        return 'done' as const;
+      }
+
+      const ageMs = d.payoutAttemptedAt
+        ? Date.now() - d.payoutAttemptedAt.toMillis()
+        : 0;
+
+      const isStaleOwnOrNoOwner =
         d.payoutStatus === 'processing' &&
-        !d.payoutSignature &&
+        !hasSig &&
         d.payoutAttemptedAt &&
-        Date.now() - d.payoutAttemptedAt.toMillis() > STALE_MS &&
+        ageMs > STALE_MS &&
         (!d.payoutLockOwner || d.payoutLockOwner === callerLockId);
 
-      if (isStaleProcessing) {
-        console.log('⚠️ Resetting stale payout lock');
+      const isForceStaleForeign =
+        d.payoutStatus === 'processing' &&
+        !hasSig &&
+        d.payoutAttemptedAt &&
+        ageMs > FORCE_STALE_MS &&
+        !!d.payoutLockOwner &&
+        d.payoutLockOwner !== callerLockId;
+
+      if (isStaleOwnOrNoOwner || isForceStaleForeign) {
+        console.log(
+          isForceStaleForeign && !isStaleOwnOrNoOwner
+            ? '⚠️ Resetting stale foreign payout lock (extended timeout)'
+            : '⚠️ Resetting stale payout lock'
+        );
         tx.update(challengeRef, {
           payoutStatus: 'pending',
           payoutLockOwner: deleteField(),
           payoutAttemptedAt: deleteField(),
         });
-      } else if (d.payoutStatus === 'processing' && !d.payoutSignature) {
+      } else if (d.payoutStatus === 'processing' && !hasSig) {
         return 'in_flight' as const;
       }
 
