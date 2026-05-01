@@ -5,27 +5,82 @@ function normalizeWinnerWallet(w: string): string {
   return w.toLowerCase();
 }
 
+export type StatsAdminResult = "win" | "loss" | "forfeit";
+
+export type StatsAdminOpts = {
+  resolutionType?: "auto" | "admin" | "forfeit";
+};
+
+function behaviorTrustBaseFromSnap(data: Record<string, unknown> | undefined): number {
+  if (!data) return 5;
+  const bt = data.behaviorTrustScore as number | undefined;
+  const ts = data.trustScore as number | undefined;
+  const base = bt ?? ts ?? 5;
+  return base || 5;
+}
+
 export async function updatePlayerStatsAdmin(
   db: Firestore,
   wallet: string,
-  result: "win" | "loss",
+  result: StatsAdminResult,
   amountEarned: number,
   game: string,
-  category: string
+  category: string,
+  opts?: StatsAdminOpts
 ): Promise<void> {
   const key = wallet.toLowerCase();
   const playerRef = db.collection("player_stats").doc(key);
   const playerSnap = await playerRef.get();
 
-  const trustScore = playerSnap.exists
-    ? ((playerSnap.data()?.trustScore as number) ?? 0)
-    : 0;
-  const trustReviews = playerSnap.exists
-    ? ((playerSnap.data()?.trustReviews as number) ?? 0)
-    : 0;
+  const resolutionType = opts?.resolutionType;
+
+  const trustReviews = playerSnap.exists ? ((playerSnap.data()?.trustReviews as number) ?? 0) : 0;
+
+  if (result === "forfeit") {
+    const baseT = playerSnap.exists ? behaviorTrustBaseFromSnap(playerSnap.data() as Record<string, unknown>) : 5;
+    const newBehavior = Math.max(0, baseT - 1);
+    if (!playerSnap.exists) {
+      await playerRef.set({
+        wallet: key,
+        wins: 0,
+        losses: 0,
+        winRate: 0,
+        totalEarned: 0,
+        gamesPlayed: 0,
+        lastActive: Timestamp.now(),
+        behaviorTrustScore: newBehavior,
+        trustReviews,
+        forfeits: 1,
+        ogFirst1k: false,
+        gameStats: {},
+        categoryStats: {},
+      });
+      return;
+    }
+    const currentStats = playerSnap.data() as Record<string, unknown>;
+    await playerRef.update({
+      forfeits: ((currentStats.forfeits as number) || 0) + 1,
+      behaviorTrustScore: newBehavior,
+      trustReviews,
+      lastActive: Timestamp.now(),
+    });
+    return;
+  }
+
+  const behaviorBefore = playerSnap.exists ? behaviorTrustBaseFromSnap(playerSnap.data() as Record<string, unknown>) : 5;
+  let behaviorTrustScore = behaviorBefore;
+  if (result === "win" && resolutionType === "admin") {
+    behaviorTrustScore = Math.min(10, behaviorTrustScore + 0.5);
+  } else if (result === "win") {
+    behaviorTrustScore = Math.min(10, behaviorTrustScore + 0.2);
+  } else if (result === "loss" && resolutionType === "admin") {
+    behaviorTrustScore = Math.max(0, behaviorTrustScore - 0.7);
+  } else if (result === "loss") {
+    behaviorTrustScore = Math.max(0, behaviorTrustScore - 0.1);
+  }
 
   if (!playerSnap.exists) {
-    await playerRef.set({
+    const docData: Record<string, unknown> = {
       wallet: key,
       wins: result === "win" ? 1 : 0,
       losses: result === "loss" ? 1 : 0,
@@ -33,7 +88,7 @@ export async function updatePlayerStatsAdmin(
       totalEarned: amountEarned,
       gamesPlayed: 1,
       lastActive: Timestamp.now(),
-      trustScore,
+      behaviorTrustScore,
       trustReviews,
       ogFirst1k: false,
       gameStats: {
@@ -50,7 +105,16 @@ export async function updatePlayerStatsAdmin(
           earned: amountEarned,
         },
       },
-    });
+    };
+    if (result === "win" && resolutionType === "admin") {
+      docData.disputesWon = 1;
+    } else if (result === "win") {
+      docData.cleanWins = 1;
+    }
+    if (result === "loss" && resolutionType === "admin") {
+      docData.disputesLost = 1;
+    }
+    await playerRef.set(docData);
     return;
   }
 
@@ -82,24 +146,35 @@ export async function updatePlayerStatsAdmin(
   categoryStats[category].losses += result === "loss" ? 1 : 0;
   categoryStats[category].earned += amountEarned;
 
-  await playerRef.update({
+  const updatePayload: Record<string, unknown> = {
     wins,
     losses,
     winRate: Math.round(winRate * 10) / 10,
     totalEarned: (currentStats.totalEarned as number) + amountEarned,
     gamesPlayed,
     lastActive: Timestamp.now(),
-    trustScore,
+    behaviorTrustScore,
     trustReviews,
     gameStats,
     categoryStats,
-  });
+  };
+
+  if (result === "win" && resolutionType === "admin") {
+    updatePayload.disputesWon = ((currentStats.disputesWon as number) || 0) + 1;
+  } else if (result === "win") {
+    updatePayload.cleanWins = ((currentStats.cleanWins as number) || 0) + 1;
+  }
+  if (result === "loss" && resolutionType === "admin") {
+    updatePayload.disputesLost = ((currentStats.disputesLost as number) || 0) + 1;
+  }
+
+  await playerRef.update(updatePayload);
 }
 
 export async function updateTeamStatsAdmin(
   db: Firestore,
   teamId: string,
-  result: "win" | "loss",
+  result: "win" | "loss" | "forfeit",
   amountEarned: number,
   game: string,
   category: string
@@ -110,6 +185,18 @@ export async function updateTeamStatsAdmin(
     throw new Error("Team not found");
   }
   const currentStats = teamSnap.data() as Record<string, unknown>;
+
+  if (result === "forfeit") {
+    const base = behaviorTrustBaseFromSnap(currentStats);
+    const newBehavior = Math.max(0, base - 1);
+    await teamRef.update({
+      forfeits: ((currentStats.forfeits as number) || 0) + 1,
+      behaviorTrustScore: newBehavior,
+      lastActive: Timestamp.now(),
+    });
+    return;
+  }
+
   const newWins = result === "win" ? (currentStats.wins as number) + 1 : (currentStats.wins as number);
   const newLosses =
     result === "loss" ? (currentStats.losses as number) + 1 : (currentStats.losses as number);
@@ -156,6 +243,9 @@ export async function applyStatsAfterDisputeResolution(
   challengeData: Record<string, unknown>,
   winnerWalletRaw: string
 ): Promise<void> {
+  if (challengeData.statsApplied === true) {
+    return;
+  }
   const db = getFirestore();
   const winnerWallet = normalizeWinnerWallet(winnerWalletRaw);
   const players = (challengeData.players as string[]) || [];
@@ -174,7 +264,9 @@ export async function applyStatsAfterDisputeResolution(
     await updateTeamStatsAdmin(db, winnerWallet, "win", prizePool, game, category);
     await updateTeamStatsAdmin(db, loser, "loss", 0, game, category);
   } else {
-    await updatePlayerStatsAdmin(db, winnerWallet, "win", prizePool, game, category);
-    await updatePlayerStatsAdmin(db, loser, "loss", 0, game, category);
+    await updatePlayerStatsAdmin(db, winnerWallet, "win", prizePool, game, category, {
+      resolutionType: "admin",
+    });
+    await updatePlayerStatsAdmin(db, loser, "loss", 0, game, category, { resolutionType: "admin" });
   }
 }

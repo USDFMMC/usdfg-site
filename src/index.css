@@ -49,7 +49,44 @@
   }
 }
 
+@layer components {
+  .trust-badge {
+    @apply inline-flex items-center rounded-md px-1.5 py-0.5 uppercase tracking-wide;
+    @apply bg-purple-500/20 border border-purple-500/35;
+    font-weight: 600;
+    font-size: 0.75rem;
+    margin-left: 6px;
+    opacity: 0.9;
+  }
+
+  .trust-elite {
+    color: #22c55e;
+  }
+  .trust-trusted {
+    color: #3b82f6;
+  }
+  .trust-neutral {
+    color: #f59e0b;
+  }
+  .trust-risky {
+    color: #ef4444;
+  }
+}
+
 @layer utilities {
+  @keyframes trust-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .animate-fade-in {
+    animation: trust-fade-in 0.35s ease-out;
+  }
+
   .text-gradient {
     @apply bg-clip-text text-transparent;
     background-image: linear-gradient(135deg, #7e43ff 0%, #ff7e3e 100%);

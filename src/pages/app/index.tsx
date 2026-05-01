@@ -63,6 +63,7 @@ import {
   testFirestoreConnection,
   isParticipantWallet,
   walletsEqual,
+  computeDisplayTrustScore,
 } from "@/lib/firebase/firestore";
 import { Timestamp } from "firebase/firestore";
 import { useConnection } from '@solana/wallet-adapter-react';
@@ -77,6 +78,7 @@ import {
   setPhantomConnectionState as persistPhantomConnectionState,
   clearPhantomConnectionState,
 } from "@/lib/utils/wallet-state";
+import { TrustBadge } from "@/lib/utils/trustDisplay";
 import { extractGameFromTitle, getGameCategory, getGameImage, isChallengeCustomGame, resolveGameName } from "@/lib/gameAssets";
 import { runCreateChallengeFlow } from "@/lib/challenges/createChallengeFlow";
 import { 
@@ -246,6 +248,7 @@ function minimalPlayerStatsForWallet(wallet: string): PlayerStats {
     lastActive: Timestamp.now(),
     trustScore: 0,
     trustReviews: 0,
+    displayTrustScore: 5,
     gameStats: {},
     categoryStats: {},
   };
@@ -640,6 +643,78 @@ const ArenaHome: React.FC = () => {
 
   // Use Firestore real-time challenges (must be before any useEffect that uses firestoreChallenges)
   const { challenges: firestoreChallenges, loading: challengesLoading, error: challengesError } = useChallenges();
+
+  const [creatorClientStatsMap, setCreatorClientStatsMap] = useState<
+    Record<string, { displayTrustScore: number; disputesWon: number; disputesLost: number }>
+  >({});
+  const creatorDisplayTrustStickyRef = useRef<Record<string, number>>({});
+  const [currentUserDisplayTrust, setCurrentUserDisplayTrust] = useState(5);
+
+  useEffect(() => {
+    let cancelled = false;
+    const creators = [
+      ...new Set(
+        firestoreChallenges
+          .map((c) => ((c as { creator?: string }).creator || "").toLowerCase())
+          .filter(Boolean)
+      ),
+    ];
+    if (creators.length === 0) {
+      setCreatorClientStatsMap({});
+      return;
+    }
+    void (async () => {
+      const entries = await Promise.all(
+        creators.map(async (w) => {
+          try {
+            const s = await getPlayerStats(w);
+            return [
+              w,
+              {
+                displayTrustScore: s?.displayTrustScore ?? 5,
+                disputesWon: s?.disputesWon ?? 0,
+                disputesLost: s?.disputesLost ?? 0,
+              },
+            ] as const;
+          } catch {
+            return [
+              w,
+              { displayTrustScore: 5, disputesWon: 0, disputesLost: 0 },
+            ] as const;
+          }
+        })
+      );
+      if (!cancelled) {
+        setCreatorClientStatsMap((prev) => {
+          if (creators.length === 0) return {};
+          const next = { ...prev };
+          for (const [w, val] of entries) {
+            next[w] = val;
+          }
+          return next;
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [firestoreChallenges]);
+
+  useEffect(() => {
+    const w = effectivePublicKey?.toString();
+    if (!w) {
+      setCurrentUserDisplayTrust(5);
+      return;
+    }
+    let c = false;
+    void getPlayerStats(w).then((s) => {
+      if (c) return;
+      setCurrentUserDisplayTrust(s?.displayTrustScore ?? 5);
+    });
+    return () => {
+      c = true;
+    };
+  }, [effectivePublicKey]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -1885,7 +1960,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   }, [firestoreChallenges, publicKey, showSubmitResultModal, showTrustReview, showStandardLobby, showTournamentLobby, selectedChallenge?.id, isConnected]);
   
   // Convert Firestore challenges to the format expected by the UI
-  const challenges = firestoreChallenges.map(challenge => {
+  const challenges = useMemo(() => firestoreChallenges.map(challenge => {
     // Generate values from stored data (mode, platform, etc. were removed to keep data light)
     // Cast to any to access optional fields that may be stored but aren't in type definition
     const challengeAny = challenge as any;
@@ -1929,6 +2004,20 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     if (pendingJoinerWallet) participantSet.add(pendingJoinerWallet.toLowerCase());
     playersArr.forEach((p: string) => p && participantSet.add(p.toLowerCase()));
     const currentPlayers = Math.min(participantSet.size || 1, maxPlayers);
+    const creatorLc = ((creatorWallet as string) || "").toLowerCase();
+    const creatorStats = creatorClientStatsMap[creatorLc];
+    const existingSticky = creatorDisplayTrustStickyRef.current[creatorLc];
+    const creatorDisplayTrust =
+      creatorStats?.displayTrustScore ?? existingSticky ?? 5;
+    if (creatorStats?.displayTrustScore != null) {
+      creatorDisplayTrustStickyRef.current[creatorLc] = creatorStats.displayTrustScore;
+      const MAX_CACHE = 200;
+      if (Object.keys(creatorDisplayTrustStickyRef.current).length > MAX_CACHE) {
+        creatorDisplayTrustStickyRef.current = {};
+      }
+    }
+    const creatorDisputesWon = Number(creatorStats?.disputesWon) || 0;
+    const creatorDisputesLost = Number(creatorStats?.disputesLost) || 0;
 
     return {
       id: challenge.id,
@@ -1955,9 +2044,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       timestamp: challenge.createdAt?.toDate?.()?.getTime() || Date.now(),
       expiresAt: challenge.expiresAt?.toDate?.()?.getTime() || (Date.now() + (2 * 60 * 60 * 1000)),
       status: challenge.status,
+      creatorDisplayTrust,
+      creatorDisputesWon,
+      creatorDisputesLost,
       rawData: challenge // Keep original Firestore data for player checks and results
     };
-  });
+  }), [firestoreChallenges, creatorClientStatsMap]);
   
   // Log errors only
   if (challengesError) {
@@ -2048,6 +2140,19 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   const handleCreateChallenge = async (challengeData: any) => {
     if (isCreatingChallenge) {
       return;
+    }
+
+    const creatorWalletAddr = publicKey?.toString();
+    if (creatorWalletAddr) {
+      try {
+        const creatorStats = await getPlayerStats(creatorWalletAddr);
+        if ((creatorStats?.forfeits || 0) > 5) {
+          showAppToast("Too many forfeits to create challenges", "error", "Cannot create");
+          return;
+        }
+      } catch (e) {
+        console.warn("Could not verify forfeits before create:", e);
+      }
     }
 
     setIsCreatingChallenge(true);
@@ -2395,6 +2500,24 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const initialized = await ensureUsdfgTokenAccount(walletAddr);
       if (!initialized) {
         return;
+      }
+    }
+
+    if (creatorWallet) {
+      try {
+        const [joinerStats, creatorStatsJoin] = await Promise.all([
+          getPlayerStats(walletAddr),
+          getPlayerStats(creatorWallet),
+        ]);
+        const userTrust = joinerStats?.displayTrustScore ?? 5;
+        const creatorTrust =
+          challenge.creatorDisplayTrust ?? creatorStatsJoin?.displayTrustScore ?? 5;
+        if (userTrust < 3 && creatorTrust > 6) {
+          showAppToast("Trust level too low for this challenge", "error", "Cannot join");
+          return;
+        }
+      } catch (e) {
+        console.warn("Trust check before join failed:", e);
       }
     }
     
@@ -4033,6 +4156,72 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   const getGameImageMemo = useCallback((game: string) => getGameImage(game), []);
   const extractGameFromTitleMemo = useCallback((title: string) => extractGameFromTitle(title), []);
 
+  const { visibleChallenges, trustBrowseUsedFallback } = useMemo(() => {
+    let trustBrowseUsedFallback = false;
+    let base: typeof challenges;
+    if (showMyChallenges || !publicKey) {
+      base = challenges;
+    } else {
+      const userTrust = currentUserDisplayTrust ?? 5;
+      let narrowed = challenges.filter((c) => {
+        const creatorTrust = c.creatorDisplayTrust ?? 5;
+        return Math.abs(creatorTrust - userTrust) <= 3.5;
+      });
+      const usedFallback = narrowed.length < 3;
+      if (usedFallback) {
+        trustBrowseUsedFallback = true;
+        narrowed = challenges;
+      }
+      base = narrowed;
+    }
+
+    const userTrust = currentUserDisplayTrust ?? 5;
+    function getTime(c: (typeof challenges)[number] | any) {
+      const ts = c.timestamp;
+      const fromTs =
+        (typeof ts === "number" && Number.isFinite(ts) ? ts : ts?.toMillis?.()) ?? 0;
+      return (
+        fromTs ||
+        c.rawData?.createdAt?.toMillis?.() ||
+        c.rawData?.createdAt?.toDate?.()?.getTime?.() ||
+        0
+      );
+    }
+
+    let orderedWithIdx = base.map((c, i) => ({
+      ...c,
+      __idx: i,
+    }));
+
+    orderedWithIdx = [...orderedWithIdx].sort((a, b) => {
+      const aTrust = a.creatorDisplayTrust ?? 5;
+      const bTrust = b.creatorDisplayTrust ?? 5;
+
+      const aWon = Number(a.creatorDisputesWon) || 0;
+      const aLost = Number(a.creatorDisputesLost) || 0;
+      const bWon = Number(b.creatorDisputesWon) || 0;
+      const bLost = Number(b.creatorDisputesLost) || 0;
+
+      const aPenalty = aLost > aWon * 2 ? 1 : 0;
+      const bPenalty = bLost > bWon * 2 ? 1 : 0;
+
+      if (aPenalty !== bPenalty) return aPenalty - bPenalty;
+
+      const aDiff = Math.abs(aTrust - userTrust);
+      const bDiff = Math.abs(bTrust - userTrust);
+      if (aDiff !== bDiff) return aDiff - bDiff;
+
+      const timeDiff = getTime(b) - getTime(a);
+      if (timeDiff !== 0) return timeDiff;
+
+      return a.__idx - b.__idx;
+    });
+
+    const visibleChallenges = orderedWithIdx.map(({ __idx: _i, ...rest }) => rest);
+
+    return { visibleChallenges, trustBrowseUsedFallback };
+  }, [challenges, currentUserDisplayTrust, showMyChallenges, publicKey]);
+
   // Memoize filtered challenges to prevent unnecessary re-renders
   // Wrapped in try/catch so malformed challenge data (e.g. players not an array) never crashes the page for any wallet
   const filteredChallenges = useMemo(() => {
@@ -4051,7 +4240,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       return isParticipantWallet(getPlayerList(c), wallet);
     };
 
-    return challenges.filter(challenge => {
+    return visibleChallenges.filter(challenge => {
       try {
       // Filter by category
       const categoryMatch = filterCategory === 'All' || challenge.category === filterCategory;
@@ -4136,6 +4325,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         (walletsEqual(creatorWallet, connectedWallet) ||
           walletsEqual(challenge.challenger ?? challenge.rawData?.challenger, connectedWallet) ||
           playerListIncludes(challenge, connectedWallet));
+
       const participantSeesCompleted = isParticipant && isCompleted && categoryMatch && gameMatch;
       
       // If user is participant in ACTIVE or creator_funded challenge, ALWAYS show it (so they can find their in-progress match)
@@ -4155,7 +4345,24 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         return false;
       }
     });
-  }, [challenges, filterCategory, filterGame, showMyChallenges, publicKey]);
+  }, [visibleChallenges, filterCategory, filterGame, showMyChallenges, publicKey]);
+
+  const rankedSoloLeaderboard = useMemo(() => {
+    return topPlayers
+      .map((player) => {
+        const trust = player.displayTrustScore ?? 5;
+        const penalty =
+          (player.disputesLost || 0) > (player.disputesWon || 0) * 2 ? 50 : 0;
+        const leaderboardScore =
+          player.wins * 10 +
+          (player.totalEarned || 0) * 0.001 +
+          trust * 20 -
+          ((player.forfeits || 0) * 15) -
+          penalty;
+        return { ...player, leaderboardScore };
+      })
+      .sort((a, b) => b.leaderboardScore - a.leaderboardScore);
+  }, [topPlayers]);
 
   /** Build payout recipients for a Founder Tournament (same logic as TournamentBracketView). */
   const getFounderTournamentRecipients = useCallback((challenge: any): { wallet: string; amount: number }[] => {
@@ -5563,6 +5770,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               <p className="text-sm text-white/50 leading-relaxed text-center md:text-left max-w-2xl mx-auto md:mx-0">
                 Browse by category. Swipe horizontally within each row to see more cards.
               </p>
+              {trustBrowseUsedFallback && (
+                <div className="animate-fade-in">
+                  <div className="text-xs text-gray-500 text-center mb-2">
+                    Showing broader results to find more matches
+                  </div>
+                </div>
+              )}
             </div>
                 
             {/* Helper function to map challenge categories to discovery categories */}
@@ -5717,6 +5931,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 const isLive = status === "active" || status === "creator_funded";
                 const isFull = challenge.players >= challenge.capacity;
 
+                const creatorDisputesWon = Number(challenge.creatorDisputesWon) || 0;
+                const creatorDisputesLost = Number(challenge.creatorDisputesLost) || 0;
+                const isPenalized = creatorDisputesLost > creatorDisputesWon * 2;
+
                 const edgeGlow = isOpen
                   ? 'border-emerald-400/40 shadow-[0_0_10px_rgba(16,185,129,0.22)] ring-1 ring-emerald-400/15'
                   : isLive
@@ -5724,6 +5942,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     : 'border-white/10';
 
                 return (
+                  <div className={isPenalized ? "opacity-70 hover:opacity-100 transition" : ""}>
                   <div className="relative">
                     <div
                       role="button"
@@ -5860,9 +6079,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           </div>
 
                       <div className="flex items-center justify-between gap-2 text-[11px] text-white/80 mt-1.5">
-                        <div className="min-w-0 truncate flex-1">
-                          <span className="text-white/60">👤 </span>
-                          <span className="font-semibold">{challenge.username || challenge.creator?.slice(0, 8) + '...'}</span>
+                        <div className="min-w-0 flex-1 flex items-center gap-1.5">
+                          <span className="text-white/60 shrink-0">👤 </span>
+                          <span className="font-semibold truncate">{challenge.username || challenge.creator?.slice(0, 8) + '...'}</span>
+                          {!isOwner && (
+                            <TrustBadge score={challenge.creatorDisplayTrust ?? 5} compact className="shrink-0" />
+                          )}
                         </div>
                         <div className="shrink-0 flex items-center gap-1">
                           <span className="text-white/60">{platformIconLocal(challenge.platform)}</span>
@@ -5872,12 +6094,20 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                   </div>
                                 </div>
                               </div>
+                  </div>
                             );
               };
 
               // Render Founder Payout row for admin (so completed Founder Tournament is always clickable)
               return (
                 <>
+                  {visibleChallenges.length === challenges.length &&
+                    filteredChallenges.length === 0 &&
+                    !challengesLoading && (
+                      <div className="text-center text-gray-400 py-8">
+                        No challenges available right now.
+                      </div>
+                    )}
                   {completedFounderNeedingPayout.length > 0 && (
                     <section className="mb-6">
                       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-0 md:px-0">
@@ -6361,14 +6591,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                         return countryFlags[countryCode.toUpperCase()] || '🌍';
                       };
                       
-                      // Transform live data from topPlayers
-                      const transformedPlayers = topPlayers.map((player, index) => {
+                      // Rank by composite leaderboard score (trust, wins, earnings, forfeits, dispute visibility)
+                      const transformedPlayers = rankedSoloLeaderboard.map((player, index) => {
                         // Get country code from Firestore first (shared across all users), then fallback to localStorage
                         const playerCountryCode = player.country || getWalletScopedValue(PROFILE_STORAGE_KEYS.country, player.wallet);
                         const countryFlag = getCountryFlag(playerCountryCode);
                         
-                        // Get trust score - ensure it's a number and defaults to 0 if undefined
-                        const trustScore = typeof player.trustScore === 'number' ? player.trustScore : 0;
+                        const displayTrust =
+                          player.displayTrustScore ?? computeDisplayTrustScore(player);
                         
                         // Removed excessive logging - only log on initial load if needed for debugging
                         
@@ -6376,16 +6606,17 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           rank: index + 1,
                           name: (player.displayName && player.displayName.trim()) ? player.displayName : `${player.wallet.slice(0, 6)}...${player.wallet.slice(-4)}`,
                           country: countryFlag, // Use player's actual country flag
-                          trust: trustScore,
+                          trust: displayTrust,
                           wins: player.wins,
                           losses: player.losses,
                           winRate: player.winRate || 0, // Win rate percentage
                           streak: 0, // We don't track streak yet
-                          integrity: trustScore, // Use trustScore for integrity display
+                          integrity: displayTrust,
                           wallet: player.wallet,
                           gamesPlayed: player.gamesPlayed,
                           profileImage: player.profileImage || getWalletScopedValue(PROFILE_STORAGE_KEYS.profileImage, player.wallet), // Use Firestore image first, fallback to localStorage
-                          playerStats: player // Store full PlayerStats for modal
+                          playerStats: player, // Store full PlayerStats for modal
+                          displayTrustScore: player.displayTrustScore,
                         };
                       });
                       
@@ -6410,7 +6641,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
                       return filteredPlayers.map((player) => (
                       <div
-                        key={player.rank}
+                        key={player.wallet}
                         className={`flex flex-col sm:flex-row items-stretch sm:items-center justify-between px-4 sm:px-6 py-3 sm:py-4 hover:bg-white/[0.04] transition cursor-pointer relative group ${
                           player.rank <= 3 ? "bg-gradient-to-r from-purple/[0.08] to-transparent" : ""
                         }`}
@@ -6487,8 +6718,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 text-base sm:text-lg font-display font-semibold text-white">
+                            <div className="flex items-center gap-2 text-base sm:text-lg font-display font-semibold text-white flex-wrap">
                               <span className="truncate">{player.name}</span> <span className="shrink-0">{player.country}</span>
+                              {player.displayTrustScore != null && (
+                                <TrustBadge score={player.displayTrustScore} compact className="shrink-0" />
+                              )}
                               {player.rank === 1 && <Crown className="h-4 w-4 text-orange shrink-0" aria-hidden />}
                             </div>
                             <div className="font-body text-xs text-white/45 mt-0.5">Integrity {player.integrity.toFixed(1)}/10 • Streak {player.streak}</div>
@@ -6945,6 +7179,25 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                       }
                       const currentChallenge = selectedChallenge?.rawData || selectedChallenge;
                       const creatorWallet = currentChallenge?.creator || '';
+                      if (creatorWallet) {
+                        try {
+                          const [joinerStats, creatorStatsJoin] = await Promise.all([
+                            getPlayerStats(publicKey.toString()),
+                            getPlayerStats(creatorWallet),
+                          ]);
+                          const userTrust = joinerStats?.displayTrustScore ?? 5;
+                          const creatorTrust =
+                            (selectedChallenge as { creatorDisplayTrust?: number })?.creatorDisplayTrust ??
+                            creatorStatsJoin?.displayTrustScore ??
+                            5;
+                          if (userTrust < 3 && creatorTrust > 6) {
+                            showAppToast("Trust level too low for this challenge", "error", "Cannot join");
+                            return;
+                          }
+                        } catch (e) {
+                          console.warn("Trust check before tournament join failed:", e);
+                        }
+                      }
                       const entryFeeValue = Number(currentChallenge?.entryFee ?? 0);
                       const founderParticipantReward = Number(currentChallenge?.founderParticipantReward ?? 0);
                       const founderWinnerBonus = Number(currentChallenge?.founderWinnerBonus ?? 0);

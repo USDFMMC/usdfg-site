@@ -36,6 +36,7 @@ exports.finalizeAdminChallengeDispute = (0, https_1.onCall)(async (request) => {
     await challengeRef.update({
         status: "completed",
         winner: normalizeWinnerWallet(winnerWalletRaw),
+        resolutionType: "admin",
         resolvedBy: adminWallet,
         resolvedAt: firestore_1.Timestamp.now(),
         adminResolutionTx: onChainTx,
@@ -56,7 +57,12 @@ exports.finalizeAdminChallengeDispute = (0, https_1.onCall)(async (request) => {
     });
     await (0, adminHelpers_1.writeAdminLog)("resolve_dispute", adminWallet, challengeId);
     try {
-        await (0, statsAdmin_1.applyStatsAfterDisputeResolution)(challengeData, winnerWalletRaw);
+        const afterSnap = await challengeRef.get();
+        const afterData = afterSnap.data();
+        if (afterData?.statsApplied !== true) {
+            await (0, statsAdmin_1.applyStatsAfterDisputeResolution)(challengeData, winnerWalletRaw);
+            await challengeRef.update({ statsApplied: true });
+        }
     }
     catch (e) {
         console.error("Stats update failed (non-fatal):", e);

@@ -9,18 +9,66 @@ function normalizeWinnerWallet(w) {
         return w;
     return w.toLowerCase();
 }
-async function updatePlayerStatsAdmin(db, wallet, result, amountEarned, game, category) {
+function behaviorTrustBaseFromSnap(data) {
+    if (!data)
+        return 5;
+    const bt = data.behaviorTrustScore;
+    const ts = data.trustScore;
+    const base = bt ?? ts ?? 5;
+    return base || 5;
+}
+async function updatePlayerStatsAdmin(db, wallet, result, amountEarned, game, category, opts) {
     const key = wallet.toLowerCase();
     const playerRef = db.collection("player_stats").doc(key);
     const playerSnap = await playerRef.get();
-    const trustScore = playerSnap.exists
-        ? (playerSnap.data()?.trustScore ?? 0)
-        : 0;
-    const trustReviews = playerSnap.exists
-        ? (playerSnap.data()?.trustReviews ?? 0)
-        : 0;
+    const resolutionType = opts?.resolutionType;
+    const trustReviews = playerSnap.exists ? (playerSnap.data()?.trustReviews ?? 0) : 0;
+    if (result === "forfeit") {
+        const baseT = playerSnap.exists ? behaviorTrustBaseFromSnap(playerSnap.data()) : 5;
+        const newBehavior = Math.max(0, baseT - 1);
+        if (!playerSnap.exists) {
+            await playerRef.set({
+                wallet: key,
+                wins: 0,
+                losses: 0,
+                winRate: 0,
+                totalEarned: 0,
+                gamesPlayed: 0,
+                lastActive: firestore_1.Timestamp.now(),
+                behaviorTrustScore: newBehavior,
+                trustReviews,
+                forfeits: 1,
+                ogFirst1k: false,
+                gameStats: {},
+                categoryStats: {},
+            });
+            return;
+        }
+        const currentStats = playerSnap.data();
+        await playerRef.update({
+            forfeits: (currentStats.forfeits || 0) + 1,
+            behaviorTrustScore: newBehavior,
+            trustReviews,
+            lastActive: firestore_1.Timestamp.now(),
+        });
+        return;
+    }
+    const behaviorBefore = playerSnap.exists ? behaviorTrustBaseFromSnap(playerSnap.data()) : 5;
+    let behaviorTrustScore = behaviorBefore;
+    if (result === "win" && resolutionType === "admin") {
+        behaviorTrustScore = Math.min(10, behaviorTrustScore + 0.5);
+    }
+    else if (result === "win") {
+        behaviorTrustScore = Math.min(10, behaviorTrustScore + 0.2);
+    }
+    else if (result === "loss" && resolutionType === "admin") {
+        behaviorTrustScore = Math.max(0, behaviorTrustScore - 0.7);
+    }
+    else if (result === "loss") {
+        behaviorTrustScore = Math.max(0, behaviorTrustScore - 0.1);
+    }
     if (!playerSnap.exists) {
-        await playerRef.set({
+        const docData = {
             wallet: key,
             wins: result === "win" ? 1 : 0,
             losses: result === "loss" ? 1 : 0,
@@ -28,7 +76,7 @@ async function updatePlayerStatsAdmin(db, wallet, result, amountEarned, game, ca
             totalEarned: amountEarned,
             gamesPlayed: 1,
             lastActive: firestore_1.Timestamp.now(),
-            trustScore,
+            behaviorTrustScore,
             trustReviews,
             ogFirst1k: false,
             gameStats: {
@@ -45,7 +93,17 @@ async function updatePlayerStatsAdmin(db, wallet, result, amountEarned, game, ca
                     earned: amountEarned,
                 },
             },
-        });
+        };
+        if (result === "win" && resolutionType === "admin") {
+            docData.disputesWon = 1;
+        }
+        else if (result === "win") {
+            docData.cleanWins = 1;
+        }
+        if (result === "loss" && resolutionType === "admin") {
+            docData.disputesLost = 1;
+        }
+        await playerRef.set(docData);
         return;
     }
     const currentStats = playerSnap.data();
@@ -67,18 +125,28 @@ async function updatePlayerStatsAdmin(db, wallet, result, amountEarned, game, ca
     categoryStats[category].wins += result === "win" ? 1 : 0;
     categoryStats[category].losses += result === "loss" ? 1 : 0;
     categoryStats[category].earned += amountEarned;
-    await playerRef.update({
+    const updatePayload = {
         wins,
         losses,
         winRate: Math.round(winRate * 10) / 10,
         totalEarned: currentStats.totalEarned + amountEarned,
         gamesPlayed,
         lastActive: firestore_1.Timestamp.now(),
-        trustScore,
+        behaviorTrustScore,
         trustReviews,
         gameStats,
         categoryStats,
-    });
+    };
+    if (result === "win" && resolutionType === "admin") {
+        updatePayload.disputesWon = (currentStats.disputesWon || 0) + 1;
+    }
+    else if (result === "win") {
+        updatePayload.cleanWins = (currentStats.cleanWins || 0) + 1;
+    }
+    if (result === "loss" && resolutionType === "admin") {
+        updatePayload.disputesLost = (currentStats.disputesLost || 0) + 1;
+    }
+    await playerRef.update(updatePayload);
 }
 async function updateTeamStatsAdmin(db, teamId, result, amountEarned, game, category) {
     const teamRef = db.collection("teams").doc(teamId);
@@ -87,6 +155,16 @@ async function updateTeamStatsAdmin(db, teamId, result, amountEarned, game, cate
         throw new Error("Team not found");
     }
     const currentStats = teamSnap.data();
+    if (result === "forfeit") {
+        const base = behaviorTrustBaseFromSnap(currentStats);
+        const newBehavior = Math.max(0, base - 1);
+        await teamRef.update({
+            forfeits: (currentStats.forfeits || 0) + 1,
+            behaviorTrustScore: newBehavior,
+            lastActive: firestore_1.Timestamp.now(),
+        });
+        return;
+    }
     const newWins = result === "win" ? currentStats.wins + 1 : currentStats.wins;
     const newLosses = result === "loss" ? currentStats.losses + 1 : currentStats.losses;
     const newGamesPlayed = currentStats.gamesPlayed + 1;
@@ -124,6 +202,9 @@ async function updateTeamStatsAdmin(db, teamId, result, amountEarned, game, cate
     });
 }
 async function applyStatsAfterDisputeResolution(challengeData, winnerWalletRaw) {
+    if (challengeData.statsApplied === true) {
+        return;
+    }
     const db = (0, firestore_1.getFirestore)();
     const winnerWallet = normalizeWinnerWallet(winnerWalletRaw);
     const players = challengeData.players || [];
@@ -142,8 +223,10 @@ async function applyStatsAfterDisputeResolution(challengeData, winnerWalletRaw) 
         await updateTeamStatsAdmin(db, loser, "loss", 0, game, category);
     }
     else {
-        await updatePlayerStatsAdmin(db, winnerWallet, "win", prizePool, game, category);
-        await updatePlayerStatsAdmin(db, loser, "loss", 0, game, category);
+        await updatePlayerStatsAdmin(db, winnerWallet, "win", prizePool, game, category, {
+            resolutionType: "admin",
+        });
+        await updatePlayerStatsAdmin(db, loser, "loss", 0, game, category, { resolutionType: "admin" });
     }
 }
 //# sourceMappingURL=statsAdmin.js.map

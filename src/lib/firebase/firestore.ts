@@ -127,6 +127,13 @@ export interface ChallengeData {
     triggeredBy?: string;
     triggeredAt: Timestamp;
   };
+  disputedBy?: string;
+  disputedAt?: Timestamp;
+  disputeReason?: string | null;
+  resolvedBy?: string;
+  resolvedAt?: Timestamp;
+  resolutionType?: 'auto' | 'admin' | 'forfeit';
+  adminResolutionTx?: string | null;
   // UI fields (minimal for display)
   players?: string[];                 // Array of player wallets
   maxPlayers?: number;                // Maximum players allowed
@@ -138,6 +145,8 @@ export interface ChallengeData {
   payoutStatus?: 'pending' | 'processing' | 'paid';
   payoutLastError?: string;
   payoutErrorAt?: Timestamp;
+  payoutAttemptedAt?: Timestamp;
+  payoutLockOwner?: string;
   payoutTriggered?: boolean;          // Whether reward has been claimed
   payoutSignature?: string;            // Transaction signature of reward claim
   payoutTimestamp?: Timestamp;        // When reward was claimed
@@ -314,6 +323,17 @@ export async function writeChallengeFields(
         'Cannot mark a paid challenge as active without an on-chain PDA. Fund escrow on-chain first.'
       );
     }
+  }
+
+  // FINALIZED: resolutionType must always exist for completed challenges.
+  // Default only applies when missing; explicit values must never be overridden.
+  if (process.env.NODE_ENV !== 'production') {
+    if (out.status === 'completed' && out.resolutionType == null) {
+      console.warn('Missing resolutionType on completed challenge', out);
+    }
+  }
+  if (out.status === 'completed' && out.resolutionType == null) {
+    out.resolutionType = 'auto';
   }
 
   const authUid = auth.currentUser?.uid ?? null;
@@ -663,6 +683,7 @@ export const resolveTournamentMatchDispute = async (
     updates['tournament.completedAt'] = serverTimestamp();
     updates['tournament.currentRound'] = bracket.length;
     updates['status'] = 'completed';
+    updates['resolutionType'] = 'admin';
     updates['canClaim'] = true;
   } else {
     const nextRound = bracket[currentRoundIndex + 1];
@@ -689,6 +710,13 @@ export const resolveTournamentMatchDispute = async (
   }
 
   await writeChallengeFields(challengeId, updates, { currentData: data });
+
+  if (currentRoundIndex === bracket.length - 1) {
+    const completedMatch = bracket[currentRoundIndex]?.matches[matchIndex];
+    if (completedMatch) {
+      await applyTournamentChampionStatsIfNeeded(challengeId, completedMatch, winnerWallet, 'admin');
+    }
+  }
 
   // Mark dispute resolved (best-effort; disputeId may be missing for older conflicts)
   if (disputeId) {
@@ -1041,6 +1069,7 @@ export const submitTournamentMatchResult = async (
         'tournament.completedAt': serverTimestamp(), // Record when tournament was completed
         'tournament.currentRound': bracket.length, // Ensure currentRound is set to final round
         'status': 'completed',
+        'resolutionType': 'auto',
         'winner': winnerWallet,
         'prizePool': prizePool,
         'canClaim': true, // Enable prize claiming for the champion
@@ -1048,7 +1077,7 @@ export const submitTournamentMatchResult = async (
         'payoutTriggered': false,
         updatedAt: serverTimestamp(),
       };
-      
+
       await writeChallengeFields(challengeId, updates);
       console.log('✅ Tournament completed! Champion:', winnerWallet, '- Reward claiming enabled');
       console.log('💰 Prize pool:', prizePool, 'USDFG');
@@ -1057,6 +1086,7 @@ export const submitTournamentMatchResult = async (
         stage: 'completed',
         currentRound: bracket.length
       });
+      await applyTournamentChampionStatsIfNeeded(challengeId, match, winnerWallet, 'auto');
       return;
     }
 
@@ -1540,12 +1570,17 @@ export const advanceBracketWinner = async (
         'tournament.stage': 'completed',
         'tournament.completedAt': serverTimestamp(), // Record when tournament was completed
         'status': 'completed',
+        'resolutionType': 'auto',
         'canClaim': true, // Enable prize claiming for the champion
         updatedAt: serverTimestamp(),
       };
-      
+
       await writeChallengeFields(challengeId, updates);
       console.log('✅ Tournament completed! Champion:', winnerWallet, '- Reward claiming enabled');
+      const completedMatch = currentRound.matches[matchIndex];
+      if (completedMatch) {
+        await applyTournamentChampionStatsIfNeeded(challengeId, completedMatch, winnerWallet, 'auto');
+      }
       return;
     }
 
@@ -3244,6 +3279,7 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
         {
           status: 'completed',
           winner: 'forfeit', // Special value: both players forfeit, no refund
+          resolutionType: 'forfeit',
           updatedAt: Timestamp.now(),
         },
         { currentData: data }
@@ -3251,6 +3287,20 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
       console.log('⚠️ FORFEIT: Both players claim they lost - Suspicious collusion detected, both lose challenge amounts');
       // Delete chat - no dispute, no need to keep
       await cleanupChallengeData(challengeId, false); // false = not dispute
+      const forfeitSnap = await getDoc(doc(db, 'challenges', challengeId));
+      const forfeitData = forfeitSnap.data() as ChallengeData | undefined;
+      if (forfeitData && forfeitData.statsApplied !== true) {
+        const game = forfeitData.game || 'Unknown';
+        const category = forfeitData.category || 'Sports';
+        const ok = await applyForfeitStatsToChallengeParticipants(forfeitData, game, category);
+        if (ok) {
+          await writeChallengeFields(
+            challengeId,
+            { statsApplied: true, updatedAt: Timestamp.now() },
+            { currentData: forfeitData }
+          );
+        }
+      }
       return;
     }
 
@@ -3263,6 +3313,7 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
       {
         status: 'completed',
         winner: normalizeWinnerWallet(winner),
+        resolutionType: 'auto',
         updatedAt: Timestamp.now(),
       },
       { currentData: data }
@@ -3272,42 +3323,21 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     await cleanupChallengeData(challengeId, false); // false = not dispute
     console.log('📊 Updating stats...');
     
-    // Check if this is a team challenge
-    const isTeamChallenge = data.challengeType === 'team';
-    
     // Calculate challenge reward if not stored (for backward compatibility with old challenges)
     let prizePool = data.prizePool;
     if (!prizePool || prizePool === 0) {
-      // Calculate from challenge amount: 2x challenge amount minus 5% platform fee
       const entryFee = data.entryFee || 0;
       const totalPrize = entryFee * 2;
-      const platformFee = totalPrize * 0.05; // 5% platform fee
+      const platformFee = totalPrize * 0.05;
       prizePool = totalPrize - platformFee;
       console.log(`⚠️ Challenge reward not found in challenge data, calculated from challenge amount: ${entryFee} USDFG → ${prizePool} USDFG`);
     }
     
-    console.log('   Game:', data.game, 'Category:', data.category, 'Reward:', prizePool, 'Type:', isTeamChallenge ? 'Team' : 'Solo');
-    
-    // Update stats (player or team)
-    if (isTeamChallenge) {
-      // Update team stats for team challenges
-      console.log('   Updating winner team stats:', winner);
-      await updateTeamStats(winner, 'win', prizePool, data.game || 'Unknown', data.category || 'Sports');
-      console.log('   Updating loser team stats:', loser);
-      await updateTeamStats(loser, 'loss', 0, data.game || 'Unknown', data.category || 'Sports');
-    } else {
-      // Update player stats for solo challenges
-      // Get display names from challenge data and sanitize
-      const rawWinnerName = winner === data.creator ? data.creatorTag : undefined;
-      const rawLoserName = loser === data.creator ? data.creatorTag : undefined;
-      
-      const winnerDisplayName = sanitizeDisplayName(rawWinnerName);
-      const loserDisplayName = sanitizeDisplayName(rawLoserName);
-      
-      console.log('   Updating winner stats:', winner, 'as', winnerDisplayName || 'Anonymous');
-      await updatePlayerStats(winner, 'win', prizePool, data.game || 'Unknown', data.category || 'Sports', winnerDisplayName);
-      console.log('   Updating loser stats:', loser, 'as', loserDisplayName || 'Anonymous');
-      await updatePlayerStats(loser, 'loss', 0, data.game || 'Unknown', data.category || 'Sports', loserDisplayName);
+    const postWinSnap = await getDoc(doc(db, 'challenges', challengeId));
+    const postWinData = postWinSnap.data() as ChallengeData;
+    let statsOk = true;
+    if (postWinData.statsApplied !== true) {
+      statsOk = await runWinLossStatsForChallenge(postWinData, winner, loser, prizePool, 'auto');
     }
     
     // Mark challenge as ready for winner to claim (Player pays gas, not admin!)
@@ -3319,8 +3349,9 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
         payoutTriggered: false,
         canClaim: true,
         updatedAt: Timestamp.now(),
+        ...(statsOk ? { statsApplied: true } : {}),
       },
-      { currentData: data }
+      { currentData: postWinData }
     );
     
     console.log('💰 Challenge reward ready for claim:', prizePool, 'USDFG to', winner);
@@ -3510,11 +3541,26 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
         {
           status: 'completed',
           winner: 'forfeit', // Special value indicating both players forfeited
+          resolutionType: 'forfeit',
           updatedAt: Timestamp.now(),
         },
         { currentData: data }
       );
       console.log('⚠️ DEADLINE PASSED: No results submitted - FORFEIT (no refund)');
+      const forfeitSnap = await getDoc(challengeRef);
+      const forfeitData = forfeitSnap.data() as ChallengeData | undefined;
+      if (forfeitData && forfeitData.statsApplied !== true) {
+        const game = forfeitData.game || 'Unknown';
+        const category = forfeitData.category || 'Sports';
+        const ok = await applyForfeitStatsToChallengeParticipants(forfeitData, game, category);
+        if (ok) {
+          await writeChallengeFields(
+            challengeId,
+            { statsApplied: true, updatedAt: Timestamp.now() },
+            { currentData: forfeitData }
+          );
+        }
+      }
       return;
     }
     
@@ -3530,6 +3576,7 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
           {
             status: 'completed',
             winner: normalizeWinnerWallet(submittedWallet),
+            resolutionType: 'auto',
             needsPayout: true,
             payoutTriggered: false,
             canClaim: true,
@@ -3538,6 +3585,33 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
           { currentData: data }
         );
         console.log('🏆 DEADLINE PASSED: Winner by default (opponent no-show):', submittedWallet);
+        const afterSnap = await getDoc(challengeRef);
+        const afterData = afterSnap.data() as ChallengeData;
+        const loserWallet = data.players?.find((p: string) => !walletsEqual(p, submittedWallet));
+        let statsOk = true;
+        if (afterData.statsApplied !== true && loserWallet) {
+          let prizePool = afterData.prizePool;
+          if (!prizePool || prizePool === 0) {
+            const entryFee = afterData.entryFee || 0;
+            const totalPrize = entryFee * 2;
+            const platformFee = totalPrize * 0.05;
+            prizePool = totalPrize - platformFee;
+          }
+          statsOk = await runWinLossStatsForChallenge(
+            afterData,
+            normalizeWinnerWallet(submittedWallet),
+            normalizeWinnerWallet(loserWallet),
+            prizePool,
+            'auto'
+          );
+        }
+        if (statsOk) {
+          await writeChallengeFields(
+            challengeId,
+            { statsApplied: true, updatedAt: Timestamp.now() },
+            { currentData: afterData }
+          );
+        }
       } else {
         // They claimed they lost → The OTHER player wins by default
         const opponentWallet = data.players?.find((p: string) => !walletsEqual(p, submittedWallet));
@@ -3547,6 +3621,7 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
           {
             status: 'completed',
             winner: winnerField,
+            resolutionType: winnerField === 'tie' ? 'forfeit' : 'auto',
             ...(winnerField !== 'tie' && {
               needsPayout: true,
               payoutTriggered: false,
@@ -3557,6 +3632,38 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
           { currentData: data }
         );
         console.log('🏆 DEADLINE PASSED: Opponent wins (player admitted defeat, opponent no-show):', opponentWallet);
+        const afterSnap = await getDoc(challengeRef);
+        const afterData = afterSnap.data() as ChallengeData;
+        let statsOk = true;
+        if (afterData.statsApplied !== true) {
+          if (winnerField !== 'tie' && opponentWallet) {
+            let prizePool = afterData.prizePool;
+            if (!prizePool || prizePool === 0) {
+              const entryFee = afterData.entryFee || 0;
+              const totalPrize = entryFee * 2;
+              const platformFee = totalPrize * 0.05;
+              prizePool = totalPrize - platformFee;
+            }
+            statsOk = await runWinLossStatsForChallenge(
+              afterData,
+              winnerField,
+              normalizeWinnerWallet(submittedWallet),
+              prizePool,
+              'auto'
+            );
+          } else {
+            const game = afterData.game || 'Unknown';
+            const category = afterData.category || 'Sports';
+            statsOk = await applyForfeitStatsToChallengeParticipants(afterData, game, category);
+          }
+        }
+        if (statsOk) {
+          await writeChallengeFields(
+            challengeId,
+            { statsApplied: true, updatedAt: Timestamp.now() },
+            { currentData: afterData }
+          );
+        }
       }
     }
     
@@ -3722,8 +3829,17 @@ export interface PlayerStats {
   gamesPlayed: number;
   lastActive: Timestamp;
   // Trust score fields
-  trustScore?: number; // Average trust score (0-10)
+  trustScore?: number; // Review-derived average (0-10); written by trust review flows only
+  behaviorTrustScore?: number; // Gameplay / behavioral trust; written by stat update flows only
+  /** Computed on read in getPlayerStats / leaderboard helpers; not stored in Firestore */
+  displayTrustScore?: number;
   trustReviews?: number; // Number of trust reviews received
+  disputesWon?: number;
+  disputesLost?: number;
+  forfeits?: number;
+  cleanWins?: number;
+  /** Lightweight skill progression; default 100 when missing */
+  skillScore?: number;
   // Special trophies
   ogFirst1k?: boolean; // OG First 2.1K Members trophy - automatically awarded if joined before 2100 users (represents 21M token supply)
   founderChallenge?: boolean; // Founder Challenge trophy - awarded when player participates in a Founder Challenge
@@ -3743,6 +3859,21 @@ export interface PlayerStats {
   };
 }
 
+/** Blended trust for UI only; not persisted. */
+export function computeDisplayTrustScore(
+  stats: Pick<PlayerStats, 'trustScore' | 'behaviorTrustScore'>
+): number {
+  const ts = stats.trustScore;
+  const bt = stats.behaviorTrustScore;
+  return ts != null && bt != null
+    ? ts * 0.5 + bt * 0.5
+    : ts ?? bt ?? 5;
+}
+
+function withDisplayTrust(stats: PlayerStats): PlayerStats {
+  return { ...stats, displayTrustScore: computeDisplayTrustScore(stats) };
+}
+
 // Team Stats Interface - Elite Esports Teams
 export interface TeamStats {
   teamId: string; // Unique team ID (wallet address of team key holder)
@@ -3759,6 +3890,8 @@ export interface TeamStats {
   createdAt: Timestamp;
   // Team trust score (average of all members)
   trustScore?: number;
+  behaviorTrustScore?: number;
+  forfeits?: number;
   trustReviews?: number;
   // Team game stats
   gameStats: {
@@ -3861,39 +3994,251 @@ function calculateTrustScoreSync(wallet: string): { trustScore: number; trustRev
   }
 }
 
+const DEFAULT_PLAYER_SKILL_SCORE = 100;
+
+function skillScoreFromStored(s: PlayerStats | null | undefined): number {
+  const v = s?.skillScore;
+  return typeof v === 'number' && Number.isFinite(v) ? v : DEFAULT_PLAYER_SKILL_SCORE;
+}
+
+function skillScoreAfterWin(selfBefore: number, opponentSkill: number): number {
+  let delta = 5;
+  if (opponentSkill > selfBefore) delta += 3;
+  return Math.max(0, selfBefore + delta);
+}
+
+function skillScoreAfterLoss(selfBefore: number, opponentSkill: number): number {
+  let delta = -2;
+  if (opponentSkill < selfBefore) delta -= 3;
+  return Math.max(0, selfBefore + delta);
+}
+
+/** Resolution context for behavioral trust counters (peer reviews stay in trust_reviews). */
+type PlayerStatsResolutionOpts = {
+  resolutionType?: 'auto' | 'admin' | 'forfeit';
+  /** Pre-match opponent skill (for upset / weaker-opponent adjustments) */
+  opponentSkillScore?: number;
+};
+
+function tournamentPrizePoolForStats(data: ChallengeData): number {
+  const stored = data.prizePool;
+  if (stored && stored > 0) return stored;
+  const bracket = data.tournament?.bracket;
+  const entryFee = data.entryFee || 0;
+  const participantSlots = data.maxPlayers ?? bracket?.[0]?.matches?.length ?? 2;
+  const totalPrize = entryFee * participantSlots;
+  const platformFee = totalPrize * 0.05;
+  return totalPrize - platformFee;
+}
+
+function tournamentFinalLoserWallet(
+  match: { player1?: string | null; player2?: string | null },
+  winnerWallet: string
+): string | null {
+  const w = winnerWallet.toLowerCase();
+  if (match.player1?.toLowerCase() === w && match.player2) return match.player2;
+  if (match.player2?.toLowerCase() === w && match.player1) return match.player1;
+  return null;
+}
+
+/** After tournament final write; idempotent via statsApplied. */
+async function applyTournamentChampionStatsIfNeeded(
+  challengeId: string,
+  match: { player1?: string | null; player2?: string | null },
+  winnerWallet: string,
+  resolutionType: 'auto' | 'admin'
+): Promise<void> {
+  const challengeRef = doc(db, 'challenges', challengeId);
+  const freshSnap = await getDoc(challengeRef);
+  if (!freshSnap.exists()) return;
+  const fd = freshSnap.data() as ChallengeData;
+  if (fd.statsApplied === true) return;
+  const loserWallet = tournamentFinalLoserWallet(match, winnerWallet);
+  if (!loserWallet) return;
+  const prizePool = tournamentPrizePoolForStats(fd);
+  const statsOk = await runWinLossStatsForChallenge(
+    fd,
+    normalizeWinnerWallet(winnerWallet),
+    normalizeWinnerWallet(loserWallet),
+    prizePool,
+    resolutionType
+  );
+  if (statsOk) {
+    await writeChallengeFields(
+      challengeId,
+      { statsApplied: true, updatedAt: Timestamp.now() },
+      { currentData: fd }
+    );
+  }
+}
+
+/** Apply win/loss to player_stats or teams; returns false if any player stats update failed. */
+async function runWinLossStatsForChallenge(
+  data: ChallengeData,
+  winnerWallet: string,
+  loserWallet: string,
+  prizePool: number,
+  resolutionType: 'auto' | 'admin'
+): Promise<boolean> {
+  if (data.statsApplied === true) {
+    return true;
+  }
+  const isTeamChallenge = data.challengeType === 'team';
+  const game = data.game || 'Unknown';
+  const category = data.category || 'Sports';
+  try {
+    if (isTeamChallenge) {
+      await updateTeamStats(winnerWallet, 'win', prizePool, game, category);
+      await updateTeamStats(loserWallet, 'loss', 0, game, category);
+      return true;
+    }
+    const rawWinnerName = winnerWallet === data.creator ? data.creatorTag : undefined;
+    const rawLoserName = loserWallet === data.creator ? data.creatorTag : undefined;
+    const winnerDisplayName = sanitizeDisplayName(rawWinnerName);
+    const loserDisplayName = sanitizeDisplayName(rawLoserName);
+    const wOk = await updatePlayerStats(
+      winnerWallet,
+      'win',
+      prizePool,
+      game,
+      category,
+      winnerDisplayName,
+      { resolutionType }
+    );
+    const lOk = await updatePlayerStats(
+      loserWallet,
+      'loss',
+      0,
+      game,
+      category,
+      loserDisplayName,
+      { resolutionType }
+    );
+    return wOk && lOk;
+  } catch (e) {
+    console.error('❌ runWinLossStatsForChallenge:', e);
+    return false;
+  }
+}
+
+/** Idempotent forfeit penalties for both participants (solo: player_stats; team: teams). */
+async function applyForfeitStatsToChallengeParticipants(
+  data: ChallengeData,
+  game: string,
+  category: string
+): Promise<boolean> {
+  if (data.statsApplied === true) {
+    return true;
+  }
+  if (data.challengeType === 'team') {
+    const players = data.players || [];
+    let ok = true;
+    for (const tid of players) {
+      try {
+        await updateTeamStats(tid, 'forfeit', 0, game, category);
+      } catch {
+        ok = false;
+      }
+    }
+    return ok;
+  }
+  const players = data.players || [];
+  let ok = true;
+  for (const w of players) {
+    const passed = await updatePlayerStats(w, 'forfeit', 0, game, category, undefined, {
+      resolutionType: 'forfeit',
+    });
+    if (!passed) ok = false;
+  }
+  return ok;
+}
+
 /**
- * Update player stats after a challenge completes
+ * Update player stats after a challenge completes.
+ * Behavioral trustScore is adjusted here; trustReviews count is synced from trust_reviews when readable.
+ * @returns true if Firestore write succeeded
  */
 async function updatePlayerStats(
   wallet: string,
-  result: 'win' | 'loss',
+  result: 'win' | 'loss' | 'forfeit',
   amountEarned: number,
   game: string,
   category: string,
-  displayName?: string
-): Promise<void> {
+  displayName?: string,
+  opts?: PlayerStatsResolutionOpts
+): Promise<boolean> {
   try {
     const playerRef = doc(db, 'player_stats', wallet);
     const playerSnap = await getDoc(playerRef);
 
-    // Calculate trust score for this player from Firestore
-    // If calculation fails due to permissions, use 0 as fallback
-    let trustScore = 0;
     let trustReviews = 0;
     try {
-      const result = await calculateTrustScore(wallet);
-      trustScore = result.trustScore;
-      trustReviews = result.trustReviews;
-    } catch (error) {
-      // If trust score calculation fails, continue with 0
-      // This prevents the entire stats update from failing
-      console.warn(`   ⚠️ Trust score calculation failed for ${wallet.slice(0, 8)}..., using 0 as fallback`);
+      const trustCalc = await calculateTrustScore(wallet);
+      trustReviews = trustCalc.trustReviews;
+    } catch {
+      trustReviews = playerSnap.exists() ? ((playerSnap.data() as PlayerStats).trustReviews ?? 0) : 0;
+      console.warn(`   ⚠️ Trust review count sync failed for ${wallet.slice(0, 8)}...`);
+    }
+
+    const resolutionType = opts?.resolutionType;
+
+    if (result === 'forfeit') {
+      const s = playerSnap.exists() ? (playerSnap.data() as PlayerStats) : null;
+      const baseT = s ? ((s.behaviorTrustScore ?? s.trustScore) || 5) : 5;
+      const newBehaviorTrust = Math.max(0, baseT - 1);
+      const skillAfterForfeit = Math.max(0, skillScoreFromStored(s) - 10);
+      if (!playerSnap.exists()) {
+        const docPayload: Record<string, unknown> = {
+          wallet,
+          wins: 0,
+          losses: 0,
+          winRate: 0,
+          totalEarned: 0,
+          gamesPlayed: 0,
+          lastActive: Timestamp.now(),
+          behaviorTrustScore: newBehaviorTrust,
+          trustReviews,
+          forfeits: 1,
+          skillScore: skillAfterForfeit,
+          ogFirst1k: false,
+          gameStats: {},
+          categoryStats: {},
+        };
+        if (displayName) docPayload.displayName = displayName;
+        await setDoc(playerRef, docPayload);
+      } else {
+        const currentStats = playerSnap.data() as PlayerStats;
+        const updateData: Record<string, unknown> = {
+          forfeits: (currentStats.forfeits || 0) + 1,
+          behaviorTrustScore: newBehaviorTrust,
+          trustReviews,
+          lastActive: Timestamp.now(),
+          skillScore: skillAfterForfeit,
+        };
+        if (displayName && !currentStats.displayName) {
+          updateData.displayName = displayName;
+        }
+        await updateDoc(playerRef, updateData);
+      }
+      console.log(`✅ Forfeit stat recorded: ${wallet.slice(0, 8)}...`);
+      return true;
+    }
+
+    const s0 = playerSnap.exists() ? (playerSnap.data() as PlayerStats) : null;
+    const behaviorBase = s0 ? ((s0.behaviorTrustScore ?? s0.trustScore) || 5) : 5;
+    let behaviorTrustScore = behaviorBase;
+    if (result === 'win' && resolutionType === 'admin') {
+      behaviorTrustScore = Math.min(10, behaviorTrustScore + 0.5);
+    } else if (result === 'win') {
+      behaviorTrustScore = Math.min(10, behaviorTrustScore + 0.2);
+    } else if (result === 'loss' && resolutionType === 'admin') {
+      behaviorTrustScore = Math.max(0, behaviorTrustScore - 0.7);
+    } else if (result === 'loss') {
+      behaviorTrustScore = Math.max(0, behaviorTrustScore - 0.1);
     }
 
     if (!playerSnap.exists()) {
-      // Create new player stats
-      // Note: OG First 1k trophy is awarded when creating first challenge, not here
-      const newStats: any = {
+      const newStats: Record<string, unknown> = {
         wallet,
         wins: result === 'win' ? 1 : 0,
         losses: result === 'loss' ? 1 : 0,
@@ -3901,85 +4246,97 @@ async function updatePlayerStats(
         totalEarned: amountEarned,
         gamesPlayed: 1,
         lastActive: Timestamp.now(),
-        trustScore,
+        behaviorTrustScore,
         trustReviews,
-        ogFirst1k: false, // Trophy is awarded at challenge creation, not completion
+        ogFirst1k: false,
         gameStats: {
           [game]: {
             wins: result === 'win' ? 1 : 0,
             losses: result === 'loss' ? 1 : 0,
-            earned: amountEarned
-          }
+            earned: amountEarned,
+          },
         },
         categoryStats: {
           [category]: {
             wins: result === 'win' ? 1 : 0,
             losses: result === 'loss' ? 1 : 0,
-            earned: amountEarned
-          }
-        }
+            earned: amountEarned,
+          },
+        },
       };
-      
-      // Only include displayName if it exists (Firestore doesn't allow undefined)
+      if (result === 'win' && resolutionType === 'admin') {
+        newStats.disputesWon = 1;
+      } else if (result === 'win') {
+        newStats.cleanWins = 1;
+      }
+      if (result === 'loss' && resolutionType === 'admin') {
+        newStats.disputesLost = 1;
+      }
       if (displayName) {
         newStats.displayName = displayName;
       }
-      
       await setDoc(playerRef, newStats);
-      console.log(`✅ Created new player stats: ${wallet} - ${result} (+${amountEarned} USDFG) - Trust: ${trustScore}/10 (${trustReviews} reviews) - ${displayName || 'Anonymous'}`);
-    } else {
-      // Update existing player stats
-      const currentStats = playerSnap.data() as PlayerStats;
-      const newWins = currentStats.wins + (result === 'win' ? 1 : 0);
-      const newLosses = currentStats.losses + (result === 'loss' ? 1 : 0);
-      const newGamesPlayed = currentStats.gamesPlayed + 1;
-      const newWinRate = (newWins / newGamesPlayed) * 100;
-
-      // Update game-specific stats
-      const gameStats = currentStats.gameStats || {};
-      if (!gameStats[game]) {
-        gameStats[game] = { wins: 0, losses: 0, earned: 0 };
-      }
-      gameStats[game].wins += result === 'win' ? 1 : 0;
-      gameStats[game].losses += result === 'loss' ? 1 : 0;
-      gameStats[game].earned += amountEarned;
-
-      // Update category-specific stats
-      const categoryStats = currentStats.categoryStats || {};
-      if (!categoryStats[category]) {
-        categoryStats[category] = { wins: 0, losses: 0, earned: 0 };
-      }
-      categoryStats[category].wins += result === 'win' ? 1 : 0;
-      categoryStats[category].losses += result === 'loss' ? 1 : 0;
-      categoryStats[category].earned += amountEarned;
-
-      const updateData: any = {
-        wins: newWins,
-        losses: newLosses,
-        winRate: Math.round(newWinRate * 10) / 10, // Round to 1 decimal
-        totalEarned: currentStats.totalEarned + amountEarned,
-        gamesPlayed: newGamesPlayed,
-        lastActive: Timestamp.now(),
-        trustScore,
-        trustReviews,
-        gameStats,
-        categoryStats
-      };
-      
-      // 🔒 LOCKED: Username can only be set once on first challenge
-      // If player doesn't have a displayName yet, set it now (first time only)
-      if (displayName && !currentStats.displayName) {
-        updateData.displayName = displayName;
-        console.log(`🔒 Username locked for ${wallet}: "${displayName}"`);
-      }
-      
-      await updateDoc(playerRef, updateData);
-
-      console.log(`✅ Updated player stats: ${wallet} - ${result} (+${amountEarned} USDFG) - Trust: ${trustScore}/10 (${trustReviews} reviews)`);
+      console.log(
+        `✅ Created new player stats: ${wallet} - ${result} (+${amountEarned} USDFG) - behaviorTrust: ${behaviorTrustScore}/10 (${trustReviews} reviews) - ${displayName || 'Anonymous'}`
+      );
+      return true;
     }
+
+    const currentStats = playerSnap.data() as PlayerStats;
+    const newWins = currentStats.wins + (result === 'win' ? 1 : 0);
+    const newLosses = currentStats.losses + (result === 'loss' ? 1 : 0);
+    const newGamesPlayed = currentStats.gamesPlayed + 1;
+    const newWinRate = (newWins / newGamesPlayed) * 100;
+
+    const gameStats = currentStats.gameStats || {};
+    if (!gameStats[game]) {
+      gameStats[game] = { wins: 0, losses: 0, earned: 0 };
+    }
+    gameStats[game].wins += result === 'win' ? 1 : 0;
+    gameStats[game].losses += result === 'loss' ? 1 : 0;
+    gameStats[game].earned += amountEarned;
+
+    const categoryStats = currentStats.categoryStats || {};
+    if (!categoryStats[category]) {
+      categoryStats[category] = { wins: 0, losses: 0, earned: 0 };
+    }
+    categoryStats[category].wins += result === 'win' ? 1 : 0;
+    categoryStats[category].losses += result === 'loss' ? 1 : 0;
+    categoryStats[category].earned += amountEarned;
+
+    const updateData: Record<string, unknown> = {
+      wins: newWins,
+      losses: newLosses,
+      winRate: Math.round(newWinRate * 10) / 10,
+      totalEarned: currentStats.totalEarned + amountEarned,
+      gamesPlayed: newGamesPlayed,
+      lastActive: Timestamp.now(),
+      behaviorTrustScore,
+      trustReviews,
+      gameStats,
+      categoryStats,
+    };
+
+    if (result === 'win' && resolutionType === 'admin') {
+      updateData.disputesWon = (currentStats.disputesWon || 0) + 1;
+    } else if (result === 'win') {
+      updateData.cleanWins = (currentStats.cleanWins || 0) + 1;
+    }
+    if (result === 'loss' && resolutionType === 'admin') {
+      updateData.disputesLost = (currentStats.disputesLost || 0) + 1;
+    }
+
+    if (displayName && !currentStats.displayName) {
+      updateData.displayName = displayName;
+      console.log(`🔒 Username locked for ${wallet}: "${displayName}"`);
+    }
+
+    await updateDoc(playerRef, updateData);
+    console.log(`✅ Updated player stats: ${wallet} - ${result} (+${amountEarned} USDFG) - behaviorTrust: ${behaviorTrustScore}/10 (${trustReviews} reviews)`);
+    return true;
   } catch (error) {
     console.error('❌ Error updating player stats:', error);
-    // Don't throw - stats update failure shouldn't block challenge completion
+    return false;
   }
 }
 
@@ -3993,7 +4350,7 @@ export async function getPlayerStats(wallet: string): Promise<PlayerStats | null
     const playerSnap = await getDoc(playerRef);
 
     if (playerSnap.exists()) {
-      return playerSnap.data() as PlayerStats;
+      return withDisplayTrust(playerSnap.data() as PlayerStats);
     }
 
     const walletLower = wallet.toLowerCase();
@@ -4001,7 +4358,7 @@ export async function getPlayerStats(wallet: string): Promise<PlayerStats | null
       const fallbackRef = doc(db, 'player_stats', walletLower);
       const fallbackSnap = await getDoc(fallbackRef);
       if (fallbackSnap.exists()) {
-        return fallbackSnap.data() as PlayerStats;
+        return withDisplayTrust(fallbackSnap.data() as PlayerStats);
       }
     }
 
@@ -5045,7 +5402,7 @@ export async function getTeamByMember(memberWallet: string): Promise<TeamStats |
  */
 export async function updateTeamStats(
   teamId: string,
-  result: 'win' | 'loss',
+  result: 'win' | 'loss' | 'forfeit',
   amountEarned: number,
   game: string,
   category: string
@@ -5059,6 +5416,19 @@ export async function updateTeamStats(
     }
     
     const currentStats = teamSnap.data() as TeamStats;
+
+    if (result === 'forfeit') {
+      const base =
+        (currentStats.behaviorTrustScore ?? currentStats.trustScore ?? 5) || 5;
+      const newBehavior = Math.max(0, base - 1);
+      await updateDoc(teamRef, {
+        forfeits: (currentStats.forfeits || 0) + 1,
+        behaviorTrustScore: newBehavior,
+        lastActive: Timestamp.now(),
+      });
+      console.log(`✅ Team forfeit stat: ${teamId.slice(0, 8)}...`);
+      return;
+    }
     const newWins = result === 'win' ? currentStats.wins + 1 : currentStats.wins;
     const newLosses = result === 'loss' ? currentStats.losses + 1 : currentStats.losses;
     const newGamesPlayed = currentStats.gamesPlayed + 1;
@@ -5219,13 +5589,13 @@ export async function getTopPlayers(limitCount: number = 10, sortBy: 'wins' | 'w
     const players: PlayerStats[] = [];
     
     snapshot.forEach((doc) => {
-      const data = doc.data() as PlayerStats;
+      const raw = doc.data() as PlayerStats;
+      const data = withDisplayTrust(raw);
       const displayName = data.displayName ? `"${data.displayName}"` : '(no display name)';
-      const trustScore = data.trustScore !== undefined ? data.trustScore : 0;
       const trustReviews = data.trustReviews || 0;
-      console.log(`   Player: ${data.wallet.slice(0, 8)}... - Name: ${displayName} - ${data.totalEarned} USDFG - ${data.winRate}% WR - Trust: ${trustScore}/10 (${trustReviews} reviews)`);
+      const dTrust = data.displayTrustScore ?? computeDisplayTrustScore(data);
+      console.log(`   Player: ${data.wallet.slice(0, 8)}... - Name: ${displayName} - ${data.totalEarned} USDFG - ${data.winRate}% WR - Display trust: ${dTrust}/10 (${trustReviews} reviews)`);
       
-      // Ensure trustScore is always a number (default to 0 if undefined)
       if (data.trustScore === undefined) {
         data.trustScore = 0;
       }
@@ -5259,7 +5629,8 @@ export async function getLeaderboardPlayers(
     const players: PlayerStats[] = [];
 
     snapshot.forEach((doc) => {
-      const data = doc.data() as PlayerStats;
+      const raw = doc.data() as PlayerStats;
+      const data = withDisplayTrust(raw);
       if (data.trustScore === undefined) {
         data.trustScore = 0;
       }
@@ -5400,6 +5771,9 @@ export async function claimChallengePrize(
             payoutTimestamp: data.payoutTimestamp ?? Timestamp.now(),
             payoutStatus: 'paid',
             needsPayout: false,
+            payoutLastError: deleteField(),
+            payoutErrorAt: deleteField(),
+            payoutLockOwner: deleteField(),
             updatedAt: Timestamp.now(),
           },
           { currentData: data, actingWallet: acting }
@@ -5504,11 +5878,21 @@ export async function claimChallengePrize(
     }
     data = preChainSnap.data() as ChallengeData;
 
-    const hasPayoutSigForStuck =
-      data.payoutSignature != null && String(data.payoutSignature).trim() !== '';
-    if (data.payoutStatus === 'processing' && !hasPayoutSigForStuck) {
-      await updateDoc(challengeRef, { payoutStatus: 'pending' });
-      data = { ...data, payoutStatus: 'pending' } as ChallengeData;
+    const STALE_MS = 2 * 60 * 1000;
+    if (
+      data.payoutStatus === 'processing' &&
+      !data.payoutSignature &&
+      data.payoutLockOwner &&
+      data.payoutAttemptedAt &&
+      Date.now() - data.payoutAttemptedAt.toMillis() > STALE_MS
+    ) {
+      await updateDoc(challengeRef, {
+        payoutStatus: 'pending',
+        payoutLockOwner: deleteField(),
+      });
+      const nextData: ChallengeData = { ...data, payoutStatus: 'pending' };
+      delete (nextData as unknown as Record<string, unknown>).payoutLockOwner;
+      data = nextData;
     }
 
     const concurrentSig =
@@ -5523,11 +5907,80 @@ export async function claimChallengePrize(
       return;
     }
 
-    if (!data.needsPayout) {
-      throw new Error('Payout not available or already processed');
+    const ERROR_SPAM_WINDOW_MS = 1000;
+    const COOLDOWN_MS = 3000;
+
+    if (data.payoutErrorAt) {
+      let sinceError = Date.now() - data.payoutErrorAt.toMillis();
+      if (sinceError < 0) sinceError = 0;
+
+      // Only block ultra-fast repeat clicks after error
+      if (
+        sinceError < ERROR_SPAM_WINDOW_MS &&
+        data.payoutAttemptedAt &&
+        sinceError < 300
+      ) {
+        return;
+      }
+
+      // IMPORTANT: do NOT apply normal cooldown after an error
+    } else {
+      if (
+        data.payoutAttemptedAt &&
+        Date.now() - data.payoutAttemptedAt.toMillis() < COOLDOWN_MS
+      ) {
+        return;
+      }
     }
 
-    await updateDoc(challengeRef, { payoutStatus: 'processing' });
+    const lockOwner = crypto.randomUUID();
+    const lockResult = await runTransaction(db, async (tx) => {
+      const snap = await tx.get(challengeRef);
+      if (!snap.exists()) {
+        throw new Error('❌ Challenge not found in Firestore');
+      }
+      const d = snap.data() as ChallengeData;
+
+      if (d.payoutSignature || d.payoutStatus === 'paid') {
+        return 'done' as const;
+      }
+      if (d.payoutStatus === 'processing' && !d.payoutSignature) {
+        return 'in_flight' as const;
+      }
+      if (!d.needsPayout) {
+        throw new Error('Payout not available or already processed');
+      }
+
+      const nowAttempt = Timestamp.now();
+      tx.update(challengeRef, {
+        payoutStatus: 'processing',
+        payoutAttemptedAt: nowAttempt,
+        payoutLockOwner: lockOwner,
+      });
+      return 'locked' as const;
+    });
+
+    if (lockResult === 'done') {
+      console.log('✅ Claim completed — idempotent (transaction)');
+      return;
+    }
+    if (lockResult === 'in_flight') {
+      console.log('✅ Another claim attempt in progress — exiting');
+      return;
+    }
+
+    const postLockSnap = await getDoc(challengeRef);
+    if (!postLockSnap.exists()) {
+      throw new Error('❌ Challenge not found in Firestore');
+    }
+    data = postLockSnap.data() as ChallengeData;
+
+    if (data.payoutStatus !== 'processing') {
+      return;
+    }
+    if (data.payoutLockOwner !== lockOwner) {
+      return;
+    }
 
     try {
       console.log('✅ Validation passed - calling smart contract...');
@@ -5558,6 +6011,9 @@ export async function claimChallengePrize(
             payoutTimestamp: Timestamp.now(),
             payoutStatus: 'paid',
             needsPayout: false,
+            payoutLastError: deleteField(),
+            payoutErrorAt: deleteField(),
+            payoutLockOwner: deleteField(),
             adminResolutionTx: signature,
             updatedAt: Timestamp.now(),
           },
@@ -5613,6 +6069,9 @@ export async function claimChallengePrize(
               payoutTimestamp: Timestamp.now(),
               payoutStatus: 'paid',
               needsPayout: false,
+              payoutLastError: deleteField(),
+              payoutErrorAt: deleteField(),
+              payoutLockOwner: deleteField(),
               updatedAt: Timestamp.now(),
             }
           : {
@@ -5622,6 +6081,9 @@ export async function claimChallengePrize(
               payoutTimestamp: Timestamp.now(),
               payoutStatus: 'paid',
               needsPayout: false,
+              payoutLastError: deleteField(),
+              payoutErrorAt: deleteField(),
+              payoutLockOwner: deleteField(),
               updatedAt: Timestamp.now(),
             };
 
@@ -5642,11 +6104,18 @@ export async function claimChallengePrize(
       console.log('   Transaction:', signature);
       console.log('   Winner received:', data.prizePool, 'USDFG');
     } catch (err) {
-      await updateDoc(challengeRef, {
-        payoutStatus: 'pending',
-        payoutLastError: String(err ?? 'unknown_error'),
-        payoutErrorAt: Timestamp.now(),
-      });
+      const rbSnap = await getDoc(challengeRef);
+      if (rbSnap.exists()) {
+        const d = rbSnap.data() as ChallengeData;
+        if (d.payoutLockOwner === lockOwner && !d.payoutSignature) {
+          await updateDoc(challengeRef, {
+            payoutStatus: 'pending',
+            payoutLastError: String(err ?? 'unknown_error'),
+            payoutErrorAt: Timestamp.now(),
+            payoutLockOwner: deleteField(),
+          });
+        }
+      }
       throw err;
     }
     
@@ -5765,6 +6234,65 @@ export const listenToDisputedChallenges = (
   });
 };
 
+export type DisputeResult = 'created' | 'already_disputed' | 'not_allowed';
+
+/**
+ * Escalate to manual admin review during the provisional auto-resolution window.
+ * Only allowed while `status === 'awaiting_auto_resolution'`.
+ */
+export async function triggerChallengeDispute(
+  challengeId: string,
+  wallet: string,
+  reason?: string
+): Promise<DisputeResult> {
+  const normalizedWallet = normalizeWinnerWallet(wallet);
+  const trimmed =
+    typeof reason === 'string'
+      ? reason.trim().slice(0, 300)
+      : '';
+
+  const challengeRef = doc(db, 'challenges', challengeId);
+  return runTransaction(db, async (tx) => {
+    const snap = await tx.get(challengeRef);
+    const d = snap.exists() ? (snap.data() as ChallengeData) : undefined;
+
+    if (!d) {
+      throw new Error('Challenge not found');
+    }
+
+    if (d.status !== 'awaiting_auto_resolution') {
+      return 'not_allowed';
+    }
+
+    if (!d.players || !isParticipantWallet(d.players, wallet)) {
+      throw new Error('Not a participant');
+    }
+
+    const COOLDOWN_MS = 10 * 1000;
+
+    if (
+      d.disputedAt &&
+      Date.now() - d.disputedAt.toMillis() < COOLDOWN_MS
+    ) {
+      return 'already_disputed';
+    }
+
+    if (d.disputedBy) {
+      return 'already_disputed';
+    }
+
+    const now = Timestamp.now();
+    tx.update(challengeRef, {
+      status: 'disputed',
+      disputedBy: normalizedWallet,
+      disputedAt: now,
+      disputeReason: trimmed || null,
+      updatedAt: now,
+    });
+    return 'created';
+  });
+}
+
 /**
  * Resolve a disputed challenge as admin
  * @param challengeId - Challenge ID
@@ -5809,6 +6337,7 @@ export const resolveAdminChallenge = async (
       {
         status: 'completed',
         winner: normalizeWinnerWallet(winnerWallet),
+        resolutionType: 'admin',
         resolvedBy: adminUid,
         resolvedAt: Timestamp.now(),
         adminResolutionTx: onChainTx || null,
@@ -5816,6 +6345,10 @@ export const resolveAdminChallenge = async (
         needsPayout: true,
         payoutTriggered: false,
         canClaim: true,
+        payoutLastError: deleteField(),
+        payoutErrorAt: deleteField(),
+        payoutLockOwner: deleteField(),
+        payoutAttemptedAt: deleteField(),
       },
       { currentData: challengeData, actingWallet: winnerWallet, actingUid: adminUid }
     );
@@ -5835,24 +6368,32 @@ export const resolveAdminChallenge = async (
       });
     }
     
-    // Update player stats (same logic as determineWinner)
-    const isTeamChallenge = challengeData.challengeType === 'team';
     const entryFee = challengeData.entryFee || 0;
     const totalPrize = entryFee * 2;
     const platformFee = totalPrize * 0.05;
     const prizePool = totalPrize - platformFee;
-    
-    const loser = players.find(p => p !== winnerWallet);
-    if (loser) {
-      if (isTeamChallenge) {
-        await updateTeamStats(winnerWallet, 'win', prizePool, challengeData.game || 'Unknown', challengeData.category || 'Sports');
-        await updateTeamStats(loser, 'loss', 0, challengeData.game || 'Unknown', challengeData.category || 'Sports');
-      } else {
-        await updatePlayerStats(winnerWallet, 'win', prizePool, challengeData.game || 'Unknown', challengeData.category || 'Sports');
-        await updatePlayerStats(loser, 'loss', 0, challengeData.game || 'Unknown', challengeData.category || 'Sports');
-      }
+    const loser = players.find(p => !walletsEqual(p, winnerWallet));
+
+    const afterSnap = await getDoc(challengeRef);
+    const afterData = afterSnap.data() as ChallengeData;
+    let statsOk = true;
+    if (afterData.statsApplied !== true && loser) {
+      statsOk = await runWinLossStatsForChallenge(
+        afterData,
+        normalizeWinnerWallet(winnerWallet),
+        normalizeWinnerWallet(loser),
+        prizePool,
+        'admin'
+      );
     }
-    
+    if (statsOk) {
+      await writeChallengeFields(
+        challengeId,
+        { statsApplied: true, updatedAt: Timestamp.now() },
+        { currentData: afterData }
+      );
+    }
+
     console.log(`✅ Admin resolved dispute: Challenge ${challengeId}, Winner: ${winnerWallet}`);
   } catch (error) {
     console.error('❌ Error resolving admin challenge:', error);

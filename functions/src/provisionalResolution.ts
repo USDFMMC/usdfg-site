@@ -34,7 +34,7 @@ async function applyClearWinnerStats(
   winnerWallet: string,
   loserWallet: string
 ): Promise<void> {
-  if (!data.needsStats || data.statsApplied) {
+  if (data.statsApplied === true) {
     return;
   }
   const prizePool = prizePoolFromChallenge(data);
@@ -44,8 +44,10 @@ async function applyClearWinnerStats(
     await updateTeamStatsAdmin(db, winnerWallet, "win", prizePool, game, category);
     await updateTeamStatsAdmin(db, loserWallet, "loss", 0, game, category);
   } else {
-    await updatePlayerStatsAdmin(db, winnerWallet, "win", prizePool, game, category);
-    await updatePlayerStatsAdmin(db, loserWallet, "loss", 0, game, category);
+    await updatePlayerStatsAdmin(db, winnerWallet, "win", prizePool, game, category, {
+      resolutionType: "auto",
+    });
+    await updatePlayerStatsAdmin(db, loserWallet, "loss", 0, game, category, { resolutionType: "auto" });
   }
 }
 
@@ -156,11 +158,11 @@ async function processOneChallenge(ref: DocumentReference): Promise<void> {
         results,
         status: "completed",
         winner: "forfeit",
+        resolutionType: "forfeit",
         needsStats: false,
-        statsApplied: true,
         updatedAt: FieldValue.serverTimestamp(),
       });
-      return { kind: "forfeit" } as const;
+      return { kind: "forfeit", p1, p2 } as const;
     }
 
     const winner = r1 ? p1 : p2;
@@ -173,6 +175,7 @@ async function processOneChallenge(ref: DocumentReference): Promise<void> {
       results,
       status: "completed",
       winner: winnerNorm,
+      resolutionType: "auto",
       needsStats: true,
       needsPayout: true,
       payoutStatus: "pending",
@@ -187,7 +190,7 @@ async function processOneChallenge(ref: DocumentReference): Promise<void> {
     const after = await ref.get();
     const d = after.data() as Record<string, unknown> | undefined;
     if (d && d.status === "completed" && typeof d.winner === "string" && d.winner !== "forfeit") {
-      if (!d.needsStats || d.statsApplied) {
+      if (d.statsApplied === true) {
         return;
       }
       try {
@@ -196,6 +199,32 @@ async function processOneChallenge(ref: DocumentReference): Promise<void> {
       } catch (e) {
         logger.error("stats after provisional finalize failed", { challengeId: ref.id, error: String(e) });
       }
+    }
+  } else if (txResult.kind === "forfeit") {
+    const after = await ref.get();
+    const d = after.data() as Record<string, unknown> | undefined;
+    if (!d || d.statsApplied === true) {
+      return;
+    }
+    const game = (d.game as string) || "Unknown";
+    const category = (d.category as string) || "Sports";
+    try {
+      const w1 = String(txResult.p1 ?? "");
+      const w2 = String(txResult.p2 ?? "");
+      if (!w1 || !w2) {
+        logger.error("forfeit stats skipped: missing player wallets", { challengeId: ref.id });
+        return;
+      }
+      if (d.challengeType === "team") {
+        await updateTeamStatsAdmin(db, normalizeWinnerWallet(w1), "forfeit", 0, game, category);
+        await updateTeamStatsAdmin(db, normalizeWinnerWallet(w2), "forfeit", 0, game, category);
+      } else {
+        await updatePlayerStatsAdmin(db, normalizeWinnerWallet(w1), "forfeit", 0, game, category);
+        await updatePlayerStatsAdmin(db, normalizeWinnerWallet(w2), "forfeit", 0, game, category);
+      }
+      await ref.update({ statsApplied: true, needsStats: false });
+    } catch (e) {
+      logger.error("stats after provisional forfeit failed", { challengeId: ref.id, error: String(e) });
     }
   }
 }

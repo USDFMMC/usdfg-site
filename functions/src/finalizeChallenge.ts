@@ -45,6 +45,7 @@ export const finalizeAdminChallengeDispute = onCall(async (request) => {
   await challengeRef.update({
     status: "completed",
     winner: normalizeWinnerWallet(winnerWalletRaw),
+    resolutionType: "admin",
     resolvedBy: adminWallet,
     resolvedAt: Timestamp.now(),
     adminResolutionTx: onChainTx,
@@ -68,7 +69,12 @@ export const finalizeAdminChallengeDispute = onCall(async (request) => {
   await writeAdminLog("resolve_dispute", adminWallet, challengeId);
 
   try {
-    await applyStatsAfterDisputeResolution(challengeData, winnerWalletRaw);
+    const afterSnap = await challengeRef.get();
+    const afterData = afterSnap.data() as Record<string, unknown> | undefined;
+    if (afterData?.statsApplied !== true) {
+      await applyStatsAfterDisputeResolution(challengeData, winnerWalletRaw);
+      await challengeRef.update({ statsApplied: true });
+    }
   } catch (e) {
     console.error("Stats update failed (non-fatal):", e);
   }

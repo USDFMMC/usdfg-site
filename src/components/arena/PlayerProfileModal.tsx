@@ -12,9 +12,11 @@ import {
   leaveTeam,
   removeTeamMember,
   getPlayerEarningsByChallenge,
+  computeDisplayTrustScore,
   type TeamStats,
   type PlayerEarningByChallenge,
 } from "@/lib/firebase/firestore";
+import { TrustBadge } from "@/lib/utils/trustDisplay";
 
 // Countries list for flag display - matches CountryFlagPicker
 const countries = [
@@ -498,8 +500,14 @@ export default function PlayerProfileModal({
         // Calculate additional stats from real data
           const totalGames = (player.wins || 0) + (player.losses || 0);
           const streak = 0; // TODO: Track actual win streak in Firestore
-          const trust = (player as { trustScore?: number }).trustScore;
-          const integrity = typeof trust === 'number' ? trust : 0;
+          const p = player as {
+            displayTrustScore?: number;
+            trustScore?: number;
+            behaviorTrustScore?: number;
+          };
+          const integrity =
+            p.displayTrustScore ??
+            computeDisplayTrustScore({ trustScore: p.trustScore, behaviorTrustScore: p.behaviorTrustScore });
           const favoriteGame = null; // TODO: Calculate from gameStats
           const rank = player.rank || 1;
           const rankTitle = rank === 1 ? "Mythic Prime" : rank <= 3 ? "Diamond Elite" : rank <= 10 ? "Platinum Pro" : "Gold Warrior";
@@ -618,6 +626,7 @@ export default function PlayerProfileModal({
             </div>
           )}
           <p className="text-xs text-zinc-400">{player.wallet?.slice(0, 8)}...{player.wallet?.slice(-4)} • {rankTitle}</p>
+          <TrustBadge score={Number.isFinite(integrity) ? integrity : 5} className="mt-1" />
           
           {/* Country Flag */}
           {isCurrentUser ? (

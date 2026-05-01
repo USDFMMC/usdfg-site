@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { ChatBox } from "./ChatBox";
 import { VoiceChat } from "./VoiceChat";
 import { Camera, Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
-import { getPlayerStats, fetchChallengeById, resolveAdminChallenge, approveMicRequest, denyMicRequest, approveMicRequestReplace, MAX_VOICE_SPEAKERS, writeChallengeFields, walletsEqual } from "@/lib/firebase/firestore";
+import { getPlayerStats, fetchChallengeById, resolveAdminChallenge, triggerChallengeDispute, approveMicRequest, denyMicRequest, approveMicRequestReplace, MAX_VOICE_SPEAKERS, writeChallengeFields, walletsEqual } from "@/lib/firebase/firestore";
 import { collection, doc, setDoc, deleteDoc, updateDoc, onSnapshot, query, where, serverTimestamp, Timestamp, getDocs, getDoc, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import { ADMIN_WALLET } from "@/lib/chain/config";
@@ -18,6 +18,7 @@ import {
   getCreatorFundingDeadline,
   isCreatorFundingDeadlineExpired
 } from "@/lib/utils/challenge-helpers";
+import { TrustBadge } from "@/lib/utils/trustDisplay";
 
 interface StandardChallengeLobbyProps {
   challenge: any;
@@ -210,13 +211,17 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const [proofImage, setProofImage] = useState<string | null>(null);
   const [proofFile, setProofFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [playerData, setPlayerData] = useState<Record<string, { displayName?: string; profileImage?: string }>>({});
+  const [playerData, setPlayerData] = useState<
+    Record<string, { displayName?: string; profileImage?: string; displayTrustScore?: number }>
+  >({});
+  const warnedRef = useRef<Set<string>>(new Set());
   const [spectatorCount, setSpectatorCount] = useState<number>(0);
   const [spectators, setSpectators] = useState<string[]>([]);
   const [pendingMicRequests, setPendingMicRequests] = useState<{ wallet: string }[]>([]);
   const [speakerWallets, setSpeakerWallets] = useState<string[]>([]);
   const [resolvingWinner, setResolvingWinner] = useState<string | null>(null);
   const [showIntegrityConfirm, setShowIntegrityConfirm] = useState(false);
+  const [isDisputing, setIsDisputing] = useState(false);
 
   const isAdmin = currentWallet && currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
   
@@ -319,6 +324,10 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const platform = getChallengeValue('platform', 'All Platforms');
   const challengeId = activeChallenge.id;
 
+  useEffect(() => {
+    warnedRef.current.clear();
+  }, [challengeId]);
+
   const [isEditingEntryFee, setIsEditingEntryFee] = useState(false);
   const [entryFeeDraft, setEntryFeeDraft] = useState<string>(String(entryFee || ''));
   const [entryFeeError, setEntryFeeError] = useState<string | null>(null);
@@ -368,6 +377,49 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     const userResult = results[currentWallet.toLowerCase()];
     return !!userResult;
   }, [currentWallet, results]);
+
+  useEffect(() => {
+    if (!onAppToast || !currentWallet || !creatorWallet) return;
+    const cw = currentWallet.toLowerCase();
+    const cr = creatorWallet.toLowerCase();
+    let opponentWallet: string | null = null;
+    if (cw === cr) {
+      opponentWallet = (challengerWallet || pendingJoinerWallet || null) as string | null;
+    } else {
+      opponentWallet = creatorWallet;
+    }
+    if (!opponentWallet) return;
+    const key = `${challengeId}-${opponentWallet.toLowerCase()}`;
+    if (
+      status !== "active" &&
+      status !== "creator_funded" &&
+      status !== "in-progress" &&
+      status !== "creator_confirmation_required"
+    ) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        const stats = await getPlayerStats(opponentWallet);
+        const t = stats?.displayTrustScore ?? 5;
+        if (t < 3 && !warnedRef.current.has(key)) {
+          warnedRef.current.add(key);
+          onAppToast("Low trust player", "warning", "Opponent");
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, [
+    challengeId,
+    currentWallet,
+    creatorWallet,
+    challengerWallet,
+    pendingJoinerWallet,
+    status,
+    onAppToast,
+  ]);
 
   const handleImageCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -449,6 +501,36 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     }
 
     await doSubmitResult();
+  };
+
+  const handleDisputeResult = async () => {
+    if (!activeChallenge?.id || !currentWallet) return;
+    const reasonInput =
+      typeof window !== 'undefined'
+        ? window.prompt("Why are you disputing this result? (optional)")
+        : null;
+
+    const reason = reasonInput || undefined;
+
+    setIsDisputing(true);
+    try {
+      const result = await triggerChallengeDispute(
+        activeChallenge.id,
+        currentWallet,
+        reason
+      );
+      if (result === 'created') {
+        onAppToast?.('Dispute opened. An admin will review.', 'success', 'Dispute');
+      } else if (result === 'already_disputed') {
+        onAppToast?.('Already disputed.', 'info', 'Dispute');
+      } else {
+        onAppToast?.('Too late to dispute.', 'warning', 'Dispute');
+      }
+    } catch (err: any) {
+      onAppToast?.(err?.message || "Failed to open dispute.", "error", "Dispute");
+    } finally {
+      setIsDisputing(false);
+    }
   };
 
   const handleResolveDispute = async (winnerWallet: string) => {
@@ -1028,7 +1110,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   // Fetch participant and spectator data (display names, profile images)
   useEffect(() => {
     const fetchPlayerData = async () => {
-      const data: Record<string, { displayName?: string; profileImage?: string }> = {};
+      const data: Record<string, { displayName?: string; profileImage?: string; displayTrustScore?: number }> =
+        {};
       const allWallets = [...participants, ...spectators];
       
       for (const wallet of allWallets) {
@@ -1039,6 +1122,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
               data[wallet.toLowerCase()] = {
                 displayName: stats.displayName,
                 profileImage: stats.profileImage,
+                displayTrustScore: stats.displayTrustScore,
               };
             }
           } catch (error) {
@@ -1121,9 +1205,10 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className={`text-xs font-semibold truncate ${onPlayerClick ? 'text-white hover:text-purple-200' : 'text-white'}`}>
+                    <div className={`text-xs font-semibold truncate flex items-center gap-1.5 flex-wrap ${onPlayerClick ? 'text-white hover:text-purple-200' : 'text-white'}`}>
                       {displayName}
                       {isCurrentUser && <span className="ml-1.5 text-[10px] text-purple-300">(You)</span>}
+                      <TrustBadge score={data.displayTrustScore ?? 5} className="shrink-0" />
                     </div>
                     <div className={`text-[10px] truncate ${onPlayerClick ? 'text-gray-400 hover:text-gray-300' : 'text-gray-400'}`}>
                       {wallet.slice(0, 6)}...{wallet.slice(-4)}
@@ -1169,9 +1254,10 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className={`text-xs font-semibold truncate ${onPlayerClick ? 'text-white hover:text-purple-200' : 'text-white'}`}>
+                      <div className={`text-xs font-semibold truncate flex items-center gap-1.5 flex-wrap ${onPlayerClick ? 'text-white hover:text-purple-200' : 'text-white'}`}>
                         {displayName}
                         {isCurrentUser && <span className="ml-1.5 text-[10px] text-purple-300">(You)</span>}
+                        <TrustBadge score={data.displayTrustScore ?? 5} className="shrink-0" />
                       </div>
                       <div className={`text-[10px] truncate ${onPlayerClick ? 'text-gray-400 hover:text-gray-300' : 'text-gray-400'}`}>
                         {wallet.slice(0, 6)}...{wallet.slice(-4)}
@@ -1683,6 +1769,33 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           <p className="text-[10px] text-green-100/80 mt-0.5">
             You have already submitted your result. Waiting for opponent...
           </p>
+        </div>
+      )}
+
+      {status === 'awaiting_auto_resolution' && isParticipant && currentWallet && (
+        <div className="rounded-lg border border-amber-400/30 bg-amber-950/25 p-2.5 text-center ring-1 ring-amber-500/10">
+          <p className="text-[10px] text-amber-100/85 mb-2">
+            If the automatic outcome is wrong or you need admin review, you can open a dispute.
+          </p>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              void handleDisputeResult();
+            }}
+            disabled={isDisputing}
+            className="w-full rounded-md border border-amber-500/40 bg-amber-600/20 px-3 py-2 text-xs font-semibold text-amber-100 hover:bg-amber-600/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isDisputing ? (
+              <span className="inline-flex items-center justify-center gap-1.5">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Opening…
+              </span>
+            ) : (
+              'Dispute Result'
+            )}
+          </button>
         </div>
       )}
 
