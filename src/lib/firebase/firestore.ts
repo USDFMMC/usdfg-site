@@ -3122,30 +3122,44 @@ export const submitChallengeResult = async (
           { currentData: updatedData, actingWallet: wallet }
         );
         const finalSnap = await getDoc(challengeRef);
-        const finalData = finalSnap.data() as ChallengeData;
-        await determineWinner(challengeId, finalData);
+        const finalData = finalSnap.data() as ChallengeData | undefined;
+        if (
+          !finalData ||
+          finalData.status === 'completed' ||
+          finalData.winner != null ||
+          finalData.disputedBy
+        ) {
+          console.log('⛔ Skipping determineWinner — already resolved or disputed');
+        } else {
+          await determineWinner(challengeId, finalData);
+        }
       }
       return;
     }
 
     const currentResults = updatedData.results || {};
     const currentPlayers = updatedData.players || [];
-    
-    // Only determine winner if BOTH players have actually submitted
-    // This prevents the exploit where first player to claim win gets rewarded immediately
-    const submittedPlayers = Object.keys(currentResults);
-    if (submittedPlayers.length === currentPlayers.length && currentPlayers.length === 2) {
-      // Verify both players in the challenge have submitted
-      const bothSubmitted = currentPlayers.every((p: string) => {
+
+    // Only determine winner if BOTH roster players have submitted (canonical keys only).
+    // Extra/legacy keys in results must not block calling determineWinner.
+    const bothSubmitted =
+      currentPlayers.length === 2 &&
+      currentPlayers.every((p: string) => {
         const key = canonicalPlayerKey(currentPlayers, p);
         return currentResults[key] !== undefined;
       });
-      
-      if (bothSubmitted) {
-        console.log('🎯 Both players submitted! Determining winner...');
-      await determineWinner(challengeId, updatedData);
+
+    if (bothSubmitted) {
+      console.log('🎯 Both players submitted! Determining winner...');
+      if (
+        updatedData.status === 'completed' ||
+        updatedData.status === 'disputed' ||
+        updatedData.winner != null ||
+        updatedData.disputedBy
+      ) {
+        console.log('⛔ Skipping determineWinner — already resolved or disputed');
       } else {
-        console.log('⏳ Waiting for opponent to submit result...');
+        await determineWinner(challengeId, updatedData);
       }
     } else {
       console.log('⏳ Waiting for opponent to submit result...');

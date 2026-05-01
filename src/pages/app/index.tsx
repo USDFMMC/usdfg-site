@@ -5969,6 +5969,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
               // Status badge component
               const StatusPill = ({ status, isOwner, players, capacity }: { status: string; isOwner: boolean; players: number; capacity: number }) => {
+                if (status === "completed") {
+                  return (
+                    <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-neutral-700/30 text-neutral-300 border-neutral-600/30">
+                      COMPLETED
+                    </span>
+                  );
+                }
                 if (status === "pending_waiting_for_opponent") {
                             return (
                     <span className="shrink-0 text-[11px] px-2 py-1 rounded-md border bg-emerald-500/20 text-emerald-200 border-emerald-500/30 ring-1 ring-emerald-400/20 shadow-[0_0_8px_rgba(16,185,129,0.18)]">
