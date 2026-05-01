@@ -2954,7 +2954,8 @@ function challengeHasResultForWallet(data: ChallengeData, wallet: string): boole
   return Object.keys(r).some((k) => walletsEqual(k, wallet) && r[k] != null);
 }
 
-function canonicalPlayerKey(players: string[], wallet: string): string {
+/** Roster-aligned key for `results` map (must match submitChallengeResult writes). */
+export function canonicalPlayerKey(players: string[], wallet: string): string {
   const hit = players.find((p) => walletsEqual(p, wallet));
   return hit || wallet;
 }
@@ -3104,7 +3105,10 @@ export const submitChallengeResult = async (
       const currentPlayers = updatedData.players || [];
       const bothSubmitted =
         currentPlayers.length === 2 &&
-        currentPlayers.every((p: string) => currentResults[p] !== undefined);
+        currentPlayers.every((p: string) => {
+          const key = canonicalPlayerKey(currentPlayers, p);
+          return currentResults[key] !== undefined;
+        });
       if (bothSubmitted) {
         await writeChallengeFields(
           challengeId,
@@ -3132,7 +3136,10 @@ export const submitChallengeResult = async (
     const submittedPlayers = Object.keys(currentResults);
     if (submittedPlayers.length === currentPlayers.length && currentPlayers.length === 2) {
       // Verify both players in the challenge have submitted
-      const bothSubmitted = currentPlayers.every((p: string) => currentResults[p] !== undefined);
+      const bothSubmitted = currentPlayers.every((p: string) => {
+        const key = canonicalPlayerKey(currentPlayers, p);
+        return currentResults[key] !== undefined;
+      });
       
       if (bothSubmitted) {
         console.log('🎯 Both players submitted! Determining winner...');
@@ -3236,6 +3243,7 @@ async function cleanupChallengeData(challengeId: string, isDispute: boolean = fa
 async function determineWinner(challengeId: string, data: ChallengeData): Promise<void> {
   try {
     const results = data.results || {};
+    const roster = data.players || [];
     const players = Object.keys(results);
     
     console.log('🎯 Determining winner for challenge:', challengeId);
@@ -3249,8 +3257,10 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
 
     const player1 = players[0];
     const player2 = players[1];
-    const player1Won = results[player1].didWin;
-    const player2Won = results[player2].didWin;
+    const key1 = canonicalPlayerKey(roster, player1);
+    const key2 = canonicalPlayerKey(roster, player2);
+    const player1Won = results[key1]?.didWin ?? results[player1]?.didWin;
+    const player2Won = results[key2]?.didWin ?? results[player2]?.didWin;
     
     console.log(`Player 1 (${player1.slice(0,8)}...): didWin=${player1Won}`);
     console.log(`Player 2 (${player2.slice(0,8)}...): didWin=${player2Won}`);
@@ -3305,8 +3315,8 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     }
 
     // Case 3: Clear winner (one YES, one NO) - DELETE CHAT (no dispute)
-    const winner = player1Won ? player1 : player2;
-    const loser = player1Won ? player2 : player1;
+    const winner = player1Won ? key1 : key2;
+    const loser = player1Won ? key2 : key1;
     
     await writeChallengeFields(
       challengeId,

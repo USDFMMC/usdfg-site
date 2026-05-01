@@ -3906,7 +3906,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         }
       }
       if (!fresh) {
-        showAppToast("Challenge not found. Try again in a moment.", "info", "Syncing");
+        if (isMountedRef.current) {
+          showAppToast("Challenge not found. Try again in a moment.", "info", "Syncing");
+        }
         return;
       }
 
