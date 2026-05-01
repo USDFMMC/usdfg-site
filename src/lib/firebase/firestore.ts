@@ -6096,6 +6096,7 @@ export async function claimChallengePrize(
     }
 
     const lockOwner = crypto.randomUUID();
+    const callerLockId = lockOwner;
     const lockResult = await runTransaction(db, async (tx) => {
       const snap = await tx.get(challengeRef);
       if (!snap.exists()) {
@@ -6106,9 +6107,25 @@ export async function claimChallengePrize(
       if (d.payoutSignature || d.payoutStatus === 'paid') {
         return 'done' as const;
       }
-      if (d.payoutStatus === 'processing' && !d.payoutSignature) {
+
+      const isStaleProcessing =
+        d.payoutStatus === 'processing' &&
+        !d.payoutSignature &&
+        d.payoutAttemptedAt &&
+        Date.now() - d.payoutAttemptedAt.toMillis() > STALE_MS &&
+        (!d.payoutLockOwner || d.payoutLockOwner === callerLockId);
+
+      if (isStaleProcessing) {
+        console.log('⚠️ Resetting stale payout lock');
+        tx.update(challengeRef, {
+          payoutStatus: 'pending',
+          payoutLockOwner: deleteField(),
+          payoutAttemptedAt: deleteField(),
+        });
+      } else if (d.payoutStatus === 'processing' && !d.payoutSignature) {
         return 'in_flight' as const;
       }
+
       if (!d.needsPayout) {
         throw new Error('Payout not available or already processed');
       }
