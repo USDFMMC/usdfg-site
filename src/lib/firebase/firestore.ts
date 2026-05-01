@@ -5818,6 +5818,22 @@ export async function recalculateAllTrustScores(): Promise<void> {
 // PLAYER-PAID PAYOUT SYSTEM
 // ============================================
 
+function challengeHasValidPayoutWinner(data: ChallengeData): boolean {
+  return (
+    !!data.winner &&
+    data.winner !== 'forfeit' &&
+    data.winner !== 'tie'
+  );
+}
+
+function ensureWinnerInRoster(data: ChallengeData): void {
+  const roster = data.players || [];
+  const inRoster = roster.some((p) => walletsEqual(p, data.winner));
+  if (!inRoster) {
+    throw new Error('❌ Winner is not a valid participant.');
+  }
+}
+
 /**
  * Claim reward for a completed challenge (WINNER ONLY)
  * 
@@ -5891,13 +5907,17 @@ export async function claimChallengePrize(
     }
     
     // Validate challenge is ready for claim
-    if (data.status !== 'completed') {
-      throw new Error('❌ Challenge is not completed');
+    const isCompleted = data.status === 'completed';
+    if (!isCompleted) {
+      throw new Error('❌ Challenge is not completed yet.');
     }
-    
-    if (!data.winner || data.winner === 'forfeit' || data.winner === 'tie') {
-      throw new Error('❌ No valid winner to pay out');
+
+    const hasValidWinner = challengeHasValidPayoutWinner(data);
+    if (!hasValidWinner) {
+      throw new Error('❌ No valid winner for payout.');
     }
+
+    ensureWinnerInRoster(data);
 
     const rawData = (data as any).rawData as Partial<ChallengeData> | undefined;
     const format = data.format ?? rawData?.format;
@@ -5908,7 +5928,14 @@ export async function claimChallengePrize(
 
     // Standard (non-tournament) escrow claims: require payout gate — never apply founder-tournament rules here.
     if (!isTournament) {
-      const isAdminResolved = !!(data as any).resolvedBy && data.status === 'completed';
+      if (!isCompleted) {
+        throw new Error('❌ Challenge is not completed yet.');
+      }
+
+      const isAdminResolved =
+        !!(data as any).resolvedBy &&
+        isCompleted &&
+        hasValidWinner;
 
       const payoutReady =
         data.needsPayout === true ||
@@ -5968,18 +5995,36 @@ export async function claimChallengePrize(
     }
     
     const callerAddress = winnerWallet.publicKey.toString();
-    if (!data.winner || !walletsEqual(callerAddress, data.winner)) {
+    if (!walletsEqual(callerAddress, data.winner)) {
       throw new Error('❌ Only the winner can claim the reward');
     }
     
-    // Allow claim if: canClaim is set, admin-resolved (resolvedBy), or challenge is completed with a winner (covers legacy/race cases)
-    const isAdminResolved = !!(data as any).resolvedBy;
-    const claimable =
-      data.canClaim === true ||
-      (isAdminResolved && data.status === 'completed') ||
-      (data.status === 'completed' && data.winner && data.winner !== 'forfeit' && data.winner !== 'tie');
-    if (!claimable) {
-      throw new Error('❌ Challenge is not ready for claim yet');
+    // Non-tournament: same readiness as payoutReady (needsPayout or admin-resolved). Tournament: unchanged (canClaim / admin / completed+winner).
+    if (!isTournament) {
+      if (!isCompleted) {
+        throw new Error('❌ Challenge is not completed yet.');
+      }
+
+      const isAdminResolved =
+        !!(data as any).resolvedBy &&
+        isCompleted &&
+        hasValidWinner;
+
+      const claimableNonTournament =
+        data.needsPayout === true ||
+        isAdminResolved;
+      if (!claimableNonTournament) {
+        throw new Error('❌ Prize payout is not enabled for this challenge yet.');
+      }
+    } else {
+      const isAdminResolved = !!(data as any).resolvedBy;
+      const claimable =
+        data.canClaim === true ||
+        (isAdminResolved && isCompleted) ||
+        (isCompleted && hasValidWinner);
+      if (!claimable) {
+        throw new Error('❌ Challenge is not ready for claim yet');
+      }
     }
 
     // Re-fetch immediately before chain to reduce double-send race (another tab / retry)
@@ -5988,6 +6033,12 @@ export async function claimChallengePrize(
       throw new Error('❌ Challenge not found in Firestore');
     }
     data = preChainSnap.data() as ChallengeData;
+
+    if (!challengeHasValidPayoutWinner(data)) {
+      throw new Error('❌ No valid winner for payout.');
+    }
+
+    ensureWinnerInRoster(data);
 
     const STALE_MS = 2 * 60 * 1000;
     if (
