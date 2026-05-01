@@ -65,8 +65,13 @@ async function applyClearWinnerStats(db, data, winnerWallet, loserWallet) {
     const game = data.game || "Unknown";
     const category = data.category || "Sports";
     if (data.challengeType === "team") {
-        await (0, statsAdmin_1.updateTeamStatsAdmin)(db, winnerWallet, "win", prizePool, game, category);
-        await (0, statsAdmin_1.updateTeamStatsAdmin)(db, loserWallet, "loss", 0, game, category);
+        const { skillA: winnerSkill, skillB: loserSkill } = await (0, statsAdmin_1.fetchTeamMatchSkillScores)(db, winnerWallet, loserWallet);
+        await (0, statsAdmin_1.updateTeamStatsAdmin)(db, winnerWallet, "win", prizePool, game, category, {
+            opponentSkillScore: loserSkill,
+        });
+        await (0, statsAdmin_1.updateTeamStatsAdmin)(db, loserWallet, "loss", 0, game, category, {
+            opponentSkillScore: winnerSkill,
+        });
     }
     else {
         const { skillA: winnerSkill, skillB: loserSkill } = await (0, statsAdmin_1.fetchSoloMatchSkillScores)(db, winnerWallet, loserWallet);

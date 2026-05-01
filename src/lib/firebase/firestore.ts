@@ -3893,6 +3893,8 @@ export interface TeamStats {
   behaviorTrustScore?: number;
   forfeits?: number;
   trustReviews?: number;
+  /** Team skill progression; same rules as PlayerStats.skillScore; default 100 when missing */
+  skillScore?: number;
   // Team game stats
   gameStats: {
     [game: string]: {
@@ -3997,7 +3999,7 @@ function calculateTrustScoreSync(wallet: string): { trustScore: number; trustRev
 const DEFAULT_PLAYER_SKILL_SCORE = 100;
 const SKILL_SCORE_SOFT_CAP = 3000;
 
-function skillScoreFromStored(s: PlayerStats | null | undefined): number {
+function skillScoreFromStored(s: { skillScore?: number } | null | undefined): number {
   const v = s?.skillScore;
   return Number.isFinite(v) ? (v as number) : DEFAULT_PLAYER_SKILL_SCORE;
 }
@@ -4022,6 +4024,10 @@ function skillScoreAfterLoss(selfBefore: number, opponentSkill: number): number 
 type PlayerStatsResolutionOpts = {
   resolutionType?: 'auto' | 'admin' | 'forfeit';
   /** Pre-match opponent skill (for upset / weaker-opponent adjustments) */
+  opponentSkillScore?: number;
+};
+
+type TeamStatsResolutionOpts = {
   opponentSkillScore?: number;
 };
 
@@ -4093,8 +4099,26 @@ async function runWinLossStatsForChallenge(
   const category = data.category || 'Sports';
   try {
     if (isTeamChallenge) {
-      await updateTeamStats(winnerWallet, 'win', prizePool, game, category);
-      await updateTeamStats(loserWallet, 'loss', 0, game, category);
+      const winnerTeamRef = doc(db, 'teams', winnerWallet);
+      const loserTeamRef = doc(db, 'teams', loserWallet);
+      const [winnerTeamSnap, loserTeamSnap] = await Promise.all([
+        getDoc(winnerTeamRef),
+        getDoc(loserTeamRef),
+      ]);
+      let winnerTeamSkill = skillScoreFromStored(
+        winnerTeamSnap.exists() ? (winnerTeamSnap.data() as TeamStats) : null
+      );
+      let loserTeamSkill = skillScoreFromStored(
+        loserTeamSnap.exists() ? (loserTeamSnap.data() as TeamStats) : null
+      );
+      if (!Number.isFinite(winnerTeamSkill)) winnerTeamSkill = DEFAULT_PLAYER_SKILL_SCORE;
+      if (!Number.isFinite(loserTeamSkill)) loserTeamSkill = DEFAULT_PLAYER_SKILL_SCORE;
+      await updateTeamStats(winnerWallet, 'win', prizePool, game, category, {
+        opponentSkillScore: loserTeamSkill,
+      });
+      await updateTeamStats(loserWallet, 'loss', 0, game, category, {
+        opponentSkillScore: winnerTeamSkill,
+      });
       return true;
     }
     const rawWinnerName = winnerWallet === data.creator ? data.creatorTag : undefined;
@@ -5434,7 +5458,8 @@ export async function updateTeamStats(
   result: 'win' | 'loss' | 'forfeit',
   amountEarned: number,
   game: string,
-  category: string
+  category: string,
+  opts?: TeamStatsResolutionOpts
 ): Promise<void> {
   try {
     const teamRef = doc(db, 'teams', teamId);
@@ -5445,19 +5470,32 @@ export async function updateTeamStats(
     }
     
     const currentStats = teamSnap.data() as TeamStats;
+    const teamSkill = skillScoreFromStored(currentStats);
+    const rawOpp = opts?.opponentSkillScore;
+    const opponentSkill = Number.isFinite(rawOpp) ? (rawOpp as number) : teamSkill;
 
     if (result === 'forfeit') {
       const base =
         (currentStats.behaviorTrustScore ?? currentStats.trustScore ?? 5) || 5;
       const newBehavior = Math.max(0, base - 1);
+      const newSkill = clampSkillScoreWrite(teamSkill - 10);
       await updateDoc(teamRef, {
         forfeits: (currentStats.forfeits || 0) + 1,
         behaviorTrustScore: newBehavior,
+        skillScore: newSkill,
         lastActive: Timestamp.now(),
       });
       console.log(`✅ Team forfeit stat: ${teamId.slice(0, 8)}...`);
       return;
     }
+    let newSkill = teamSkill;
+    if (result === 'win') {
+      newSkill = skillScoreAfterWin(teamSkill, opponentSkill);
+    } else if (result === 'loss') {
+      newSkill = skillScoreAfterLoss(teamSkill, opponentSkill);
+    }
+    const skillWrite = clampSkillScoreWrite(newSkill);
+
     const newWins = result === 'win' ? currentStats.wins + 1 : currentStats.wins;
     const newLosses = result === 'loss' ? currentStats.losses + 1 : currentStats.losses;
     const newGamesPlayed = currentStats.gamesPlayed + 1;
@@ -5493,6 +5531,7 @@ export async function updateTeamStats(
       totalEarned: newTotalEarned,
       gamesPlayed: newGamesPlayed,
       lastActive: Timestamp.now(),
+      skillScore: skillWrite,
       gameStats: newGameStats,
       categoryStats: newCategoryStats
     });

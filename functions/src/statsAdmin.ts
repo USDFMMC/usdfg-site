@@ -54,6 +54,22 @@ export async function fetchSoloMatchSkillScores(
   };
 }
 
+/** Pre-update team skill from teams collection (same skill field semantics as players). */
+export async function fetchTeamMatchSkillScores(
+  db: Firestore,
+  teamIdA: string,
+  teamIdB: string
+): Promise<{ skillA: number; skillB: number }> {
+  const [snapA, snapB] = await Promise.all([
+    db.collection("teams").doc(teamIdA).get(),
+    db.collection("teams").doc(teamIdB).get(),
+  ]);
+  return {
+    skillA: skillScoreFromStoredAdmin(snapA.exists ? (snapA.data() as Record<string, unknown>) : undefined),
+    skillB: skillScoreFromStoredAdmin(snapB.exists ? (snapB.data() as Record<string, unknown>) : undefined),
+  };
+}
+
 function behaviorTrustBaseFromSnap(data: Record<string, unknown> | undefined): number {
   if (!data) return 5;
   const bt = data.behaviorTrustScore as number | undefined;
@@ -240,7 +256,8 @@ export async function updateTeamStatsAdmin(
   result: "win" | "loss" | "forfeit",
   amountEarned: number,
   game: string,
-  category: string
+  category: string,
+  opts?: Pick<StatsAdminOpts, "opponentSkillScore">
 ): Promise<void> {
   const teamRef = db.collection("teams").doc(teamId);
   const teamSnap = await teamRef.get();
@@ -248,17 +265,30 @@ export async function updateTeamStatsAdmin(
     throw new Error("Team not found");
   }
   const currentStats = teamSnap.data() as Record<string, unknown>;
+  const teamSkill = skillScoreFromStoredAdmin(currentStats);
+  const rawOpp = opts?.opponentSkillScore;
+  const opponentSkill = Number.isFinite(rawOpp) ? (rawOpp as number) : teamSkill;
 
   if (result === "forfeit") {
     const base = behaviorTrustBaseFromSnap(currentStats);
     const newBehavior = Math.max(0, base - 1);
+    const newSkill = clampSkillScoreWrite(teamSkill - 10);
     await teamRef.update({
       forfeits: ((currentStats.forfeits as number) || 0) + 1,
       behaviorTrustScore: newBehavior,
+      skillScore: newSkill,
       lastActive: Timestamp.now(),
     });
     return;
   }
+
+  let newSkill = teamSkill;
+  if (result === "win") {
+    newSkill = skillScoreAfterWin(teamSkill, opponentSkill);
+  } else if (result === "loss") {
+    newSkill = skillScoreAfterLoss(teamSkill, opponentSkill);
+  }
+  const skillWrite = clampSkillScoreWrite(newSkill);
 
   const newWins = result === "win" ? (currentStats.wins as number) + 1 : (currentStats.wins as number);
   const newLosses =
@@ -297,6 +327,7 @@ export async function updateTeamStatsAdmin(
     totalEarned: newTotalEarned,
     gamesPlayed: newGamesPlayed,
     lastActive: Timestamp.now(),
+    skillScore: skillWrite,
     gameStats: newGameStats,
     categoryStats: newCategoryStats,
   });
@@ -324,8 +355,17 @@ export async function applyStatsAfterDisputeResolution(
   if (!loser) return;
 
   if (isTeamChallenge) {
-    await updateTeamStatsAdmin(db, winnerWallet, "win", prizePool, game, category);
-    await updateTeamStatsAdmin(db, loser, "loss", 0, game, category);
+    const { skillA: winnerSkill, skillB: loserSkill } = await fetchTeamMatchSkillScores(
+      db,
+      winnerWallet,
+      loser
+    );
+    await updateTeamStatsAdmin(db, winnerWallet, "win", prizePool, game, category, {
+      opponentSkillScore: loserSkill,
+    });
+    await updateTeamStatsAdmin(db, loser, "loss", 0, game, category, {
+      opponentSkillScore: winnerSkill,
+    });
   } else {
     const { skillA: winnerSkill, skillB: loserSkill } = await fetchSoloMatchSkillScores(db, winnerWallet, loser);
     await updatePlayerStatsAdmin(db, winnerWallet, "win", prizePool, game, category, {

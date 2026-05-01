@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.fetchSoloMatchSkillScores = fetchSoloMatchSkillScores;
+exports.fetchTeamMatchSkillScores = fetchTeamMatchSkillScores;
 exports.updatePlayerStatsAdmin = updatePlayerStatsAdmin;
 exports.updateTeamStatsAdmin = updateTeamStatsAdmin;
 exports.applyStatsAfterDisputeResolution = applyStatsAfterDisputeResolution;
@@ -38,6 +39,17 @@ async function fetchSoloMatchSkillScores(db, walletA, walletB) {
     const [snapA, snapB] = await Promise.all([
         db.collection("player_stats").doc(keyA).get(),
         db.collection("player_stats").doc(keyB).get(),
+    ]);
+    return {
+        skillA: skillScoreFromStoredAdmin(snapA.exists ? snapA.data() : undefined),
+        skillB: skillScoreFromStoredAdmin(snapB.exists ? snapB.data() : undefined),
+    };
+}
+/** Pre-update team skill from teams collection (same skill field semantics as players). */
+async function fetchTeamMatchSkillScores(db, teamIdA, teamIdB) {
+    const [snapA, snapB] = await Promise.all([
+        db.collection("teams").doc(teamIdA).get(),
+        db.collection("teams").doc(teamIdB).get(),
     ]);
     return {
         skillA: skillScoreFromStoredAdmin(snapA.exists ? snapA.data() : undefined),
@@ -199,23 +211,36 @@ async function updatePlayerStatsAdmin(db, wallet, result, amountEarned, game, ca
     }
     await playerRef.update(updatePayload);
 }
-async function updateTeamStatsAdmin(db, teamId, result, amountEarned, game, category) {
+async function updateTeamStatsAdmin(db, teamId, result, amountEarned, game, category, opts) {
     const teamRef = db.collection("teams").doc(teamId);
     const teamSnap = await teamRef.get();
     if (!teamSnap.exists) {
         throw new Error("Team not found");
     }
     const currentStats = teamSnap.data();
+    const teamSkill = skillScoreFromStoredAdmin(currentStats);
+    const rawOpp = opts?.opponentSkillScore;
+    const opponentSkill = Number.isFinite(rawOpp) ? rawOpp : teamSkill;
     if (result === "forfeit") {
         const base = behaviorTrustBaseFromSnap(currentStats);
         const newBehavior = Math.max(0, base - 1);
+        const newSkill = clampSkillScoreWrite(teamSkill - 10);
         await teamRef.update({
             forfeits: (currentStats.forfeits || 0) + 1,
             behaviorTrustScore: newBehavior,
+            skillScore: newSkill,
             lastActive: firestore_1.Timestamp.now(),
         });
         return;
     }
+    let newSkill = teamSkill;
+    if (result === "win") {
+        newSkill = skillScoreAfterWin(teamSkill, opponentSkill);
+    }
+    else if (result === "loss") {
+        newSkill = skillScoreAfterLoss(teamSkill, opponentSkill);
+    }
+    const skillWrite = clampSkillScoreWrite(newSkill);
     const newWins = result === "win" ? currentStats.wins + 1 : currentStats.wins;
     const newLosses = result === "loss" ? currentStats.losses + 1 : currentStats.losses;
     const newGamesPlayed = currentStats.gamesPlayed + 1;
@@ -248,6 +273,7 @@ async function updateTeamStatsAdmin(db, teamId, result, amountEarned, game, cate
         totalEarned: newTotalEarned,
         gamesPlayed: newGamesPlayed,
         lastActive: firestore_1.Timestamp.now(),
+        skillScore: skillWrite,
         gameStats: newGameStats,
         categoryStats: newCategoryStats,
     });
@@ -270,8 +296,13 @@ async function applyStatsAfterDisputeResolution(challengeData, winnerWalletRaw) 
     if (!loser)
         return;
     if (isTeamChallenge) {
-        await updateTeamStatsAdmin(db, winnerWallet, "win", prizePool, game, category);
-        await updateTeamStatsAdmin(db, loser, "loss", 0, game, category);
+        const { skillA: winnerSkill, skillB: loserSkill } = await fetchTeamMatchSkillScores(db, winnerWallet, loser);
+        await updateTeamStatsAdmin(db, winnerWallet, "win", prizePool, game, category, {
+            opponentSkillScore: loserSkill,
+        });
+        await updateTeamStatsAdmin(db, loser, "loss", 0, game, category, {
+            opponentSkillScore: winnerSkill,
+        });
     }
     else {
         const { skillA: winnerSkill, skillB: loserSkill } = await fetchSoloMatchSkillScores(db, winnerWallet, loser);
