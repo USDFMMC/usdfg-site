@@ -148,14 +148,17 @@ async function processOneChallenge(ref) {
             return { kind: "skip" };
         }
         const provKey = players.find((p) => normalizeWinnerWallet(p) === provNorm) || prov;
-        let resultsTouched = false;
-        if (!results[provKey]) {
+        const existing = results?.[provKey];
+        const needsProvisionalWrite = !existing ||
+            existing.didWin !== true ||
+            !existing.submittedAt ||
+            existing.autoDetermined !== true;
+        if (needsProvisionalWrite) {
             results[provKey] = {
                 didWin: true,
                 submittedAt: firestore_1.Timestamp.now(),
                 autoDetermined: true,
             };
-            resultsTouched = true;
         }
         const [p1, p2] = [players[0], players[1]];
         const r1 = resultForWallet(results, p1)?.didWin;
@@ -189,16 +192,16 @@ async function processOneChallenge(ref) {
             });
             return { kind: "disputed" };
         }
-        const completionResultsPatch = hasAnyProofImageData(results)
+        const resultsPatch = hasAnyProofImageData(results)
             ? { results: stripProofImageDataFromResults(results) }
-            : resultsTouched
+            : needsProvisionalWrite
                 ? { results }
                 : {};
         if (!r1 && !r2) {
             tx.update(ref, {
                 ...clearFields,
                 ...finalizeMeta,
-                ...completionResultsPatch,
+                ...resultsPatch,
                 status: "completed",
                 winner: "forfeit",
                 resolutionType: "forfeit",
@@ -214,7 +217,7 @@ async function processOneChallenge(ref) {
         tx.update(ref, {
             ...clearFields,
             ...finalizeMeta,
-            ...completionResultsPatch,
+            ...resultsPatch,
             status: "completed",
             winner: winnerNorm,
             resolutionType: "auto",

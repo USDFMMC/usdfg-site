@@ -147,14 +147,20 @@ async function processOneChallenge(ref: DocumentReference): Promise<void> {
     }
 
     const provKey = players.find((p) => normalizeWinnerWallet(p) === provNorm) || prov;
-    let resultsTouched = false;
-    if (!results[provKey]) {
+    const existing = results?.[provKey];
+
+    const needsProvisionalWrite =
+      !existing ||
+      existing.didWin !== true ||
+      !existing.submittedAt ||
+      existing.autoDetermined !== true;
+
+    if (needsProvisionalWrite) {
       results[provKey] = {
         didWin: true,
         submittedAt: Timestamp.now(),
         autoDetermined: true,
       };
-      resultsTouched = true;
     }
 
     const [p1, p2] = [players[0], players[1]];
@@ -194,10 +200,10 @@ async function processOneChallenge(ref: DocumentReference): Promise<void> {
       return { kind: "disputed" } as const;
     }
 
-    const completionResultsPatch =
+    const resultsPatch =
       hasAnyProofImageData(results as Record<string, any>)
         ? { results: stripProofImageDataFromResults(results as Record<string, any>)! }
-        : resultsTouched
+        : needsProvisionalWrite
           ? { results }
           : {};
 
@@ -205,7 +211,7 @@ async function processOneChallenge(ref: DocumentReference): Promise<void> {
       tx.update(ref, {
         ...clearFields,
         ...finalizeMeta,
-        ...completionResultsPatch,
+        ...resultsPatch,
         status: "completed",
         winner: "forfeit",
         resolutionType: "forfeit",
@@ -222,7 +228,7 @@ async function processOneChallenge(ref: DocumentReference): Promise<void> {
     tx.update(ref, {
       ...clearFields,
       ...finalizeMeta,
-      ...completionResultsPatch,
+      ...resultsPatch,
       status: "completed",
       winner: winnerNorm,
       resolutionType: "auto",
