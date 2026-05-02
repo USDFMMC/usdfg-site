@@ -3247,6 +3247,25 @@ async function cleanupChallengeData(challengeId: string, isDispute: boolean = fa
   }
 }
 
+const hasAnyProofImageData = (results?: Record<string, any>) =>
+  !!results &&
+  Object.values(results).some((r: any) => r && r.proofImageData != null);
+
+/** Remove proof images from `results` after completion (shallow copy per entry; does not mutate source). */
+const stripProofImageDataFromResults = (results?: Record<string, any>) => {
+  if (!results) return results;
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(results)) {
+    if (!v) {
+      out[k] = v;
+      continue;
+    }
+    const { proofImageData, ...rest } = v;
+    out[k] = { ...rest };
+  }
+  return out;
+};
+
 /**
  * Determine winner based on submitted results
  * Logic:
@@ -3304,6 +3323,13 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
           status: 'completed',
           winner: 'forfeit', // Special value: both players forfeit, no refund
           resolutionType: 'forfeit',
+          ...(hasAnyProofImageData(data.results as Record<string, any>)
+            ? {
+                results: stripProofImageDataFromResults(
+                  data.results as Record<string, any>
+                ) as ChallengeData['results'],
+              }
+            : {}),
           updatedAt: Timestamp.now(),
         },
         { currentData: data }
@@ -3372,6 +3398,13 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
         needsPayout: true,
         payoutTriggered: false,
         canClaim: true,
+        ...(hasAnyProofImageData(postWinData.results as Record<string, any>)
+          ? {
+              results: stripProofImageDataFromResults(
+                postWinData.results as Record<string, any>
+              ) as ChallengeData['results'],
+            }
+          : {}),
         updatedAt: Timestamp.now(),
         ...(statsOk ? { statsApplied: true } : {}),
       },
@@ -3566,6 +3599,13 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
           status: 'completed',
           winner: 'forfeit', // Special value indicating both players forfeited
           resolutionType: 'forfeit',
+          ...(hasAnyProofImageData(data.results as Record<string, any>)
+            ? {
+                results: stripProofImageDataFromResults(
+                  data.results as Record<string, any>
+                ) as ChallengeData['results'],
+              }
+            : {}),
           updatedAt: Timestamp.now(),
         },
         { currentData: data }
@@ -3604,6 +3644,13 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
             needsPayout: true,
             payoutTriggered: false,
             canClaim: true,
+            ...(hasAnyProofImageData(data.results as Record<string, any>)
+              ? {
+                  results: stripProofImageDataFromResults(
+                    data.results as Record<string, any>
+                  ) as ChallengeData['results'],
+                }
+              : {}),
             updatedAt: Timestamp.now(),
           },
           { currentData: data }
@@ -3651,6 +3698,13 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
               payoutTriggered: false,
               canClaim: true,
             }),
+            ...(hasAnyProofImageData(data.results as Record<string, any>)
+              ? {
+                  results: stripProofImageDataFromResults(
+                    data.results as Record<string, any>
+                  ) as ChallengeData['results'],
+                }
+              : {}),
             updatedAt: Timestamp.now(),
           },
           { currentData: data }
@@ -6554,6 +6608,13 @@ export const resolveAdminChallenge = async (
         needsPayout: true,
         payoutTriggered: false,
         canClaim: true,
+        ...(hasAnyProofImageData(challengeData.results as Record<string, any>)
+          ? {
+              results: stripProofImageDataFromResults(
+                challengeData.results as Record<string, any>
+              ) as ChallengeData['results'],
+            }
+          : {}),
         payoutLastError: deleteField(),
         payoutErrorAt: deleteField(),
         payoutLockOwner: deleteField(),

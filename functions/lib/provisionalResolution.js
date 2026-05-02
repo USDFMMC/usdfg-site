@@ -43,6 +43,22 @@ function normalizeWinnerWallet(w) {
         return w;
     return w.toLowerCase();
 }
+const hasAnyProofImageData = (results) => !!results &&
+    Object.values(results).some((r) => r && r.proofImageData != null);
+const stripProofImageDataFromResults = (results) => {
+    if (!results)
+        return results;
+    const out = {};
+    for (const [k, v] of Object.entries(results)) {
+        if (!v) {
+            out[k] = v;
+            continue;
+        }
+        const { proofImageData, ...rest } = v;
+        out[k] = { ...rest };
+    }
+    return out;
+};
 function prizePoolFromChallenge(data) {
     const stored = data.prizePool;
     if (stored && stored > 0)
@@ -132,12 +148,14 @@ async function processOneChallenge(ref) {
             return { kind: "skip" };
         }
         const provKey = players.find((p) => normalizeWinnerWallet(p) === provNorm) || prov;
+        let resultsTouched = false;
         if (!results[provKey]) {
             results[provKey] = {
                 didWin: true,
                 submittedAt: firestore_1.Timestamp.now(),
                 autoDetermined: true,
             };
+            resultsTouched = true;
         }
         const [p1, p2] = [players[0], players[1]];
         const r1 = resultForWallet(results, p1)?.didWin;
@@ -171,11 +189,16 @@ async function processOneChallenge(ref) {
             });
             return { kind: "disputed" };
         }
+        const completionResultsPatch = hasAnyProofImageData(results)
+            ? { results: stripProofImageDataFromResults(results) }
+            : resultsTouched
+                ? { results }
+                : {};
         if (!r1 && !r2) {
             tx.update(ref, {
                 ...clearFields,
                 ...finalizeMeta,
-                results,
+                ...completionResultsPatch,
                 status: "completed",
                 winner: "forfeit",
                 resolutionType: "forfeit",
@@ -191,7 +214,7 @@ async function processOneChallenge(ref) {
         tx.update(ref, {
             ...clearFields,
             ...finalizeMeta,
-            results,
+            ...completionResultsPatch,
             status: "completed",
             winner: winnerNorm,
             resolutionType: "auto",

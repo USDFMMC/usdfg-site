@@ -10,6 +10,22 @@ function normalizeWinnerWallet(w) {
         return w;
     return w.toLowerCase();
 }
+const hasAnyProofImageData = (results) => !!results &&
+    Object.values(results).some((r) => r && r.proofImageData != null);
+const stripProofImageDataFromResults = (results) => {
+    if (!results)
+        return results;
+    const out = {};
+    for (const [k, v] of Object.entries(results)) {
+        if (!v) {
+            out[k] = v;
+            continue;
+        }
+        const { proofImageData, ...rest } = v;
+        out[k] = { ...rest };
+    }
+    return out;
+};
 exports.finalizeAdminChallengeDispute = (0, https_1.onCall)(async (request) => {
     const adminWallet = (0, adminHelpers_1.requireAdminClaims)(request);
     const challengeId = request.data?.challengeId;
@@ -33,7 +49,8 @@ exports.finalizeAdminChallengeDispute = (0, https_1.onCall)(async (request) => {
     if (!players.some((p) => normalizeWinnerWallet(p) === winnerNorm)) {
         throw new https_1.HttpsError("invalid-argument", "Winner must be one of the challenge participants");
     }
-    await challengeRef.update({
+    const resultsRaw = challengeData.results;
+    const completionPatch = {
         status: "completed",
         winner: normalizeWinnerWallet(winnerWalletRaw),
         resolutionType: "admin",
@@ -44,7 +61,11 @@ exports.finalizeAdminChallengeDispute = (0, https_1.onCall)(async (request) => {
         needsPayout: true,
         payoutTriggered: false,
         canClaim: true,
-    });
+    };
+    if (hasAnyProofImageData(resultsRaw)) {
+        completionPatch.results = stripProofImageDataFromResults(resultsRaw);
+    }
+    await challengeRef.update(completionPatch);
     await db.collection("admin_audit_log").add({
         adminUid: adminWallet,
         adminEmail: `wallet:${adminWallet}`,

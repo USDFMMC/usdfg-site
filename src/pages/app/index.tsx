@@ -815,7 +815,7 @@ const ArenaHome: React.FC = () => {
   const [selectedTrophy, setSelectedTrophy] = useState<any>(null);
   const [pendingMatchResult, setPendingMatchResult] = useState<{
     didWin: boolean;
-    proofFile?: File | null;
+    proofImageData?: string | null;
     challengeId?: string;
     opponentWallet?: string; // Store opponent wallet for trust review
     autoWon?: boolean; // Flag to indicate this win was auto-determined (opponent submitted loss)
@@ -1948,7 +1948,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         
         setPendingMatchResult({
           didWin: true,
-          proofFile: null,
+          proofImageData: null,
           challengeId: challenge.id,
           opponentWallet: opponentWallet || undefined,
           autoWon: true
@@ -3455,13 +3455,26 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Get opponent wallet - find from players array
       const playersArray = selectedChallenge.rawData?.players || (Array.isArray(selectedChallenge.players) ? selectedChallenge.players : []);
       const opponentWallet = playersArray.find((p: string) => p && !walletsEqual(p, publicKey.toBase58()));
-      
-      // Store the match result for later submission with trust review
-      const matchResult = { 
-        didWin, 
-        proofFile, 
+
+      const toBase64 = (file: File) =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(reader.error ?? new Error('Failed to read proof file'));
+        });
+
+      let proofImageData: string | null = null;
+      if (proofFile) {
+        proofImageData = await toBase64(proofFile);
+      }
+
+      // Store the match result for later submission with trust review (proof as data URL only)
+      const matchResult = {
+        didWin,
+        proofImageData,
         challengeId: selectedChallenge.id,
-        opponentWallet: opponentWallet || undefined, // Store opponent wallet for trust review
+        opponentWallet: opponentWallet || undefined,
       };
       setPendingMatchResult(matchResult);
       
@@ -3519,7 +3532,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       if (!pendingMatchResult.autoWon) {
         try {
           // Standard challenge result submission
-      await submitChallengeResult(challengeId, publicKey.toBase58(), pendingMatchResult.didWin);
+          await submitChallengeResult(
+            challengeId,
+            publicKey.toBase58(),
+            pendingMatchResult.didWin,
+            pendingMatchResult.proofImageData || undefined
+          );
           console.log('✅ Match result submitted');
         } catch (resultError: any) {
           // If result is already submitted, that's okay - we can still store the trust review
@@ -3795,7 +3813,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           // Set up pending match result as if they won (which they did)
           setPendingMatchResult({
             didWin: true,
-            proofFile: null,
+            proofImageData: null,
             challengeId: challenge.id,
             opponentWallet: opponentWallet || undefined,
             autoWon: true,

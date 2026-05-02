@@ -15,6 +15,24 @@ function normalizeWinnerWallet(w: string): string {
 
 type ResultEntry = { didWin: boolean; submittedAt?: Timestamp; autoDetermined?: boolean };
 
+const hasAnyProofImageData = (results?: Record<string, any>) =>
+  !!results &&
+  Object.values(results).some((r: any) => r && r.proofImageData != null);
+
+const stripProofImageDataFromResults = (results?: Record<string, any>) => {
+  if (!results) return results;
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(results)) {
+    if (!v) {
+      out[k] = v;
+      continue;
+    }
+    const { proofImageData, ...rest } = v as Record<string, any>;
+    out[k] = { ...rest };
+  }
+  return out;
+};
+
 function prizePoolFromChallenge(data: Record<string, unknown>): number {
   const stored = data.prizePool as number | undefined;
   if (stored && stored > 0) return stored;
@@ -129,12 +147,14 @@ async function processOneChallenge(ref: DocumentReference): Promise<void> {
     }
 
     const provKey = players.find((p) => normalizeWinnerWallet(p) === provNorm) || prov;
+    let resultsTouched = false;
     if (!results[provKey]) {
       results[provKey] = {
         didWin: true,
         submittedAt: Timestamp.now(),
         autoDetermined: true,
       };
+      resultsTouched = true;
     }
 
     const [p1, p2] = [players[0], players[1]];
@@ -174,11 +194,18 @@ async function processOneChallenge(ref: DocumentReference): Promise<void> {
       return { kind: "disputed" } as const;
     }
 
+    const completionResultsPatch =
+      hasAnyProofImageData(results as Record<string, any>)
+        ? { results: stripProofImageDataFromResults(results as Record<string, any>)! }
+        : resultsTouched
+          ? { results }
+          : {};
+
     if (!r1 && !r2) {
       tx.update(ref, {
         ...clearFields,
         ...finalizeMeta,
-        results,
+        ...completionResultsPatch,
         status: "completed",
         winner: "forfeit",
         resolutionType: "forfeit",
@@ -195,7 +222,7 @@ async function processOneChallenge(ref: DocumentReference): Promise<void> {
     tx.update(ref, {
       ...clearFields,
       ...finalizeMeta,
-      results,
+      ...completionResultsPatch,
       status: "completed",
       winner: winnerNorm,
       resolutionType: "auto",
