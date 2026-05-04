@@ -8,3 +8,6 @@ export { finalizeAdminChallengeDispute } from "./finalizeChallenge";
 export { finalizeAdminTournamentDispute } from "./finalizeTournament";
 export { pruneStaleAdminNonces } from "./pruneAdminNonces";
 export { finalizeProvisionalChallengeResolutions } from "./provisionalResolution";
+export { cleanupAuditLogs } from "./cleanupAuditLogs";
+export { cleanupPlatformData } from "./cleanupPlatformData";
+export { applyMatchStats } from "./applyMatchStats";

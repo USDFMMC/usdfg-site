@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.finalizeProvisionalChallengeResolutions = exports.pruneStaleAdminNonces = exports.finalizeAdminTournamentDispute = exports.finalizeAdminChallengeDispute = exports.verifyAdmin = exports.createAdminNonce = void 0;
+exports.applyMatchStats = exports.cleanupPlatformData = exports.cleanupAuditLogs = exports.finalizeProvisionalChallengeResolutions = exports.pruneStaleAdminNonces = exports.finalizeAdminTournamentDispute = exports.finalizeAdminChallengeDispute = exports.verifyAdmin = exports.createAdminNonce = void 0;
 const admin = __importStar(require("firebase-admin"));
 admin.initializeApp();
 var createAdminNonceHandler_1 = require("./createAdminNonceHandler");
@@ -48,4 +48,10 @@ var pruneAdminNonces_1 = require("./pruneAdminNonces");
 Object.defineProperty(exports, "pruneStaleAdminNonces", { enumerable: true, get: function () { return pruneAdminNonces_1.pruneStaleAdminNonces; } });
 var provisionalResolution_1 = require("./provisionalResolution");
 Object.defineProperty(exports, "finalizeProvisionalChallengeResolutions", { enumerable: true, get: function () { return provisionalResolution_1.finalizeProvisionalChallengeResolutions; } });
+var cleanupAuditLogs_1 = require("./cleanupAuditLogs");
+Object.defineProperty(exports, "cleanupAuditLogs", { enumerable: true, get: function () { return cleanupAuditLogs_1.cleanupAuditLogs; } });
+var cleanupPlatformData_1 = require("./cleanupPlatformData");
+Object.defineProperty(exports, "cleanupPlatformData", { enumerable: true, get: function () { return cleanupPlatformData_1.cleanupPlatformData; } });
+var applyMatchStats_1 = require("./applyMatchStats");
+Object.defineProperty(exports, "applyMatchStats", { enumerable: true, get: function () { return applyMatchStats_1.applyMatchStats; } });
 //# sourceMappingURL=index.js.map

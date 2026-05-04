@@ -1,7 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.normalizeWinnerWallet = normalizeWinnerWallet;
 exports.fetchSoloMatchSkillScores = fetchSoloMatchSkillScores;
 exports.fetchTeamMatchSkillScores = fetchTeamMatchSkillScores;
+exports.fetchTrustReviewCount = fetchTrustReviewCount;
 exports.updatePlayerStatsAdmin = updatePlayerStatsAdmin;
 exports.updateTeamStatsAdmin = updateTeamStatsAdmin;
 exports.applyStatsAfterDisputeResolution = applyStatsAfterDisputeResolution;
@@ -56,6 +58,11 @@ async function fetchTeamMatchSkillScores(db, teamIdA, teamIdB) {
         skillB: skillScoreFromStoredAdmin(snapB.exists ? snapB.data() : undefined),
     };
 }
+/** Match count used by client calculateTrustScore for trustReviews field on player_stats. */
+async function fetchTrustReviewCount(db, opponentWalletLower) {
+    const snap = await db.collection("trust_reviews").where("opponent", "==", opponentWalletLower).get();
+    return snap.size;
+}
 function behaviorTrustBaseFromSnap(data) {
     if (!data)
         return 5;
@@ -69,13 +76,13 @@ async function updatePlayerStatsAdmin(db, wallet, result, amountEarned, game, ca
     const playerRef = db.collection("player_stats").doc(key);
     const playerSnap = await playerRef.get();
     const resolutionType = opts?.resolutionType;
-    const trustReviews = playerSnap.exists ? (playerSnap.data()?.trustReviews ?? 0) : 0;
+    const trustReviews = await fetchTrustReviewCount(db, key);
     if (result === "forfeit") {
         const baseT = playerSnap.exists ? behaviorTrustBaseFromSnap(playerSnap.data()) : 5;
         const newBehavior = Math.max(0, baseT - 1);
         const skillAfterForfeit = clampSkillScoreWrite(skillScoreFromStoredAdmin(playerSnap.exists ? playerSnap.data() : undefined) - 10);
         if (!playerSnap.exists) {
-            await playerRef.set({
+            const createPayload = {
                 wallet: key,
                 wins: 0,
                 losses: 0,
@@ -90,17 +97,24 @@ async function updatePlayerStatsAdmin(db, wallet, result, amountEarned, game, ca
                 ogFirst1k: false,
                 gameStats: {},
                 categoryStats: {},
-            });
+            };
+            if (opts?.displayName)
+                createPayload.displayName = opts.displayName;
+            await playerRef.set(createPayload);
             return;
         }
         const currentStats = playerSnap.data();
-        await playerRef.update({
+        const forfeitUpdate = {
             forfeits: (currentStats.forfeits || 0) + 1,
             behaviorTrustScore: newBehavior,
             trustReviews,
             skillScore: skillAfterForfeit,
             lastActive: firestore_1.Timestamp.now(),
-        });
+        };
+        if (opts?.displayName && !currentStats.displayName) {
+            forfeitUpdate.displayName = opts.displayName;
+        }
+        await playerRef.update(forfeitUpdate);
         return;
     }
     const behaviorBefore = playerSnap.exists ? behaviorTrustBaseFromSnap(playerSnap.data()) : 5;
@@ -165,6 +179,9 @@ async function updatePlayerStatsAdmin(db, wallet, result, amountEarned, game, ca
         if (result === "loss" && resolutionType === "admin") {
             docData.disputesLost = 1;
         }
+        if (opts?.displayName) {
+            docData.displayName = opts.displayName;
+        }
         await playerRef.set(docData);
         return;
     }
@@ -208,6 +225,9 @@ async function updatePlayerStatsAdmin(db, wallet, result, amountEarned, game, ca
     }
     if (result === "loss" && resolutionType === "admin") {
         updatePayload.disputesLost = (currentStats.disputesLost || 0) + 1;
+    }
+    if (opts?.displayName && !currentStats.displayName) {
+        updatePayload.displayName = opts.displayName;
     }
     await playerRef.update(updatePayload);
 }

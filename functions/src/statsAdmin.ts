@@ -1,6 +1,6 @@
 import { Firestore, Timestamp, getFirestore } from "firebase-admin/firestore";
 
-function normalizeWinnerWallet(w: string): string {
+export function normalizeWinnerWallet(w: string): string {
   if (w === "forfeit" || w === "tie" || w === "cancelled") return w;
   return w.toLowerCase();
 }
@@ -10,6 +10,8 @@ export type StatsAdminResult = "win" | "loss" | "forfeit";
 export type StatsAdminOpts = {
   resolutionType?: "auto" | "admin" | "forfeit";
   opponentSkillScore?: number;
+  /** Same semantics as client updatePlayerStats: lock username on first write when from creatorTag */
+  displayName?: string;
 };
 
 const DEFAULT_PLAYER_SKILL_SCORE = 100;
@@ -70,6 +72,12 @@ export async function fetchTeamMatchSkillScores(
   };
 }
 
+/** Match count used by client calculateTrustScore for trustReviews field on player_stats. */
+export async function fetchTrustReviewCount(db: Firestore, opponentWalletLower: string): Promise<number> {
+  const snap = await db.collection("trust_reviews").where("opponent", "==", opponentWalletLower).get();
+  return snap.size;
+}
+
 function behaviorTrustBaseFromSnap(data: Record<string, unknown> | undefined): number {
   if (!data) return 5;
   const bt = data.behaviorTrustScore as number | undefined;
@@ -93,7 +101,7 @@ export async function updatePlayerStatsAdmin(
 
   const resolutionType = opts?.resolutionType;
 
-  const trustReviews = playerSnap.exists ? ((playerSnap.data()?.trustReviews as number) ?? 0) : 0;
+  const trustReviews = await fetchTrustReviewCount(db, key);
 
   if (result === "forfeit") {
     const baseT = playerSnap.exists ? behaviorTrustBaseFromSnap(playerSnap.data() as Record<string, unknown>) : 5;
@@ -102,7 +110,7 @@ export async function updatePlayerStatsAdmin(
       skillScoreFromStoredAdmin(playerSnap.exists ? (playerSnap.data() as Record<string, unknown>) : undefined) - 10
     );
     if (!playerSnap.exists) {
-      await playerRef.set({
+      const createPayload: Record<string, unknown> = {
         wallet: key,
         wins: 0,
         losses: 0,
@@ -117,17 +125,23 @@ export async function updatePlayerStatsAdmin(
         ogFirst1k: false,
         gameStats: {},
         categoryStats: {},
-      });
+      };
+      if (opts?.displayName) createPayload.displayName = opts.displayName;
+      await playerRef.set(createPayload);
       return;
     }
     const currentStats = playerSnap.data() as Record<string, unknown>;
-    await playerRef.update({
+    const forfeitUpdate: Record<string, unknown> = {
       forfeits: ((currentStats.forfeits as number) || 0) + 1,
       behaviorTrustScore: newBehavior,
       trustReviews,
       skillScore: skillAfterForfeit,
       lastActive: Timestamp.now(),
-    });
+    };
+    if (opts?.displayName && !currentStats.displayName) {
+      forfeitUpdate.displayName = opts.displayName;
+    }
+    await playerRef.update(forfeitUpdate);
     return;
   }
 
@@ -192,6 +206,9 @@ export async function updatePlayerStatsAdmin(
     if (result === "loss" && resolutionType === "admin") {
       docData.disputesLost = 1;
     }
+    if (opts?.displayName) {
+      docData.displayName = opts.displayName;
+    }
     await playerRef.set(docData);
     return;
   }
@@ -245,6 +262,10 @@ export async function updatePlayerStatsAdmin(
   }
   if (result === "loss" && resolutionType === "admin") {
     updatePayload.disputesLost = ((currentStats.disputesLost as number) || 0) + 1;
+  }
+
+  if (opts?.displayName && !currentStats.displayName) {
+    updatePayload.displayName = opts.displayName;
   }
 
   await playerRef.update(updatePayload);

@@ -141,9 +141,10 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // player stats
+    // player stats — client writes disabled; updates via Admin SDK (functions) only
     match /player_stats/{wallet} {
-      allow read, create, update, delete: if isSignedIn();
+      allow read: if true;
+      allow write: if false;
     }
 
     // lock notifications (friendly match request/accept/cancel)
@@ -188,6 +189,20 @@ service cloud.firestore {
     // misc stats
     match /stats/{statId} {
       allow read, create, update, delete: if isSignedIn();
+    }
+
+    // Ephemeral submission audit (enable TTL on expiresAt in Firebase console)
+    match /challenge_submissions/{docId} {
+      allow create: if isSignedIn();
+      allow read: if false;
+      allow update, delete: if false;
+    }
+
+    // Admin dispute resolution audit (client DisputeConsole; Cloud Functions use Admin SDK)
+    match /admin_audit_log/{docId} {
+      allow create: if isAdminUser();
+      allow read: if false;
+      allow update, delete: if false;
     }
 
     // challenge lobbies + subcollections

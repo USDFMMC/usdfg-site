@@ -56,3 +56,16 @@ export async function finalizeAdminTournamentOnServer(params: {
     { ok: boolean }
   >("finalizeAdminTournamentDispute", params);
 }
+
+/** Server-side match stats (player_stats / teams); sets challenges.statsApplied when successful. */
+export async function invokeApplyMatchStats(params: {
+  challengeId: string;
+}): Promise<{ ok: boolean; skipped?: boolean }> {
+  await ensureFreshIdToken();
+  const callable = httpsCallable<
+    { challengeId: string },
+    { ok: boolean; skipped?: boolean }
+  >(functions, "applyMatchStats");
+  const res = await callable(params);
+  return res.data ?? { ok: false };
+}
