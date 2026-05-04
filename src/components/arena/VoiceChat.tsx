@@ -113,9 +113,9 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
   const recoveryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recoveryAttemptedRef = useRef(false);
   const iceCandidatesAddedRef = useRef<Set<string>>(new Set());
+  const purgeSignalingDoneRef = useRef(false);
   // Perfect negotiation (glare-safe renegotiation)
   const makingOfferRef = useRef(false);
-  const ignoreOfferRef = useRef(false);
   const hasOfferedRef = useRef(false);
   const [needTapToHear, setNeedTapToHear] = useState(false);
 
@@ -188,13 +188,11 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
 
     return () => {
       activeVoiceChatMounts.delete(memoizedChallengeId);
-      if (currentChallengeIdRef.current !== memoizedChallengeId) {
-        removeSpeaker(memoizedChallengeId, currentWallet).catch(() => {});
-        cleanup(true);
-        initializedRef.current = false;
-        currentChallengeIdRef.current = '';
-        initInProgressRef.current = false;
-      }
+      removeSpeaker(memoizedChallengeId, currentWallet).catch(() => {});
+      cleanup(true);
+      initializedRef.current = false;
+      currentChallengeIdRef.current = '';
+      initInProgressRef.current = false;
     };
   }, [memoizedChallengeId, voiceDisabled, canConnect, publishMic, reinitKey]);
 
@@ -235,6 +233,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
   const initVoiceChat = async (publishMicNow: boolean) => {
     const validChallengeId = memoizedChallengeId;
     iceCandidatesAddedRef.current.clear();
+    purgeSignalingDoneRef.current = false;
     if (!validChallengeId || validChallengeId.trim() === '') {
       setStatus("Error: Invalid challenge ID");
       setConnected(false);
@@ -335,11 +334,18 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
         }
       };
 
-      // Handle ICE candidates - store in array instead of overwriting
-      const iceCandidatesRef = { sent: new Set<string>() };
+      const tryPurgeMergedSignaling = () => {
+        if (purgeSignalingDoneRef.current) return;
+        if (pc.iceConnectionState !== "connected" || pc.iceGatheringState !== "complete") return;
+        purgeSignalingDoneRef.current = true;
+        hub.purgeSignaling();
+      };
+
       pc.onicecandidate = async (event) => {
         if (event.candidate) {
-          const candidateKey = `candidate_${currentWallet}_${Date.now()}`;
+          const w = String(currentWallet).toLowerCase();
+          const id = `${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+          const candidateKey = `ice|${w}|${id}`;
           hub.mergeVdoc({
             [candidateKey]: event.candidate.toJSON(),
             timestamp: Date.now(),
@@ -348,6 +354,10 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
       };
 
       const DISCONNECTED_RECOVERY_MS = 8000;
+
+      pc.onicegatheringstatechange = () => {
+        tryPurgeMergedSignaling();
+      };
 
       pc.onconnectionstatechange = () => {
         const state = pc.connectionState;
@@ -365,9 +375,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
           reconnectAttempts.current = 0;
           addSpeaker(memoizedChallengeId, currentWallet).catch(() => {});
           void deleteVoiceSignalsDocument(memoizedChallengeId);
-          setTimeout(() => {
-            hub.purgeSignaling();
-          }, 800);
+          tryPurgeMergedSignaling();
         } else if (state === 'connecting') {
           setStatus("Connecting to opponent...");
         } else if (state === 'disconnected' || state === 'failed') {
@@ -399,11 +407,11 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
         }
       };
 
-      // Monitor ICE connection state
       pc.oniceconnectionstatechange = () => {
-        if (pc.iceConnectionState === 'failed') {
+        if (pc.iceConnectionState === "failed") {
           console.error("❌ ICE connection failed - may need better TURN servers");
         }
+        tryPurgeMergedSignaling();
       };
 
       if (unsubscribeSignalRef.current) {
@@ -511,10 +519,27 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
             }
           }
 
-          // Add ICE candidates from the other peer (skip own, avoid duplicates, process in order)
           if (pc.remoteDescription) {
+            const my = String(currentWallet).toLowerCase();
+            const iceOwner = (k: string): string | null => {
+              if (k.startsWith("ice|")) {
+                const segs = k.split("|");
+                return segs.length >= 3 ? segs[1].toLowerCase() : null;
+              }
+              if (k.startsWith("candidate_")) {
+                const rest = k.slice("candidate_".length);
+                const idx = rest.lastIndexOf("_");
+                if (idx <= 0) return null;
+                return rest.slice(0, idx).toLowerCase();
+              }
+              return null;
+            };
             const candidateKeys = Object.keys(data)
-              .filter((k) => k.startsWith('candidate_') && !k.includes(currentWallet))
+              .filter((k) => {
+                const owner = iceOwner(k);
+                if (owner == null) return false;
+                return owner !== my;
+              })
               .sort();
             for (const key of candidateKeys) {
               if (iceCandidatesAddedRef.current.has(key)) continue;
@@ -598,6 +623,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
   }, [isListenOnly, mutedByCreator]);
 
   const cleanup = (deleteSignalsDoc: boolean) => {
+    purgeSignalingDoneRef.current = false;
     if (recoveryTimeoutRef.current) {
       clearTimeout(recoveryTimeoutRef.current);
       recoveryTimeoutRef.current = null;

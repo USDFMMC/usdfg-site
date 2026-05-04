@@ -39,6 +39,34 @@ function broadcast(roomId, msg, exceptWs = null) {
   }
 }
 
+function stripWalletSignalingFromVdoc(roomId, wallet) {
+  const r = rooms.get(roomId);
+  if (!r || !wallet) return;
+  const wl = wallet.toLowerCase();
+  const vd = { ...r.voiceDoc };
+  let changed = false;
+  for (const k of Object.keys(vd)) {
+    if (k.startsWith("ice|")) {
+      const segs = k.split("|");
+      if (segs.length >= 3 && segs[1].toLowerCase() === wl) {
+        delete vd[k];
+        changed = true;
+      }
+    } else if (k.startsWith("candidate_")) {
+      const rest = k.slice("candidate_".length);
+      const idx = rest.lastIndexOf("_");
+      if (idx > 0 && rest.slice(0, idx).toLowerCase() === wl) {
+        delete vd[k];
+        changed = true;
+      }
+    }
+  }
+  if (changed) {
+    r.voiceDoc = vd;
+    broadcast(roomId, { type: "vdoc", data: { ...r.voiceDoc } });
+  }
+}
+
 function removeClient(roomId, ws) {
   const r = rooms.get(roomId);
   if (!r) return;
@@ -52,6 +80,7 @@ function removeClient(roomId, ws) {
       break;
     }
   }
+  if (wallet) stripWalletSignalingFromVdoc(roomId, wallet);
   if (wallet && role === "spectator") {
     let specCanon = null;
     for (const s of r.spectators) {
@@ -227,7 +256,7 @@ function handleMessage(roomId, ws, msg) {
       delete vd.answerFrom;
       delete vd.timestamp;
       for (const k of Object.keys(vd)) {
-        if (k.startsWith("candidate_")) delete vd[k];
+        if (k.startsWith("candidate_") || k.startsWith("ice|")) delete vd[k];
       }
       r.voiceDoc = vd;
       broadcast(roomId, { type: "vdoc", data: { ...r.voiceDoc } });
