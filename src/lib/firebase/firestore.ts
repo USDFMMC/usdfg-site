@@ -2975,125 +2975,115 @@ export const submitChallengeResult = async (
 ): Promise<void> => {
   try {
     const challengeRef = doc(db, "challenges", challengeId);
-    const snap = await getDoc(challengeRef);
-    
-    if (!snap.exists()) {
-      throw new Error("Challenge not found");
-    }
 
-    const data = snap.data() as ChallengeData;
-    
-    // Verify player is part of this challenge
-    if (!data.players || !isParticipantWallet(data.players, wallet)) {
-      throw new Error("You are not part of this challenge");
-    }
+    const txResult = await runTransaction(db, async (tx) => {
+      const snap = await tx.get(challengeRef);
 
-    if (challengeHasResultForWallet(data, wallet)) {
-      throw new Error("You have already submitted your result");
-    }
+      if (!snap.exists()) {
+        throw new Error("Challenge not found");
+      }
 
-    const players = data.players || [];
+      const data = snap.data() as ChallengeData;
+      const players = data.players || [];
 
-    // 2-player loss: single atomic write (results + provisional) — race-safe, idempotent
-    const canAtomicProvisionalLoss =
-      !didWin &&
-      players.length === 2 &&
-      (data.status === 'active' || data.status === 'in-progress') &&
-      !data.lossReportedBy;
+      // Verify player is part of this challenge
+      if (!players.length || !isParticipantWallet(players, wallet)) {
+        throw new Error("You are not part of this challenge");
+      }
 
-    if (canAtomicProvisionalLoss) {
-      await runTransaction(db, async (transaction) => {
-        const s = await transaction.get(challengeRef);
-        if (!s.exists()) {
-          throw new Error("Challenge not found");
-        }
-        const d = s.data() as ChallengeData;
-        const pl = d.players || [];
+      const keySelf = canonicalPlayerKey(players, wallet);
+      const currentResults = (data.results || {}) as Record<string, any>;
 
-        if (pl.length !== 2) {
-          throw new Error("Result submission is only supported for two-player challenges in this flow");
-        }
-        if (!isParticipantWallet(pl, wallet)) {
-          throw new Error("You are not part of this challenge");
-        }
+      // 🔒 ATOMIC GUARD: block duplicates (including any legacy/non-canonical keys)
+      if (currentResults[keySelf] !== undefined || challengeHasResultForWallet(data, wallet)) {
+        console.warn("Duplicate submission blocked (atomic)");
+        return "duplicate" as const;
+      }
 
-        const st = d.status;
-        if (st === 'completed' || st === 'disputed' || st === 'cancelled' || st === 'expired') {
+      // 2-player loss: single atomic write (results + provisional) — race-safe, idempotent
+      const canAtomicProvisionalLoss =
+        !didWin &&
+        players.length === 2 &&
+        (data.status === "active" || data.status === "in-progress") &&
+        !data.lossReportedBy;
+
+      if (canAtomicProvisionalLoss) {
+        const st = data.status;
+        if (st === "completed" || st === "disputed" || st === "cancelled" || st === "expired") {
           throw new Error(`Cannot submit result: challenge is ${st}`);
         }
-        if (st === 'awaiting_auto_resolution') {
-          if (challengeHasResultForWallet(d, wallet)) {
-            return;
-          }
+        if (st === "awaiting_auto_resolution") {
           throw new Error(
             "This challenge is already awaiting resolution from a loss report. Please refresh and try again."
           );
         }
-        if (d.lossReportedBy) {
-          if (walletsEqual(d.lossReportedBy, wallet) && challengeHasResultForWallet(d, wallet)) {
-            return;
-          }
+        if (data.lossReportedBy) {
           throw new Error("A loss has already been reported for this challenge.");
         }
-        if (st !== 'active' && st !== 'in-progress') {
+        if (st !== "active" && st !== "in-progress") {
           throw new Error(`Cannot submit loss in status: ${st}`);
         }
 
-        if (challengeHasResultForWallet(d, wallet)) {
-          return;
-        }
-
-        const opponentWallet = pl.find((p: string) => !walletsEqual(p, wallet));
+        const opponentWallet = players.find((p: string) => !walletsEqual(p, wallet));
         if (!opponentWallet) {
           throw new Error("Could not resolve opponent wallet");
         }
 
-        const selfKey = canonicalPlayerKey(pl, wallet);
-        const results = { ...(d.results || {}) };
         const nowTs = Timestamp.now();
-        results[selfKey] = {
-          didWin: false,
-          submittedAt: nowTs,
-          ...(proofImageData && { proofImageData }),
+        const updatedResults = {
+          ...currentResults,
+          [keySelf]: {
+            didWin: false,
+            submittedAt: nowTs,
+            ...(proofImageData && { proofImageData }),
+          },
         };
 
-        transaction.update(challengeRef, {
-          results,
-          status: 'awaiting_auto_resolution',
+        tx.update(challengeRef, {
+          results: updatedResults,
+          status: "awaiting_auto_resolution",
           provisionalWinner: opponentWallet,
-          lossReportedBy: selfKey,
+          lossReportedBy: keySelf,
           resolveAfter: Timestamp.fromMillis(nowTs.toMillis() + 120000),
           updatedAt: nowTs,
           resolutionMeta: {
-            type: 'loss_auto_resolution',
+            type: "loss_auto_resolution",
             triggeredBy: wallet,
             triggeredAt: nowTs,
           },
         });
+
+        return "provisional_loss" as const;
+      }
+
+      // All other paths: atomic single-write result submission (first write wins)
+      const nowTs = Timestamp.now();
+      const updatedResults = {
+        ...currentResults,
+        [keySelf]: {
+          didWin,
+          submittedAt: nowTs,
+          ...(proofImageData && { proofImageData }),
+        },
+      };
+
+      tx.update(challengeRef, {
+        results: updatedResults,
+        updatedAt: nowTs,
       });
-      console.log('✅ Result submitted (provisional loss, atomic):', { challengeId, wallet });
+
+      return "submitted" as const;
+    });
+
+    if (txResult === "duplicate") {
+      return;
+    }
+    if (txResult === "provisional_loss") {
+      console.log("✅ Result submitted (provisional loss, atomic):", { challengeId, wallet });
       return;
     }
 
-    // Add result with optional proof image (non-atomic-loss paths: wins, >2 players, second loss while awaiting, etc.)
-    const results = { ...(data.results || {}) };
-    const keySelf = canonicalPlayerKey(players, wallet);
-    results[keySelf] = {
-      didWin,
-      submittedAt: Timestamp.now(),
-      ...(proofImageData && { proofImageData }), // Only include if provided
-    };
-
-    await writeChallengeFields(
-      challengeId,
-      {
-        results,
-        updatedAt: Timestamp.now(),
-      },
-      { currentData: data, actingWallet: wallet }
-    );
-
-    console.log('✅ Result submitted:', { challengeId, wallet, didWin });
+    console.log("✅ Result submitted:", { challengeId, wallet, didWin });
 
     // CRITICAL FIX: Re-fetch from Firestore to get the actual current state
     // Don't use local results object - it might be stale

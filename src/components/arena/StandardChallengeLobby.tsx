@@ -200,7 +200,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   requestAppConfirm,
   onUpdateEntryFee,
   onClose,
-  isSubmitting = false,
+  isSubmitting: externalIsSubmitting = false,
   isClaiming = false,
   isCreatorFunding = false,
   isJoinerFunding = false,
@@ -208,7 +208,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 }) => {
   const [showSubmitForm, setShowSubmitForm] = useState(false);
   const [selectedResult, setSelectedResult] = useState<boolean | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [proofImage, setProofImage] = useState<string | null>(null);
   const [proofFile, setProofFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -380,6 +380,12 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     return !!userResult;
   }, [currentWallet, results, players]);
 
+  const submitLocked =
+    isSubmitting || externalIsSubmitting || hasAlreadySubmitted;
+
+  const isLockedVisual =
+    hasAlreadySubmitted && !isSubmitting && !externalIsSubmitting;
+
   useEffect(() => {
     if (!onAppToast || !currentWallet || !creatorWallet) return;
     const cw = currentWallet.toLowerCase();
@@ -471,8 +477,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   };
 
   const doSubmitResult = async () => {
-    if (selectedResult === null || isLoading || hasAlreadySubmitted) return;
-    setIsLoading(true);
+    if (selectedResult === null || submitLocked) return;
+    setIsSubmitting(true);
     try {
       await onSubmitResult(selectedResult, proofFile);
       setShowSubmitForm(false);
@@ -484,12 +490,12 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       console.error("Error submitting result:", error);
       onAppToast?.(error.message || "Failed to submit result. Please try again.", "error", "Submit failed");
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   const handleSubmit = async () => {
-    if (selectedResult === null || isLoading || hasAlreadySubmitted) return;
+    if (selectedResult === null || submitLocked) return;
 
     // If user is about to claim "I won" and opponent already claimed "I won", show integrity warning
     if (selectedResult === true && results && typeof results === 'object' && creatorWallet && challengerWallet && currentWallet) {
@@ -1737,14 +1743,27 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           <div className="text-center">
             <button
               type="button"
+              disabled={submitLocked}
+              aria-disabled={submitLocked}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 setShowSubmitForm(true);
               }}
-              className="relative w-full rounded-md bg-gradient-to-r from-purple-500 to-orange-500 hover:brightness-110 text-white px-3 py-2 text-xs font-semibold transition-all shadow-[0_0_10px_rgba(124,58,237,0.22)] border border-white/10 mb-1"
+              className={`
+                relative w-full rounded-md bg-gradient-to-r from-purple-500 to-orange-500 hover:brightness-110 text-white px-3 py-2 text-xs font-semibold transition-all shadow-[0_0_10px_rgba(124,58,237,0.22)] border mb-1 disabled:opacity-50 disabled:cursor-not-allowed
+                ${
+                  isLockedVisual
+                    ? "opacity-70 cursor-not-allowed border-green-500 ring-1 ring-green-400/40"
+                    : "border-white/10"
+                }
+              `}
             >
-              Submit Result
+              {isSubmitting || externalIsSubmitting
+                ? "Submitting..."
+                : hasAlreadySubmitted
+                  ? "Result Submitted"
+                  : "Submit Result"}
             </button>
             <div className="text-[10px] text-white/70 font-medium mb-1">
               No wallet required
@@ -1827,7 +1846,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
             <div className="grid grid-cols-2 gap-1.5">
               <button
                 onClick={() => setSelectedResult(true)}
-                disabled={isLoading || isSubmitting}
+                disabled={submitLocked}
                 className={`
                   relative overflow-hidden p-2 rounded-md border transition-all duration-200
                   disabled:opacity-50 disabled:cursor-not-allowed
@@ -1854,7 +1873,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
               <button
                 onClick={() => setSelectedResult(false)}
-                disabled={isLoading || isSubmitting}
+                disabled={submitLocked}
                 className={`
                   relative overflow-hidden p-2 rounded-md border transition-all duration-200
                   disabled:opacity-50 disabled:cursor-not-allowed
@@ -1983,10 +2002,10 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                     setShowIntegrityConfirm(false);
                     doSubmitResult();
                   }}
-                  disabled={isLoading}
+                  disabled={submitLocked}
                   className="flex-1 py-2 rounded-md border border-orange-500/45 bg-orange-600/25 text-orange-50 text-xs font-semibold hover:bg-orange-600/35 disabled:opacity-50"
                 >
-                  {isLoading ? 'Submitting…' : 'I confirm, submit'}
+                  {submitLocked ? 'Submitting…' : 'I confirm, submit'}
                 </button>
               </div>
             </div>
@@ -1995,7 +2014,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           {/* Submit Button */}
           <button
             onClick={handleSubmit}
-            disabled={selectedResult === null || isLoading || isSubmitting || hasAlreadySubmitted || showIntegrityConfirm}
+            disabled={selectedResult === null || submitLocked || showIntegrityConfirm}
             className={`
               w-full py-1.5 rounded-md font-semibold text-xs transition-all duration-200 border
               disabled:opacity-50 disabled:cursor-not-allowed
@@ -2006,7 +2025,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
               }
             `}
           >
-            {isLoading || isSubmitting ? (
+            {submitLocked ? (
               <span className="flex items-center justify-center gap-1.5">
                 <Loader2 className="w-3 h-3 animate-spin" />
                 Submitting...
