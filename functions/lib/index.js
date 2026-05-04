@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.applyMatchStats = exports.cleanupPlatformData = exports.cleanupAuditLogs = exports.finalizeProvisionalChallengeResolutions = exports.pruneStaleAdminNonces = exports.finalizeAdminTournamentDispute = exports.finalizeAdminChallengeDispute = exports.verifyAdmin = exports.createAdminNonce = void 0;
+exports.updateTrustScore = exports.updatePlayerMeta = exports.updatePlayerProfile = exports.applyMatchStats = exports.cleanupPlatformData = exports.cleanupAuditLogs = exports.finalizeProvisionalChallengeResolutions = exports.pruneStaleAdminNonces = exports.finalizeAdminTournamentDispute = exports.finalizeAdminChallengeDispute = exports.verifyAdmin = exports.createAdminNonce = void 0;
 const admin = __importStar(require("firebase-admin"));
 admin.initializeApp();
 var createAdminNonceHandler_1 = require("./createAdminNonceHandler");
@@ -54,4 +54,8 @@ var cleanupPlatformData_1 = require("./cleanupPlatformData");
 Object.defineProperty(exports, "cleanupPlatformData", { enumerable: true, get: function () { return cleanupPlatformData_1.cleanupPlatformData; } });
 var applyMatchStats_1 = require("./applyMatchStats");
 Object.defineProperty(exports, "applyMatchStats", { enumerable: true, get: function () { return applyMatchStats_1.applyMatchStats; } });
+var playerStatsCallables_1 = require("./playerStatsCallables");
+Object.defineProperty(exports, "updatePlayerProfile", { enumerable: true, get: function () { return playerStatsCallables_1.updatePlayerProfile; } });
+Object.defineProperty(exports, "updatePlayerMeta", { enumerable: true, get: function () { return playerStatsCallables_1.updatePlayerMeta; } });
+Object.defineProperty(exports, "updateTrustScore", { enumerable: true, get: function () { return playerStatsCallables_1.updateTrustScore; } });
 //# sourceMappingURL=index.js.map

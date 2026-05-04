@@ -69,3 +69,42 @@ export async function invokeApplyMatchStats(params: {
   const res = await callable(params);
   return res.data ?? { ok: false };
 }
+
+export async function invokeUpdatePlayerProfile(params: {
+  wallet: string;
+  displayName?: string;
+  country?: string | null;
+  profileImage?: string | null;
+}): Promise<{ ok: boolean }> {
+  await ensureFreshIdToken();
+  const callable = httpsCallable<typeof params, { ok: boolean }>(functions, "updatePlayerProfile");
+  const res = await callable(params);
+  return res.data ?? { ok: false };
+}
+
+export async function invokeUpdatePlayerMeta(params: {
+  wallet: string;
+  touchLastActive?: boolean;
+  founderEarnedDelta?: number;
+  awardOgFirst1kIfEligible?: boolean;
+}): Promise<{ ok: boolean; skipped?: boolean }> {
+  await ensureFreshIdToken();
+  const callable = httpsCallable<typeof params, { ok: boolean; skipped?: boolean }>(
+    functions,
+    "updatePlayerMeta"
+  );
+  const res = await callable(params);
+  return res.data ?? { ok: false };
+}
+
+export async function invokeUpdateTrustScore(params: {
+  wallet: string;
+}): Promise<{ ok: boolean; trustScore?: number; trustReviews?: number }> {
+  await ensureFreshIdToken();
+  const callable = httpsCallable<
+    typeof params,
+    { ok: boolean; trustScore?: number; trustReviews?: number }
+  >(functions, "updateTrustScore");
+  const res = await callable(params);
+  return res.data ?? { ok: false };
+}

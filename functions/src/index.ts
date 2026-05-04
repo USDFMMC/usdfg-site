@@ -11,3 +11,4 @@ export { finalizeProvisionalChallengeResolutions } from "./provisionalResolution
 export { cleanupAuditLogs } from "./cleanupAuditLogs";
 export { cleanupPlatformData } from "./cleanupPlatformData";
 export { applyMatchStats } from "./applyMatchStats";
+export { updatePlayerProfile, updatePlayerMeta, updateTrustScore } from "./playerStatsCallables";

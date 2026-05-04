@@ -3606,80 +3606,95 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Clear pending match result but keep challenge so both players stay in lobby
       setPendingMatchResult(null);
       
-      // Get challenge status to check if completed
-      const challengeStatus = selectedChallenge?.status || selectedChallenge?.rawData?.status;
+      const challengeStatus =
+        selectedChallenge?.status || selectedChallenge?.rawData?.status;
       const isCompleted = challengeStatus === 'completed';
-      
+      const isWin = didWin || Boolean(autoWon);
+
       // Keep lobby open for BOTH winner and loser so they can chat and use mic after match ends
       if (!showStandardLobby) {
         setShowStandardLobby(true);
       }
-      
-      // Show Victory Modal only for real wins — not during provisional loss (awaiting_auto_resolution)
-      const showVictoryForWin = (didWin && isCompleted) || (Boolean(autoWon) && isCompleted);
-      if (showVictoryForWin) {
-        const opponentName = opponentWallet 
-          ? `${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}`
-          : undefined;
-        
-        setVictoryModalData({
-          autoWon,
-          opponentName,
-          needsClaim: needsClaim || (isCompleted && didWin)
-        });
-        setShowVictoryModal(true);
-        
-        // Check for dispute in background (don't block UI)
-        if (selectedChallenge?.id) {
-          setTimeout(async () => {
-            try {
-              const { fetchChallengeById } = await import("@/lib/firebase/firestore");
-              const refreshed = await fetchChallengeById(selectedChallenge.id);
-              if (refreshed) {
-                const refreshedStatus = refreshed.status || refreshed.rawData?.status;
-                if (refreshedStatus === 'disputed') {
-                  // Dispute detected - close victory modal and show dispute message
-                  setShowVictoryModal(false);
-                  setVictoryModalData(null);
-                  setSelectedChallenge(refreshed);
-                  // Keep lobby open to show dispute status
-                  if (!showStandardLobby) {
-                    setShowStandardLobby(true);
-                  }
-                  showAppToast(
-                    "Dispute detected: both players claimed victory. Waiting for admin resolution.",
-                    "warning",
-                    "Dispute"
-                  );
-                } else if (refreshedStatus === 'awaiting_auto_resolution' && autoWon) {
-                  setShowVictoryModal(false);
-                  setVictoryModalData(null);
-                  setSelectedChallenge(refreshed);
-                } else if (refreshedStatus === 'completed') {
-                  // Challenge completed - update challenge data
-                  setSelectedChallenge(refreshed);
-                  const winner = refreshed.winner || refreshed.rawData?.winner;
-                  const isActualWinner = winner && walletsEqual(winner, publicKey.toBase58());
-                  
-                  if (!isActualWinner && !autoWon) {
-                    // Player claimed win but isn't the actual winner - close victory modal
+
+      if (isWin) {
+        if (isCompleted) {
+          const opponentName = opponentWallet
+            ? `${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}`
+            : undefined;
+
+          setVictoryModalData({
+            autoWon,
+            opponentName,
+            needsClaim: needsClaim || isWin,
+          });
+          setShowVictoryModal(true);
+
+          // Check for dispute in background (don't block UI)
+          if (selectedChallenge?.id) {
+            setTimeout(async () => {
+              try {
+                const { fetchChallengeById } = await import("@/lib/firebase/firestore");
+                const refreshed = await fetchChallengeById(selectedChallenge.id);
+                if (refreshed) {
+                  const refreshedStatus = refreshed.status || refreshed.rawData?.status;
+                  if (refreshedStatus === 'disputed') {
+                    // Dispute detected - close victory modal and show dispute message
                     setShowVictoryModal(false);
                     setVictoryModalData(null);
+                    setSelectedChallenge(refreshed);
+                    // Keep lobby open to show dispute status
+                    if (!showStandardLobby) {
+                      setShowStandardLobby(true);
+                    }
+                    showAppToast(
+                      "Dispute detected: both players claimed victory. Waiting for admin resolution.",
+                      "warning",
+                      "Dispute"
+                    );
+                  } else if (refreshedStatus === 'awaiting_auto_resolution' && autoWon) {
+                    setShowVictoryModal(false);
+                    setVictoryModalData(null);
+                    setSelectedChallenge(refreshed);
+                  } else if (refreshedStatus === 'completed') {
+                    // Challenge completed - update challenge data
+                    setSelectedChallenge(refreshed);
+                    const winner = refreshed.winner || refreshed.rawData?.winner;
+                    const isActualWinner = winner && walletsEqual(winner, publicKey.toBase58());
+
+                    if (!isActualWinner && !autoWon) {
+                      // Player claimed win but isn't the actual winner - close victory modal
+                      setShowVictoryModal(false);
+                      setVictoryModalData(null);
+                    }
                   }
                 }
+              } catch (error) {
+                console.warn('Could not refresh challenge status:', error);
               }
-            } catch (error) {
-              console.warn('Could not refresh challenge status:', error);
-            }
-          }, 2000); // Check after 2 seconds (gives time for determineWinner to run)
+            }, 2000); // Check after 2 seconds (gives time for determineWinner to run)
+          }
+        } else {
+          showAppToast(
+            "Result submitted. Awaiting confirmation...",
+            "info",
+            "Submitted"
+          );
         }
-      } else {
+      } else if (didWin === false) {
         const lossMessage = opponentWallet
           ? "You submitted that you lost. Trust review recorded."
           : "You submitted that you lost.";
         showAppToast(lossMessage, "info", "Submitted");
+      } else {
+        console.warn("Unexpected result state", {
+          didWin,
+          autoWon,
+          challengeStatus,
+        });
+
+        showAppToast("Result submitted. Processing...", "info", "Submitted");
       }
-      
+
     } catch (error: any) {
       console.error("❌ Failed to submit result and trust review:", error);
       

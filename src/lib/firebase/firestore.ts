@@ -22,7 +22,12 @@ import {
   runTransaction
 } from 'firebase/firestore';
 import { db, auth } from './config';
-import { invokeApplyMatchStats } from './adminApi';
+import {
+  invokeApplyMatchStats,
+  invokeUpdatePlayerProfile,
+  invokeUpdatePlayerMeta,
+  invokeUpdateTrustScore,
+} from './adminApi';
 import { CHALLENGE_CONFIG } from '../chain/config';
 import { getExplorerTxUrl } from '../chain/explorer';
 
@@ -1763,25 +1768,10 @@ export interface ChallengeNotification {
 // Challenge operations
 export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'createdAt'>) => {
   try {
-    // Check if creator is eligible for OG First 2.1K trophy (only when creating their first challenge)
     const creatorWallet = challengeData.creator;
-    const playerRef = doc(db, 'player_stats', creatorWallet);
+    const creatorKey = normalizeWinnerWallet(creatorWallet);
+    const playerRef = doc(db, 'player_stats', creatorKey);
     const playerSnap = await getDoc(playerRef);
-    
-    let shouldAwardOgFirst1k = false;
-    
-    // Only award if player doesn't exist yet (first challenge creation)
-    if (!playerSnap.exists()) {
-      // Count total users BEFORE adding this one
-      const statsCollection = collection(db, 'player_stats');
-      const allUsersSnapshot = await getDocs(statsCollection);
-      const totalUsersBefore = allUsersSnapshot.size;
-      shouldAwardOgFirst1k = totalUsersBefore < 2100; // Represents USDFG's 21M token supply
-      
-      if (shouldAwardOgFirst1k) {
-        console.log(`🏆 OG First 2.1K Trophy eligible for ${creatorWallet.slice(0, 8)}... (Total users: ${totalUsersBefore})`);
-      }
-    }
     
     const initialPlayers = Array.isArray(challengeData.players)
       ? challengeData.players
@@ -1867,24 +1857,21 @@ export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'cr
       wallet: creatorWallet,
     });
     
-    // If eligible, create/update player stats with trophy flag
-    if (shouldAwardOgFirst1k) {
-      const newStats: any = {
-        wallet: creatorWallet,
-        wins: 0,
-        losses: 0,
-        winRate: 0,
-        totalEarned: 0,
-        gamesPlayed: 0,
-        lastActive: Timestamp.now(),
-        ogFirst1k: true, // Award the trophy!
-        gameStats: {},
-        categoryStats: {}
-      };
-      // Note: displayName will be set on first challenge completion (only include if it exists)
-      
-      await setDoc(playerRef, newStats);
-      console.log(`🏆 OG First 2.1K Trophy awarded to ${creatorWallet.slice(0, 8)}... for creating their first challenge!`);
+    // OG First 2.1K (server decides eligibility + writes player_stats)
+    if (!playerSnap.exists()) {
+      try {
+        const r = await invokeUpdatePlayerMeta({
+          wallet: creatorWallet,
+          awardOgFirst1kIfEligible: true,
+        });
+        if (!r.skipped) {
+          console.log(
+            `🏆 OG First 2.1K handled on server for ${creatorWallet.slice(0, 8)}... (callable ok=${r.ok})`
+          );
+        }
+      } catch (e) {
+        console.error('updatePlayerMeta (OG award) failed:', e);
+      }
     }
     
     // If challenge has a targetPlayer, create a notification
@@ -2693,32 +2680,10 @@ export async function recordFounderChallengeReward(
       });
     }
 
-    // Update player stats (totalEarned) with actual amount
-    const playerRef = doc(db, 'player_stats', wallet);
-    const playerSnap = await getDoc(playerRef);
-    
-    if (playerSnap.exists()) {
-      const currentStats = playerSnap.data() as PlayerStats;
-      await updateDoc(playerRef, {
-        totalEarned: (currentStats.totalEarned || 0) + amount,
-        lastActive: Timestamp.now(),
-      });
-    } else {
-      // Create new player stats
-      await setDoc(playerRef, {
-        wallet,
-        wins: 0,
-        losses: 0,
-        winRate: 0,
-        totalEarned: amount,
-        gamesPlayed: 0,
-        lastActive: Timestamp.now(),
-        trustScore: 0,
-        trustReviews: 0,
-        gameStats: {},
-        categoryStats: {},
-      });
-    }
+    await invokeUpdatePlayerMeta({
+      wallet,
+      founderEarnedDelta: amount,
+    });
 
     // Update challenge to mark reward as transferred and set actual challenge reward
     const founderPayoutSig =
@@ -3989,90 +3954,6 @@ export interface TeamStats {
 }
 
 /**
- * Calculate trust score for a player from Firestore
- */
-async function calculateTrustScore(wallet: string): Promise<{ trustScore: number; trustReviews: number }> {
-  try {
-    const walletLower = wallet.toLowerCase();
-    const reviewsRef = collection(db, 'trust_reviews');
-    const q = query(
-      reviewsRef,
-      where('opponent', '==', walletLower)
-    );
-    
-    const snapshot = await getDocs(q);
-    
-    if (snapshot.empty) {
-      console.log(`   📊 No trust reviews found for ${wallet.slice(0, 8)}... (searched for: ${walletLower})`);
-      return { trustScore: 0, trustReviews: 0 };
-    }
-    
-    let totalScore = 0;
-    let reviewCount = 0;
-    snapshot.forEach((doc) => {
-      const data = doc.data();
-      const score = data.review?.trustScore10 || 0;
-      totalScore += score;
-      reviewCount++;
-      console.log(`   📊 Found review ${reviewCount}: score ${score}/10 from ${data.reviewer?.slice(0, 8)}...`);
-    });
-    
-    const averageScore = totalScore / reviewCount;
-    const trustScore = Math.round(averageScore * 10) / 10; // Round to 1 decimal
-    
-    console.log(`   ✅ Calculated trust score for ${wallet.slice(0, 8)}...: ${trustScore}/10 from ${reviewCount} reviews`);
-    
-    return {
-      trustScore,
-      trustReviews: reviewCount
-    };
-  } catch (error: any) {
-    // If it's a permission error, log it but don't fail - just return 0
-    if (error?.code === 'permission-denied' || error?.message?.includes('permissions')) {
-      console.warn(`   ⚠️ Permission denied when calculating trust score for ${wallet.slice(0, 8)}... - Firestore rules may need to be updated`);
-      console.warn(`   ⚠️ This is non-fatal - player stats will be updated without trust score`);
-    } else {
-      console.error(`❌ Error calculating trust score for ${wallet.slice(0, 8)}...:`, error);
-    }
-    return { trustScore: 0, trustReviews: 0 };
-  }
-}
-
-/**
- * Calculate trust score from Firestore (synchronous fallback for backward compatibility)
- */
-function calculateTrustScoreSync(wallet: string): { trustScore: number; trustReviews: number } {
-  try {
-    // Try localStorage as fallback (for backward compatibility)
-    const trustReviews = JSON.parse(localStorage.getItem('trustReviews') || '[]');
-    
-    // Filter reviews for this specific player
-    const playerReviews = trustReviews.filter((review: any) => 
-      review.opponent && review.opponent.toLowerCase() === wallet.toLowerCase()
-    );
-    
-    if (playerReviews.length === 0) {
-      return { trustScore: 0, trustReviews: 0 };
-    }
-    
-    // Calculate average trust score
-    const totalScore = playerReviews.reduce((sum: number, review: any) => {
-      return sum + (review.review?.trustScore10 || 0);
-    }, 0);
-    
-    const averageScore = totalScore / playerReviews.length;
-    
-    return {
-      trustScore: Math.round(averageScore * 10) / 10, // Round to 1 decimal
-      trustReviews: playerReviews.length
-    };
-  } catch (error) {
-    console.error('❌ Error calculating trust score:', error);
-    return { trustScore: 0, trustReviews: 0 };
-  }
-}
-
-/**
  * Get player stats by wallet address.
  * Tries lowercase doc id if not found so profile works regardless of URL casing.
  */
@@ -4164,30 +4045,7 @@ export async function getPlayerEarningsByChallenge(wallet: string, limitCount: n
  */
 export async function updatePlayerLastActive(wallet: string): Promise<void> {
   try {
-    const playerRef = doc(db, 'player_stats', wallet);
-    const playerSnap = await getDoc(playerRef);
-    
-    if (playerSnap.exists()) {
-      // Update existing player's lastActive
-      await updateDoc(playerRef, {
-        lastActive: Timestamp.now(),
-      });
-    } else {
-      // Create new player stats with current timestamp
-      await setDoc(playerRef, {
-        wallet,
-        wins: 0,
-        losses: 0,
-        winRate: 0,
-        totalEarned: 0,
-        gamesPlayed: 0,
-        lastActive: Timestamp.now(),
-        trustScore: 0,
-        trustReviews: 0,
-        gameStats: {},
-        categoryStats: {},
-      });
-    }
+    await invokeUpdatePlayerMeta({ wallet, touchLastActive: true });
   } catch (error) {
     console.error('❌ Error updating player lastActive:', error);
     // Don't throw - this is a background update, shouldn't block the app
@@ -4628,44 +4486,11 @@ export async function storeTrustReview(
  */
 export async function updatePlayerTrustScore(wallet: string): Promise<void> {
   try {
-    console.log(`🔄 Recalculating trust score for ${wallet.slice(0, 8)}...`);
-    const { trustScore, trustReviews } = await calculateTrustScore(wallet);
-    
-    const playerRef = doc(db, 'player_stats', wallet);
-    const playerSnap = await getDoc(playerRef);
-    
-    if (playerSnap.exists()) {
-      const currentData = playerSnap.data() as PlayerStats;
-      const currentTrustScore = currentData.trustScore || 0;
-      const currentTrustReviews = currentData.trustReviews || 0;
-      
-      // Only update if the score has changed
-      if (currentTrustScore !== trustScore || currentTrustReviews !== trustReviews) {
-        await updateDoc(playerRef, {
-          trustScore,
-          trustReviews
-        });
-        console.log(`✅ Updated trust score for ${wallet.slice(0, 8)}...: ${currentTrustScore} → ${trustScore}/10 (${currentTrustReviews} → ${trustReviews} reviews)`);
-      } else {
-        console.log(`   ℹ️ Trust score unchanged for ${wallet.slice(0, 8)}...: ${trustScore}/10 (${trustReviews} reviews)`);
-      }
-    } else {
-      // Player doesn't exist yet, create with trust score
-      await setDoc(playerRef, {
-        wallet,
-        wins: 0,
-        losses: 0,
-        winRate: 0,
-        totalEarned: 0,
-        gamesPlayed: 0,
-        lastActive: Timestamp.now(),
-        trustScore,
-        trustReviews,
-        gameStats: {},
-        categoryStats: {}
-      });
-      console.log(`✅ Created player stats with trust score for ${wallet.slice(0, 8)}...: ${trustScore}/10 (${trustReviews} reviews)`);
-    }
+    console.log(`🔄 Recalculating trust score for ${wallet.slice(0, 8)}... (server)`);
+    const res = await invokeUpdateTrustScore({ wallet });
+    console.log(
+      `✅ Trust score sync for ${wallet.slice(0, 8)}...: ${res.trustScore ?? '?'}/10 (${res.trustReviews ?? '?'} reviews)`
+    );
   } catch (error) {
     console.error(`❌ Error updating player trust score for ${wallet.slice(0, 8)}...:`, error);
     throw error;
@@ -4679,33 +4504,8 @@ export async function updatePlayerDisplayName(wallet: string, displayName: strin
       console.warn('⚠️ Display name failed sanitization:', displayName);
       return;
     }
-    
-    const playerRef = doc(db, 'player_stats', wallet);
-    const playerSnap = await getDoc(playerRef);
-    
-    if (playerSnap.exists()) {
-      await updateDoc(playerRef, {
-        displayName: sanitized
-      });
-      console.log(`✅ Updated display name for ${wallet}: "${sanitized}"`);
-    } else {
-      // Player doesn't exist yet, create with display name
-      await setDoc(playerRef, {
-        wallet,
-        displayName: sanitized,
-        wins: 0,
-        losses: 0,
-        winRate: 0,
-        totalEarned: 0,
-        gamesPlayed: 0,
-        lastActive: Timestamp.now(),
-        trustScore: 0,
-        trustReviews: 0,
-        gameStats: {},
-        categoryStats: {}
-      });
-      console.log(`✅ Created player stats with display name for ${wallet}: "${sanitized}"`);
-    }
+    await invokeUpdatePlayerProfile({ wallet, displayName: sanitized });
+    console.log(`✅ Updated display name for ${wallet}: "${sanitized}"`);
   } catch (error) {
     console.error('❌ Error updating display name:', error);
     throw error;
@@ -4717,41 +4517,14 @@ export async function updatePlayerDisplayName(wallet: string, displayName: strin
  */
 export async function updatePlayerCountry(wallet: string, countryCode: string | null): Promise<void> {
   try {
-    const playerRef = doc(db, 'player_stats', wallet);
-    const playerSnap = await getDoc(playerRef);
-    
-    if (playerSnap.exists()) {
-      if (countryCode) {
-        await updateDoc(playerRef, {
-          country: countryCode
-        });
-        console.log(`✅ Updated country for ${wallet}: ${countryCode}`);
-      } else {
-        // Remove country if null
-        await updateDoc(playerRef, {
-          country: null
-        });
-        console.log(`✅ Removed country for ${wallet}`);
-      }
+    await invokeUpdatePlayerProfile({
+      wallet,
+      country: countryCode,
+    });
+    if (countryCode) {
+      console.log(`✅ Updated country for ${wallet}: ${countryCode}`);
     } else {
-      // Player doesn't exist yet, create with country
-      if (countryCode) {
-        await setDoc(playerRef, {
-          wallet,
-          country: countryCode,
-          wins: 0,
-          losses: 0,
-          winRate: 0,
-          totalEarned: 0,
-          gamesPlayed: 0,
-          lastActive: Timestamp.now(),
-          trustScore: 0,
-          trustReviews: 0,
-          gameStats: {},
-          categoryStats: {}
-        });
-        console.log(`✅ Created player stats with country for ${wallet}: ${countryCode}`);
-      }
+      console.log(`✅ Removed country for ${wallet}`);
     }
   } catch (error) {
     console.error('❌ Error updating country:', error);
@@ -4851,41 +4624,14 @@ async function compressImage(file: File, maxSizeKB: number = 50): Promise<File> 
  */
 export async function updatePlayerProfileImage(wallet: string, imageURL: string | null): Promise<void> {
   try {
-    const playerRef = doc(db, 'player_stats', wallet);
-    const playerSnap = await getDoc(playerRef);
-    
-    if (playerSnap.exists()) {
-      if (imageURL) {
-        await updateDoc(playerRef, {
-          profileImage: imageURL
-        });
-        console.log(`✅ Updated profile image for ${wallet}`);
-      } else {
-        // Remove profileImage field from Firestore
-        await updateDoc(playerRef, {
-          profileImage: null
-        });
-        console.log(`✅ Removed profile image for ${wallet}`);
-      }
+    await invokeUpdatePlayerProfile({
+      wallet,
+      profileImage: imageURL,
+    });
+    if (imageURL) {
+      console.log(`✅ Updated profile image for ${wallet}`);
     } else {
-      // Player doesn't exist yet, create with profile image
-      if (imageURL) {
-        await setDoc(playerRef, {
-          wallet,
-          profileImage: imageURL,
-          wins: 0,
-          losses: 0,
-          winRate: 0,
-          totalEarned: 0,
-          gamesPlayed: 0,
-          lastActive: Timestamp.now(),
-          trustScore: 0,
-          trustReviews: 0,
-          gameStats: {},
-          categoryStats: {}
-        });
-        console.log(`✅ Created player stats with profile image for ${wallet}`);
-      }
+      console.log(`✅ Removed profile image for ${wallet}`);
     }
   } catch (error) {
     console.error('❌ Error updating profile image:', error);
