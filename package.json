@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lobby-ws": "node server/lobby-room.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -78,6 +79,7 @@
     "three": "^0.182.0",
     "tweetnacl": "^1.0.3",
     "vaul": "^1.1.2",
+    "ws": "^8.18.3",
     "zod": "^4.3.5"
   },
   "devDependencies": {

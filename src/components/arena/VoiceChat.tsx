@@ -1,8 +1,12 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import { Mic, MicOff } from "lucide-react";
-import { doc, setDoc, onSnapshot, deleteDoc, getDoc, collection, getDocs } from "firebase/firestore";
-import { db } from "../../lib/firebase/config";
-import { createMicRequest, addSpeaker, removeSpeaker } from "../../lib/firebase/firestore";
+import {
+  getActiveLobbyHub,
+  createMicRequest,
+  addSpeaker,
+  removeSpeaker,
+} from "../../lib/realtime/lobbyHub";
+import { deleteVoiceSignalsDocument } from "../../lib/firebase/firestore";
 
 interface VoiceChatProps {
   challengeId: string;
@@ -26,6 +30,9 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
   participants = [],
   spectators = []
 }) => {
+  const participantsRef = useRef(participants);
+  participantsRef.current = participants;
+
   // Remove mount logging - excessive logging removed
   const [muted, setMuted] = useState(false);
   const [connected, setConnected] = useState(false);
@@ -47,59 +54,55 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
   // Participants (creator/challenger) always publish mic; spectators only when approved (inSpeakerList)
   const publishMic = !isSpectator || inSpeakerList;
   
-  // Listen to creator mute controls from Firestore
   useEffect(() => {
     if (!challengeId || !currentWallet) return;
-    const muteRef = doc(db, 'challenge_lobbies', challengeId, 'voice_controls', currentWallet);
-    const unsubscribe = onSnapshot(
-      muteRef,
-      (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.data();
-          setMutedByCreator(data.muted === true);
-        } else {
-          setMutedByCreator(false);
-        }
-      },
-      (error) => {
-        if (error.code !== 'permission-denied' && error.code !== 'unavailable') {
-          console.error('Error listening to mute status:', error);
-        }
+    const hub = getActiveLobbyHub(challengeId);
+    if (!hub) return;
+    const onCtl = (p: unknown) => {
+      const o = p as { target?: string; muted?: boolean };
+      if (o.target?.toLowerCase() === currentWallet.toLowerCase()) {
+        setMutedByCreator(!!o.muted);
       }
-    );
-    return () => unsubscribe();
+    };
+    hub.on("voice_control", onCtl);
+    return () => hub.off("voice_control", onCtl);
   }, [challengeId, currentWallet]);
 
-  // Listen to my mic request status (spectators)
   useEffect(() => {
     if (!challengeId || !currentWallet) return;
-    const requestRef = doc(db, 'challenge_lobbies', challengeId, 'mic_requests', currentWallet.toLowerCase());
-    const unsub = onSnapshot(
-      requestRef,
-      (snap) => {
-        const s = snap.data()?.status;
-        setMicRequestStatus(s === 'pending' || s === 'approved' || s === 'denied' ? s : null);
-      },
-      () => {}
-    );
-    return () => unsub();
+    const hub = getActiveLobbyHub(challengeId);
+    if (!hub) return;
+    const onMic = (requests: unknown) => {
+      const req = requests as Record<string, string>;
+      const lower = currentWallet.toLowerCase();
+      const s = req[lower] ?? req[currentWallet];
+      setMicRequestStatus(s === "pending" || s === "approved" || s === "denied" ? s : null);
+    };
+    hub.on("mic_snapshot", onMic);
+    return () => hub.off("mic_snapshot", onMic);
   }, [challengeId, currentWallet]);
 
-  // Listen to speaker list (max 2) for approved-speaker state
   useEffect(() => {
     if (!challengeId) return;
-    const stateRef = doc(db, 'challenge_lobbies', challengeId, 'voice_state', 'main');
-    const unsub = onSnapshot(
-      stateRef,
-      (snap) => {
-        const list = snap.exists() ? (snap.data()?.speakerWallets || []) : [];
-        setSpeakerWallets(Array.isArray(list) ? list : []);
-      },
-      () => {}
-    );
-    return () => unsub();
+    const hub = getActiveLobbyHub(challengeId);
+    if (!hub) return;
+    const onSp = (list: unknown) => {
+      setSpeakerWallets(Array.isArray(list) ? (list as string[]) : []);
+    };
+    hub.on("voice_state", onSp);
+    return () => hub.off("voice_state", onSp);
   }, [challengeId]);
-  
+
+  useEffect(() => {
+    const id = challengeId?.trim();
+    if (!id) return;
+    const onBeforeUnload = () => {
+      void deleteVoiceSignalsDocument(id);
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [challengeId]);
+
   const localStream = useRef<MediaStream | null>(null);
   const peerConnection = useRef<RTCPeerConnection | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
@@ -240,6 +243,21 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
     }
 
     try {
+      let hub = getActiveLobbyHub(validChallengeId);
+      if (!hub?.isConnected()) {
+        for (let i = 0; i < 60; i++) {
+          await new Promise((r) => setTimeout(r, 50));
+          hub = getActiveLobbyHub(validChallengeId);
+          if (hub?.isConnected()) break;
+        }
+      }
+      if (!hub?.isConnected()) {
+        setStatus("Lobby realtime unavailable");
+        setConnected(false);
+        initInProgressRef.current = false;
+        return;
+      }
+
       // Do NOT call getUserMedia here – iOS Safari requires a user gesture. Mic is acquired via "Enable mic" button.
       let stream: MediaStream | null = localStream.current;
       if (publishMicNow) {
@@ -322,10 +340,10 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
       pc.onicecandidate = async (event) => {
         if (event.candidate) {
           const candidateKey = `candidate_${currentWallet}_${Date.now()}`;
-          await setDoc(doc(db, "voice_signals", memoizedChallengeId), {
+          hub.mergeVdoc({
             [candidateKey]: event.candidate.toJSON(),
-            timestamp: Date.now()
-          }, { merge: true });
+            timestamp: Date.now(),
+          });
         }
       };
 
@@ -346,6 +364,10 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
           setStatus("Voice connected!");
           reconnectAttempts.current = 0;
           addSpeaker(memoizedChallengeId, currentWallet).catch(() => {});
+          void deleteVoiceSignalsDocument(memoizedChallengeId);
+          setTimeout(() => {
+            hub.purgeSignaling();
+          }, 800);
         } else if (state === 'connecting') {
           setStatus("Connecting to opponent...");
         } else if (state === 'disconnected' || state === 'failed') {
@@ -384,31 +406,26 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
         }
       };
 
-      // Listen for remote signals from the shared document
-      const signalRef = doc(db, "voice_signals", memoizedChallengeId);
-      
-      // Only set up new listener if we don't already have one for this challenge
       if (unsubscribeSignalRef.current) {
-        // Clean up old listener first
         unsubscribeSignalRef.current();
         unsubscribeSignalRef.current = null;
       }
-      
-      // Store unsubscribe function for cleanup
-      let quotaRetryUsed = false;
-      let quotaRetryTimer: ReturnType<typeof setTimeout> | null = null;
-      const unsubscribe = onSnapshot(signalRef, async (snapshot) => {
-        // Check if challengeId is still valid (in case it changed)
-        const currentChallengeId = memoizedChallengeId; // Capture in closure
-        if (!currentChallengeId || currentChallengeId.trim() === '') {
-          console.log("⚠️ challengeId became invalid during snapshot, ignoring");
+
+      const onVdoc = async (payload: unknown) => {
+        const currentChallengeId = memoizedChallengeId;
+        if (!currentChallengeId || currentChallengeId.trim() === "") {
+          console.log("⚠️ challengeId became invalid during vdoc, ignoring");
           return;
         }
-        
-        const data = snapshot.data() || {};
+
+        const data =
+          payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+        const offerInit = data.offer as RTCSessionDescriptionInit | undefined;
+        const answerInit = data.answer as RTCSessionDescriptionInit | undefined;
 
         try {
-          const sortedWallets = [...participants].map((p) => p?.toLowerCase()).filter(Boolean).sort();
+          const parts = participantsRef.current;
+          const sortedWallets = [...parts].map((p) => p?.toLowerCase()).filter(Boolean).sort();
           const amOfferer = sortedWallets.length === 0 || (currentWallet && currentWallet.toLowerCase() === sortedWallets[0]);
           // Non-offerer is "polite" and will roll back on collisions
           const isPolite = !amOfferer;
@@ -428,11 +445,11 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
               makingOfferRef.current = true;
               await pc.setLocalDescription(await pc.createOffer());
               hasOfferedRef.current = true;
-              await setDoc(signalRef, {
+              hub.mergeVdoc({
                 offer: pc.localDescription,
                 offerFrom: currentWallet,
                 timestamp: Date.now(),
-              }, { merge: true });
+              });
             } finally {
               makingOfferRef.current = false;
             }
@@ -440,8 +457,8 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
 
           // Check for offer from other player (initial or renegotiation e.g. after approved spectator adds mic)
           // Skip if we already answered this exact offer (prevents loop when our own write triggers onSnapshot)
-          const offerAlreadyProcessed = pc.currentRemoteDescription?.sdp === data.offer?.sdp;
-          if (data.offer && data.offerFrom !== currentWallet && !offerAlreadyProcessed) {
+          const offerAlreadyProcessed = pc.currentRemoteDescription?.sdp === offerInit?.sdp;
+          if (offerInit?.sdp && data.offerFrom !== currentWallet && !offerAlreadyProcessed) {
             const isRenegotiation = !!pc.currentRemoteDescription;
             if (isRenegotiation) console.log("📞 Renegotiation: received new offer, creating answer...");
             else console.log("📞 Received offer, creating answer...");
@@ -452,7 +469,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
               return;
             }
 
-            const description = new RTCSessionDescription(data.offer);
+            const description = new RTCSessionDescription(offerInit);
 
             // 3) Collision guard (glare)
             const makingOffer = makingOfferRef.current;
@@ -480,17 +497,17 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
               return;
             }
             await pc.setLocalDescription(answer);
-            await setDoc(signalRef, {
+            hub.mergeVdoc({
               answer: pc.localDescription,
               answerFrom: currentWallet,
-              timestamp: Date.now()
-            }, { merge: true });
+              timestamp: Date.now(),
+            });
           }
           // Check for answer from other player (only if we created the offer)
-          else if (data.answer && data.answerFrom !== currentWallet && data.offerFrom === currentWallet) {
+          else if (answerInit?.sdp && data.answerFrom !== currentWallet && data.offerFrom === currentWallet) {
             if (pc.signalingState === 'have-local-offer') {
               console.log("✅ Received answer, setting remote description...");
-              await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+              await pc.setRemoteDescription(new RTCSessionDescription(answerInit));
             }
           }
 
@@ -520,7 +537,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
           if (pc.signalingState !== "stable") return;
           if (
             amOfferer &&
-            !data.offer &&
+            !offerInit?.sdp &&
             !hasOfferedRef.current
           ) {
             hasOfferedRef.current = true;
@@ -529,38 +546,14 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
         } catch (error) {
           console.error("❌ Error handling WebRTC signal:", error);
         }
-      }, (error) => {
-        if ((error as any)?.code === 'resource-exhausted') {
-          console.warn('[Firestore] quota hit — switching to fail-soft mode');
-          unsubscribe();
-          unsubscribeSignalRef.current = null;
-          if (!quotaRetryUsed) {
-            quotaRetryUsed = true;
-            quotaRetryTimer = setTimeout(() => {
-              // One safe retry path: re-init signaling stack once.
-              if (!initializedRef.current) return;
-              setReinitKey((k) => k + 1);
-            }, 4000);
-          }
-          return;
-        }
-        // Handle snapshot errors (e.g., permission denied, invalid path)
-        if (error.code === 'invalid-argument' || error.message.includes('segments')) {
-          console.error("❌ Invalid Firestore path - challengeId may be empty:", error);
-          setStatus("Error: Invalid challenge ID");
-          setConnected(false);
-        } else {
-          console.error("❌ Firestore snapshot error:", error);
-        }
-      });
-      
-      // Store unsubscribe function for cleanup
-      unsubscribeSignalRef.current = unsubscribe;
+      };
 
-      await new Promise(resolve => setTimeout(resolve, 100));
-      // Offer creation is single-sourced via renegotiation path (glare-safe).
-      // Status/UI updates are driven by connection state + remote tracks.
-      if (quotaRetryTimer) clearTimeout(quotaRetryTimer);
+      hub.on("vdoc", onVdoc);
+      unsubscribeSignalRef.current = () => {
+        hub.off("vdoc", onVdoc);
+      };
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
     } catch (error) {
       console.error("❌ Voice chat init failed:", error);
@@ -619,14 +612,9 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
     hasOfferedRef.current = false;
 
     const validChallengeId = memoizedChallengeId || challengeId;
-    if (deleteSignalsDoc && validChallengeId && validChallengeId.trim() !== '') {
-      import("firebase/firestore").then(({ deleteDoc, doc }) => {
-        deleteDoc(doc(db, "voice_signals", validChallengeId)).catch((error: any) => {
-          if (error.code !== 'not-found' && !error.message?.includes('not found')) {
-            console.log("⚠️ Could not delete Firestore signals document (may already be cleaned up):", error);
-          }
-        });
-      });
+    if (deleteSignalsDoc && validChallengeId && validChallengeId.trim() !== "") {
+      getActiveLobbyHub(validChallengeId)?.purgeSignaling();
+      void deleteVoiceSignalsDocument(validChallengeId);
     }
 
     // Stop all local tracks
@@ -755,7 +743,6 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
         if (pc) {
           // 5) Mic toggle fix: add track first, then renegotiate after short delay
           stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-          const signalRef = doc(db, "voice_signals", challengeId!);
           setTimeout(() => {
             if (!peerConnection.current) return;
             const pcNow = peerConnection.current;
@@ -768,17 +755,18 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
               console.log("Offer already created, skipping");
               return;
             }
-            // Only the deterministic offerer should initiate
-            const sortedWallets = [...participants].map((p) => p?.toLowerCase()).filter(Boolean).sort();
+            const sortedWallets = [...participantsRef.current].map((p) => p?.toLowerCase()).filter(Boolean).sort();
             const amOfferer = sortedWallets.length === 0 || (currentWallet && currentWallet.toLowerCase() === sortedWallets[0]);
             if (!amOfferer) return;
+            const h = getActiveLobbyHub(challengeId!);
+            if (!h) return;
             (async () => {
               try {
                 makingOfferRef.current = true;
                 const offer = await pcNow.createOffer();
                 await pcNow.setLocalDescription(offer);
                 hasOfferedRef.current = true;
-                await setDoc(signalRef, { offer, offerFrom: currentWallet, timestamp: Date.now() }, { merge: true });
+                h.mergeVdoc({ offer, offerFrom: currentWallet, timestamp: Date.now() });
               } catch (e) {
                 console.error("❌ renegotiation after mic enable failed:", e);
               } finally {
@@ -901,11 +889,15 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
 
 // Memoize component to prevent unnecessary re-renders
 export const VoiceChat = React.memo(VoiceChatComponent, (prevProps, nextProps) => {
-  // Re-render if challengeId, currentWallet, status, or role changed
-  return prevProps.challengeId === nextProps.challengeId && 
-         prevProps.currentWallet === nextProps.currentWallet &&
-         prevProps.challengeStatus === nextProps.challengeStatus &&
-         prevProps.isSpectator === nextProps.isSpectator &&
-         prevProps.isCreator === nextProps.isCreator;
+  const sameParticipants =
+    (prevProps.participants ?? []).join(",") === (nextProps.participants ?? []).join(",");
+  return (
+    prevProps.challengeId === nextProps.challengeId &&
+    prevProps.currentWallet === nextProps.currentWallet &&
+    prevProps.challengeStatus === nextProps.challengeStatus &&
+    prevProps.isSpectator === nextProps.isSpectator &&
+    prevProps.isCreator === nextProps.isCreator &&
+    sameParticipants
+  );
 });
 
