@@ -440,7 +440,22 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   };
 
   const doSubmitResult = async () => {
-    if (selectedResult === null || submitLocked) return;
+    const isParticipantWallet = Boolean(currentWallet && isParticipant);
+    console.log("[SubmitResult] doSubmitResult()", {
+      isSubmitting,
+      hasAlreadySubmitted,
+      submitLocked,
+      selectedResult,
+      playersLength: players.length,
+      isParticipantWallet,
+    });
+    if (selectedResult === null || submitLocked) {
+      console.log("[SubmitResult] doSubmitResult() early return", {
+        selectedResultIsNull: selectedResult === null,
+        submitLocked,
+      });
+      return;
+    }
     setIsSubmitting(true);
     try {
       await onSubmitResult(selectedResult, proofFile);
@@ -458,7 +473,22 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   };
 
   const handleSubmit = async () => {
-    if (selectedResult === null || submitLocked) return;
+    const isParticipantWallet = Boolean(currentWallet && isParticipant);
+    console.log("[SubmitResult] handleSubmit()", {
+      isSubmitting,
+      hasAlreadySubmitted,
+      submitLocked,
+      selectedResult,
+      playersLength: players.length,
+      isParticipantWallet,
+    });
+    if (selectedResult === null || submitLocked) {
+      console.log("[SubmitResult] handleSubmit() early return", {
+        selectedResultIsNull: selectedResult === null,
+        submitLocked,
+      });
+      return;
+    }
 
     // If user is about to claim "I won" and opponent already claimed "I won", show integrity warning
     if (selectedResult === true && results && typeof results === 'object' && creatorWallet && challengerWallet && currentWallet) {
@@ -1612,7 +1642,11 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
             <div className="grid grid-cols-2 gap-1.5">
               <button
-                onClick={() => setSelectedResult(true)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setSelectedResult(true);
+                }}
                 disabled={submitLocked}
                 className={`
                   relative overflow-hidden p-2 rounded-md border transition-all duration-200
@@ -1639,7 +1673,11 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
               </button>
 
               <button
-                onClick={() => setSelectedResult(false)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setSelectedResult(false);
+                }}
                 disabled={submitLocked}
                 className={`
                   relative overflow-hidden p-2 rounded-md border transition-all duration-200
@@ -1780,7 +1818,11 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
           {/* Submit Button */}
           <button
-            onClick={handleSubmit}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              void handleSubmit();
+            }}
             disabled={selectedResult === null || submitLocked || showIntegrityConfirm}
             className={`
               w-full py-1.5 rounded-md font-semibold text-xs transition-all duration-200 border
