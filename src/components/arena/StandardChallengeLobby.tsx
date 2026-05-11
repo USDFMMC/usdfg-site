@@ -186,6 +186,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const [resolvingWinner, setResolvingWinner] = useState<string | null>(null);
   const [showIntegrityConfirm, setShowIntegrityConfirm] = useState(false);
   const [isDisputing, setIsDisputing] = useState(false);
+  const [submitLockedLocal, setSubmitLockedLocal] = useState(false);
+  const [submittedLocally, setSubmittedLocally] = useState(false);
 
   const isAdmin = currentWallet && currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
   
@@ -343,11 +345,20 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     return !!userResult;
   }, [currentWallet, results, players]);
 
+  const hasAlreadySubmittedEffective = hasAlreadySubmitted || submittedLocally;
+
   const submitLocked =
-    isSubmitting || externalIsSubmitting || hasAlreadySubmitted;
+    submitLockedLocal || isSubmitting || externalIsSubmitting || hasAlreadySubmittedEffective;
 
   const isLockedVisual =
-    hasAlreadySubmitted && !isSubmitting && !externalIsSubmitting;
+    hasAlreadySubmittedEffective && !isSubmitting && !externalIsSubmitting;
+
+  const canSubmit =
+    selectedResult !== null &&
+    !submitLocked &&
+    !isSubmitting &&
+    !externalIsSubmitting &&
+    !hasAlreadySubmittedEffective;
 
   useEffect(() => {
     if (!onAppToast || !currentWallet || !creatorWallet) return;
@@ -440,25 +451,16 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   };
 
   const doSubmitResult = async () => {
-    const isParticipantWallet = Boolean(currentWallet && isParticipant);
-    console.log("[SubmitResult] doSubmitResult()", {
-      isSubmitting,
-      hasAlreadySubmitted,
-      submitLocked,
-      selectedResult,
-      playersLength: players.length,
-      isParticipantWallet,
-    });
-    if (selectedResult === null || submitLocked) {
-      console.log("[SubmitResult] doSubmitResult() early return", {
-        selectedResultIsNull: selectedResult === null,
-        submitLocked,
-      });
-      return;
-    }
+    console.log("DO SUBMIT RESULT TRIGGERED");
+    const resultToSubmit = selectedResult;
+    if (resultToSubmit === null) return;
+    if (!canSubmit) return;
+    setSubmitLockedLocal(true);
     setIsSubmitting(true);
     try {
-      await onSubmitResult(selectedResult, proofFile);
+      console.log("CALLING onSubmitResult", resultToSubmit);
+      await onSubmitResult(resultToSubmit, proofFile);
+      setSubmittedLocally(true);
       setShowSubmitForm(false);
       setSelectedResult(null);
       setProofImage(null);
@@ -467,31 +469,23 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     } catch (error: any) {
       console.error("Error submitting result:", error);
       onAppToast?.(error.message || "Failed to submit result. Please try again.", "error", "Submit failed");
+      setSubmitLockedLocal(false);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleSubmit = async () => {
-    const isParticipantWallet = Boolean(currentWallet && isParticipant);
-    console.log("[SubmitResult] handleSubmit()", {
-      isSubmitting,
-      hasAlreadySubmitted,
+    const resultToSubmit = selectedResult;
+    console.log("HANDLE SUBMIT", {
       submitLocked,
       selectedResult,
-      playersLength: players.length,
-      isParticipantWallet,
     });
-    if (selectedResult === null || submitLocked) {
-      console.log("[SubmitResult] handleSubmit() early return", {
-        selectedResultIsNull: selectedResult === null,
-        submitLocked,
-      });
-      return;
-    }
+    if (resultToSubmit === null) return;
+    if (!canSubmit) return;
 
     // If user is about to claim "I won" and opponent already claimed "I won", show integrity warning
-    if (selectedResult === true && results && typeof results === 'object' && creatorWallet && challengerWallet && currentWallet) {
+    if (resultToSubmit === true && results && typeof results === 'object' && creatorWallet && challengerWallet && currentWallet) {
       const opponentWallet = currentWallet.toLowerCase() === creatorWallet.toLowerCase() ? challengerWallet : creatorWallet;
       const opponentKey = opponentWallet ? canonicalPlayerKey(players, opponentWallet) : '';
       const opponentResult = opponentKey ? results[opponentKey] : null;
@@ -1540,8 +1534,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           <div className="text-center">
             <button
               type="button"
-              disabled={submitLocked}
-              aria-disabled={submitLocked}
+              disabled={hasAlreadySubmittedEffective || submitLocked}
+              aria-disabled={hasAlreadySubmittedEffective || submitLocked}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -1558,7 +1552,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
             >
               {isSubmitting || externalIsSubmitting
                 ? "Submitting..."
-                : hasAlreadySubmitted
+                : hasAlreadySubmittedEffective
                   ? "Result Submitted"
                   : "Submit Result"}
             </button>
@@ -1573,7 +1567,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       )}
 
       {/* Show message if already submitted */}
-      {hasAlreadySubmitted && (status === 'active' || status === 'awaiting_auto_resolution') && isParticipant && (
+      {hasAlreadySubmittedEffective && (status === 'active' || status === 'awaiting_auto_resolution') && isParticipant && (
         <div className="rounded-lg border border-green-400/30 bg-green-500/10 p-2.5 text-center text-xs text-green-100">
           <div className="text-sm font-semibold text-white mb-0.5">
             ✅ Result Submitted
@@ -1612,7 +1606,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       )}
 
       {/* Submit Result Form - Inline in lobby */}
-      {canSubmitResult && showSubmitForm && !hasAlreadySubmitted && (
+      {canSubmitResult && showSubmitForm && !hasAlreadySubmittedEffective && (
         <div className="rounded-lg border border-white/10 bg-gradient-to-br from-[#07080C]/98 via-purple-950/20 to-[#07080C]/98 p-2.5 space-y-2 ring-1 ring-purple-500/10">
           <div className="flex items-center justify-between mb-1.5">
             <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
@@ -1645,9 +1639,20 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
+                  console.log("CLICK YES", {
+                    submitLocked,
+                    isSubmitting,
+                    externalIsSubmitting,
+                    hasAlreadySubmitted: hasAlreadySubmittedEffective,
+                    selectedResult,
+                  });
+                  if (selectedResult === true) {
+                    void handleSubmit();
+                    return;
+                  }
                   setSelectedResult(true);
                 }}
-                disabled={submitLocked}
+                disabled={!canSubmit && selectedResult !== null}
                 className={`
                   relative overflow-hidden p-2 rounded-md border transition-all duration-200
                   disabled:opacity-50 disabled:cursor-not-allowed
@@ -1676,9 +1681,13 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
+                  if (selectedResult === false) {
+                    void handleSubmit();
+                    return;
+                  }
                   setSelectedResult(false);
                 }}
-                disabled={submitLocked}
+                disabled={!canSubmit && selectedResult !== null}
                 className={`
                   relative overflow-hidden p-2 rounded-md border transition-all duration-200
                   disabled:opacity-50 disabled:cursor-not-allowed
