@@ -3891,8 +3891,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           if (accountInfo && accountInfo.data) {
             const data = accountInfo.data;
             const statusByte = data[8 + 32 + 33 + 8]; // Skip discriminator, creator, challenger, entry_fee, then status
-            // Status 2 = Completed (already resolved)
-            if (statusByte === 2) {
+            // Align with syncChallengeStatus: 4 = completed (released). 2 = creator_funded — not "already claimed".
+            if (statusByte === 4) {
               showAppToast(
                 "This reward has already been claimed. Syncing latest state…",
                 "warning",
@@ -3921,82 +3921,118 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         }
       }
       
-      const beforeClaimed = isChallengeRewardClaimed(challenge);
       const { claimChallengePrize } = await import("@/lib/firebase/firestore");
+      const claimResult = await claimChallengePrize(challenge.id, wallet, connection);
 
-      await claimChallengePrize(challenge.id, wallet, connection);
+      const shouldRefreshAfterClaim =
+        claimResult.status === "success" ||
+        claimResult.status === "already_claimed";
 
-      let fresh = await fetchChallengeById(challenge.id);
-      if (!fresh) {
-        showAppToast("Syncing latest state…", "info", "Syncing");
-        const list = await resyncAfterClaimData();
-        if (Array.isArray(list)) {
-          fresh = list.find((c) => c.id === challenge.id) || null;
+      let fresh: ChallengeData | null = null;
+      if (shouldRefreshAfterClaim) {
+        fresh = await fetchChallengeById(challenge.id);
+        if (!fresh) {
+          showAppToast("Syncing latest state…", "info", "Syncing");
+          const list = await resyncAfterClaimData();
+          if (Array.isArray(list)) {
+            fresh = list.find((c) => c.id === challenge.id) || null;
+          }
+          if (!fresh) {
+            fresh = await fetchChallengeById(challenge.id);
+          }
         }
         if (!fresh) {
-          fresh = await fetchChallengeById(challenge.id);
+          await new Promise((r) => setTimeout(r, 300));
+          const retryFresh = await fetchChallengeById(challenge.id);
+          if (isMountedRef.current) {
+            fresh = retryFresh;
+          }
         }
-      }
-      if (!fresh) {
-        await new Promise((r) => setTimeout(r, 300));
-        const retryFresh = await fetchChallengeById(challenge.id);
-        if (isMountedRef.current) {
-          fresh = retryFresh;
+        if (!fresh) {
+          if (isMountedRef.current) {
+            showAppToast("Challenge not found. Try again in a moment.", "info", "Syncing");
+          }
+        } else {
+          const freshChallenge = fresh;
+          if (selectedChallenge && freshChallenge.id === selectedChallenge.id) {
+            setSelectedChallenge(mergeChallengeDataForModal(freshChallenge, freshChallenge));
+          }
+          if (isChallengeRewardClaimed(freshChallenge)) {
+            setUnclaimedPrizeChallenges((prev) =>
+              prev.filter((c) => c.id !== freshChallenge.id)
+            );
+          }
         }
-      }
-      if (!fresh) {
-        if (isMountedRef.current) {
-          showAppToast("Challenge not found. Try again in a moment.", "info", "Syncing");
-        }
-        return;
       }
 
-      if (fresh) {
-        if (selectedChallenge && fresh.id === selectedChallenge.id) {
-          setSelectedChallenge(mergeChallengeDataForModal(fresh, fresh));
-        }
-        if (isChallengeRewardClaimed(fresh)) {
-          setUnclaimedPrizeChallenges((prev) =>
-            prev.filter((c) => c.id !== fresh.id)
+      switch (claimResult.status) {
+        case "success":
+          showAppToast(
+            "Reward claimed. Check your wallet for the USDFG tokens.",
+            "success",
+            "Claimed"
           );
+          setTimeout(() => {
+            refreshUSDFGBalance().catch(() => {});
+          }, 2000);
+          break;
+        case "already_claimed":
+          showAppToast("Reward already claimed.", "info", "Already claimed");
+          break;
+        case "in_flight":
+          showAppToast(
+            "Claim already in progress. Please wait.",
+            "info",
+            "Claim in progress"
+          );
+          break;
+        case "cooldown":
+          showAppToast(
+            "Please wait a moment before trying again.",
+            "info",
+            "Please wait"
+          );
+          break;
+        case "not_available":
+          showAppToast(
+            (claimResult.message && claimResult.message.trim()) ||
+              "Payout is not available yet.",
+            "info",
+            "Payout"
+          );
+          break;
+        case "error": {
+          let errorMessage = claimResult.message || "Unknown error";
+          if (
+            errorMessage.includes("ChallengeExpired") ||
+            errorMessage.includes("6005") ||
+            errorMessage.includes("challenge has expired") ||
+            errorMessage.includes("Challenge has expired")
+          ) {
+            errorMessage =
+              "⚠️ Old contract version detected. The contract needs to be redeployed to remove the expiration check for reward claims. Please contact support.";
+          } else if (
+            errorMessage.includes("NotInProgress") ||
+            errorMessage.includes("not in progress")
+          ) {
+            errorMessage =
+              "❌ Challenge is not in progress. It may have already been completed or cancelled.";
+          }
+          showAppToast("Failed to claim reward: " + errorMessage, "error", "Claim failed");
+          break;
         }
-      }
-
-      const afterClaimed = isChallengeRewardClaimed(fresh);
-
-      if (!beforeClaimed && afterClaimed) {
-        showAppToast("Reward claimed. Check your wallet for the USDFG tokens.", "success", "Claimed");
-        setTimeout(() => {
-          refreshUSDFGBalance().catch(() => {});
-        }, 2000);
-      } else {
-        showAppToast("This reward was already processed earlier.", "info", "Already processed");
+        default:
+          showAppToast("Failed to claim reward.", "error", "Claim failed");
       }
     } catch (error) {
       console.error("❌ Failed to claim reward:", error);
-      
-      // Check for expired challenge error
-      let errorMessage = error instanceof Error ? error.message : "Unknown error";
-      
-      if (errorMessage.includes("ChallengeExpired") || 
-          errorMessage.includes("6005") || 
-          errorMessage.includes("challenge has expired") ||
-          errorMessage.includes("Challenge has expired")) {
-        errorMessage = "⚠️ Old contract version detected. The contract needs to be redeployed to remove the expiration check for reward claims. Please contact support.";
-      } else if (errorMessage.includes("already been processed") || 
-                 errorMessage.includes("already processed") ||
-                 errorMessage.includes("already claimed") ||
-                 errorMessage.includes("Reward already claimed")) {
-        errorMessage = "✅ This reward has already been claimed. Please refresh the page to see the latest status.";
-        // Remove from unclaimed so the green button disappears
-        setUnclaimedPrizeChallenges(prev => prev.filter(c => c.id !== challenge.id));
-        await resyncAfterClaimData();
-      } else if (errorMessage.includes("NotInProgress") || 
-                 errorMessage.includes("not in progress")) {
-        errorMessage = "❌ Challenge is not in progress. It may have already been completed or cancelled.";
-      }
-      
-      showAppToast("Failed to claim reward: " + errorMessage, "error", "Claim failed");
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      showAppToast(
+        "Failed to claim reward: " + errorMessage,
+        "error",
+        "Claim failed"
+      );
     } finally {
       setClaimingPrize(null);
     }

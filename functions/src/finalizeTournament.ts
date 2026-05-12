@@ -8,6 +8,9 @@ import {
   type TournamentState,
 } from "./tournamentBracket";
 
+/** Matches client `ADMIN_WALLET` (founder / escrow gate checks). */
+const ADMIN_WALLET_BASE58 = "3SeLoDGsajuQUt2pzSkZV7LmB7gKtckmrD693U69kcUd";
+
 export const finalizeAdminTournamentDispute = onCall(async (request) => {
   const adminWallet = requireAdminClaims(request);
 
@@ -97,6 +100,22 @@ export const finalizeAdminTournamentDispute = onCall(async (request) => {
     updates["tournament.currentRound"] = bracket.length;
     updates.status = "completed";
     updates.canClaim = true;
+
+    const entryFee = Number(data.entryFee ?? 0);
+    const creator = String(data.creator ?? "").toLowerCase();
+    const pda =
+      typeof data.pda === "string" && (data.pda as string).trim() !== "";
+    const founderPR = Number(data.founderParticipantReward ?? 0);
+    const founderWB = Number(data.founderWinnerBonus ?? 0);
+    const isFree = entryFee === 0 || entryFee < 0.000000001;
+    const isAdminCreator = creator === ADMIN_WALLET_BASE58.toLowerCase();
+    const isFounderTournament =
+      isAdminCreator && isFree && (founderPR > 0 || founderWB > 0);
+    if (pda && !isFounderTournament) {
+      updates.needsPayout = true;
+      updates.payoutTriggered = false;
+      updates.payoutStatus = "pending";
+    }
   } else {
     const nextRound = bracket[currentRoundIndex + 1];
     if (!nextRound) {

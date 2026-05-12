@@ -28,7 +28,7 @@ import {
   invokeUpdatePlayerMeta,
   invokeUpdateTrustScore,
 } from './adminApi';
-import { CHALLENGE_CONFIG } from '../chain/config';
+import { CHALLENGE_CONFIG, ADMIN_WALLET } from '../chain/config';
 import { getExplorerTxUrl } from '../chain/explorer';
 import { broadcastLobbySystemMessage } from '../realtime/lobbyHub';
 
@@ -693,16 +693,17 @@ export const resolveTournamentMatchDispute = async (
     updatedAt: serverTimestamp(),
   };
 
-  if (currentRoundIndex === bracket.length - 1) {
-    // Final round => tournament complete
-    updates['tournament.champion'] = winnerWallet;
-    updates['tournament.stage'] = 'completed';
-    updates['tournament.completedAt'] = serverTimestamp();
-    updates['tournament.currentRound'] = bracket.length;
-    updates['status'] = 'completed';
-    updates['resolutionType'] = 'admin';
-    updates['canClaim'] = true;
-  } else {
+    if (currentRoundIndex === bracket.length - 1) {
+      // Final round => tournament complete
+      updates['tournament.champion'] = winnerWallet;
+      updates['tournament.stage'] = 'completed';
+      updates['tournament.completedAt'] = serverTimestamp();
+      updates['tournament.currentRound'] = bracket.length;
+      updates['status'] = 'completed';
+      updates['resolutionType'] = 'admin';
+      updates['canClaim'] = true;
+      Object.assign(updates, escrowTournamentClaimGatePatch(data));
+    } else {
     const nextRound = bracket[currentRoundIndex + 1];
     if (!nextRound) throw new Error('Next round not found');
 
@@ -1096,6 +1097,7 @@ export const submitTournamentMatchResult = async (
         'canClaim': true, // Enable prize claiming for the champion
         'needsPayout': true,
         'payoutTriggered': false,
+        'payoutStatus': 'pending',
         updatedAt: serverTimestamp(),
       };
 
@@ -1598,6 +1600,7 @@ export const advanceBracketWinner = async (
         'resolutionType': 'auto',
         'canClaim': true, // Enable prize claiming for the champion
         updatedAt: serverTimestamp(),
+        ...escrowTournamentClaimGatePatch(data),
       };
 
       await writeChallengeFields(challengeId, updates);
@@ -5035,6 +5038,41 @@ function ensureWinnerInRoster(data: ChallengeData): void {
   }
 }
 
+/** Outcome from {@link claimChallengePrize} (no silent soft-returns). */
+export type ClaimPrizeResult =
+  | { status: 'success'; signature?: string }
+  | { status: 'already_claimed'; signature?: string }
+  | { status: 'in_flight' }
+  | { status: 'cooldown' }
+  | { status: 'not_available'; message?: string }
+  | { status: 'error'; message: string };
+
+/** Escrow tournaments need `needsPayout` so the payout transaction guard matches `canClaim`. */
+function escrowTournamentClaimGatePatch(data: ChallengeData): {
+  needsPayout: true;
+  payoutTriggered: false;
+  payoutStatus: 'pending';
+} | Record<string, never> {
+  const raw = (data as { rawData?: Partial<ChallengeData> }).rawData;
+  const entryFee = Number(data.entryFee ?? raw?.entryFee ?? 0);
+  const creator = (data.creator || raw?.creator || '').toLowerCase();
+  const isFree = entryFee === 0 || entryFee < 0.000000001;
+  const founderPR = Number(data.founderParticipantReward ?? raw?.founderParticipantReward ?? 0);
+  const founderWB = Number(data.founderWinnerBonus ?? raw?.founderWinnerBonus ?? 0);
+  const isAdminCreator = creator === ADMIN_WALLET.toString().toLowerCase();
+  const isFounderTournament =
+    isAdminCreator && isFree && (founderPR > 0 || founderWB > 0);
+  const pda = typeof data.pda === 'string' && data.pda.trim() !== '';
+  if (!pda || isFounderTournament) {
+    return {};
+  }
+  return {
+    needsPayout: true,
+    payoutTriggered: false,
+    payoutStatus: 'pending',
+  };
+}
+
 /**
  * Claim reward for a completed challenge (WINNER ONLY)
  * 
@@ -5049,25 +5087,23 @@ export async function claimChallengePrize(
   challengeId: string,
   winnerWallet: any,
   connection: any
-): Promise<void> {
+): Promise<ClaimPrizeResult> {
   try {
     console.log('🏆 Claiming reward for challenge:', challengeId);
-    
-    // Get challenge data from Firestore
+
     const challengeRef = doc(db, 'challenges', challengeId);
     const snap = await getDoc(challengeRef);
-    
+
     if (!snap.exists()) {
-      throw new Error('❌ Challenge not found in Firestore');
+      return { status: 'error', message: '❌ Challenge not found in Firestore' };
     }
-    
+
     let data = snap.data() as ChallengeData;
 
     const payoutSigRaw = data.payoutSignature;
     const hasPayoutSignature =
       payoutSigRaw != null && String(payoutSigRaw).trim() !== '';
 
-    // True idempotency key: any non-empty payoutSignature means a payout was already executed — never send again.
     if (hasPayoutSignature) {
       const sigTrim = String(payoutSigRaw).trim();
       if (looksLikeSolanaTxSignature(sigTrim) && (!data.payoutTriggered || !data.prizeClaimedAt)) {
@@ -5089,36 +5125,42 @@ export async function claimChallengePrize(
         );
       }
       console.log('✅ payoutSignature already set — idempotent return (no chain)');
-      return;
+      return {
+        status: 'already_claimed',
+        signature: sigTrim.length > 0 ? sigTrim : undefined,
+      };
     }
 
     if (data.payoutTriggered === true) {
       console.log('✅ Reward already claimed - idempotent check passed');
-      return;
+      return { status: 'already_claimed' };
     }
 
     if (data.prizeClaimedAt) {
       console.log('✅ Reward already claimed (prizeClaimedAt) — idempotent');
-      return;
+      return { status: 'already_claimed' };
     }
 
     if (data.payoutStatus === 'paid') {
       console.log('✅ Reward already paid (payoutStatus) — idempotent');
-      return;
+      return { status: 'already_claimed' };
     }
-    
-    // Validate challenge is ready for claim
+
     const isCompleted = data.status === 'completed';
     if (!isCompleted) {
-      throw new Error('❌ Challenge is not completed yet.');
+      return { status: 'not_available', message: 'Challenge is not completed yet.' };
     }
 
     const hasValidWinner = challengeHasValidPayoutWinner(data);
     if (!hasValidWinner) {
-      throw new Error('❌ No valid winner for payout.');
+      return { status: 'error', message: '❌ No valid winner for payout.' };
     }
 
-    ensureWinnerInRoster(data);
+    try {
+      ensureWinnerInRoster(data);
+    } catch (e) {
+      return { status: 'error', message: e instanceof Error ? e.message : String(e) };
+    }
 
     const rawData = (data as any).rawData as Partial<ChallengeData> | undefined;
     const format = data.format ?? rawData?.format;
@@ -5127,12 +5169,7 @@ export async function claimChallengePrize(
       data.tournament != null ||
       rawData?.tournament != null;
 
-    // Standard (non-tournament) escrow claims: require payout gate — never apply founder-tournament rules here.
     if (!isTournament) {
-      if (!isCompleted) {
-        throw new Error('❌ Challenge is not completed yet.');
-      }
-
       const isAdminResolved =
         !!(data as any).resolvedBy &&
         isCompleted &&
@@ -5142,15 +5179,16 @@ export async function claimChallengePrize(
         data.needsPayout === true ||
         isAdminResolved;
       if (!payoutReady) {
-        throw new Error('❌ Prize payout is not enabled for this challenge yet.');
+        return {
+          status: 'not_available',
+          message: 'Prize payout is not enabled for this challenge yet.',
+        };
       }
     }
 
-    // Founder Tournament (platform airdrop): only when this document is actually a tournament.
     const entryFee = data.entryFee || rawData?.entryFee || 0;
     const creatorWallet = data.creator || rawData?.creator || '';
     const isFree = entryFee === 0 || entryFee < 0.000000001;
-    const { ADMIN_WALLET } = await import('../chain/config');
     const isAdminCreator = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
     const founderParticipantReward =
       data.founderParticipantReward ?? rawData?.founderParticipantReward ?? 0;
@@ -5165,47 +5203,44 @@ export async function claimChallengePrize(
     }
 
     if (isFounderTournament) {
-      // Founder Tournament rewards are distributed by the platform after the tournament concludes
-      throw new Error('🏆 This is a Founder Tournament. Rewards are distributed by the platform after the tournament concludes. No action is required from you.');
+      return {
+        status: 'not_available',
+        message:
+          '🏆 This is a Founder Tournament. Rewards are distributed by the platform after the tournament concludes. No action is required from you.',
+      };
     }
 
-    // Regular Founder Challenge (non-tournament, no on-chain PDA) — manual founder payout, not this claim path.
     const isFounderChallenge = !isTournament && !data.pda && (isFree || isAdminCreator);
-    
+
     if (isFounderChallenge) {
-      // Founder Challenge rewards are transferred manually by the founder, not via smart contract
-      throw new Error('🏆 This is a Founder Challenge. Rewards are transferred manually by the founder after the challenge completes. Please contact the founder to receive your reward.');
+      return {
+        status: 'not_available',
+        message:
+          '🏆 This is a Founder Challenge. Rewards are transferred manually by the founder after the challenge completes. Please contact the founder to receive your reward.',
+      };
     }
-    
-    // If no PDA, try to derive it from the challenge data
+
     let challengePDA = data.pda;
     if (!challengePDA) {
       console.log('⚠️ No PDA found, attempting to derive from challenge data...');
-      
-      // For existing challenges without PDA, we need to manually add it
-      // This is a temporary fix for challenges created before PDA field was added
       console.log('🔧 Attempting to fix missing PDA for existing challenge...');
-      
-      // Try to find the PDA by looking up the challenge on-chain
-      // For now, we'll need to manually add the PDA to the challenge document
-      throw new Error('❌ Challenge has no on-chain PDA. This challenge was created before the PDA field was added. Please create a new challenge to use the claim reward functionality.');
+      return {
+        status: 'error',
+        message:
+          '❌ Challenge has no on-chain PDA. This challenge was created before the PDA field was added. Please create a new challenge to use the claim reward functionality.',
+      };
     }
-    
+
     if (!winnerWallet || !winnerWallet.publicKey) {
-      throw new Error('❌ Wallet not connected');
+      return { status: 'error', message: '❌ Wallet not connected' };
     }
-    
+
     const callerAddress = winnerWallet.publicKey.toString();
     if (!walletsEqual(callerAddress, data.winner)) {
-      throw new Error('❌ Only the winner can claim the reward');
+      return { status: 'error', message: '❌ Only the winner can claim the reward' };
     }
-    
-    // Non-tournament: same readiness as payoutReady (needsPayout or admin-resolved). Tournament: unchanged (canClaim / admin / completed+winner).
-    if (!isTournament) {
-      if (!isCompleted) {
-        throw new Error('❌ Challenge is not completed yet.');
-      }
 
+    if (!isTournament) {
       const isAdminResolved =
         !!(data as any).resolvedBy &&
         isCompleted &&
@@ -5215,7 +5250,10 @@ export async function claimChallengePrize(
         data.needsPayout === true ||
         isAdminResolved;
       if (!claimableNonTournament) {
-        throw new Error('❌ Prize payout is not enabled for this challenge yet.');
+        return {
+          status: 'not_available',
+          message: 'Prize payout is not enabled for this challenge yet.',
+        };
       }
     } else {
       const isAdminResolved = !!(data as any).resolvedBy;
@@ -5224,22 +5262,28 @@ export async function claimChallengePrize(
         (isAdminResolved && isCompleted) ||
         (isCompleted && hasValidWinner);
       if (!claimable) {
-        throw new Error('❌ Challenge is not ready for claim yet');
+        return {
+          status: 'not_available',
+          message: 'Challenge is not ready for claim yet.',
+        };
       }
     }
 
-    // Re-fetch immediately before chain to reduce double-send race (another tab / retry)
     const preChainSnap = await getDoc(challengeRef);
     if (!preChainSnap.exists()) {
-      throw new Error('❌ Challenge not found in Firestore');
+      return { status: 'error', message: '❌ Challenge not found in Firestore' };
     }
     data = preChainSnap.data() as ChallengeData;
 
     if (!challengeHasValidPayoutWinner(data)) {
-      throw new Error('❌ No valid winner for payout.');
+      return { status: 'error', message: '❌ No valid winner for payout.' };
     }
 
-    ensureWinnerInRoster(data);
+    try {
+      ensureWinnerInRoster(data);
+    } catch (e) {
+      return { status: 'error', message: e instanceof Error ? e.message : String(e) };
+    }
 
     const STALE_MS = 2 * 60 * 1000;
     const FORCE_STALE_MS = 5 * 60 * 1000;
@@ -5250,6 +5294,7 @@ export async function claimChallengePrize(
       data.payoutAttemptedAt &&
       Date.now() - data.payoutAttemptedAt.toMillis() > STALE_MS
     ) {
+      console.log('⚠️ Resetting stale payout lock (pre-transaction recovery)');
       await updateDoc(challengeRef, {
         payoutStatus: 'pending',
         payoutLockOwner: deleteField(),
@@ -5263,12 +5308,12 @@ export async function claimChallengePrize(
       data.payoutSignature != null && String(data.payoutSignature).trim() !== '';
     if (concurrentSig || data.payoutTriggered === true) {
       console.log('✅ Claim completed by concurrent request — idempotent');
-      return;
+      return { status: 'already_claimed' };
     }
 
     if (data.payoutStatus === 'paid') {
       console.log('✅ Reward already paid (payoutStatus) — idempotent');
-      return;
+      return { status: 'already_claimed' };
     }
 
     const ERROR_SPAM_WINDOW_MS = 1000;
@@ -5278,118 +5323,134 @@ export async function claimChallengePrize(
       let sinceError = Date.now() - data.payoutErrorAt.toMillis();
       if (sinceError < 0) sinceError = 0;
 
-      // Only block ultra-fast repeat clicks after error
       if (
         sinceError < ERROR_SPAM_WINDOW_MS &&
         data.payoutAttemptedAt &&
         sinceError < 300
       ) {
-        return;
+        return { status: 'cooldown' };
       }
-
-      // IMPORTANT: do NOT apply normal cooldown after an error
     } else {
       if (
         data.payoutAttemptedAt &&
         Date.now() - data.payoutAttemptedAt.toMillis() < COOLDOWN_MS
       ) {
-        return;
+        return { status: 'cooldown' };
       }
     }
 
     const lockOwner = crypto.randomUUID();
     const callerLockId = lockOwner;
-    const lockResult = await runTransaction(db, async (tx) => {
-      const snap = await tx.get(challengeRef);
-      if (!snap.exists()) {
-        throw new Error('❌ Challenge not found in Firestore');
-      }
-      const d = snap.data() as ChallengeData;
-
-      const hasSig =
-        d.payoutSignature != null && String(d.payoutSignature).trim() !== '';
-
-      if (hasSig) {
-        console.log('✅ Payout already completed (signature present)');
-        if (d.payoutStatus !== 'paid') {
-          tx.update(challengeRef, {
-            payoutStatus: 'paid',
-          });
+    let lockResult: 'done' | 'in_flight' | 'locked';
+    try {
+      lockResult = await runTransaction(db, async (tx) => {
+        const txSnap = await tx.get(challengeRef);
+        if (!txSnap.exists()) {
+          throw new Error('❌ Challenge not found in Firestore');
         }
-        return 'done' as const;
-      }
+        const d = txSnap.data() as ChallengeData;
 
-      if (d.payoutStatus === 'paid') {
-        return 'done' as const;
-      }
+        const hasSig =
+          d.payoutSignature != null && String(d.payoutSignature).trim() !== '';
 
-      const ageMs = d.payoutAttemptedAt
-        ? Date.now() - d.payoutAttemptedAt.toMillis()
-        : 0;
+        if (hasSig) {
+          console.log('✅ Payout already completed (signature present)');
+          if (d.payoutStatus !== 'paid') {
+            tx.update(challengeRef, {
+              payoutStatus: 'paid',
+            });
+          }
+          return 'done' as const;
+        }
 
-      const isStaleOwnOrNoOwner =
-        d.payoutStatus === 'processing' &&
-        !hasSig &&
-        d.payoutAttemptedAt &&
-        ageMs > STALE_MS &&
-        (!d.payoutLockOwner || d.payoutLockOwner === callerLockId);
+        if (d.payoutStatus === 'paid') {
+          return 'done' as const;
+        }
 
-      const isForceStaleForeign =
-        d.payoutStatus === 'processing' &&
-        !hasSig &&
-        d.payoutAttemptedAt &&
-        ageMs > FORCE_STALE_MS &&
-        !!d.payoutLockOwner &&
-        d.payoutLockOwner !== callerLockId;
+        const ageMs = d.payoutAttemptedAt
+          ? Date.now() - d.payoutAttemptedAt.toMillis()
+          : 0;
 
-      if (isStaleOwnOrNoOwner || isForceStaleForeign) {
-        console.log(
-          isForceStaleForeign && !isStaleOwnOrNoOwner
-            ? '⚠️ Resetting stale foreign payout lock (extended timeout)'
-            : '⚠️ Resetting stale payout lock'
-        );
+        const isStaleOwnOrNoOwner =
+          d.payoutStatus === 'processing' &&
+          !hasSig &&
+          d.payoutAttemptedAt &&
+          ageMs > STALE_MS &&
+          (!d.payoutLockOwner || d.payoutLockOwner === callerLockId);
+
+        const isForceStaleForeign =
+          d.payoutStatus === 'processing' &&
+          !hasSig &&
+          d.payoutAttemptedAt &&
+          ageMs > FORCE_STALE_MS &&
+          !!d.payoutLockOwner &&
+          d.payoutLockOwner !== callerLockId;
+
+        if (isStaleOwnOrNoOwner || isForceStaleForeign) {
+          console.log(
+            isForceStaleForeign && !isStaleOwnOrNoOwner
+              ? '⚠️ Resetting stale foreign payout lock (extended timeout)'
+              : '⚠️ Resetting stale payout lock'
+          );
+          tx.update(challengeRef, {
+            payoutStatus: 'pending',
+            payoutLockOwner: deleteField(),
+            payoutAttemptedAt: deleteField(),
+          });
+        } else if (d.payoutStatus === 'processing' && !hasSig) {
+          return 'in_flight' as const;
+        }
+
+        if (!d.needsPayout) {
+          throw new Error('Payout not available or already processed');
+        }
+
+        const nowAttempt = Timestamp.now();
         tx.update(challengeRef, {
-          payoutStatus: 'pending',
-          payoutLockOwner: deleteField(),
-          payoutAttemptedAt: deleteField(),
+          payoutStatus: 'processing',
+          payoutAttemptedAt: nowAttempt,
+          payoutLockOwner: lockOwner,
         });
-      } else if (d.payoutStatus === 'processing' && !hasSig) {
-        return 'in_flight' as const;
-      }
-
-      if (!d.needsPayout) {
-        throw new Error('Payout not available or already processed');
-      }
-
-      const nowAttempt = Timestamp.now();
-      tx.update(challengeRef, {
-        payoutStatus: 'processing',
-        payoutAttemptedAt: nowAttempt,
-        payoutLockOwner: lockOwner,
+        return 'locked' as const;
       });
-      return 'locked' as const;
-    });
+    } catch (txErr: unknown) {
+      const txMsg = txErr instanceof Error ? txErr.message : String(txErr);
+      if (txMsg.includes('Payout not available or already processed')) {
+        return {
+          status: 'not_available',
+          message: 'Payout is not available yet.',
+        };
+      }
+      return { status: 'error', message: txMsg };
+    }
 
     if (lockResult === 'done') {
       console.log('✅ Claim completed — idempotent (transaction)');
-      return;
+      return { status: 'already_claimed' };
     }
     if (lockResult === 'in_flight') {
       console.log('✅ Another claim attempt in progress — exiting');
-      return;
+      return { status: 'in_flight' };
     }
 
     const postLockSnap = await getDoc(challengeRef);
     if (!postLockSnap.exists()) {
-      throw new Error('❌ Challenge not found in Firestore');
+      return { status: 'error', message: '❌ Challenge not found in Firestore' };
     }
     data = postLockSnap.data() as ChallengeData;
 
     if (data.payoutStatus !== 'processing') {
-      return;
+      if (
+        data.payoutStatus === 'paid' ||
+        data.payoutTriggered === true ||
+        (data.payoutSignature != null && String(data.payoutSignature).trim() !== '')
+      ) {
+        return { status: 'already_claimed' };
+      }
+      return { status: 'in_flight' };
     }
     if (data.payoutLockOwner !== lockOwner) {
-      return;
+      return { status: 'in_flight' };
     }
 
     try {
@@ -5398,8 +5459,6 @@ export async function claimChallengePrize(
       console.log('   Challenge Reward:', data.prizePool, 'USDFG');
       console.log('   Challenge PDA:', challengePDA);
 
-      // Admin-resolved dispute: on-chain state is still "both claimed win". Use resolve_admin with winner as signer (winner pays gas).
-      // Normal completion: use resolve_challenge with winner as signer (winner pays gas).
       const isAdminResolvedDispute = !!(data as any).resolvedBy;
       const winnerCanonical = callerAddress;
 
@@ -5436,7 +5495,7 @@ export async function claimChallengePrize(
           await postChallengeSystemMessage(challengeId, `🏆 Reward claimed on-chain: ${explorerUrl}`);
         }
         console.log('✅ REWARD CLAIMED (admin-resolved dispute)!');
-        return;
+        return { status: 'success', signature };
       }
 
       const { resolveChallenge } = await import('../chain/contract');
@@ -5461,11 +5520,11 @@ export async function claimChallengePrize(
           console.error(
             '⚠️ Old contract version detected - still has expiration check. Please redeploy with updated contract.'
           );
-          const expiredError = new Error(
-            '❌ Old contract version detected. Please contact support to redeploy the contract without expiration check for reward claims.'
-          );
-          expiredError.name = 'ChallengeExpired';
-          throw expiredError;
+          return {
+            status: 'error',
+            message:
+              '❌ Old contract version detected. Please contact support to redeploy the contract without expiration check for reward claims.',
+          };
         }
         throw contractError;
       }
@@ -5513,6 +5572,7 @@ export async function claimChallengePrize(
       console.log('✅ REWARD CLAIMED!');
       console.log('   Transaction:', signature);
       console.log('   Winner received:', data.prizePool, 'USDFG');
+      return { status: 'success', signature };
     } catch (err) {
       const rbSnap = await getDoc(challengeRef);
       if (rbSnap.exists()) {
@@ -5526,12 +5586,36 @@ export async function claimChallengePrize(
           });
         }
       }
-      throw err;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (
+        msg.includes('ChallengeExpired') ||
+        msg.includes('6005') ||
+        msg.includes('challenge has expired') ||
+        msg.includes('Challenge has expired')
+      ) {
+        return {
+          status: 'error',
+          message:
+            '⚠️ Old contract version detected. The contract needs to be redeployed to remove the expiration check for reward claims. Please contact support.',
+        };
+      }
+      if (
+        msg.includes('already been processed') ||
+        msg.includes('already processed') ||
+        msg.includes('already claimed') ||
+        msg.includes('Reward already claimed')
+      ) {
+        return {
+          status: 'already_claimed',
+          signature: 'already-processed',
+        };
+      }
+      return { status: 'error', message: msg };
     }
-    
   } catch (error) {
     console.error('❌ Error claiming reward:', error);
-    throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    return { status: 'error', message };
   }
 }
 

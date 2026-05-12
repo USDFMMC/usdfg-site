@@ -5,6 +5,8 @@ const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const adminHelpers_1 = require("./adminHelpers");
 const tournamentBracket_1 = require("./tournamentBracket");
+/** Matches client `ADMIN_WALLET` (founder / escrow gate checks). */
+const ADMIN_WALLET_BASE58 = "3SeLoDGsajuQUt2pzSkZV7LmB7gKtckmrD693U69kcUd";
 exports.finalizeAdminTournamentDispute = (0, https_1.onCall)(async (request) => {
     const adminWallet = (0, adminHelpers_1.requireAdminClaims)(request);
     const challengeId = request.data?.challengeId;
@@ -77,6 +79,19 @@ exports.finalizeAdminTournamentDispute = (0, https_1.onCall)(async (request) => 
         updates["tournament.currentRound"] = bracket.length;
         updates.status = "completed";
         updates.canClaim = true;
+        const entryFee = Number(data.entryFee ?? 0);
+        const creator = String(data.creator ?? "").toLowerCase();
+        const pda = typeof data.pda === "string" && data.pda.trim() !== "";
+        const founderPR = Number(data.founderParticipantReward ?? 0);
+        const founderWB = Number(data.founderWinnerBonus ?? 0);
+        const isFree = entryFee === 0 || entryFee < 0.000000001;
+        const isAdminCreator = creator === ADMIN_WALLET_BASE58.toLowerCase();
+        const isFounderTournament = isAdminCreator && isFree && (founderPR > 0 || founderWB > 0);
+        if (pda && !isFounderTournament) {
+            updates.needsPayout = true;
+            updates.payoutTriggered = false;
+            updates.payoutStatus = "pending";
+        }
     }
     else {
         const nextRound = bracket[currentRoundIndex + 1];
