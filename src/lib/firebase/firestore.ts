@@ -2920,6 +2920,56 @@ export function canonicalPlayerKey(players: string[], wallet: string): string {
 }
 
 /**
+ * If both roster players have canonical `results` entries but the doc is not finalized,
+ * run determineWinner (self-heal: e.g. active + stale provisional fields after partial flows).
+ */
+async function tryFinalCanonicalResolution(
+  challengeId: string,
+  challengeRef: ReturnType<typeof doc>
+): Promise<void> {
+  const resSnap = await getDoc(challengeRef);
+  if (!resSnap.exists()) return;
+  const resData = resSnap.data() as ChallengeData;
+  const rosterF = resData.players || [];
+  const resultsF = (resData.results || {}) as Record<string, any>;
+  if (rosterF.length !== 2) return;
+
+  const canonicalA = canonicalPlayerKey(rosterF, rosterF[0]);
+  const canonicalB = canonicalPlayerKey(rosterF, rosterF[1]);
+  const hasA = resultsF[canonicalA] !== undefined;
+  const hasB = resultsF[canonicalB] !== undefined;
+
+  console.log('FINAL CANONICAL RESOLUTION CHECK', {
+    challengeId,
+    status: resData.status,
+    players: rosterF,
+    canonicalA,
+    canonicalB,
+    hasA,
+    hasB,
+    winner: resData.winner,
+    disputedBy: resData.disputedBy,
+  });
+
+  const statusOk =
+    resData.status === 'active' ||
+    resData.status === 'in-progress' ||
+    resData.status === 'awaiting_auto_resolution';
+
+  const canFinalize =
+    statusOk &&
+    hasA &&
+    hasB &&
+    resData.winner == null &&
+    !resData.disputedBy;
+
+  if (!canFinalize) return;
+
+  console.log('✅ Final canonical resolution: invoking determineWinner');
+  await determineWinner(challengeId, resData);
+}
+
+/**
  * Submit a player's result for a challenge
  * @param challengeId - The challenge ID
  * @param wallet - The player's wallet address
@@ -3082,11 +3132,13 @@ export const submitChallengeResult = async (
 
     if (txResult.kind === "duplicate") {
       logDuplicateBlockedAudit(txResult.keySelf);
+      await tryFinalCanonicalResolution(challengeId, challengeRef);
       return;
     }
     if (txResult.kind === "provisional_loss") {
       logSubmissionAudit(txResult.keySelf, false);
       console.log("✅ Result submitted (provisional loss, atomic):", { challengeId, wallet });
+      await tryFinalCanonicalResolution(challengeId, challengeRef);
       return;
     }
 
@@ -3115,6 +3167,7 @@ export const submitChallengeResult = async (
             provisionalWinner: deleteField(),
             lossReportedBy: deleteField(),
             resolveAfter: deleteField(),
+            resolutionMeta: deleteField(),
             updatedAt: Timestamp.now(),
           },
           { currentData: updatedData, actingWallet: wallet }
@@ -3132,6 +3185,7 @@ export const submitChallengeResult = async (
           await determineWinner(challengeId, finalData);
         }
       }
+      await tryFinalCanonicalResolution(challengeId, challengeRef);
       return;
     }
 
@@ -3162,6 +3216,8 @@ export const submitChallengeResult = async (
     } else {
       console.log('⏳ Waiting for opponent to submit result...');
     }
+
+    await tryFinalCanonicalResolution(challengeId, challengeRef);
   } catch (error) {
     console.error('❌ Error submitting result:', error);
     throw error;
@@ -3317,6 +3373,10 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
         status: 'completed',
         winner: normalizeWinnerWallet(winnerKey),
         resolutionType: 'auto',
+        lossReportedBy: deleteField(),
+        provisionalWinner: deleteField(),
+        resolveAfter: deleteField(),
+        resolutionMeta: deleteField(),
         updatedAt: Timestamp.now(),
       },
       { currentData: data }
