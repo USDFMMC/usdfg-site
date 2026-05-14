@@ -3365,6 +3365,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       return;
     }
 
+    console.log('[AUDIT] handleSubmitResult entered', {
+      didWin,
+      challengeId: selectedChallenge.id,
+      hasWallet: !!publicKey,
+    });
+
     try {
       // Check if this is a tournament match
       const format = selectedChallenge.rawData?.format || (selectedChallenge.rawData?.tournament ? 'tournament' : 'standard');
@@ -3484,6 +3490,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Show Trust Review Modal
       setTrustReviewOpponent(opponentName);
       setShowTrustReview(true);
+      console.log('[AUDIT] setShowTrustReview true', {
+        challengeId: selectedChallenge.id,
+        opponentWallet: opponentWallet || null,
+      });
       setShowSubmitResultModal(false);
       
     } catch (error) {

@@ -450,15 +450,22 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     }
   };
 
-  const doSubmitResult = async () => {
-    console.log("DO SUBMIT RESULT TRIGGERED");
-    const resultToSubmit = selectedResult;
+  const doSubmitResult = async (forcedResult?: boolean) => {
+    const resultToSubmit = typeof forcedResult === 'boolean' ? forcedResult : selectedResult;
+    console.log('DO SUBMIT RESULT TRIGGERED', { forcedResult, selectedResult, resultToSubmit });
     if (resultToSubmit === null) return;
-    if (!canSubmit) return;
+    const allowSubmit =
+      typeof forcedResult === 'boolean'
+        ? !submitLocked && !isSubmitting && !externalIsSubmitting && !hasAlreadySubmittedEffective
+        : canSubmit;
+    if (!allowSubmit) {
+      console.log('[AUDIT] DO SUBMIT RESULT blocked', { allowSubmit, forcedResult });
+      return;
+    }
     setSubmitLockedLocal(true);
     setIsSubmitting(true);
     try {
-      console.log("CALLING onSubmitResult", resultToSubmit);
+      console.log('CALLING onSubmitResult', resultToSubmit);
       await onSubmitResult(resultToSubmit, proofFile);
       setSubmittedLocally(true);
       setShowSubmitForm(false);
@@ -475,14 +482,24 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     }
   };
 
-  const handleSubmit = async () => {
-    const resultToSubmit = selectedResult;
-    console.log("HANDLE SUBMIT", {
+  const handleSubmit = async (forcedResult?: boolean) => {
+    const resultToSubmit = typeof forcedResult === 'boolean' ? forcedResult : selectedResult;
+    console.log('HANDLE SUBMIT', {
+      forcedResult,
       submitLocked,
       selectedResult,
+      resultToSubmit,
+      canSubmit,
     });
     if (resultToSubmit === null) return;
-    if (!canSubmit) return;
+    const allowSubmit =
+      typeof forcedResult === 'boolean'
+        ? !submitLocked && !isSubmitting && !externalIsSubmitting && !hasAlreadySubmittedEffective
+        : canSubmit;
+    if (!allowSubmit) {
+      console.log('[AUDIT] HANDLE SUBMIT blocked', { allowSubmit });
+      return;
+    }
 
     // If user is about to claim "I won" and opponent already claimed "I won", show integrity warning
     if (resultToSubmit === true && results && typeof results === 'object' && creatorWallet && challengerWallet && currentWallet) {
@@ -495,7 +512,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       }
     }
 
-    await doSubmitResult();
+    await doSubmitResult(typeof forcedResult === 'boolean' ? forcedResult : undefined);
   };
 
   const handleDisputeResult = async () => {
@@ -1639,18 +1656,15 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  console.log("CLICK YES", {
+                  console.log('CLICK YES', {
                     submitLocked,
                     isSubmitting,
                     externalIsSubmitting,
                     hasAlreadySubmitted: hasAlreadySubmittedEffective,
                     selectedResult,
                   });
-                  if (selectedResult === true) {
-                    void handleSubmit();
-                    return;
-                  }
                   setSelectedResult(true);
+                  void handleSubmit(true);
                 }}
                 disabled={!canSubmit && selectedResult !== null}
                 className={`
@@ -1681,11 +1695,9 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  if (selectedResult === false) {
-                    void handleSubmit();
-                    return;
-                  }
+                  console.log('CLICK NO', { selectedResult });
                   setSelectedResult(false);
+                  void handleSubmit(false);
                 }}
                 disabled={!canSubmit && selectedResult !== null}
                 className={`
@@ -1814,7 +1826,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                   type="button"
                   onClick={() => {
                     setShowIntegrityConfirm(false);
-                    doSubmitResult();
+                    void doSubmitResult(true);
                   }}
                   disabled={submitLocked}
                   className="flex-1 py-2 rounded-md border border-orange-500/45 bg-orange-600/25 text-orange-50 text-xs font-semibold hover:bg-orange-600/35 disabled:opacity-50"
