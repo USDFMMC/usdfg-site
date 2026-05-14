@@ -5130,6 +5130,28 @@ export async function recalculateAllTrustScores(): Promise<void> {
 // PLAYER-PAID PAYOUT SYSTEM
 // ============================================
 
+/** Age of payout lock in ms; null if unset or not parseable (callers may treat as unknown/stale). */
+function payoutLockAgeMs(data: ChallengeData): number | null {
+  const at = data.payoutAttemptedAt;
+  if (at == null) return null;
+  try {
+    if (typeof (at as Timestamp).toMillis === 'function') {
+      const t = (at as Timestamp).toMillis();
+      if (typeof t !== 'number' || Number.isNaN(t)) return null;
+      const age = Date.now() - t;
+      return Number.isFinite(age) ? age : null;
+    }
+    const raw = at as { seconds?: number; _seconds?: number };
+    const sec = raw.seconds ?? raw._seconds;
+    if (typeof sec === 'number' && Number.isFinite(sec)) {
+      return Date.now() - sec * 1000;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 function challengeHasValidPayoutWinner(data: ChallengeData): boolean {
   return (
     !!data.winner &&
@@ -5393,22 +5415,34 @@ export async function claimChallengePrize(
       return { status: 'error', message: e instanceof Error ? e.message : String(e) };
     }
 
+    const noPayoutSig =
+      data.payoutSignature == null || String(data.payoutSignature).trim() === '';
+
     const STALE_MS = 2 * 60 * 1000;
-    const FORCE_STALE_MS = 5 * 60 * 1000;
-    if (
+    const lockAgePre = payoutLockAgeMs(data);
+    const stalePreTx =
       data.payoutStatus === 'processing' &&
-      !data.payoutSignature &&
-      data.payoutLockOwner &&
-      data.payoutAttemptedAt &&
-      Date.now() - data.payoutAttemptedAt.toMillis() > STALE_MS
-    ) {
-      console.log('⚠️ Resetting stale payout lock (pre-transaction recovery)');
+      noPayoutSig &&
+      !!data.payoutLockOwner &&
+      (lockAgePre === null || lockAgePre > STALE_MS);
+
+    if (stalePreTx) {
+      console.log('[AUDIT] payout stale lock recovery (pre-transaction)', {
+        challengeId,
+        lockAgeMs: lockAgePre,
+        payoutLockOwner: data.payoutLockOwner,
+      });
       await updateDoc(challengeRef, {
         payoutStatus: 'pending',
         payoutLockOwner: deleteField(),
+        payoutAttemptedAt: deleteField(),
       });
-      const nextData: ChallengeData = { ...data, payoutStatus: 'pending' };
+      const nextData: ChallengeData = {
+        ...data,
+        payoutStatus: 'pending',
+      };
       delete (nextData as unknown as Record<string, unknown>).payoutLockOwner;
+      delete (nextData as unknown as Record<string, unknown>).payoutAttemptedAt;
       data = nextData;
     }
 
@@ -5439,10 +5473,8 @@ export async function claimChallengePrize(
         return { status: 'cooldown' };
       }
     } else {
-      if (
-        data.payoutAttemptedAt &&
-        Date.now() - data.payoutAttemptedAt.toMillis() < COOLDOWN_MS
-      ) {
+      const cdAge = payoutLockAgeMs(data);
+      if (cdAge !== null && cdAge >= 0 && cdAge < COOLDOWN_MS) {
         return { status: 'cooldown' };
       }
     }
@@ -5475,37 +5507,31 @@ export async function claimChallengePrize(
           return 'done' as const;
         }
 
-        const ageMs = d.payoutAttemptedAt
-          ? Date.now() - d.payoutAttemptedAt.toMillis()
-          : 0;
+        const ageMs = payoutLockAgeMs(d);
 
-        const isStaleOwnOrNoOwner =
+        const staleProcessingReset =
           d.payoutStatus === 'processing' &&
           !hasSig &&
-          d.payoutAttemptedAt &&
-          ageMs > STALE_MS &&
-          (!d.payoutLockOwner || d.payoutLockOwner === callerLockId);
+          (ageMs === null || ageMs > STALE_MS);
 
-        const isForceStaleForeign =
-          d.payoutStatus === 'processing' &&
-          !hasSig &&
-          d.payoutAttemptedAt &&
-          ageMs > FORCE_STALE_MS &&
-          !!d.payoutLockOwner &&
-          d.payoutLockOwner !== callerLockId;
-
-        if (isStaleOwnOrNoOwner || isForceStaleForeign) {
-          console.log(
-            isForceStaleForeign && !isStaleOwnOrNoOwner
-              ? '⚠️ Resetting stale foreign payout lock (extended timeout)'
-              : '⚠️ Resetting stale payout lock'
-          );
+        if (staleProcessingReset) {
+          console.log('[AUDIT] payout stale lock recovery (transaction)', {
+            challengeId,
+            ageMs,
+            storedLock: d.payoutLockOwner,
+            callerLock: callerLockId,
+          });
           tx.update(challengeRef, {
             payoutStatus: 'pending',
             payoutLockOwner: deleteField(),
             payoutAttemptedAt: deleteField(),
           });
         } else if (d.payoutStatus === 'processing' && !hasSig) {
+          console.log('[AUDIT] payout lock in_flight (another attempt within stale window)', {
+            challengeId,
+            ageMs,
+            storedLock: d.payoutLockOwner,
+          });
           return 'in_flight' as const;
         }
 
@@ -5518,6 +5544,10 @@ export async function claimChallengePrize(
           payoutStatus: 'processing',
           payoutAttemptedAt: nowAttempt,
           payoutLockOwner: lockOwner,
+        });
+        console.log('[AUDIT] payout lock acquired (staged in transaction)', {
+          challengeId,
+          lockOwner,
         });
         return 'locked' as const;
       });
@@ -5537,8 +5567,15 @@ export async function claimChallengePrize(
       return { status: 'already_claimed' };
     }
     if (lockResult === 'in_flight') {
-      console.log('✅ Another claim attempt in progress — exiting');
+      console.log('[AUDIT] claimChallengePrize result in_flight', {
+        challengeId,
+        note: 'Doc still processing or fresh lock held by another client within stale window',
+      });
       return { status: 'in_flight' };
+    }
+
+    if (lockResult === 'locked') {
+      console.log('[AUDIT] payout lock acquired', { challengeId, lockOwner });
     }
 
     const postLockSnap = await getDoc(challengeRef);
@@ -5555,30 +5592,46 @@ export async function claimChallengePrize(
       ) {
         return { status: 'already_claimed' };
       }
+      console.log('[AUDIT] claim post-lock unexpected payoutStatus', {
+        challengeId,
+        payoutStatus: data.payoutStatus,
+        lockOwner,
+      });
       return { status: 'in_flight' };
     }
     if (data.payoutLockOwner !== lockOwner) {
+      console.log('[AUDIT] claim post-lock lock_owner_mismatch', {
+        challengeId,
+        expectedLock: lockOwner,
+        docLock: data.payoutLockOwner,
+      });
       return { status: 'in_flight' };
     }
 
     try {
-      console.log('✅ Validation passed - calling smart contract...');
-      console.log('   Winner:', data.winner);
-      console.log('   Challenge Reward:', data.prizePool, 'USDFG');
-      console.log('   Challenge PDA:', challengePDA);
+      console.log('[AUDIT] claim validation passed — starting on-chain payout', {
+        challengeId,
+        winner: data.winner,
+        challengePDA,
+      });
 
       const isAdminResolvedDispute = !!(data as any).resolvedBy;
       const winnerCanonical = callerAddress;
 
       if (isAdminResolvedDispute) {
         const { resolveAdminChallengeOnChain } = await import('../chain/contract');
-        console.log('🚀 Winner claiming after admin resolution (winner pays gas)...');
+        console.log('[AUDIT] calling resolveAdminChallengeOnChain', { challengeId });
         const signature = await resolveAdminChallengeOnChain(
           winnerWallet,
           connection,
           challengeId,
           data.winner!
         );
+        console.log('[AUDIT] resolveAdminChallengeOnChain returned signature', {
+          challengeId,
+          sigPreview: typeof signature === 'string' ? signature.slice(0, 12) : String(signature),
+        });
+        console.log('[AUDIT] writing payout completion patch (admin-resolved)', { challengeId });
         await writeChallengeFields(
           challengeId,
           {
@@ -5596,6 +5649,7 @@ export async function claimChallengePrize(
           },
           { currentData: data, actingWallet: callerAddress }
         );
+        console.log('[AUDIT] payout completion write success (admin-resolved)', { challengeId });
         const explorerUrl = looksLikeSolanaTxSignature(signature)
           ? getExplorerTxUrl(signature)
           : null;
@@ -5607,8 +5661,11 @@ export async function claimChallengePrize(
       }
 
       const { resolveChallenge } = await import('../chain/contract');
-      console.log('🚀 Winner calling smart contract to release escrow...');
-      console.log('   Note: Reward claims have NO expiration - winners can claim anytime!');
+      console.log('[AUDIT] calling resolveChallenge', {
+        challengeId,
+        challengePDA,
+        winner: winnerCanonical,
+      });
       let signature: string;
       try {
         signature = await resolveChallenge(
@@ -5628,6 +5685,35 @@ export async function claimChallengePrize(
           console.error(
             '⚠️ Old contract version detected - still has expiration check. Please redeploy with updated contract.'
           );
+          try {
+            const s = await getDoc(challengeRef);
+            if (s.exists()) {
+              const doc = s.data() as ChallengeData;
+              const hasS =
+                doc.payoutSignature != null && String(doc.payoutSignature).trim() !== '';
+              if (doc.payoutLockOwner === lockOwner && !hasS) {
+                await updateDoc(challengeRef, {
+                  payoutStatus: 'pending',
+                  payoutLastError: 'ChallengeExpired_contract_inner',
+                  payoutErrorAt: Timestamp.now(),
+                  payoutLockOwner: deleteField(),
+                  payoutAttemptedAt: deleteField(),
+                });
+                console.log('[AUDIT] claim rollback write success (ChallengeExpired inner)', {
+                  challengeId,
+                });
+              } else {
+                console.log('[AUDIT] claim rollback skipped (ChallengeExpired inner)', {
+                  challengeId,
+                  docLock: doc.payoutLockOwner,
+                  expectedLock: lockOwner,
+                  hasSig: hasS,
+                });
+              }
+            }
+          } catch (rb0) {
+            console.error('[AUDIT] claim rollback failed (ChallengeExpired inner)', rb0);
+          }
           return {
             status: 'error',
             message:
@@ -5636,6 +5722,11 @@ export async function claimChallengePrize(
         }
         throw contractError;
       }
+
+      console.log('[AUDIT] resolveChallenge returned signature', {
+        challengeId,
+        sigPreview: typeof signature === 'string' ? signature.slice(0, 12) : String(signature),
+      });
 
       const completionPatch =
         signature === 'already-processed'
@@ -5664,10 +5755,12 @@ export async function claimChallengePrize(
               updatedAt: Timestamp.now(),
             };
 
+      console.log('[AUDIT] writing payout completion patch', { challengeId });
       await writeChallengeFields(challengeId, completionPatch, {
         currentData: data,
         actingWallet: callerAddress,
       });
+      console.log('[AUDIT] payout completion write success', { challengeId });
 
       const explorerUrl =
         typeof signature === 'string' && looksLikeSolanaTxSignature(signature)
@@ -5682,17 +5775,47 @@ export async function claimChallengePrize(
       console.log('   Winner received:', data.prizePool, 'USDFG');
       return { status: 'success', signature };
     } catch (err) {
+      console.log('[AUDIT] claim chain catch entered', {
+        challengeId,
+        lockOwner,
+        message: err instanceof Error ? err.message : String(err),
+      });
       const rbSnap = await getDoc(challengeRef);
       if (rbSnap.exists()) {
         const d = rbSnap.data() as ChallengeData;
-        if (d.payoutLockOwner === lockOwner && !d.payoutSignature) {
-          await updateDoc(challengeRef, {
-            payoutStatus: 'pending',
-            payoutLastError: String(err ?? 'unknown_error'),
-            payoutErrorAt: Timestamp.now(),
-            payoutLockOwner: deleteField(),
+        const docHasSig =
+          d.payoutSignature != null && String(d.payoutSignature).trim() !== '';
+        const canRollback = d.payoutLockOwner === lockOwner && !docHasSig;
+        if (!canRollback) {
+          console.log('[AUDIT] claim rollback skipped', {
+            challengeId,
+            reason:
+              d.payoutLockOwner !== lockOwner
+                ? 'lock_owner_mismatch'
+                : 'payout_signature_present',
+            docLock: d.payoutLockOwner,
+            expectedLock: lockOwner,
+            hasSig: docHasSig,
           });
+        } else {
+          try {
+            await updateDoc(challengeRef, {
+              payoutStatus: 'pending',
+              payoutLastError: String(err ?? 'unknown_error'),
+              payoutErrorAt: Timestamp.now(),
+              payoutLockOwner: deleteField(),
+              payoutAttemptedAt: deleteField(),
+            });
+            console.log('[AUDIT] claim rollback write success', { challengeId });
+          } catch (rbErr) {
+            console.error('[AUDIT] claim rollback write failed', {
+              challengeId,
+              message: rbErr instanceof Error ? rbErr.message : String(rbErr),
+            });
+          }
         }
+      } else {
+        console.warn('[AUDIT] claim rollback skipped — challenge doc missing', { challengeId });
       }
       const msg = err instanceof Error ? err.message : String(err);
       if (
