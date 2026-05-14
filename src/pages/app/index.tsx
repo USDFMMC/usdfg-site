@@ -3531,7 +3531,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Note: Tournaments skip trust review entirely and handle results in handleSubmitResult
       if (!pendingMatchResult.autoWon) {
         try {
-          // Standard challenge result submission
           await submitChallengeResult(
             challengeId,
             publicKey.toBase58(),
@@ -3539,14 +3538,25 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             pendingMatchResult.proofImageData || undefined
           );
           console.log('✅ Match result submitted');
-        } catch (resultError: any) {
-          // If result is already submitted, that's okay - we can still store the trust review
-          if (resultError?.message?.includes('already submitted') || 
-              resultError?.message?.includes('already been processed')) {
+        } catch (resultError: unknown) {
+          const msg =
+            resultError instanceof Error ? resultError.message : String(resultError);
+          const isDuplicateOrIdempotent =
+            msg.includes('already submitted') ||
+            msg.includes('already been processed') ||
+            msg.includes('Duplicate submission blocked');
+          if (isDuplicateOrIdempotent) {
             console.log('ℹ️ Result already submitted, continuing with trust review...');
           } else {
-            // If it's a different error, still try to store the trust review
-            console.warn('⚠️ Result submission failed, but continuing with trust review:', resultError);
+            console.error('❌ Match result submission failed:', resultError);
+            showAppToast(
+              `Could not submit your match result: ${msg}. Your trust review was not saved. Please try again.`,
+              'error',
+              'Submit failed'
+            );
+            setShowTrustReview(false);
+            setTrustReviewOpponent('');
+            return;
           }
         }
       } else {

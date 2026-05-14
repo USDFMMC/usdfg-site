@@ -3220,31 +3220,48 @@ const stripProofImageDataFromResults = (results?: Record<string, any>) => {
  */
 async function determineWinner(challengeId: string, data: ChallengeData): Promise<void> {
   try {
-    const results = data.results || {};
+    const results = (data.results || {}) as Record<string, any>;
     const roster = data.players || [];
-    const players = Object.keys(results);
-    
+
     console.log('🎯 Determining winner for challenge:', challengeId);
     console.log('📊 Results:', results);
-    console.log('👥 Players who submitted:', players);
-    
-    if (players.length !== 2) {
-      console.log('⏳ Waiting for both players to submit results');
+
+    if (roster.length !== 2) {
+      console.log('⏳ determineWinner: roster must have exactly 2 players; skipping', {
+        rosterLength: roster.length,
+      });
       return;
     }
 
-    const player1 = players[0];
-    const player2 = players[1];
-    const key1 = canonicalPlayerKey(roster, player1);
-    const key2 = canonicalPlayerKey(roster, player2);
-    const player1Won = results[key1]?.didWin ?? results[player1]?.didWin;
-    const player2Won = results[key2]?.didWin ?? results[player2]?.didWin;
-    
-    console.log(`Player 1 (${player1.slice(0,8)}...): didWin=${player1Won}`);
-    console.log(`Player 2 (${player2.slice(0,8)}...): didWin=${player2Won}`);
+    const walletA = roster[0];
+    const walletB = roster[1];
+    const playerAKey = canonicalPlayerKey(roster, walletA);
+    const playerBKey = canonicalPlayerKey(roster, walletB);
+    const playerAResult = results[playerAKey];
+    const playerBResult = results[playerBKey];
+
+    console.log('DETERMINE WINNER CHECK', {
+      players: roster,
+      resultKeys: Object.keys(results || {}),
+      canonicalA: playerAKey,
+      canonicalB: playerBKey,
+      hasA: !!playerAResult,
+      hasB: !!playerBResult,
+    });
+
+    if (!playerAResult || !playerBResult) {
+      console.warn('Waiting for both canonical player submissions');
+      return;
+    }
+
+    const playerAWon = playerAResult.didWin === true;
+    const playerBWon = playerBResult.didWin === true;
+
+    console.log(`Player A (${playerAKey.slice(0, 8)}...): didWin=${playerAWon}`);
+    console.log(`Player B (${playerBKey.slice(0, 8)}...): didWin=${playerBWon}`);
 
     // Case 1: Both claim they won → Dispute (KEEP CHAT for evidence)
-    if (player1Won && player2Won) {
+    if (playerAWon && playerBWon) {
       await writeChallengeFields(
         challengeId,
         {
@@ -3261,7 +3278,7 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     }
 
     // Case 2: Both claim they lost → FORFEIT (delete chat - no dispute)
-    if (!player1Won && !player2Won) {
+    if (!playerAWon && !playerBWon) {
       await writeChallengeFields(
         challengeId,
         {
@@ -3291,20 +3308,20 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     }
 
     // Case 3: Clear winner (one YES, one NO) - DELETE CHAT (no dispute)
-    const winner = player1Won ? key1 : key2;
-    const loser = player1Won ? key2 : key1;
+    const winnerKey = playerAWon ? playerAKey : playerBKey;
+    const loserKey = playerAWon ? playerBKey : playerAKey;
     
     await writeChallengeFields(
       challengeId,
       {
         status: 'completed',
-        winner: normalizeWinnerWallet(winner),
+        winner: normalizeWinnerWallet(winnerKey),
         resolutionType: 'auto',
         updatedAt: Timestamp.now(),
       },
       { currentData: data }
     );
-    console.log('🏆 WINNER DETERMINED:', winner);
+    console.log('🏆 WINNER DETERMINED:', winnerKey, '(loser:', loserKey, ')');
     // Delete chat messages - clear winner, no dispute resolution needed
     await cleanupChallengeData(challengeId, false); // false = not dispute
     console.log('📊 Updating stats...');
@@ -3352,7 +3369,7 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
       { currentData: postWinData }
     );
     
-    console.log('💰 Challenge reward ready for claim:', prizePool, 'USDFG to', winner);
+    console.log('💰 Challenge reward ready for claim:', prizePool, 'USDFG to', winnerKey);
     console.log('✅ Winner can now claim their reward (they pay gas, not you!)');
     
   } catch (error) {
