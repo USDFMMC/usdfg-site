@@ -2927,12 +2927,21 @@ async function tryFinalCanonicalResolution(
   challengeId: string,
   challengeRef: ReturnType<typeof doc>
 ): Promise<void> {
+  console.log('[AUDIT] tryFinalCanonicalResolution entered', { challengeId });
   const resSnap = await getDoc(challengeRef);
-  if (!resSnap.exists()) return;
+  if (!resSnap.exists()) {
+    console.log('[AUDIT] tryFinalCanonicalResolution exit: snapshot missing');
+    return;
+  }
   const resData = resSnap.data() as ChallengeData;
   const rosterF = resData.players || [];
   const resultsF = (resData.results || {}) as Record<string, any>;
-  if (rosterF.length !== 2) return;
+  if (rosterF.length !== 2) {
+    console.log('[AUDIT] tryFinalCanonicalResolution exit: players.length !== 2', {
+      rosterLength: rosterF.length,
+    });
+    return;
+  }
 
   const canonicalA = canonicalPlayerKey(rosterF, rosterF[0]);
   const canonicalB = canonicalPlayerKey(rosterF, rosterF[1]);
@@ -2963,9 +2972,19 @@ async function tryFinalCanonicalResolution(
     resData.winner == null &&
     !resData.disputedBy;
 
-  if (!canFinalize) return;
+  if (!canFinalize) {
+    console.log('[AUDIT] tryFinalCanonicalResolution exit: canFinalize false', {
+      statusOk,
+      hasA,
+      hasB,
+      winner: resData.winner,
+      disputedBy: resData.disputedBy,
+    });
+    return;
+  }
 
   console.log('✅ Final canonical resolution: invoking determineWinner');
+  console.log('[AUDIT] tryFinalCanonicalResolution → determineWinner', { challengeId });
   await determineWinner(challengeId, resData);
 }
 
@@ -2983,6 +3002,7 @@ export const submitChallengeResult = async (
   proofImageData?: string
 ): Promise<void> => {
   try {
+    console.log('[AUDIT] submitChallengeResult start', { challengeId, wallet, didWin });
     const challengeRef = doc(db, "challenges", challengeId);
 
     // AUDIT LOG POLICY:
@@ -3182,6 +3202,9 @@ export const submitChallengeResult = async (
         ) {
           console.log('⛔ Skipping determineWinner — already resolved or disputed');
         } else {
+          console.log('[AUDIT] submitChallengeResult → determineWinner (awaiting branch)', {
+            challengeId,
+          });
           await determineWinner(challengeId, finalData);
         }
       }
@@ -3211,6 +3234,9 @@ export const submitChallengeResult = async (
       ) {
         console.log('⛔ Skipping determineWinner — already resolved or disputed');
       } else {
+        console.log('[AUDIT] submitChallengeResult → determineWinner (active branch)', {
+          challengeId,
+        });
         await determineWinner(challengeId, updatedData);
       }
     } else {
@@ -3276,6 +3302,11 @@ const stripProofImageDataFromResults = (results?: Record<string, any>) => {
  */
 async function determineWinner(challengeId: string, data: ChallengeData): Promise<void> {
   try {
+    console.log('[AUDIT] determineWinner entered', {
+      challengeId,
+      status: data?.status,
+      rosterLength: (data?.players || []).length,
+    });
     const results = (data.results || {}) as Record<string, any>;
     const roster = data.players || [];
 

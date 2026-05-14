@@ -3525,12 +3525,22 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       return;
     }
 
+    console.log('[AUDIT] handleTrustReviewSubmit start', {
+      challengeId,
+      autoWon: pendingMatchResult.autoWon,
+      didWin: pendingMatchResult.didWin,
+    });
+
     try {
       // Submit the match result to Firestore (if not already submitted or auto-won)
       // If autoWon is true, the result was already auto-determined when opponent submitted loss
       // Note: Tournaments skip trust review entirely and handle results in handleSubmitResult
       if (!pendingMatchResult.autoWon) {
         try {
+          console.log('[AUDIT] handleTrustReviewSubmit calling submitChallengeResult', {
+            challengeId,
+            wallet: publicKey.toBase58(),
+          });
           await submitChallengeResult(
             challengeId,
             publicKey.toBase58(),
