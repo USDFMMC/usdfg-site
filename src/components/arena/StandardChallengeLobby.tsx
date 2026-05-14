@@ -820,13 +820,6 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const canSubmitResult = ctaState.showSubmit;
   const canClaimPrize = ctaState.showClaim;
 
-  console.log("FUND UI CHECK", {
-    status,
-    isCreator,
-    currentWallet,
-    creatorWallet
-  });
-
   const handleFundChallenge = async () => {
     console.log("FUND BUTTON CLICKED", {
       challengeId: activeChallenge?.id,

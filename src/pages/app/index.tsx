@@ -820,7 +820,13 @@ const ArenaHome: React.FC = () => {
     opponentWallet?: string; // Store opponent wallet for trust review
     autoWon?: boolean; // Flag to indicate this win was auto-determined (opponent submitted loss)
     needsClaim?: boolean; // Flag to indicate user needs to claim reward after review
+    /** Set after standard path writes to Firestore in handleSubmitResult; post-submit UX already ran */
+    resultAlreadyWritten?: boolean;
   } | null>(null);
+  const pendingMatchResultRef = useRef(pendingMatchResult);
+  useEffect(() => {
+    pendingMatchResultRef.current = pendingMatchResult;
+  }, [pendingMatchResult]);
   const [copiedWallet, setCopiedWallet] = useState<string | null>(null);
   const [showAllPlayers, setShowAllPlayers] = useState<boolean>(false);
   const [leaderboardLimit, setLeaderboardLimit] = useState<number>(30); // Start with 30 players, load more on demand
@@ -3358,11 +3364,124 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
   };
 
-  // Handle result submission - now stores result and shows trust review
+  /** Lobby / modals after a standard challenge result is in Firestore (not trust-dependent). */
+  const standardResultPostSubmitUx = useCallback(
+    (opts: {
+      didWin: boolean;
+      autoWon?: boolean;
+      needsClaim?: boolean;
+      opponentWallet?: string;
+    }) => {
+      const { didWin, autoWon, needsClaim, opponentWallet } = opts;
+      const challengeStatus =
+        selectedChallenge?.status || selectedChallenge?.rawData?.status;
+      const isCompleted = challengeStatus === 'completed';
+      const isWin = didWin || Boolean(autoWon);
+
+      if (!showStandardLobby) {
+        setShowStandardLobby(true);
+      }
+
+      if (isWin) {
+        if (isCompleted) {
+          const opponentName = opponentWallet
+            ? `${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}`
+            : undefined;
+
+          setVictoryModalData({
+            autoWon,
+            opponentName,
+            needsClaim: needsClaim || isWin,
+          });
+          setShowVictoryModal(true);
+
+          if (selectedChallenge?.id) {
+            setTimeout(async () => {
+              try {
+                const { fetchChallengeById } = await import("@/lib/firebase/firestore");
+                const refreshed = await fetchChallengeById(selectedChallenge.id);
+                if (refreshed) {
+                  const refreshedStatus = refreshed.status || refreshed.rawData?.status;
+                  if (refreshedStatus === 'disputed') {
+                    setShowVictoryModal(false);
+                    setVictoryModalData(null);
+                    setSelectedChallenge(refreshed);
+                    if (!showStandardLobby) {
+                      setShowStandardLobby(true);
+                    }
+                    showAppToast(
+                      "Dispute detected: both players claimed victory. Waiting for admin resolution.",
+                      "warning",
+                      "Dispute"
+                    );
+                  } else if (refreshedStatus === 'awaiting_auto_resolution' && autoWon) {
+                    setShowVictoryModal(false);
+                    setVictoryModalData(null);
+                    setSelectedChallenge(refreshed);
+                  } else if (refreshedStatus === 'completed') {
+                    setSelectedChallenge(refreshed);
+                    const winner = refreshed.winner || refreshed.rawData?.winner;
+                    const isActualWinner =
+                      winner && publicKey && walletsEqual(winner, publicKey.toBase58());
+
+                    if (!isActualWinner && !autoWon) {
+                      setShowVictoryModal(false);
+                      setVictoryModalData(null);
+                    }
+                  }
+                }
+              } catch (error) {
+                console.warn('Could not refresh challenge status:', error);
+              }
+            }, 2000);
+          }
+        } else {
+          showAppToast(
+            "Result submitted. Awaiting confirmation...",
+            "info",
+            "Submitted"
+          );
+        }
+      } else if (didWin === false) {
+        const lossMessage = opponentWallet
+          ? "You submitted that you lost."
+          : "You submitted that you lost.";
+        showAppToast(lossMessage, "info", "Submitted");
+      } else {
+        console.warn("Unexpected result state", {
+          didWin,
+          autoWon,
+          challengeStatus,
+        });
+        showAppToast("Result submitted. Processing...", "info", "Submitted");
+      }
+    },
+    [selectedChallenge, publicKey, showStandardLobby, showAppToast]
+  );
+
+  const handleTrustReviewClose = useCallback(() => {
+    const snap = pendingMatchResultRef.current;
+    setShowTrustReview(false);
+    setTrustReviewOpponent('');
+    if (snap && !snap.resultAlreadyWritten) {
+      standardResultPostSubmitUx({
+        didWin: snap.didWin,
+        autoWon: snap.autoWon,
+        needsClaim: snap.needsClaim,
+        opponentWallet: snap.opponentWallet,
+      });
+    }
+    setPendingMatchResult(null);
+  }, [standardResultPostSubmitUx]);
+
+  // Handle result submission — standard: Firestore first, then optional trust review
   const handleSubmitResult = async (didWin: boolean, proofFile?: File | null) => {
     if (!selectedChallenge || !publicKey) {
+      const err = new Error(
+        !publicKey ? "Connect your wallet to submit a result." : "No challenge selected."
+      );
       console.error("❌ No challenge selected or wallet not connected");
-      return;
+      throw err;
     }
 
     console.log('[AUDIT] handleSubmitResult entered', {
@@ -3456,9 +3575,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         }
         return;
       }
-      
-      // Standard challenge - proceed with trust review flow
-      // Get opponent wallet - find from players array
+
+      console.log("[AUDIT] standard challenge immediate result path", {
+        challengeId: selectedChallenge.id,
+        format,
+        isTournament,
+      });
+
+      // Standard challenge — write result to Firestore immediately; trust review is optional afterward
       const playersArray = selectedChallenge.rawData?.players || (Array.isArray(selectedChallenge.players) ? selectedChallenge.players : []);
       const opponentWallet = playersArray.find((p: string) => p && !walletsEqual(p, publicKey.toBase58()));
 
@@ -3475,25 +3599,61 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         proofImageData = await toBase64(proofFile);
       }
 
-      // Store the match result for later submission with trust review (proof as data URL only)
-      const matchResult = {
+      const challengeId = selectedChallenge.id;
+      const wallet = publicKey.toBase58();
+      console.log('[AUDIT] immediate submitChallengeResult start', {
+        challengeId,
+        wallet,
         didWin,
-        proofImageData,
-        challengeId: selectedChallenge.id,
+        hasProof: !!proofImageData,
+      });
+
+      try {
+        await submitChallengeResult(
+          challengeId,
+          wallet,
+          didWin,
+          proofImageData || undefined
+        );
+        console.log('[AUDIT] immediate submitChallengeResult success', { challengeId });
+      } catch (resultError: unknown) {
+        const msg =
+          resultError instanceof Error ? resultError.message : String(resultError);
+        const isDuplicateOrIdempotent =
+          msg.includes('already submitted') ||
+          msg.includes('already been processed') ||
+          msg.includes('Duplicate submission blocked');
+        if (!isDuplicateOrIdempotent) {
+          console.error('[AUDIT] immediate submitChallengeResult failed', resultError);
+          throw resultError;
+        }
+        console.log('[AUDIT] immediate submitChallengeResult idempotent/duplicate — continuing', {
+          challengeId,
+        });
+      }
+
+      standardResultPostSubmitUx({
+        didWin,
+        autoWon: false,
+        needsClaim: undefined,
         opponentWallet: opponentWallet || undefined,
-      };
-      setPendingMatchResult(matchResult);
-      
-      // Get opponent name for trust review display
+      });
+
       const opponentName = opponentWallet ? `${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}` : 'Opponent';
-      
-      // Show Trust Review Modal
+
+      const pendingSnap = {
+        didWin,
+        proofImageData: null as string | null,
+        challengeId,
+        opponentWallet: opponentWallet || undefined,
+        resultAlreadyWritten: true as const,
+      };
+      pendingMatchResultRef.current = pendingSnap;
+      setPendingMatchResult(pendingSnap);
+
       setTrustReviewOpponent(opponentName);
       setShowTrustReview(true);
-      console.log('[AUDIT] setShowTrustReview true', {
-        challengeId: selectedChallenge.id,
-        opponentWallet: opponentWallet || null,
-      });
+      console.log('[AUDIT] opening trust review optional', { challengeId, opponentWallet: opponentWallet || null });
       setShowSubmitResultModal(false);
       
     } catch (error) {
@@ -3502,7 +3662,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
   };
 
-  // Handle trust review submission - now submits both match result and trust review
+  // Trust review only — standard match results are written in handleSubmitResult before this modal
   const handleTrustReviewSubmit = async (payload: {
     honesty: number;
     fairness: number;
@@ -3511,10 +3671,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     trustScore10: number;
     comment?: string;
   }) => {
-    // Debug: Trust review submission (uncomment for debugging)
-    // console.log("🏆 Trust review submitted:", payload);
-    // console.log("🔍 Debug state:", { selectedChallenge: selectedChallenge?.id, publicKey: publicKey?.toBase58(), pendingMatchResult });
-    
     if (!publicKey || !pendingMatchResult) {
       console.error("❌ Missing wallet or pending match result");
       console.error("❌ Details:", {
@@ -3526,7 +3682,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       return;
     }
 
-    // Use stored challenge ID as fallback if selectedChallenge is cleared
     const challengeId = selectedChallenge?.id || pendingMatchResult.challengeId;
     if (!challengeId) {
       console.error("❌ No challenge ID available");
@@ -3535,64 +3690,23 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       return;
     }
 
+    const snap = pendingMatchResult;
+
     console.log('[AUDIT] handleTrustReviewSubmit start', {
       challengeId,
-      autoWon: pendingMatchResult.autoWon,
-      didWin: pendingMatchResult.didWin,
+      autoWon: snap.autoWon,
+      didWin: snap.didWin,
+      resultAlreadyWritten: snap.resultAlreadyWritten,
     });
 
     try {
-      // Submit the match result to Firestore (if not already submitted or auto-won)
-      // If autoWon is true, the result was already auto-determined when opponent submitted loss
-      // Note: Tournaments skip trust review entirely and handle results in handleSubmitResult
-      if (!pendingMatchResult.autoWon) {
-        try {
-          console.log('[AUDIT] handleTrustReviewSubmit calling submitChallengeResult', {
-            challengeId,
-            wallet: publicKey.toBase58(),
-          });
-          await submitChallengeResult(
-            challengeId,
-            publicKey.toBase58(),
-            pendingMatchResult.didWin,
-            pendingMatchResult.proofImageData || undefined
-          );
-          console.log('✅ Match result submitted');
-        } catch (resultError: unknown) {
-          const msg =
-            resultError instanceof Error ? resultError.message : String(resultError);
-          const isDuplicateOrIdempotent =
-            msg.includes('already submitted') ||
-            msg.includes('already been processed') ||
-            msg.includes('Duplicate submission blocked');
-          if (isDuplicateOrIdempotent) {
-            console.log('ℹ️ Result already submitted, continuing with trust review...');
-          } else {
-            console.error('❌ Match result submission failed:', resultError);
-            showAppToast(
-              `Could not submit your match result: ${msg}. Your trust review was not saved. Please try again.`,
-              'error',
-              'Submit failed'
-            );
-            setShowTrustReview(false);
-            setTrustReviewOpponent('');
-            return;
-          }
-        }
-      } else {
-        console.log('ℹ️ Result was auto-determined (opponent submitted loss), skipping result submission - going straight to review');
-      }
-      
-      // Store trust review in Firestore and update opponent's trust score
-      // Use stored opponent wallet from pendingMatchResult, fallback to selectedChallenge if available
-      let opponentWallet = pendingMatchResult.opponentWallet;
-      
-      // Fallback: try to find opponent from selectedChallenge if not stored
+      let opponentWallet = snap.opponentWallet;
+
       if (!opponentWallet && selectedChallenge) {
         const playersArray = selectedChallenge.rawData?.players || (Array.isArray(selectedChallenge.players) ? selectedChallenge.players : []);
         opponentWallet = playersArray.find((p: string) => p && !walletsEqual(p, publicKey.toBase58()));
       }
-      
+
       if (opponentWallet) {
         console.log(`✅ Storing trust review for opponent: ${opponentWallet.slice(0, 8)}...`);
         await storeTrustReview(
@@ -3601,8 +3715,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           challengeId,
           payload
         );
-        
-        // Refresh leaderboard to show updated trust scores
+
         setTimeout(async () => {
         try {
           const limit = showAllPlayers ? leaderboardLimit : 5;
@@ -3611,138 +3724,56 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         } catch (error) {
           console.error('Failed to refresh leaderboard after trust review:', error);
         }
-        }, 2000); // Wait 2 seconds for Firestore to update and trust score to be recalculated
+        }, 2000);
       } else {
         console.warn('⚠️ Could not find opponent wallet for trust review');
         console.warn('   Debug info:', {
-          hasPendingResult: !!pendingMatchResult,
-          hasOpponentInPending: !!pendingMatchResult?.opponentWallet,
+          hasPendingResult: !!snap,
+          hasOpponentInPending: !!snap?.opponentWallet,
           hasSelectedChallenge: !!selectedChallenge,
           challengeId
         });
       }
-      
-      
-      // Close modals and clear state
+
       setShowTrustReview(false);
       setTrustReviewOpponent('');
-      
-      // Save values before clearing
-      const needsClaim = pendingMatchResult.needsClaim;
-      const didWin = pendingMatchResult.didWin;
-      const autoWon = pendingMatchResult.autoWon;
-      const challengeForClaim = needsClaim ? selectedChallenge : null;
-      
-      // Clear pending match result but keep challenge so both players stay in lobby
-      setPendingMatchResult(null);
-      
-      const challengeStatus =
-        selectedChallenge?.status || selectedChallenge?.rawData?.status;
-      const isCompleted = challengeStatus === 'completed';
-      const isWin = didWin || Boolean(autoWon);
 
-      // Keep lobby open for BOTH winner and loser so they can chat and use mic after match ends
-      if (!showStandardLobby) {
-        setShowStandardLobby(true);
-      }
-
-      if (isWin) {
-        if (isCompleted) {
-          const opponentName = opponentWallet
-            ? `${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}`
-            : undefined;
-
-          setVictoryModalData({
-            autoWon,
-            opponentName,
-            needsClaim: needsClaim || isWin,
-          });
-          setShowVictoryModal(true);
-
-          // Check for dispute in background (don't block UI)
-          if (selectedChallenge?.id) {
-            setTimeout(async () => {
-              try {
-                const { fetchChallengeById } = await import("@/lib/firebase/firestore");
-                const refreshed = await fetchChallengeById(selectedChallenge.id);
-                if (refreshed) {
-                  const refreshedStatus = refreshed.status || refreshed.rawData?.status;
-                  if (refreshedStatus === 'disputed') {
-                    // Dispute detected - close victory modal and show dispute message
-                    setShowVictoryModal(false);
-                    setVictoryModalData(null);
-                    setSelectedChallenge(refreshed);
-                    // Keep lobby open to show dispute status
-                    if (!showStandardLobby) {
-                      setShowStandardLobby(true);
-                    }
-                    showAppToast(
-                      "Dispute detected: both players claimed victory. Waiting for admin resolution.",
-                      "warning",
-                      "Dispute"
-                    );
-                  } else if (refreshedStatus === 'awaiting_auto_resolution' && autoWon) {
-                    setShowVictoryModal(false);
-                    setVictoryModalData(null);
-                    setSelectedChallenge(refreshed);
-                  } else if (refreshedStatus === 'completed') {
-                    // Challenge completed - update challenge data
-                    setSelectedChallenge(refreshed);
-                    const winner = refreshed.winner || refreshed.rawData?.winner;
-                    const isActualWinner = winner && walletsEqual(winner, publicKey.toBase58());
-
-                    if (!isActualWinner && !autoWon) {
-                      // Player claimed win but isn't the actual winner - close victory modal
-                      setShowVictoryModal(false);
-                      setVictoryModalData(null);
-                    }
-                  }
-                }
-              } catch (error) {
-                console.warn('Could not refresh challenge status:', error);
-              }
-            }, 2000); // Check after 2 seconds (gives time for determineWinner to run)
-          }
-        } else {
-          showAppToast(
-            "Result submitted. Awaiting confirmation...",
-            "info",
-            "Submitted"
-          );
-        }
-      } else if (didWin === false) {
-        const lossMessage = opponentWallet
-          ? "You submitted that you lost. Trust review recorded."
-          : "You submitted that you lost.";
-        showAppToast(lossMessage, "info", "Submitted");
-      } else {
-        console.warn("Unexpected result state", {
-          didWin,
-          autoWon,
-          challengeStatus,
+      if (!snap.resultAlreadyWritten) {
+        standardResultPostSubmitUx({
+          didWin: snap.didWin,
+          autoWon: snap.autoWon,
+          needsClaim: snap.needsClaim,
+          opponentWallet: snap.opponentWallet,
         });
-
-        showAppToast("Result submitted. Processing...", "info", "Submitted");
       }
+
+      setPendingMatchResult(null);
 
     } catch (error: any) {
-      console.error("❌ Failed to submit result and trust review:", error);
-      
-      // If it's just a duplicate submission error, show a more friendly message
-      if (error?.message?.includes('already submitted') || 
+      console.error("❌ Failed to save trust review:", error);
+
+      if (error?.message?.includes('already submitted') ||
           error?.message?.includes('already been processed')) {
-        showAppToast("Your result was already submitted. Trust review may not have been recorded.", "info", "Already submitted");
+        showAppToast("Your result was already on record. Trust review may not have been saved.", "info", "Already submitted");
       } else if (error?.message?.includes('permission') || error?.message?.includes('Missing or insufficient permissions')) {
-        // Trust review permission error - result was submitted successfully, just review failed
-        console.warn("⚠️ Trust review failed due to permissions, but result was submitted successfully");
+        console.warn("⚠️ Trust review failed due to permissions; match result is already on record for standard challenges");
         showAppToast(
-          "Result submitted successfully. Trust review could not be saved (permission issue). Your result was still recorded.",
-          "success",
-          "Submitted"
+          "Trust review could not be saved (permission issue). Your match result is already on record.",
+          'warning',
+          'Trust review'
         );
       } else {
-        showAppToast("Failed to submit result and trust review. Please try again.", "error", "Submit failed");
+        showAppToast(
+          "Failed to save trust review. Your match result is already on record.",
+          'error',
+          'Trust review'
+        );
       }
+
+      setShowTrustReview(false);
+      setTrustReviewOpponent("");
+      pendingMatchResultRef.current = null;
+      setPendingMatchResult(null);
     }
   };
 
@@ -7787,10 +7818,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         isOpen={showTrustReview}
         opponentName={trustReviewOpponent}
         completionRate={1} // Default to 1 (100% completion)
-        onClose={() => {
-          setShowTrustReview(false);
-          setTrustReviewOpponent('');
-        }}
+        onClose={handleTrustReviewClose}
         onSubmit={handleTrustReviewSubmit}
       />
 
