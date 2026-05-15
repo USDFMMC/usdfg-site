@@ -1871,20 +1871,16 @@ export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'cr
       wallet: creatorWallet,
     });
     
-    // OG First 2.1K (server decides eligibility + writes player_stats)
+    // OG First 2.1K (server decides eligibility + writes player_stats) — best-effort; never blocks create
     if (!playerSnap.exists()) {
-      try {
-        const r = await invokeUpdatePlayerMeta({
-          wallet: creatorWallet,
-          awardOgFirst1kIfEligible: true,
-        });
-        if (!r.skipped) {
-          console.log(
-            `🏆 OG First 2.1K handled on server for ${creatorWallet.slice(0, 8)}... (callable ok=${r.ok})`
-          );
-        }
-      } catch (e) {
-        console.error('updatePlayerMeta (OG award) failed:', e);
+      const r = await invokeUpdatePlayerMeta({
+        wallet: creatorWallet,
+        awardOgFirst1kIfEligible: true,
+      });
+      if (!r.skipped && r.ok && import.meta.env.DEV) {
+        console.log(
+          `🏆 OG First 2.1K handled on server for ${creatorWallet.slice(0, 8)}... (callable ok=${r.ok})`
+        );
       }
     }
     
@@ -4008,12 +4004,7 @@ export async function getPlayerEarningsByChallenge(wallet: string, limitCount: n
  * This ensures they show as "online" in the stats
  */
 export async function updatePlayerLastActive(wallet: string): Promise<void> {
-  try {
-    await invokeUpdatePlayerMeta({ wallet, touchLastActive: true });
-  } catch (error) {
-    console.error('❌ Error updating player lastActive:', error);
-    // Don't throw - this is a background update, shouldn't block the app
-  }
+  await invokeUpdatePlayerMeta({ wallet, touchLastActive: true });
 }
 
 /**

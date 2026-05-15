@@ -2,6 +2,23 @@ import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase/config";
 import { ensureFreshIdToken } from "@/lib/firebase/ensureFreshIdToken";
 
+/** One concise line per page load if updatePlayerMeta cannot obtain a token or the callable fails. */
+let updatePlayerMetaAuthDegradedLogged = false;
+
+function logUpdatePlayerMetaDegradedOnce(context: string, err: unknown): void {
+  if (updatePlayerMetaAuthDegradedLogged) return;
+  updatePlayerMetaAuthDegradedLogged = true;
+  const code =
+    typeof err === "object" && err !== null && "code" in err
+      ? String((err as { code: unknown }).code)
+      : "";
+  const msg = err instanceof Error ? err.message : String(err);
+  const short = msg.length > 200 ? `${msg.slice(0, 200)}…` : msg;
+  console.warn(
+    `[updatePlayerMeta] ${context}${code ? ` [${code}]` : ""}: ${short}`
+  );
+}
+
 function getStaleAdminTokenCode(e: unknown): string | undefined {
   if (!e || typeof e !== "object") return undefined;
   const o = e as { details?: { code?: string }; customData?: { code?: string } };
@@ -88,13 +105,23 @@ export async function invokeUpdatePlayerMeta(params: {
   founderEarnedDelta?: number;
   awardOgFirst1kIfEligible?: boolean;
 }): Promise<{ ok: boolean; skipped?: boolean }> {
-  await ensureFreshIdToken();
-  const callable = httpsCallable<typeof params, { ok: boolean; skipped?: boolean }>(
-    functions,
-    "updatePlayerMeta"
-  );
-  const res = await callable(params);
-  return res.data ?? { ok: false };
+  try {
+    await ensureFreshIdToken({ force: false });
+  } catch (err) {
+    logUpdatePlayerMetaDegradedOnce("ID token (avoid forced refresh; Secure Token may be blocked)", err);
+    return { ok: false, skipped: true };
+  }
+  try {
+    const callable = httpsCallable<typeof params, { ok: boolean; skipped?: boolean }>(
+      functions,
+      "updatePlayerMeta"
+    );
+    const res = await callable(params);
+    return res.data ?? { ok: false };
+  } catch (err) {
+    logUpdatePlayerMetaDegradedOnce("Cloud Function updatePlayerMeta", err);
+    return { ok: false, skipped: true };
+  }
 }
 
 export async function invokeUpdateTrustScore(params: {

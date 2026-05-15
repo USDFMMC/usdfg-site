@@ -1,12 +1,25 @@
 import { auth } from "@/lib/firebase/config";
 
+export type EnsureFreshIdTokenOptions = {
+  /**
+   * When true (default), calls Secure Token `grant` via `getIdToken(true)` — required for some
+   * admin callables that reject stale `iat`. When false, uses a cached token if still valid and
+   * avoids an unnecessary round-trip (reduces exposure if Secure Token API is restricted).
+   */
+  force?: boolean;
+};
+
 /**
- * Forces an ID token refresh so Cloud Functions see a current `iat` (admin freshness checks).
+ * Returns the current user's ID token for callable requests.
+ * @param options.force - default `true` (refresh); set `false` for best-effort meta updates.
  */
-export async function ensureFreshIdToken(): Promise<string | null> {
+export async function ensureFreshIdToken(
+  options?: EnsureFreshIdTokenOptions
+): Promise<string | null> {
   const user = auth.currentUser;
   if (!user) return null;
 
-  const token = await user.getIdToken(true);
+  const force = options?.force ?? true;
+  const token = await user.getIdToken(force);
   return token;
 }

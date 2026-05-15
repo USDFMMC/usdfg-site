@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getAuth, onAuthStateChanged, signInAnonymously } from "firebase/auth";
+import { getAuth, signInAnonymously } from "firebase/auth";
 import { getFunctions } from "firebase/functions";
 
 /**
@@ -35,10 +35,6 @@ export const auth = getAuth(app);
 
 signInAnonymously(auth).catch((err) => {
   console.error("ANON AUTH ERROR:", err);
-});
-
-onAuthStateChanged(auth, (user) => {
-  console.log("AUTH USER:", user);
 });
 
 export const db = getFirestore(app);
