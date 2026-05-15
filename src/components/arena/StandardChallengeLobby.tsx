@@ -220,16 +220,11 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           const pendingJoiner = getChallengePendingJoiner(updatedData);
           
           // Only log significant status changes to reduce noise
-          const prevStatus = liveChallenge ? getChallengeStatus(liveChallenge) : null;
-          if (status !== prevStatus || pendingJoiner !== getChallengePendingJoiner(liveChallenge || challenge)) {
-            console.log('🔄 Challenge real-time update received:', {
-              challengeId: challenge.id,
-              status,
-              prevStatus,
-              pendingJoiner,
-              hasCreator: !!(updatedData as any).creator,
-              timestamp: new Date().toISOString()
-            });
+          if (import.meta.env.DEV) {
+            const prevStatus = liveChallenge ? getChallengeStatus(liveChallenge) : null;
+            if (status !== prevStatus || pendingJoiner !== getChallengePendingJoiner(liveChallenge || challenge)) {
+              console.log('🔄 Challenge real-time update:', challenge.id, status, prevStatus);
+            }
           }
           
           // Auto-fix: If challenge is active but players array is empty, fix it
@@ -452,20 +447,17 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
   const doSubmitResult = async (forcedResult?: boolean) => {
     const resultToSubmit = typeof forcedResult === 'boolean' ? forcedResult : selectedResult;
-    console.log('DO SUBMIT RESULT TRIGGERED', { forcedResult, selectedResult, resultToSubmit });
     if (resultToSubmit === null) return;
     const allowSubmit =
       typeof forcedResult === 'boolean'
         ? !submitLocked && !isSubmitting && !externalIsSubmitting && !hasAlreadySubmittedEffective
         : canSubmit;
     if (!allowSubmit) {
-      console.log('[AUDIT] DO SUBMIT RESULT blocked', { allowSubmit, forcedResult });
       return;
     }
     setSubmitLockedLocal(true);
     setIsSubmitting(true);
     try {
-      console.log('CALLING onSubmitResult', resultToSubmit);
       await onSubmitResult(resultToSubmit, proofFile);
       setSubmittedLocally(true);
       setShowSubmitForm(false);
@@ -484,20 +476,12 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
   const handleSubmit = async (forcedResult?: boolean) => {
     const resultToSubmit = typeof forcedResult === 'boolean' ? forcedResult : selectedResult;
-    console.log('HANDLE SUBMIT', {
-      forcedResult,
-      submitLocked,
-      selectedResult,
-      resultToSubmit,
-      canSubmit,
-    });
     if (resultToSubmit === null) return;
     const allowSubmit =
       typeof forcedResult === 'boolean'
         ? !submitLocked && !isSubmitting && !externalIsSubmitting && !hasAlreadySubmittedEffective
         : canSubmit;
     if (!allowSubmit) {
-      console.log('[AUDIT] HANDLE SUBMIT blocked', { allowSubmit });
       return;
     }
 
@@ -716,21 +700,6 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     // Creator funding: creator + creator_confirmation_required + deadline not expired
     if (userRole === 'creator' && status === 'creator_confirmation_required' && !isDeadlineExpired && onCreatorFund) {
       state.showCreatorFund = true;
-      console.log('✅ Creator fund button should be visible:', {
-        userRole,
-        status,
-        isDeadlineExpired,
-        hasHandler: !!onCreatorFund,
-        pendingJoiner: getChallengePendingJoiner(activeChallenge)
-      });
-    } else if (userRole === 'creator' && status === 'creator_confirmation_required') {
-      console.log('⚠️ Creator fund button NOT showing:', {
-        userRole,
-        status,
-        isDeadlineExpired,
-        hasHandler: !!onCreatorFund,
-        pendingJoiner: getChallengePendingJoiner(activeChallenge)
-      });
     }
     
     // Joiner funding: challenger + creator_funded + deadline not expired
@@ -741,25 +710,6 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     
     if (isActuallyChallenger && status === 'creator_funded' && !isJoinerDeadlineExpired && onJoinerFund) {
       state.showJoinerFund = true;
-      console.log('✅ Joiner fund button should be visible:', {
-        userRole,
-        isActuallyChallenger,
-        status,
-        isJoinerDeadlineExpired,
-        hasHandler: !!onJoinerFund,
-        joinerFundingDeadline: joinerFundingDeadline?.toMillis(),
-        challengerWallet
-      });
-    } else if (isActuallyChallenger && status === 'creator_funded') {
-      console.log('⚠️ Joiner fund button NOT showing:', {
-        userRole,
-        isActuallyChallenger,
-        status,
-        isJoinerDeadlineExpired,
-        hasHandler: !!onJoinerFund,
-        joinerFundingDeadline: joinerFundingDeadline?.toMillis(),
-        challengerWallet
-      });
     }
     
     // Join button: spectator + joinable status + not full + handler available
@@ -821,11 +771,6 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const canClaimPrize = ctaState.showClaim;
 
   const handleFundChallenge = async () => {
-    console.log("FUND BUTTON CLICKED", {
-      challengeId: activeChallenge?.id,
-      wallet: currentWallet
-    });
-
     if (!onCreatorFund) {
       console.error('onCreatorFund handler not provided');
       onAppToast?.("Funding handler not available. Please refresh the page.", "error", "Setup error");
@@ -834,12 +779,12 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
     try {
       const challengePDA = (activeChallenge as any)?.pda || (activeChallenge as any)?.rawData?.pda || null;
-      console.log("CALLING ON-CHAIN FUND");
-      console.log("PDA:", challengePDA);
 
       const result: any = await onCreatorFund(activeChallenge);
       const signature = result?.signature ?? result?.txid ?? result ?? 'ok';
-      console.log("FUND TX SUCCESS", signature);
+      if (import.meta.env.DEV) {
+        console.log('Fund challenge tx:', signature);
+      }
 
       if (challengePDA) {
         await writeChallengeFields(
@@ -1649,13 +1594,6 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  console.log('CLICK YES', {
-                    submitLocked,
-                    isSubmitting,
-                    externalIsSubmitting,
-                    hasAlreadySubmitted: hasAlreadySubmittedEffective,
-                    selectedResult,
-                  });
                   setSelectedResult(true);
                   void handleSubmit(true);
                 }}
@@ -1688,7 +1626,6 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  console.log('CLICK NO', { selectedResult });
                   setSelectedResult(false);
                   void handleSubmit(false);
                 }}

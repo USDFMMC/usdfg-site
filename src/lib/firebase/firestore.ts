@@ -2927,19 +2927,14 @@ async function tryFinalCanonicalResolution(
   challengeId: string,
   challengeRef: ReturnType<typeof doc>
 ): Promise<void> {
-  console.log('[AUDIT] tryFinalCanonicalResolution entered', { challengeId });
   const resSnap = await getDoc(challengeRef);
   if (!resSnap.exists()) {
-    console.log('[AUDIT] tryFinalCanonicalResolution exit: snapshot missing');
     return;
   }
   const resData = resSnap.data() as ChallengeData;
   const rosterF = resData.players || [];
   const resultsF = (resData.results || {}) as Record<string, any>;
   if (rosterF.length !== 2) {
-    console.log('[AUDIT] tryFinalCanonicalResolution exit: players.length !== 2', {
-      rosterLength: rosterF.length,
-    });
     return;
   }
 
@@ -2947,18 +2942,6 @@ async function tryFinalCanonicalResolution(
   const canonicalB = canonicalPlayerKey(rosterF, rosterF[1]);
   const hasA = resultsF[canonicalA] !== undefined;
   const hasB = resultsF[canonicalB] !== undefined;
-
-  console.log('FINAL CANONICAL RESOLUTION CHECK', {
-    challengeId,
-    status: resData.status,
-    players: rosterF,
-    canonicalA,
-    canonicalB,
-    hasA,
-    hasB,
-    winner: resData.winner,
-    disputedBy: resData.disputedBy,
-  });
 
   const statusOk =
     resData.status === 'active' ||
@@ -2973,18 +2956,12 @@ async function tryFinalCanonicalResolution(
     !resData.disputedBy;
 
   if (!canFinalize) {
-    console.log('[AUDIT] tryFinalCanonicalResolution exit: canFinalize false', {
-      statusOk,
-      hasA,
-      hasB,
-      winner: resData.winner,
-      disputedBy: resData.disputedBy,
-    });
     return;
   }
 
-  console.log('✅ Final canonical resolution: invoking determineWinner');
-  console.log('[AUDIT] tryFinalCanonicalResolution → determineWinner', { challengeId });
+  if (import.meta.env.DEV) {
+    console.log('tryFinalCanonicalResolution → determineWinner', challengeId);
+  }
   await determineWinner(challengeId, resData);
 }
 
@@ -3002,7 +2979,6 @@ export const submitChallengeResult = async (
   proofImageData?: string
 ): Promise<void> => {
   try {
-    console.log('[AUDIT] submitChallengeResult start', { challengeId, wallet, didWin });
     const challengeRef = doc(db, "challenges", challengeId);
 
     // AUDIT LOG POLICY:
@@ -3157,13 +3133,17 @@ export const submitChallengeResult = async (
     }
     if (txResult.kind === "provisional_loss") {
       logSubmissionAudit(txResult.keySelf, false);
-      console.log("✅ Result submitted (provisional loss, atomic):", { challengeId, wallet });
+      if (import.meta.env.DEV) {
+        console.log("Result submitted (provisional loss, atomic):", { challengeId, wallet });
+      }
       await tryFinalCanonicalResolution(challengeId, challengeRef);
       return;
     }
 
     logSubmissionAudit(txResult.keySelf, txResult.didWin);
-    console.log("✅ Result submitted:", { challengeId, wallet, didWin });
+    if (import.meta.env.DEV) {
+      console.log("Result submitted:", { challengeId, wallet, didWin });
+    }
 
     // CRITICAL FIX: Re-fetch from Firestore to get the actual current state
     // Don't use local results object - it might be stale
@@ -3200,11 +3180,10 @@ export const submitChallengeResult = async (
           finalData.winner != null ||
           finalData.disputedBy
         ) {
-          console.log('⛔ Skipping determineWinner — already resolved or disputed');
+          if (import.meta.env.DEV) {
+            console.log('Skipping determineWinner — already resolved or disputed');
+          }
         } else {
-          console.log('[AUDIT] submitChallengeResult → determineWinner (awaiting branch)', {
-            challengeId,
-          });
           await determineWinner(challengeId, finalData);
         }
       }
@@ -3225,22 +3204,23 @@ export const submitChallengeResult = async (
       });
 
     if (bothSubmitted) {
-      console.log('🎯 Both players submitted! Determining winner...');
+      if (import.meta.env.DEV) {
+        console.log('Both players submitted; calling determineWinner', challengeId);
+      }
       if (
         updatedData.status === 'completed' ||
         updatedData.status === 'disputed' ||
         updatedData.winner != null ||
         updatedData.disputedBy
       ) {
-        console.log('⛔ Skipping determineWinner — already resolved or disputed');
+        if (import.meta.env.DEV) {
+          console.log('Skipping determineWinner — already resolved or disputed');
+        }
       } else {
-        console.log('[AUDIT] submitChallengeResult → determineWinner (active branch)', {
-          challengeId,
-        });
         await determineWinner(challengeId, updatedData);
       }
-    } else {
-      console.log('⏳ Waiting for opponent to submit result...');
+    } else if (import.meta.env.DEV) {
+      console.log('⏳ Waiting for opponent to submit result...', challengeId);
     }
 
     await tryFinalCanonicalResolution(challengeId, challengeRef);
@@ -3302,21 +3282,13 @@ const stripProofImageDataFromResults = (results?: Record<string, any>) => {
  */
 async function determineWinner(challengeId: string, data: ChallengeData): Promise<void> {
   try {
-    console.log('[AUDIT] determineWinner entered', {
-      challengeId,
-      status: data?.status,
-      rosterLength: (data?.players || []).length,
-    });
     const results = (data.results || {}) as Record<string, any>;
     const roster = data.players || [];
 
-    console.log('🎯 Determining winner for challenge:', challengeId);
-    console.log('📊 Results:', results);
-
     if (roster.length !== 2) {
-      console.log('⏳ determineWinner: roster must have exactly 2 players; skipping', {
-        rosterLength: roster.length,
-      });
+      if (import.meta.env.DEV) {
+        console.log('determineWinner skipped: roster length', roster.length, challengeId);
+      }
       return;
     }
 
@@ -3327,25 +3299,17 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
     const playerAResult = results[playerAKey];
     const playerBResult = results[playerBKey];
 
-    console.log('DETERMINE WINNER CHECK', {
-      players: roster,
-      resultKeys: Object.keys(results || {}),
-      canonicalA: playerAKey,
-      canonicalB: playerBKey,
-      hasA: !!playerAResult,
-      hasB: !!playerBResult,
-    });
-
     if (!playerAResult || !playerBResult) {
-      console.warn('Waiting for both canonical player submissions');
+      console.warn('determineWinner: waiting for both canonical player submissions', challengeId);
       return;
     }
 
     const playerAWon = playerAResult.didWin === true;
     const playerBWon = playerBResult.didWin === true;
 
-    console.log(`Player A (${playerAKey.slice(0, 8)}...): didWin=${playerAWon}`);
-    console.log(`Player B (${playerBKey.slice(0, 8)}...): didWin=${playerBWon}`);
+    if (import.meta.env.DEV) {
+      console.log('determineWinner', challengeId, { playerAWon, playerBWon });
+    }
 
     // Case 1: Both claim they won → Dispute (KEEP CHAT for evidence)
     if (playerAWon && playerBWon) {
@@ -3412,10 +3376,9 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
       },
       { currentData: data }
     );
-    console.log('🏆 WINNER DETERMINED:', winnerKey, '(loser:', loserKey, ')');
+    console.log('🏆 WINNER DETERMINED:', challengeId, winnerKey);
     // Delete chat messages - clear winner, no dispute resolution needed
     await cleanupChallengeData(challengeId, false); // false = not dispute
-    console.log('📊 Updating stats...');
     
     // Calculate challenge reward if not stored (for backward compatibility with old challenges)
     let prizePool = data.prizePool;
@@ -3459,9 +3422,6 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
       },
       { currentData: postWinData }
     );
-    
-    console.log('💰 Challenge reward ready for claim:', prizePool, 'USDFG to', winnerKey);
-    console.log('✅ Winner can now claim their reward (they pay gas, not you!)');
     
   } catch (error) {
     console.error('❌ Error determining winner:', error);
@@ -5219,8 +5179,6 @@ export async function claimChallengePrize(
   connection: any
 ): Promise<ClaimPrizeResult> {
   try {
-    console.log('🏆 Claiming reward for challenge:', challengeId);
-
     const challengeRef = doc(db, 'challenges', challengeId);
     const snap = await getDoc(challengeRef);
 
@@ -5254,7 +5212,6 @@ export async function claimChallengePrize(
           { currentData: data, actingWallet: acting }
         );
       }
-      console.log('✅ payoutSignature already set — idempotent return (no chain)');
       return {
         status: 'already_claimed',
         signature: sigTrim.length > 0 ? sigTrim : undefined,
@@ -5262,17 +5219,14 @@ export async function claimChallengePrize(
     }
 
     if (data.payoutTriggered === true) {
-      console.log('✅ Reward already claimed - idempotent check passed');
       return { status: 'already_claimed' };
     }
 
     if (data.prizeClaimedAt) {
-      console.log('✅ Reward already claimed (prizeClaimedAt) — idempotent');
       return { status: 'already_claimed' };
     }
 
     if (data.payoutStatus === 'paid') {
-      console.log('✅ Reward already paid (payoutStatus) — idempotent');
       return { status: 'already_claimed' };
     }
 
@@ -5352,8 +5306,6 @@ export async function claimChallengePrize(
 
     let challengePDA = data.pda;
     if (!challengePDA) {
-      console.log('⚠️ No PDA found, attempting to derive from challenge data...');
-      console.log('🔧 Attempting to fix missing PDA for existing challenge...');
       return {
         status: 'error',
         message:
@@ -5427,11 +5379,7 @@ export async function claimChallengePrize(
       (lockAgePre === null || lockAgePre > STALE_MS);
 
     if (stalePreTx) {
-      console.log('[AUDIT] payout stale lock recovery (pre-transaction)', {
-        challengeId,
-        lockAgeMs: lockAgePre,
-        payoutLockOwner: data.payoutLockOwner,
-      });
+      console.warn('Payout: resetting stale processing lock (pre-transaction)', challengeId);
       await updateDoc(challengeRef, {
         payoutStatus: 'pending',
         payoutLockOwner: deleteField(),
@@ -5449,12 +5397,10 @@ export async function claimChallengePrize(
     const concurrentSig =
       data.payoutSignature != null && String(data.payoutSignature).trim() !== '';
     if (concurrentSig || data.payoutTriggered === true) {
-      console.log('✅ Claim completed by concurrent request — idempotent');
       return { status: 'already_claimed' };
     }
 
     if (data.payoutStatus === 'paid') {
-      console.log('✅ Reward already paid (payoutStatus) — idempotent');
       return { status: 'already_claimed' };
     }
 
@@ -5480,7 +5426,6 @@ export async function claimChallengePrize(
     }
 
     const lockOwner = crypto.randomUUID();
-    const callerLockId = lockOwner;
     let lockResult: 'done' | 'in_flight' | 'locked';
     try {
       lockResult = await runTransaction(db, async (tx) => {
@@ -5494,7 +5439,6 @@ export async function claimChallengePrize(
           d.payoutSignature != null && String(d.payoutSignature).trim() !== '';
 
         if (hasSig) {
-          console.log('✅ Payout already completed (signature present)');
           if (d.payoutStatus !== 'paid') {
             tx.update(challengeRef, {
               payoutStatus: 'paid',
@@ -5515,23 +5459,13 @@ export async function claimChallengePrize(
           (ageMs === null || ageMs > STALE_MS);
 
         if (staleProcessingReset) {
-          console.log('[AUDIT] payout stale lock recovery (transaction)', {
-            challengeId,
-            ageMs,
-            storedLock: d.payoutLockOwner,
-            callerLock: callerLockId,
-          });
+          console.warn('Payout: resetting stale processing lock (transaction)', challengeId);
           tx.update(challengeRef, {
             payoutStatus: 'pending',
             payoutLockOwner: deleteField(),
             payoutAttemptedAt: deleteField(),
           });
         } else if (d.payoutStatus === 'processing' && !hasSig) {
-          console.log('[AUDIT] payout lock in_flight (another attempt within stale window)', {
-            challengeId,
-            ageMs,
-            storedLock: d.payoutLockOwner,
-          });
           return 'in_flight' as const;
         }
 
@@ -5544,10 +5478,6 @@ export async function claimChallengePrize(
           payoutStatus: 'processing',
           payoutAttemptedAt: nowAttempt,
           payoutLockOwner: lockOwner,
-        });
-        console.log('[AUDIT] payout lock acquired (staged in transaction)', {
-          challengeId,
-          lockOwner,
         });
         return 'locked' as const;
       });
@@ -5563,19 +5493,10 @@ export async function claimChallengePrize(
     }
 
     if (lockResult === 'done') {
-      console.log('✅ Claim completed — idempotent (transaction)');
       return { status: 'already_claimed' };
     }
     if (lockResult === 'in_flight') {
-      console.log('[AUDIT] claimChallengePrize result in_flight', {
-        challengeId,
-        note: 'Doc still processing or fresh lock held by another client within stale window',
-      });
       return { status: 'in_flight' };
-    }
-
-    if (lockResult === 'locked') {
-      console.log('[AUDIT] payout lock acquired', { challengeId, lockOwner });
     }
 
     const postLockSnap = await getDoc(challengeRef);
@@ -5592,46 +5513,30 @@ export async function claimChallengePrize(
       ) {
         return { status: 'already_claimed' };
       }
-      console.log('[AUDIT] claim post-lock unexpected payoutStatus', {
-        challengeId,
-        payoutStatus: data.payoutStatus,
-        lockOwner,
-      });
+      if (import.meta.env.DEV) {
+        console.warn('claim: unexpected payoutStatus after lock', challengeId, data.payoutStatus);
+      }
       return { status: 'in_flight' };
     }
     if (data.payoutLockOwner !== lockOwner) {
-      console.log('[AUDIT] claim post-lock lock_owner_mismatch', {
-        challengeId,
-        expectedLock: lockOwner,
-        docLock: data.payoutLockOwner,
-      });
+      if (import.meta.env.DEV) {
+        console.warn('claim: payout lock owner mismatch', challengeId);
+      }
       return { status: 'in_flight' };
     }
 
     try {
-      console.log('[AUDIT] claim validation passed — starting on-chain payout', {
-        challengeId,
-        winner: data.winner,
-        challengePDA,
-      });
-
       const isAdminResolvedDispute = !!(data as any).resolvedBy;
       const winnerCanonical = callerAddress;
 
       if (isAdminResolvedDispute) {
         const { resolveAdminChallengeOnChain } = await import('../chain/contract');
-        console.log('[AUDIT] calling resolveAdminChallengeOnChain', { challengeId });
         const signature = await resolveAdminChallengeOnChain(
           winnerWallet,
           connection,
           challengeId,
           data.winner!
         );
-        console.log('[AUDIT] resolveAdminChallengeOnChain returned signature', {
-          challengeId,
-          sigPreview: typeof signature === 'string' ? signature.slice(0, 12) : String(signature),
-        });
-        console.log('[AUDIT] writing payout completion patch (admin-resolved)', { challengeId });
         await writeChallengeFields(
           challengeId,
           {
@@ -5649,23 +5554,17 @@ export async function claimChallengePrize(
           },
           { currentData: data, actingWallet: callerAddress }
         );
-        console.log('[AUDIT] payout completion write success (admin-resolved)', { challengeId });
         const explorerUrl = looksLikeSolanaTxSignature(signature)
           ? getExplorerTxUrl(signature)
           : null;
         if (explorerUrl) {
           await postChallengeSystemMessage(challengeId, `🏆 Reward claimed on-chain: ${explorerUrl}`);
         }
-        console.log('✅ REWARD CLAIMED (admin-resolved dispute)!');
+        console.log('✅ Reward claimed (admin-resolved)', challengeId);
         return { status: 'success', signature };
       }
 
       const { resolveChallenge } = await import('../chain/contract');
-      console.log('[AUDIT] calling resolveChallenge', {
-        challengeId,
-        challengePDA,
-        winner: winnerCanonical,
-      });
       let signature: string;
       try {
         signature = await resolveChallenge(
@@ -5699,20 +5598,10 @@ export async function claimChallengePrize(
                   payoutLockOwner: deleteField(),
                   payoutAttemptedAt: deleteField(),
                 });
-                console.log('[AUDIT] claim rollback write success (ChallengeExpired inner)', {
-                  challengeId,
-                });
-              } else {
-                console.log('[AUDIT] claim rollback skipped (ChallengeExpired inner)', {
-                  challengeId,
-                  docLock: doc.payoutLockOwner,
-                  expectedLock: lockOwner,
-                  hasSig: hasS,
-                });
               }
             }
           } catch (rb0) {
-            console.error('[AUDIT] claim rollback failed (ChallengeExpired inner)', rb0);
+            console.error('claim rollback failed (ChallengeExpired inner)', rb0);
           }
           return {
             status: 'error',
@@ -5722,11 +5611,6 @@ export async function claimChallengePrize(
         }
         throw contractError;
       }
-
-      console.log('[AUDIT] resolveChallenge returned signature', {
-        challengeId,
-        sigPreview: typeof signature === 'string' ? signature.slice(0, 12) : String(signature),
-      });
 
       const completionPatch =
         signature === 'already-processed'
@@ -5755,12 +5639,10 @@ export async function claimChallengePrize(
               updatedAt: Timestamp.now(),
             };
 
-      console.log('[AUDIT] writing payout completion patch', { challengeId });
       await writeChallengeFields(challengeId, completionPatch, {
         currentData: data,
         actingWallet: callerAddress,
       });
-      console.log('[AUDIT] payout completion write success', { challengeId });
 
       const explorerUrl =
         typeof signature === 'string' && looksLikeSolanaTxSignature(signature)
@@ -5775,11 +5657,7 @@ export async function claimChallengePrize(
       console.log('   Winner received:', data.prizePool, 'USDFG');
       return { status: 'success', signature };
     } catch (err) {
-      console.log('[AUDIT] claim chain catch entered', {
-        challengeId,
-        lockOwner,
-        message: err instanceof Error ? err.message : String(err),
-      });
+      console.error('Claim payout failed:', challengeId, err instanceof Error ? err.message : String(err));
       const rbSnap = await getDoc(challengeRef);
       if (rbSnap.exists()) {
         const d = rbSnap.data() as ChallengeData;
@@ -5787,16 +5665,14 @@ export async function claimChallengePrize(
           d.payoutSignature != null && String(d.payoutSignature).trim() !== '';
         const canRollback = d.payoutLockOwner === lockOwner && !docHasSig;
         if (!canRollback) {
-          console.log('[AUDIT] claim rollback skipped', {
-            challengeId,
-            reason:
-              d.payoutLockOwner !== lockOwner
-                ? 'lock_owner_mismatch'
-                : 'payout_signature_present',
-            docLock: d.payoutLockOwner,
-            expectedLock: lockOwner,
-            hasSig: docHasSig,
-          });
+          if (import.meta.env.DEV) {
+            console.warn('claim rollback skipped', challengeId, {
+              reason:
+                d.payoutLockOwner !== lockOwner
+                  ? 'lock_owner_mismatch'
+                  : 'payout_signature_present',
+            });
+          }
         } else {
           try {
             await updateDoc(challengeRef, {
@@ -5806,16 +5682,12 @@ export async function claimChallengePrize(
               payoutLockOwner: deleteField(),
               payoutAttemptedAt: deleteField(),
             });
-            console.log('[AUDIT] claim rollback write success', { challengeId });
           } catch (rbErr) {
-            console.error('[AUDIT] claim rollback write failed', {
-              challengeId,
-              message: rbErr instanceof Error ? rbErr.message : String(rbErr),
-            });
+            console.error('claim rollback write failed', challengeId, rbErr);
           }
         }
       } else {
-        console.warn('[AUDIT] claim rollback skipped — challenge doc missing', { challengeId });
+        console.warn('claim rollback skipped — challenge doc missing', challengeId);
       }
       const msg = err instanceof Error ? err.message : String(err);
       if (

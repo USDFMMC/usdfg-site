@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { X, Star as StarIcon } from "lucide-react";
 
 interface TrustReviewModalProps {
@@ -42,12 +42,6 @@ export default function TrustReviewModal({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [comment, setComment] = useState("");
 
-  useEffect(() => {
-    if (isOpen) {
-      console.log('[AUDIT] trust modal rendered');
-    }
-  }, [isOpen]);
-
   if (!isOpen) return null;
 
   const handleTagToggle = (tag: string) => {
@@ -59,7 +53,6 @@ export default function TrustReviewModal({
   };
 
   const handleSubmit = () => {
-    console.log('[AUDIT] trust review submit clicked');
     // Calculate overall trust score (average of the three ratings)
     const trustScore10 = Math.round((honesty + fairness + sportsmanship) / 3 * 10) / 10;
     

@@ -1948,8 +1948,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         userIsDeclaredWinner
       ) {
         // Only after finalization: never treat provisional loss (awaiting_auto_resolution) as a win
-        console.log("🎯 Match finalized with you as winner — opening trust review...");
-        
         const opponentName = opponentWallet ? `${opponentWallet.slice(0, 4)}...${opponentWallet.slice(-4)}` : 'Opponent';
         
         setPendingMatchResult({
@@ -3484,12 +3482,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       throw err;
     }
 
-    console.log('[AUDIT] handleSubmitResult entered', {
-      didWin,
-      challengeId: selectedChallenge.id,
-      hasWallet: !!publicKey,
-    });
-
     try {
       // Check if this is a tournament match
       const format = selectedChallenge.rawData?.format || (selectedChallenge.rawData?.tournament ? 'tournament' : 'standard');
@@ -3517,7 +3509,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               if (match.id === tournamentMatchData.matchId) {
                 if (match.status === 'completed') {
                   matchAlreadyCompleted = true;
-                  console.log('⚠️ Match already completed - preventing duplicate submission');
+                  if (import.meta.env.DEV) {
+                    console.log('⚠️ Match already completed - preventing duplicate submission');
+                  }
                 }
                 break;
               }
@@ -3564,7 +3558,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         } catch (error: any) {
           // If error is about already submitted/completed, just close modal
           if (error.message?.includes('already') || error.message?.includes('completed') || error.message?.includes('duplicate')) {
-            console.log('⚠️ Submission prevented - match already processed');
+            if (import.meta.env.DEV) {
+              console.log('⚠️ Submission prevented - match already processed');
+            }
             setShowSubmitResultModal(false);
             setTournamentMatchData(null);
             setShowTournamentLobby(true);
@@ -3575,12 +3571,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         }
         return;
       }
-
-      console.log("[AUDIT] standard challenge immediate result path", {
-        challengeId: selectedChallenge.id,
-        format,
-        isTournament,
-      });
 
       // Standard challenge — write result to Firestore immediately; trust review is optional afterward
       const playersArray = selectedChallenge.rawData?.players || (Array.isArray(selectedChallenge.players) ? selectedChallenge.players : []);
@@ -3601,12 +3591,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
       const challengeId = selectedChallenge.id;
       const wallet = publicKey.toBase58();
-      console.log('[AUDIT] immediate submitChallengeResult start', {
-        challengeId,
-        wallet,
-        didWin,
-        hasProof: !!proofImageData,
-      });
 
       try {
         await submitChallengeResult(
@@ -3615,7 +3599,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           didWin,
           proofImageData || undefined
         );
-        console.log('[AUDIT] immediate submitChallengeResult success', { challengeId });
       } catch (resultError: unknown) {
         const msg =
           resultError instanceof Error ? resultError.message : String(resultError);
@@ -3624,12 +3607,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           msg.includes('already been processed') ||
           msg.includes('Duplicate submission blocked');
         if (!isDuplicateOrIdempotent) {
-          console.error('[AUDIT] immediate submitChallengeResult failed', resultError);
+          console.error('submitChallengeResult failed:', resultError);
           throw resultError;
         }
-        console.log('[AUDIT] immediate submitChallengeResult idempotent/duplicate — continuing', {
-          challengeId,
-        });
       }
 
       standardResultPostSubmitUx({
@@ -3653,7 +3633,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
       setTrustReviewOpponent(opponentName);
       setShowTrustReview(true);
-      console.log('[AUDIT] opening trust review optional', { challengeId, opponentWallet: opponentWallet || null });
       setShowSubmitResultModal(false);
       
     } catch (error) {
@@ -3692,13 +3671,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
     const snap = pendingMatchResult;
 
-    console.log('[AUDIT] handleTrustReviewSubmit start', {
-      challengeId,
-      autoWon: snap.autoWon,
-      didWin: snap.didWin,
-      resultAlreadyWritten: snap.resultAlreadyWritten,
-    });
-
     try {
       let opponentWallet = snap.opponentWallet;
 
@@ -3708,7 +3680,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       }
 
       if (opponentWallet) {
-        console.log(`✅ Storing trust review for opponent: ${opponentWallet.slice(0, 8)}...`);
         await storeTrustReview(
           publicKey.toBase58(),
           opponentWallet,
@@ -3726,13 +3697,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         }
         }, 2000);
       } else {
-        console.warn('⚠️ Could not find opponent wallet for trust review');
-        console.warn('   Debug info:', {
-          hasPendingResult: !!snap,
-          hasOpponentInPending: !!snap?.opponentWallet,
-          hasSelectedChallenge: !!selectedChallenge,
-          challengeId
-        });
+        console.warn('Could not find opponent wallet for trust review', { challengeId });
       }
 
       setShowTrustReview(false);
@@ -3863,7 +3828,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         
         if (!hasReviewed) {
           // User hasn't reviewed yet - show review modal first
-          console.log('🎯 User tried to claim reward but hasn\'t reviewed yet - showing review modal');
           
           // Ensure challenge is selected and lobby is open
           if (!selectedChallenge || selectedChallenge.id !== challenge.id) {
