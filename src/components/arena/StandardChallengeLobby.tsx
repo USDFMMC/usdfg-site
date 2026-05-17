@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { ChatBox } from "./ChatBox";
 import { VoiceChat } from "./VoiceChat";
 import { Camera, Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
-import { getPlayerStats, fetchChallengeById, resolveAdminChallenge, triggerChallengeDispute, writeChallengeFields, walletsEqual, canonicalPlayerKey } from "@/lib/firebase/firestore";
+import { getPlayerStats, fetchChallengeById, resolveAdminChallenge, triggerChallengeDispute, writeChallengeFields, walletsEqual, canonicalPlayerKey, repairChallengeFinalizationIfNeeded } from "@/lib/firebase/firestore";
 import {
   acquireLobbyHub,
   releaseLobbyHub,
@@ -249,6 +249,19 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
             }
           }
           
+          // Self-heal: both results written but status still active (e.g. missed determineWinner)
+          const resultsMap = (updatedData as { results?: Record<string, unknown> }).results;
+          const st = getChallengeStatus(updatedData);
+          if (
+            resultsMap &&
+            (st === 'active' || st === 'in-progress' || st === 'awaiting_auto_resolution') &&
+            !(updatedData as { winner?: string | null }).winner
+          ) {
+            void repairChallengeFinalizationIfNeeded(challenge.id).catch((err) => {
+              console.warn('[repairFinalize] lobby snapshot repair failed', challenge.id, err);
+            });
+          }
+
           // Update immediately - don't wait for async operations
           setLiveChallenge(updatedData);
         } else {

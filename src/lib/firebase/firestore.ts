@@ -2915,6 +2915,153 @@ export function canonicalPlayerKey(players: string[], wallet: string): string {
   return hit || wallet;
 }
 
+/** Two roster wallets for finalize/repair — falls back to creator + challenger when `players` is missing or wrong length. */
+export function getEffectiveChallengeRoster(data: ChallengeData): string[] {
+  const raw = Array.isArray(data.players)
+    ? data.players.filter((p): p is string => typeof p === 'string' && !!p)
+    : [];
+  if (raw.length === 2) {
+    return raw;
+  }
+  const creator =
+    (typeof data.creator === 'string' && data.creator) ||
+    (typeof (data as { creatorWallet?: string }).creatorWallet === 'string' &&
+      (data as { creatorWallet?: string }).creatorWallet) ||
+    '';
+  const challenger =
+    (typeof data.challenger === 'string' && data.challenger) ||
+    (typeof data.opponentWallet === 'string' && data.opponentWallet) ||
+    '';
+  if (creator && challenger && !walletsEqual(creator, challenger)) {
+    return [creator, challenger];
+  }
+  return raw;
+}
+
+export function bothPlayersHaveCanonicalResults(
+  data: ChallengeData,
+  roster?: string[]
+): boolean {
+  const players = roster ?? getEffectiveChallengeRoster(data);
+  if (players.length !== 2) return false;
+  const results = (data.results || {}) as Record<string, unknown>;
+  return players.every((p) => results[canonicalPlayerKey(players, p)] !== undefined);
+}
+
+const repairFinalizeCooldownMs = 60_000;
+const lastRepairFinalizeAt = new Map<string, number>();
+
+/**
+ * Self-heal: both canonical results present but challenge never left active/in-progress.
+ * Safe to call from snapshots; no-ops when finalize is not applicable.
+ */
+/** Read-only snapshot of fields needed to debug stuck active + both-results states. */
+export async function getChallengeFinalizeDiagnostics(
+  challengeId: string
+): Promise<Record<string, unknown> | null> {
+  const snap = await getDoc(doc(db, 'challenges', challengeId));
+  if (!snap.exists()) return null;
+  const d = snap.data() as ChallengeData;
+  const roster = getEffectiveChallengeRoster(d);
+  const results = (d.results || {}) as Record<string, unknown>;
+  const toIso = (v: unknown) =>
+    v && typeof v === 'object' && 'toMillis' in (v as object)
+      ? new Date((v as Timestamp).toMillis()).toISOString()
+      : v ?? null;
+  return {
+    status: d.status ?? null,
+    players: d.players ?? null,
+    effectiveRoster: roster,
+    results,
+    canonicalResults: roster.map((w) => ({
+      wallet: w,
+      key: canonicalPlayerKey(roster, w),
+      hasResult: results[canonicalPlayerKey(roster, w)] !== undefined,
+    })),
+    winner: d.winner ?? null,
+    lossReportedBy: d.lossReportedBy ?? null,
+    provisionalWinner: d.provisionalWinner ?? null,
+    resolveAfter: toIso(d.resolveAfter),
+    needsPayout: d.needsPayout ?? null,
+    canClaim: d.canClaim ?? null,
+    disputedBy: d.disputedBy ?? null,
+    updatedAt: toIso(d.updatedAt),
+    bothCanonicalReady: bothPlayersHaveCanonicalResults(d, roster),
+  };
+}
+
+export async function repairChallengeFinalizationIfNeeded(
+  challengeId: string
+): Promise<boolean> {
+  const now = Date.now();
+  if (now - (lastRepairFinalizeAt.get(challengeId) ?? 0) < repairFinalizeCooldownMs) {
+    return false;
+  }
+  lastRepairFinalizeAt.set(challengeId, now);
+
+  const challengeRef = doc(db, 'challenges', challengeId);
+  const resSnap = await getDoc(challengeRef);
+  if (!resSnap.exists()) {
+    return false;
+  }
+
+  const resData = resSnap.data() as ChallengeData;
+  const roster = getEffectiveChallengeRoster(resData);
+  const status = resData.status;
+
+  const statusOk =
+    status === 'active' ||
+    status === 'in-progress' ||
+    status === 'awaiting_auto_resolution';
+
+  if (
+    !statusOk ||
+    roster.length !== 2 ||
+    !bothPlayersHaveCanonicalResults(resData, roster) ||
+    resData.winner != null ||
+    resData.disputedBy
+  ) {
+    if (import.meta.env.DEV && statusOk && roster.length === 2) {
+      console.log('[repairFinalize] skip', challengeId, {
+        hasBothResults: bothPlayersHaveCanonicalResults(resData, roster),
+        winner: resData.winner,
+        disputedBy: resData.disputedBy,
+        playersFieldLen: Array.isArray(resData.players) ? resData.players.length : 0,
+      });
+    }
+    return false;
+  }
+
+  console.warn(
+    '[repairFinalize] both results present but challenge not completed — running determineWinner',
+    challengeId
+  );
+
+  const dataForWinner: ChallengeData = {
+    ...resData,
+    players: roster,
+  };
+
+  if (
+    !Array.isArray(resData.players) ||
+    resData.players.length !== 2 ||
+    !resData.players.every((p, i) => walletsEqual(p, roster[i]))
+  ) {
+    try {
+      await writeChallengeFields(
+        challengeId,
+        { players: roster, updatedAt: Timestamp.now() },
+        { currentData: resData, skipParticipantHybridMerge: false }
+      );
+    } catch (e) {
+      console.warn('[repairFinalize] could not patch players array', challengeId, e);
+    }
+  }
+
+  await determineWinner(challengeId, dataForWinner);
+  return true;
+}
+
 /**
  * If both roster players have canonical `results` entries but the doc is not finalized,
  * run determineWinner (self-heal: e.g. active + stale provisional fields after partial flows).
@@ -2928,7 +3075,7 @@ async function tryFinalCanonicalResolution(
     return;
   }
   const resData = resSnap.data() as ChallengeData;
-  const rosterF = resData.players || [];
+  const rosterF = getEffectiveChallengeRoster(resData);
   const resultsF = (resData.results || {}) as Record<string, any>;
   if (rosterF.length !== 2) {
     return;
@@ -2958,7 +3105,7 @@ async function tryFinalCanonicalResolution(
   if (import.meta.env.DEV) {
     console.log('tryFinalCanonicalResolution → determineWinner', challengeId);
   }
-  await determineWinner(challengeId, resData);
+  await determineWinner(challengeId, { ...resData, players: rosterF });
 }
 
 /**
@@ -3148,13 +3295,8 @@ export const submitChallengeResult = async (
 
     if (updatedData.status === 'awaiting_auto_resolution') {
       const currentResults = updatedData.results || {};
-      const currentPlayers = updatedData.players || [];
-      const bothSubmitted =
-        currentPlayers.length === 2 &&
-        currentPlayers.every((p: string) => {
-          const key = canonicalPlayerKey(currentPlayers, p);
-          return currentResults[key] !== undefined;
-        });
+      const currentPlayers = getEffectiveChallengeRoster(updatedData);
+      const bothSubmitted = bothPlayersHaveCanonicalResults(updatedData, currentPlayers);
       if (bothSubmitted) {
         await writeChallengeFields(
           challengeId,
@@ -3180,24 +3322,20 @@ export const submitChallengeResult = async (
             console.log('Skipping determineWinner — already resolved or disputed');
           }
         } else {
-          await determineWinner(challengeId, finalData);
+          await determineWinner(challengeId, {
+            ...finalData,
+            players: getEffectiveChallengeRoster(finalData),
+          });
         }
       }
       await tryFinalCanonicalResolution(challengeId, challengeRef);
       return;
     }
 
-    const currentResults = updatedData.results || {};
-    const currentPlayers = updatedData.players || [];
+    const currentPlayers = getEffectiveChallengeRoster(updatedData);
 
     // Only determine winner if BOTH roster players have submitted (canonical keys only).
-    // Extra/legacy keys in results must not block calling determineWinner.
-    const bothSubmitted =
-      currentPlayers.length === 2 &&
-      currentPlayers.every((p: string) => {
-        const key = canonicalPlayerKey(currentPlayers, p);
-        return currentResults[key] !== undefined;
-      });
+    const bothSubmitted = bothPlayersHaveCanonicalResults(updatedData, currentPlayers);
 
     if (bothSubmitted) {
       if (import.meta.env.DEV) {
@@ -3213,7 +3351,10 @@ export const submitChallengeResult = async (
           console.log('Skipping determineWinner — already resolved or disputed');
         }
       } else {
-        await determineWinner(challengeId, updatedData);
+        await determineWinner(challengeId, {
+          ...updatedData,
+          players: currentPlayers,
+        });
       }
     } else if (import.meta.env.DEV) {
       console.log('⏳ Waiting for opponent to submit result...', challengeId);
@@ -3279,7 +3420,7 @@ const stripProofImageDataFromResults = (results?: Record<string, any>) => {
 async function determineWinner(challengeId: string, data: ChallengeData): Promise<void> {
   try {
     const results = (data.results || {}) as Record<string, any>;
-    const roster = data.players || [];
+    const roster = getEffectiveChallengeRoster(data);
 
     if (roster.length !== 2) {
       if (import.meta.env.DEV) {

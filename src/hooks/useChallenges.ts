@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import type { ChallengeData } from '@/lib/firebase/firestore';
-import { listenToRecentChallenges, listenToUserChallenges, fetchChallenges } from '@/lib/firebase/firestore';
+import { listenToRecentChallenges, listenToUserChallenges, fetchChallenges, repairChallengeFinalizationIfNeeded } from '@/lib/firebase/firestore';
 import { auth } from '@/lib/firebase/config';
 
 function challengeParticipantUidMatches(challenge: ChallengeData, uid: string | null): boolean {
@@ -91,9 +91,20 @@ export const useChallenges = () => {
         for (const challenge of newChallenges) {
           const challengeId = challenge.id;
           if (!challengeId) continue;
-          console.log("CHALLENGE SNAPSHOT", challenge.id, challenge.status, challenge.pendingJoiner);
+          if (import.meta.env.DEV) {
+            console.log("CHALLENGE SNAPSHOT", challenge.id, challenge.status, challenge.pendingJoiner);
+          }
 
           if (!challengeParticipantUidMatches(challenge, authUid)) continue;
+
+          const snapStatus = challenge.status;
+          if (
+            snapStatus === 'active' ||
+            snapStatus === 'in-progress' ||
+            snapStatus === 'awaiting_auto_resolution'
+          ) {
+            void repairChallengeFinalizationIfNeeded(challengeId).catch(() => {});
+          }
 
           const challengePDA = (challenge.rawData as any)?.pda || (challenge as any).pda;
           if (!challengePDA) continue;
