@@ -27,7 +27,9 @@ import {
   isChallengeChallenger,
   getCreatorFundingDeadline,
   isCreatorFundingDeadlineExpired,
-  isChallengeRewardClaimed
+  isChallengeRewardClaimed,
+  isPayoutStaleProcessing,
+  isPayoutInFlightProcessing
 } from "@/lib/utils/challenge-helpers";
 import { TrustBadge } from "@/lib/utils/trustDisplay";
 
@@ -817,6 +819,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   };
   
   const prizeClaimed = isChallengeRewardClaimed(activeChallenge);
+  const payoutStale = isPayoutStaleProcessing(activeChallenge);
+  const payoutInFlight = isPayoutInFlightProcessing(activeChallenge);
   
   // Winner check (for display)
   const winner = getChallengeValue<string | null>('winner', null) as string | null;
@@ -1821,6 +1825,16 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           <div className="text-center">
             <div className="text-2xl mb-1.5">🏆</div>
             <h3 className="text-sm font-bold text-emerald-200 mb-1">You Won!</h3>
+            {payoutStale && !isClaiming && (
+              <p className="text-[10px] text-amber-200/90 mb-1.5">
+                Previous claim did not finish. You can retry safely.
+              </p>
+            )}
+            {payoutInFlight && !isClaiming && !payoutStale && (
+              <p className="text-[10px] text-emerald-100/70 mb-1.5">
+                Claim in progress… wait a moment before retrying.
+              </p>
+            )}
             <button
               type="button"
               onClick={async () => {
@@ -1830,22 +1844,30 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                   console.error('Error claiming reward:', error);
                 }
               }}
-              disabled={isClaiming || prizeClaimed}
-              className="w-full rounded-md bg-gradient-to-r from-emerald-500/90 to-green-500/90 hover:from-emerald-600 hover:to-green-600 text-white px-3 py-2 text-xs font-semibold transition-all shadow-[0_0_10px_rgba(34,197,94,0.25)] border border-emerald-400/30 disabled:opacity-50 disabled:cursor-not-allowed mb-1"
+              disabled={(isClaiming && !payoutStale) || prizeClaimed || (payoutInFlight && !payoutStale)}
+              className={`w-full rounded-md px-3 py-2 text-xs font-semibold transition-all shadow-[0_0_10px_rgba(34,197,94,0.25)] border disabled:opacity-50 disabled:cursor-not-allowed mb-1 ${
+                payoutStale && !isClaiming
+                  ? 'bg-gradient-to-r from-amber-500/90 to-orange-500/90 hover:from-amber-600 hover:to-orange-600 text-white border-amber-400/30'
+                  : 'bg-gradient-to-r from-emerald-500/90 to-green-500/90 hover:from-emerald-600 hover:to-green-600 text-white border-emerald-400/30'
+              }`}
             >
               {isClaiming ? (
                 <span className="flex items-center justify-center gap-1.5">
                   <Loader2 className="w-3 h-3 animate-spin" />
-                  Claiming… Confirm in wallet
+                  {payoutStale ? 'Retrying claim… Confirm in wallet' : 'Claiming… Confirm in wallet'}
                 </span>
               ) : prizeClaimed ? (
                 "Claimed"
+              ) : payoutStale ? (
+                "Retry Claim"
+              ) : payoutInFlight ? (
+                "Claim in progress…"
               ) : (
                 "Claim Reward"
               )}
             </button>
             <div className="text-[10px] text-emerald-100/90 font-medium mb-1">
-              This will open your wallet
+              {payoutStale ? 'Retry will reset a stuck payout and open your wallet' : 'This will open your wallet'}
             </div>
             <div className="text-xs text-emerald-100/80 mb-1">
               Reward payout minus platform fee

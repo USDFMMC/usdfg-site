@@ -99,6 +99,7 @@ import {
   isChallengeInProgress,
   canCancelChallenge,
   isChallengeRewardClaimed,
+  isPayoutStaleProcessing,
 } from "@/lib/utils/challenge-helpers";
 import ElegantButton from "@/components/ui/ElegantButton";
 import ElegantModal from "@/components/ui/ElegantModal";
@@ -3794,8 +3795,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
   // Handle reward claiming
   const handleClaimPrize = async (challenge: any) => {
+    const payoutStaleBefore = isPayoutStaleProcessing(challenge);
     // CRITICAL: Disable button immediately on click to prevent double-submission
-    if (claimingPrize === challenge.id) {
+    if (claimingPrize === challenge.id && !payoutStaleBefore) {
       return; // Already processing
     }
     
@@ -3946,12 +3948,27 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         }
       }
       
+      if (payoutStaleBefore) {
+        showAppToast(
+          "Retrying stale claim… resetting stuck payout and opening your wallet.",
+          "info",
+          "Retry claim"
+        );
+      } else {
+        showAppToast(
+          "Claim in progress. Confirm the transaction in your wallet.",
+          "info",
+          "Claim in progress"
+        );
+      }
+
       const { claimChallengePrize } = await import("@/lib/firebase/firestore");
       const claimResult = await claimChallengePrize(challenge.id, wallet, connection);
 
       const shouldRefreshAfterClaim =
         claimResult.status === "success" ||
-        claimResult.status === "already_claimed";
+        claimResult.status === "already_claimed" ||
+        (claimResult.status === "stale_retry" && claimResult.outcome === "success");
 
       let fresh: ChallengeData | null = null;
       if (shouldRefreshAfterClaim) {
@@ -4001,15 +4018,41 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             refreshUSDFGBalance().catch(() => {});
           }, 2000);
           break;
+        case "stale_retry":
+          if (claimResult.outcome === "success") {
+            showAppToast(
+              "Stale claim recovered. Reward claimed — check your wallet.",
+              "success",
+              "Claimed"
+            );
+            setTimeout(() => {
+              refreshUSDFGBalance().catch(() => {});
+            }, 2000);
+          } else {
+            showAppToast(
+              claimResult.message || "Retry claim failed.",
+              "error",
+              "Claim failed"
+            );
+          }
+          break;
         case "already_claimed":
           showAppToast("Reward already claimed.", "info", "Already claimed");
           break;
         case "in_flight":
-          showAppToast(
-            "Claim already in progress. Please wait.",
-            "info",
-            "Claim in progress"
-          );
+          if (claimResult.isStale) {
+            showAppToast(
+              "Payout is still marked in progress. Wait two minutes, then use Retry Claim.",
+              "warning",
+              "Retry soon"
+            );
+          } else {
+            showAppToast(
+              "Claim already in progress. Please wait.",
+              "info",
+              "Claim in progress"
+            );
+          }
           break;
         case "cooldown":
           showAppToast(
@@ -4028,6 +4071,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           break;
         case "error": {
           let errorMessage = claimResult.message || "Unknown error";
+          if (claimResult.walletRejected) {
+            showAppToast(
+              "Claim cancelled in wallet. You can try again when ready.",
+              "warning",
+              "Wallet rejected"
+            );
+            break;
+          }
           if (
             errorMessage.includes("ChallengeExpired") ||
             errorMessage.includes("6005") ||

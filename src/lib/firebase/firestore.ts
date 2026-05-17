@@ -5263,11 +5263,47 @@ function ensureWinnerInRoster(data: ChallengeData): void {
 /** Outcome from {@link claimChallengePrize} (no silent soft-returns). */
 export type ClaimPrizeResult =
   | { status: 'success'; signature?: string }
+  | { status: 'stale_retry'; outcome: 'success'; signature?: string }
+  | { status: 'stale_retry'; outcome: 'error'; message: string }
   | { status: 'already_claimed'; signature?: string }
-  | { status: 'in_flight' }
+  | { status: 'in_flight'; isStale?: boolean }
   | { status: 'cooldown' }
   | { status: 'not_available'; message?: string }
-  | { status: 'error'; message: string };
+  | { status: 'error'; message: string; walletRejected?: boolean };
+
+function isWalletUserRejection(err: unknown): boolean {
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return (
+    msg.includes('user rejected') ||
+    msg.includes('user denied') ||
+    msg.includes('user cancelled') ||
+    msg.includes('user canceled') ||
+    msg.includes('rejected the request') ||
+    msg.includes('approval denied') ||
+    msg.includes('transaction cancelled') ||
+    msg.includes('transaction canceled') ||
+    msg.includes('request rejected') ||
+    (msg.includes('sign') && msg.includes('reject'))
+  );
+}
+
+function wrapStaleRetryResult(
+  recoveredFromStale: boolean,
+  base: ClaimPrizeResult
+): ClaimPrizeResult {
+  if (!recoveredFromStale) return base;
+  if (base.status === 'success') {
+    return { status: 'stale_retry', outcome: 'success', signature: base.signature };
+  }
+  if (base.status === 'error') {
+    return {
+      status: 'stale_retry',
+      outcome: 'error',
+      message: base.message,
+    };
+  }
+  return base;
+}
 
 /** Escrow tournaments need `needsPayout` so the payout transaction guard matches `canClaim`. */
 function escrowTournamentClaimGatePatch(data: ChallengeData): {
@@ -5503,14 +5539,15 @@ export async function claimChallengePrize(
       data.payoutSignature == null || String(data.payoutSignature).trim() === '';
 
     const STALE_MS = 2 * 60 * 1000;
+    let recoveredFromStale = false;
     const lockAgePre = payoutLockAgeMs(data);
     const stalePreTx =
       data.payoutStatus === 'processing' &&
       noPayoutSig &&
-      !!data.payoutLockOwner &&
       (lockAgePre === null || lockAgePre > STALE_MS);
 
     if (stalePreTx) {
+      recoveredFromStale = true;
       console.warn('Payout: resetting stale processing lock (pre-transaction)', challengeId);
       await updateDoc(challengeRef, {
         payoutStatus: 'pending',
@@ -5558,6 +5595,7 @@ export async function claimChallengePrize(
     }
 
     const lockOwner = crypto.randomUUID();
+    const recoveryState = { fromStale: recoveredFromStale };
     let lockResult: 'done' | 'in_flight' | 'locked';
     try {
       lockResult = await runTransaction(db, async (tx) => {
@@ -5591,6 +5629,7 @@ export async function claimChallengePrize(
           (ageMs === null || ageMs > STALE_MS);
 
         if (staleProcessingReset) {
+          recoveryState.fromStale = true;
           console.warn('Payout: resetting stale processing lock (transaction)', challengeId);
           tx.update(challengeRef, {
             payoutStatus: 'pending',
@@ -5628,8 +5667,15 @@ export async function claimChallengePrize(
       return { status: 'already_claimed' };
     }
     if (lockResult === 'in_flight') {
-      return { status: 'in_flight' };
+      const ageNow = payoutLockAgeMs(data);
+      const staleNow =
+        data.payoutStatus === 'processing' &&
+        noPayoutSig &&
+        (ageNow === null || ageNow > STALE_MS);
+      return { status: 'in_flight', isStale: staleNow };
     }
+
+    recoveredFromStale = recoveryState.fromStale;
 
     const postLockSnap = await getDoc(challengeRef);
     if (!postLockSnap.exists()) {
@@ -5648,13 +5694,18 @@ export async function claimChallengePrize(
       if (import.meta.env.DEV) {
         console.warn('claim: unexpected payoutStatus after lock', challengeId, data.payoutStatus);
       }
-      return { status: 'in_flight' };
+      return { status: 'in_flight', isStale: false };
     }
     if (data.payoutLockOwner !== lockOwner) {
       if (import.meta.env.DEV) {
         console.warn('claim: payout lock owner mismatch', challengeId);
       }
-      return { status: 'in_flight' };
+      const ageMismatch = payoutLockAgeMs(data);
+      const staleMismatch =
+        data.payoutStatus === 'processing' &&
+        (data.payoutSignature == null || String(data.payoutSignature).trim() === '') &&
+        (ageMismatch === null || ageMismatch > STALE_MS);
+      return { status: 'in_flight', isStale: staleMismatch };
     }
 
     try {
@@ -5693,7 +5744,7 @@ export async function claimChallengePrize(
           await postChallengeSystemMessage(challengeId, `🏆 Reward claimed on-chain: ${explorerUrl}`);
         }
         console.log('✅ Reward claimed (admin-resolved)', challengeId);
-        return { status: 'success', signature };
+        return wrapStaleRetryResult(recoveredFromStale, { status: 'success', signature });
       }
 
       const { resolveChallenge } = await import('../chain/contract');
@@ -5735,11 +5786,11 @@ export async function claimChallengePrize(
           } catch (rb0) {
             console.error('claim rollback failed (ChallengeExpired inner)', rb0);
           }
-          return {
+          return wrapStaleRetryResult(recoveredFromStale, {
             status: 'error',
             message:
               '❌ Old contract version detected. Please contact support to redeploy the contract without expiration check for reward claims.',
-          };
+          });
         }
         throw contractError;
       }
@@ -5787,8 +5838,9 @@ export async function claimChallengePrize(
       console.log('✅ REWARD CLAIMED!');
       console.log('   Transaction:', signature);
       console.log('   Winner received:', data.prizePool, 'USDFG');
-      return { status: 'success', signature };
+      return wrapStaleRetryResult(recoveredFromStale, { status: 'success', signature });
     } catch (err) {
+      const walletRejected = isWalletUserRejection(err);
       console.error('Claim payout failed:', challengeId, err instanceof Error ? err.message : String(err));
       const rbSnap = await getDoc(challengeRef);
       if (rbSnap.exists()) {
@@ -5807,9 +5859,12 @@ export async function claimChallengePrize(
           }
         } else {
           try {
+            const rollbackError = walletRejected
+              ? 'wallet_rejected'
+              : String(err ?? 'unknown_error');
             await updateDoc(challengeRef, {
               payoutStatus: 'pending',
-              payoutLastError: String(err ?? 'unknown_error'),
+              payoutLastError: rollbackError,
               payoutErrorAt: Timestamp.now(),
               payoutLockOwner: deleteField(),
               payoutAttemptedAt: deleteField(),
@@ -5821,7 +5876,11 @@ export async function claimChallengePrize(
       } else {
         console.warn('claim rollback skipped — challenge doc missing', challengeId);
       }
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = walletRejected
+        ? 'Transaction was rejected in your wallet. You can try claiming again.'
+        : err instanceof Error
+          ? err.message
+          : String(err);
       if (
         msg.includes('ChallengeExpired') ||
         msg.includes('6005') ||
@@ -5845,12 +5904,21 @@ export async function claimChallengePrize(
           signature: 'already-processed',
         };
       }
-      return { status: 'error', message: msg };
+      return wrapStaleRetryResult(recoveredFromStale, {
+        status: 'error',
+        message: msg,
+        walletRejected,
+      });
     }
   } catch (error) {
     console.error('❌ Error claiming reward:', error);
-    const message = error instanceof Error ? error.message : String(error);
-    return { status: 'error', message };
+    const walletRejected = isWalletUserRejection(error);
+    const message = walletRejected
+      ? 'Transaction was rejected in your wallet. You can try claiming again.'
+      : error instanceof Error
+        ? error.message
+        : String(error);
+    return { status: 'error', message, walletRejected };
   }
 }
 

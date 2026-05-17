@@ -242,6 +242,62 @@ export function isTournamentChallenge(challenge: any): boolean {
   return getChallengeFormat(challenge) === 'tournament';
 }
 
+/** Stale `payoutStatus: processing` threshold (matches claimChallengePrize). */
+export const PAYOUT_STALE_PROCESSING_MS = 2 * 60 * 1000;
+
+function readPayoutField<T>(challenge: any, key: string): T | undefined {
+  if (!challenge) return undefined;
+  const raw = challenge.rawData;
+  return (challenge[key] ?? raw?.[key]) as T | undefined;
+}
+
+/** Age of payout lock in ms; null if unset or not parseable. */
+export function getPayoutLockAgeMs(challenge: any): number | null {
+  const at = readPayoutField<unknown>(challenge, 'payoutAttemptedAt');
+  if (at == null) return null;
+  try {
+    if (typeof (at as Timestamp).toMillis === 'function') {
+      const t = (at as Timestamp).toMillis();
+      if (typeof t !== 'number' || Number.isNaN(t)) return null;
+      const age = Date.now() - t;
+      return Number.isFinite(age) ? age : null;
+    }
+    const raw = at as { seconds?: number; _seconds?: number };
+    const sec = raw.seconds ?? raw._seconds;
+    if (typeof sec === 'number' && Number.isFinite(sec)) {
+      return Date.now() - sec * 1000;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+export function challengeHasPayoutSignature(challenge: any): boolean {
+  const sig = readPayoutField<unknown>(challenge, 'payoutSignature');
+  return sig != null && String(sig).trim() !== '';
+}
+
+/** Processing lock with no on-chain signature, older than stale threshold (or unknown age). */
+export function isPayoutStaleProcessing(challenge: any): boolean {
+  const payoutStatus = readPayoutField<string>(challenge, 'payoutStatus');
+  if (payoutStatus !== 'processing' || challengeHasPayoutSignature(challenge)) {
+    return false;
+  }
+  const age = getPayoutLockAgeMs(challenge);
+  return age === null || age > PAYOUT_STALE_PROCESSING_MS;
+}
+
+/** Recent processing lock — claim may still be in flight; prefer waiting over retry UI. */
+export function isPayoutInFlightProcessing(challenge: any): boolean {
+  const payoutStatus = readPayoutField<string>(challenge, 'payoutStatus');
+  if (payoutStatus !== 'processing' || challengeHasPayoutSignature(challenge)) {
+    return false;
+  }
+  const age = getPayoutLockAgeMs(challenge);
+  return age !== null && age >= 0 && age <= PAYOUT_STALE_PROCESSING_MS;
+}
+
 /**
  * Unified payout/claim state (aligns with claimChallengePrize idempotency fields).
  * Checks top-level and rawData for merged challenge objects used in the app.
