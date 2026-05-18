@@ -5866,27 +5866,29 @@ export async function claimChallengePrize(
           !hasSig &&
           (ageMs === null || ageMs > STALE_MS);
 
-        if (staleProcessingReset) {
-          recoveryState.fromStale = true;
-          console.warn('Payout: resetting stale processing lock (transaction)', challengeId);
-          tx.update(challengeRef, {
-            payoutStatus: 'pending',
-            payoutLockOwner: deleteField(),
-            payoutAttemptedAt: deleteField(),
-          });
-        } else if (dPayoutStatus === 'processing' && !hasSig) {
-          return 'in_flight' as const;
-        }
-
         if (!d.needsPayout) {
           throw new Error('Payout not available or already processed');
         }
 
-        const nowAttempt = Timestamp.now();
+        if (dPayoutStatus === 'processing' && !hasSig && !staleProcessingReset) {
+          return 'in_flight' as const;
+        }
+
+        if (staleProcessingReset) {
+          recoveryState.fromStale = true;
+          console.warn(
+            'Payout: stale processing lock — re-acquiring in one write',
+            challengeId
+          );
+        }
+
+        // Single update per document per transaction (Firestore merges multiple updates
+        // unreliably; stale recovery must not write pending in a separate tx.update).
         tx.update(challengeRef, {
           payoutStatus: 'processing',
-          payoutAttemptedAt: nowAttempt,
+          payoutAttemptedAt: serverTimestamp(),
           payoutLockOwner: lockOwner,
+          updatedAt: serverTimestamp(),
         });
         return 'locked' as const;
       });
@@ -5922,8 +5924,9 @@ export async function claimChallengePrize(
     data = postLockSnap.data() as ChallengeData;
 
     const postLockPayoutStatus =
-      data.payoutStatus ??
-      (data.payoutLockOwner === lockOwner ? 'processing' : readEffectivePayoutStatus(data));
+      data.payoutLockOwner === lockOwner
+        ? 'processing'
+        : (data.payoutStatus ?? readEffectivePayoutStatus(data));
 
     if (postLockPayoutStatus !== 'processing') {
       if (
