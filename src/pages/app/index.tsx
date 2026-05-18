@@ -31,6 +31,8 @@ import {
   expirePendingChallenge,
   cleanupExpiredChallenge,
   submitChallengeResult,
+  acknowledgeWarmupComplete,
+  acknowledgeOfficialMatchReady,
   getLeaderboardPlayers,
   getLeaderboardTeams,
   getTotalUSDFGRewarded,
@@ -79,6 +81,10 @@ import {
   clearPhantomConnectionState,
 } from "@/lib/utils/wallet-state";
 import { TrustBadge } from "@/lib/utils/trustDisplay";
+import {
+  findCreatorActiveChallenge,
+  isPendingInviteToPlayer,
+} from "@/lib/utils/active-challenge";
 import { extractGameFromTitle, getGameCategory, getGameImage, isChallengeCustomGame, resolveGameName } from "@/lib/gameAssets";
 import { runCreateChallengeFlow } from "@/lib/challenges/createChallengeFlow";
 import { 
@@ -107,6 +113,7 @@ import CreateChallengeForm from "@/components/arena/CreateChallengeForm";
 import ElegantNavbar from "@/components/layout/ElegantNavbar";
 import LiveActivityTicker from "@/components/LiveActivityTicker";
 import LiveChallengesGrid from "@/components/arena/LiveChallengesGrid";
+import WarmUpBadge from "@/components/arena/WarmUpBadge";
 // Lazy load heavy modals for better performance on all devices
 const SubmitResultRoom = lazy(() => import("@/components/arena/SubmitResultRoom").then(module => ({ default: module.SubmitResultRoom })));
 const PlayerProfileModal = lazy(() => import("@/components/arena/PlayerProfileModal"));
@@ -898,6 +905,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
   // userLocks derived from lockNotificationsList (no listenToAllUserLocks)
   const [lockInProgress, setLockInProgress] = useState<string | null>(null);
+  const [challengeInviteInProgress, setChallengeInviteInProgress] = useState<string | null>(null);
   const [friendlyMatch, setFriendlyMatch] = useState<{
     opponentId: string;
     opponentName: string;
@@ -2090,47 +2098,93 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     console.error("❌ Challenges error:", challengesError);
   }
 
-  const handleChallengePlayer = (playerData: any) => {
-    const currentWallet = publicKey?.toString();
-    if (!currentWallet) {
-      showAppToast("Please connect your wallet first.", "warning", "Wallet");
-      return;
-    }
+  const handleChallengePlayer = useCallback(
+    (
+      playerData: {
+        wallet?: string;
+        address?: string;
+        displayName?: string;
+        name?: string;
+      },
+      options?: { fromLeaderboard?: boolean }
+    ) => {
+      const currentWalletAddr = publicKey?.toString();
+      if (!currentWalletAddr) {
+        showAppToast("Please connect your wallet first.", "warning", "Wallet");
+        return;
+      }
 
-    // Check if user has an active challenge they created
-    const userActiveChallenge = challenges.find(c => 
-      c.creator === currentWallet && 
-      (c.status === 'active' || c.status === 'pending_waiting_for_opponent' || c.status === 'creator_confirmation_required' || c.status === 'creator_funded')
-    );
+      const targetWallet = playerData.address || playerData.wallet;
+      if (!targetWallet) {
+        showAppToast("Could not find player wallet address.", "error", "Send failed");
+        return;
+      }
 
-    if (userActiveChallenge) {
+      const playerName =
+        (playerData.displayName && playerData.displayName.trim()) ||
+        playerData.name ||
+        formatWalletAddress(targetWallet);
+
+      const userActiveChallenge = findCreatorActiveChallenge(
+        firestoreChallenges,
+        currentWalletAddr
+      );
+
+      if (!userActiveChallenge?.id) {
+        showAppToast(
+          options?.fromLeaderboard
+            ? "Create an active challenge before sending invites from the leaderboard."
+            : "Create an active challenge before sending invites to other players.",
+          "info",
+          "Create Challenge First"
+        );
+        if (!options?.fromLeaderboard) {
+          setShowPlayerProfile(false);
+          setShowCreateModal(true);
+        }
+        return;
+      }
+
+      if (isPendingInviteToPlayer(userActiveChallenge, targetWallet)) {
+        return;
+      }
+
+      const challengeTitle =
+        userActiveChallenge.title ||
+        userActiveChallenge.rawData?.title ||
+        "Challenge";
+      const challengeGame =
+        userActiveChallenge.game ||
+        userActiveChallenge.rawData?.game ||
+        extractGameFromTitle(challengeTitle);
+      const entryFee =
+        userActiveChallenge.entryFee ?? userActiveChallenge.rawData?.entryFee ?? 0;
+      const prizePool =
+        userActiveChallenge.prizePool ?? userActiveChallenge.rawData?.prizePool ?? 0;
+
       void (async () => {
         const confirmSend = await requestAppConfirm({
-          title: "Send challenge?",
+          title: "Issue challenge?",
           message:
-            `Send your challenge "${userActiveChallenge.title}" to ${playerData.displayName || playerData.name}?\n\n` +
-            `Game: ${userActiveChallenge.game}\n` +
-            `Challenge Amount: ${userActiveChallenge.entryFee} USDFG\n` +
-            `Challenge Reward: ${userActiveChallenge.prizePool} USDFG`,
+            `Send "${challengeTitle}" to ${playerName}?\n\n` +
+            `Game: ${challengeGame}\n` +
+            `Challenge Amount: ${entryFee} USDFG\n` +
+            `Challenge Reward: ${prizePool} USDFG`,
           confirmLabel: "Send",
           cancelLabel: "Cancel",
           destructive: false,
         });
         if (!confirmSend) return;
 
+        const normalizedTarget = targetWallet.toLowerCase();
+        setChallengeInviteInProgress(normalizedTarget);
         try {
-          const targetWallet = playerData.address || playerData.wallet;
-          if (!targetWallet) {
-            showAppToast("Could not find player wallet address.", "error", "Send failed");
-            return;
-          }
-
           const { updateChallenge } = await import("@/lib/firebase/firestore");
           await updateChallenge(userActiveChallenge.id!, {
             targetPlayer: targetWallet,
           });
 
-          const creatorStats = await getPlayerStats(currentWallet);
+          const creatorStats = await getPlayerStats(currentWalletAddr);
           const creatorDisplayName = creatorStats?.displayName;
 
           const targetStats = await getPlayerStats(targetWallet);
@@ -2138,38 +2192,41 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
           await upsertChallengeNotification({
             challengeId: userActiveChallenge.id!,
-            creator: currentWallet,
+            creator: currentWalletAddr,
             targetPlayer: targetWallet,
             creatorDisplayName,
             targetDisplayName,
-            challengeTitle: userActiveChallenge.title,
-            entryFee: userActiveChallenge.entryFee,
-            prizePool: userActiveChallenge.prizePool,
+            challengeTitle,
+            entryFee,
+            prizePool,
             status: "pending",
           });
 
           setNotification({
             isOpen: true,
-            title: "Challenge Sent",
-            message: `Challenge sent to ${playerData.displayName || playerData.name}! They will be notified.`,
+            title: "Challenge Issued",
+            message: `${playerName} has received your challenge request.`,
             type: "success",
           });
           setShowPlayerProfile(false);
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error("Failed to send challenge:", error);
-          showAppToast(`Failed to send challenge: ${error.message || "Unknown error"}`, "error", "Send failed");
+          const message =
+            error instanceof Error ? error.message : "Unknown error";
+          showAppToast(`Failed to send challenge: ${message}`, "error", "Send failed");
+        } finally {
+          setChallengeInviteInProgress(null);
         }
       })();
-    } else {
-      showAppToast(
-        "You need to create a challenge first before you can send it to other players. Opening challenge creation.",
-        "info",
-        "Create a challenge"
-      );
-      setShowPlayerProfile(false);
-      setShowCreateModal(true);
-    }
-  };
+    },
+    [
+      publicKey,
+      firestoreChallenges,
+      showAppToast,
+      requestAppConfirm,
+      formatWalletAddress,
+    ]
+  );
 
   const handleCreateChallenge = async (challengeData: any) => {
     if (isCreatingChallenge) {
@@ -3472,6 +3529,26 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
     setPendingMatchResult(null);
   }, [standardResultPostSubmitUx]);
+
+  const handleCompleteWarmup = useCallback(
+    async (challenge: { id: string }) => {
+      if (!publicKey) {
+        throw new Error('Connect your wallet to continue.');
+      }
+      await acknowledgeWarmupComplete(challenge.id, publicKey.toBase58());
+    },
+    [publicKey]
+  );
+
+  const handleOfficialMatchReady = useCallback(
+    async (challenge: { id: string }) => {
+      if (!publicKey) {
+        throw new Error('Connect your wallet to continue.');
+      }
+      await acknowledgeOfficialMatchReady(challenge.id, publicKey.toBase58());
+    },
+    [publicKey]
+  );
 
   // Handle result submission — standard: Firestore first, then optional trust review
   const handleSubmitResult = async (didWin: boolean, proofFile?: File | null) => {
@@ -4857,37 +4934,17 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   const uniqueGames = useMemo(() => ['All', ...Array.from(new Set(challenges.map(c => c.game)))], [challenges]);
   const categories = useMemo(() => ['All', 'Fighting', 'Sports', 'Shooting', 'Racing'], []);
 
-  // Check if user has active challenge (for button disable logic)
-  // EXCLUDE completed, cancelled, disputed, and expired challenges
-  // Use Firestore data directly for most reliable status check
   const isAdminUser = currentWallet && walletsEqual(currentWallet, ADMIN_WALLET.toString());
-  const hasActiveChallenge = !isAdminUser && currentWallet && firestoreChallenges.some((fc: any) => {
-    const isCreator = walletsEqual(fc.creator, currentWallet);
-    const isParticipant = isParticipantWallet(fc.players, currentWallet);
-    
-    if (!isCreator && !isParticipant) return false; // Not relevant to this user
-    
-    // Get status from Firestore data directly (most reliable)
-    const status = fc.status || fc.rawData?.status || 'unknown';
-    
-    // EXCLUDE completed, cancelled, disputed, and expired challenges
-    const isActive =
-      status === 'active' ||
-      status === 'in-progress' ||
-      status === 'pending_waiting_for_opponent' ||
-      status === 'creator_confirmation_required' ||
-      status === 'creator_funded';
-    const isCompleted = status === 'completed' || status === 'cancelled' || status === 'disputed' || status === 'expired';
-    
-    const shouldBlock = (isCreator || isParticipant) && isActive && !isCompleted;
-    
-    if ((isCreator || isParticipant)) {
-      // Debug: Navbar challenge check (uncomment for debugging)
-      // console.log(`🔍 Navbar check - Challenge: ${fc.id}, Status: ${status}, IsActive: ${isActive}, IsCompleted: ${isCompleted}, ShouldBlock: ${shouldBlock}`);
-    }
-    
-    return shouldBlock;
-  });
+
+  const creatorActiveChallengeForInvite = useMemo(
+    () =>
+      currentWallet
+        ? findCreatorActiveChallenge(firestoreChallenges, currentWallet)
+        : null,
+    [firestoreChallenges, currentWallet]
+  );
+
+  const hasCreatorActiveChallengeForInvite = !!creatorActiveChallengeForInvite;
 
   // Add arena-page class to body for mobile CSS
   useEffect(() => {
@@ -4922,14 +4979,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
   }, [isTeamsView]);
 
-  const renderLockAction = useCallback((playerWallet: string, displayName: string) => {
+  const renderLeaderboardChallengeAction = useCallback((playerWallet: string, displayName: string) => {
     if (!playerWallet) {
       return null;
     }
 
-    const resolvedName = displayName && displayName.trim().length > 0 ? displayName : formatWalletAddress(playerWallet);
-
-    if (playerWallet === currentWallet) {
+    if (
+      currentWallet &&
+      playerWallet.toLowerCase() === currentWallet.toLowerCase()
+    ) {
       return (
         <div className="text-xs text-green-400 font-semibold pointer-events-none">
           You
@@ -4950,85 +5008,69 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             connect();
           }}
         >
-          Connect to Lock
+          Connect Wallet
         </button>
       );
     }
 
     const normalizedPlayerWallet = playerWallet.toLowerCase();
-    const isLoading = lockInProgress?.toLowerCase() === normalizedPlayerWallet;
-    const playerLockTarget = userLocks[normalizedPlayerWallet] ?? null;
-    const isLockedByMe = currentLockTarget === normalizedPlayerWallet;
-    const isLockedOnMe = playerLockTarget === normalizedCurrentWallet;
-    const isMutual = mutualLockOpponentId === normalizedPlayerWallet;
-    const isPendingRequest = pendingLockInitiators.has(playerWallet.toLowerCase());
+    const isSending =
+      challengeInviteInProgress?.toLowerCase() === normalizedPlayerWallet;
+    const isPending =
+      !!creatorActiveChallengeForInvite &&
+      isPendingInviteToPlayer(creatorActiveChallengeForInvite, playerWallet);
 
-    if (isMutual) {
-      return (
-        <button
-          className="px-3 py-1.5 rounded-lg border border-green-500/40 bg-green-600/20 text-green-200 text-xs font-semibold hover:bg-green-600/30 transition-colors pointer-events-auto"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            if ('stopImmediatePropagation' in event.nativeEvent) {
-              event.nativeEvent.stopImmediatePropagation();
-            }
-            setFriendlyMatch((previous) => {
-              if (previous && previous.opponentId === normalizedPlayerWallet) {
-                if (displayName && previous.opponentName !== displayName) {
-                  return { ...previous, opponentName: displayName };
-                }
-                return previous;
-              }
-              return {
-                opponentId: normalizedPlayerWallet,
-                opponentName: resolvedName,
-                matchId: normalizedCurrentWallet
-                  ? createFriendlyMatchId(normalizedCurrentWallet, normalizedPlayerWallet)
-                  : `friendly-pending-${normalizedPlayerWallet}`,
-              };
-            });
-            setShowFriendlySubmitResult(true);
-          }}
-        >
-          Submit Result
-        </button>
-      );
-    }
+    let label = "Send Challenge";
+    let buttonClass =
+      "px-3 py-1.5 rounded-lg border border-purple-500/35 bg-zinc-900/70 text-purple-100 text-xs font-semibold hover:border-purple-400/55 hover:bg-zinc-800/70 transition-colors pointer-events-auto";
+    let disabled = false;
 
-    let label = 'Challenge Friendly';
-    let buttonClass = 'px-3 py-1.5 rounded-lg border border-purple-500/35 bg-zinc-900/70 text-purple-100 text-xs font-semibold hover:border-purple-400/55 hover:bg-zinc-800/70 transition-colors pointer-events-auto';
-
-    if (isLockedByMe) {
-      label = 'Cancel Challenge';
-      buttonClass = 'px-3 py-1.5 rounded-lg border border-red-500/40 bg-red-600/20 text-red-200 text-xs font-semibold hover:bg-red-600/30 transition-colors pointer-events-auto';
-    } else if (isLockedOnMe) {
-      label = isPendingRequest ? 'Accept Challenge (New)' : 'Accept Challenge';
-      buttonClass = 'px-3 py-1.5 rounded-lg border border-purple-500/45 bg-purple-600/20 text-purple-100 text-xs font-semibold hover:bg-purple-600/30 transition-colors pointer-events-auto';
-    }
-
-    if (isPendingRequest && !isMutual) {
-      buttonClass += ' shadow-[0_0_10px_rgba(124,58,237,0.35)] animate-pulse';
+    if (isPending) {
+      label = "Pending Response";
+      buttonClass =
+        "px-3 py-1.5 rounded-lg border border-amber-500/35 bg-amber-950/30 text-amber-100/90 text-xs font-semibold cursor-not-allowed opacity-80 pointer-events-auto";
+      disabled = true;
     }
 
     return (
       <button
-        className={`${buttonClass} ${isLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
-        disabled={isLoading}
+        type="button"
+        className={`${buttonClass} ${isSending ? "opacity-60 cursor-wait" : ""}`}
+        disabled={disabled || isSending}
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
-          if ('stopImmediatePropagation' in event.nativeEvent) {
+          if ("stopImmediatePropagation" in event.nativeEvent) {
             event.nativeEvent.stopImmediatePropagation();
           }
-          handleLockToggle(playerWallet);
+          handleChallengePlayer(
+            {
+              wallet: playerWallet,
+              displayName,
+              name: displayName,
+            },
+            { fromLeaderboard: true }
+          );
         }}
-        title={isLockedByMe && !isLockedOnMe ? 'Waiting for opponent to accept challenge' : undefined}
+        title={
+          isPending
+            ? "Waiting for this player to respond to your challenge"
+            : !hasCreatorActiveChallengeForInvite
+              ? "Create an active challenge before sending invites"
+              : undefined
+        }
       >
-        {isLoading ? 'Updating...' : label}
+        {isSending ? "Sending…" : label}
       </button>
     );
-  }, [currentWallet, normalizedCurrentWallet, connect, lockInProgress, userLocks, currentLockTarget, mutualLockOpponentId, handleLockToggle, formatWalletAddress, createFriendlyMatchId, pendingLockInitiators]);
+  }, [
+    currentWallet,
+    connect,
+    challengeInviteInProgress,
+    creatorActiveChallengeForInvite,
+    hasCreatorActiveChallengeForInvite,
+    handleChallengePlayer,
+  ]);
 
   // Platform icon helper (used in detail sheet)
   const platformIcon = (platform: string) => {
@@ -5275,12 +5317,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                   <p className="text-sm text-white/60 truncate">{challenge.mode || 'Head-to-Head'}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <StatusPillDetail 
-                    status={status} 
-                    isOwner={isOwner} 
-                    players={challenge.players || 0} 
-                    capacity={challenge.capacity || 2} 
-                  />
+                  <div className="flex flex-col items-end gap-1">
+                    <StatusPillDetail 
+                      status={status} 
+                      isOwner={isOwner} 
+                      players={challenge.players || 0} 
+                      capacity={challenge.capacity || 2} 
+                    />
+                    <WarmUpBadge challenge={challenge} />
+                  </div>
                   <button
                     type="button"
                     onClick={(e) => {
@@ -6316,12 +6361,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1.5">
-                          <StatusPill 
-                            status={status} 
-                            isOwner={isOwner} 
-                            players={Array.isArray(challenge.players) ? challenge.players.length : (typeof challenge.players === 'number' ? challenge.players : 0)} 
-                            capacity={challenge.capacity || 2} 
-                          />
+                          <div className="flex flex-col items-end gap-1">
+                            <StatusPill 
+                              status={status} 
+                              isOwner={isOwner} 
+                              players={Array.isArray(challenge.players) ? challenge.players.length : (typeof challenge.players === 'number' ? challenge.players : 0)} 
+                              capacity={challenge.capacity || 2} 
+                            />
+                            <WarmUpBadge challenge={challenge} />
+                          </div>
                           {/* Share button - positioned below status */}
                                         <button
                             type="button"
@@ -7190,7 +7238,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                         </div>
                         </div>
                     <div className="mt-3 sm:mt-0 sm:ml-6 flex items-center justify-end pointer-events-auto">
-                      {renderLockAction(player.wallet, player.name)}
+                      {renderLeaderboardChallengeAction(player.wallet, player.name)}
                     </div>
                       </div>
                       ));
@@ -7617,6 +7665,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     onAppToast={showAppToast}
                     requestAppConfirm={requestAppConfirm}
                     onUpdateEntryFee={handleUpdateEntryFee}
+                    onCompleteWarmup={handleCompleteWarmup}
+                    onOfficialMatchReady={handleOfficialMatchReady}
                     onClose={() => {
                       setShowStandardLobby(false);
                       setSelectedChallenge(null);
@@ -7799,13 +7849,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               }
             }}
           onChallengePlayer={handleChallengePlayer}
-          hasActiveChallenge={publicKey ? challenges.some(c => 
-            c.creator === publicKey.toString() && 
-            (c.status === 'active' ||
-              c.status === 'pending_waiting_for_opponent' ||
-              c.status === 'creator_confirmation_required' ||
-              c.status === 'creator_funded')
-          ) : false}
+          hasActiveChallenge={hasCreatorActiveChallengeForInvite}
           currentWallet={publicKey?.toString() || null}
           onTeamUpdated={refreshTopTeams}
         />

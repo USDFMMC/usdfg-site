@@ -31,13 +31,13 @@ const ElegantNotification: React.FC<ElegantNotificationProps> = ({
   const getIcon = () => {
     switch (type) {
       case 'error':
-        return <AlertCircle className="h-5 w-5 text-red-400" />;
+        return <AlertCircle className="h-4 w-4 text-red-400 shrink-0" />;
       case 'warning':
-        return <AlertTriangle className="h-5 w-5 text-orange-400" />;
+        return <AlertTriangle className="h-4 w-4 text-orange-400 shrink-0" />;
       case 'success':
-        return <CheckCircle className="h-5 w-5 text-green-400" />;
+        return <CheckCircle className="h-4 w-4 text-green-400 shrink-0" />;
       default:
-        return <Info className="h-5 w-5 text-purple-300" />;
+        return <Info className="h-4 w-4 text-purple-300 shrink-0" />;
     }
   };
 
@@ -45,39 +45,35 @@ const ElegantNotification: React.FC<ElegantNotificationProps> = ({
     switch (type) {
       case 'error':
         return {
-          bg: 'from-red-500/10 via-red-500/5 to-red-500/10',
-          border: 'border-red-400/30',
-          text: 'text-red-200',
-          title: 'text-red-300',
-          glow: 'rgba(248, 113, 113, 0.12)',
-          topBar: 'from-transparent via-red-300/60 to-transparent',
+          border: 'border-red-400/25',
+          text: 'text-red-100/90',
+          title: 'text-red-200',
+          glow: 'rgba(248, 113, 113, 0.15)',
+          topBar: 'from-transparent via-red-300/50 to-transparent',
         };
       case 'warning':
         return {
-          bg: 'from-orange-950/40 via-orange-950/20 to-orange-950/40',
-          border: 'border-orange-500/35',
-          text: 'text-orange-100',
+          border: 'border-orange-500/30',
+          text: 'text-orange-100/90',
           title: 'text-orange-200',
           glow: 'rgba(251, 146, 60, 0.12)',
-          topBar: 'from-transparent via-orange-300/60 to-transparent',
+          topBar: 'from-transparent via-orange-300/50 to-transparent',
         };
       case 'success':
         return {
-          bg: 'from-green-500/10 via-green-500/5 to-green-500/10',
-          border: 'border-green-400/30',
-          text: 'text-green-200',
-          title: 'text-green-300',
+          border: 'border-green-400/25',
+          text: 'text-green-100/90',
+          title: 'text-green-200',
           glow: 'rgba(74, 222, 128, 0.12)',
-          topBar: 'from-transparent via-green-300/60 to-transparent',
+          topBar: 'from-transparent via-green-300/50 to-transparent',
         };
       default:
         return {
-          bg: 'from-[#07080C]/95 via-purple-950/25 to-[#07080C]/95',
           border: 'border-white/10',
-          text: 'text-white/80',
+          text: 'text-white/75',
           title: 'text-purple-200',
           glow: 'rgba(124, 58, 237, 0.12)',
-          topBar: 'from-transparent via-purple-300/50 to-transparent',
+          topBar: 'from-transparent via-purple-300/40 to-transparent',
         };
     }
   };
@@ -87,52 +83,54 @@ const ElegantNotification: React.FC<ElegantNotificationProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
+        <motion.div
+          initial={{ opacity: 0, y: -12, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -8, scale: 0.96 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          className="fixed z-[100] pointer-events-none top-4 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-sm sm:left-auto sm:right-4 sm:translate-x-0 sm:w-full sm:max-w-md"
+          role="status"
+          aria-live="polite"
+        >
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className={`relative w-[90vw] max-w-md rounded-xl bg-gradient-to-br ${colors.bg} border ${colors.border} ring-1 ring-white/5 backdrop-blur-md pointer-events-auto`}
-            style={{ boxShadow: `0 12px 40px ${colors.glow}` }}
+            className={`relative rounded-xl border ${colors.border} bg-[#07080C]/85 ring-1 ring-white/5 backdrop-blur-xl pointer-events-auto shadow-lg`}
+            style={{ boxShadow: `0 8px 32px ${colors.glow}` }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className={`absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r ${colors.topBar}`} />
-            
-            <div className="p-4">
-              <div className="flex items-start gap-3">
-                {/* Icon */}
-                <div className="flex-shrink-0 mt-0.5">
-                  {getIcon()}
-                </div>
-                
-                {/* Content */}
+            <motion.div
+              className={`absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r ${colors.topBar} rounded-t-xl`}
+            />
+
+            <motion.div className="p-3.5 sm:p-4">
+              <div className="flex items-start gap-2.5">
+                <div className="mt-0.5">{getIcon()}</div>
+
                 <div className="flex-1 min-w-0">
                   {title && (
-                    <h3 className={`text-sm font-semibold ${colors.title} mb-1`}>
+                    <h3 className={`text-sm font-semibold ${colors.title} mb-0.5 leading-snug`}>
                       {title}
                     </h3>
                   )}
-                  <p className={`text-sm ${colors.text} leading-relaxed`}>
+                  <p className={`text-xs sm:text-sm ${colors.text} leading-relaxed`}>
                     {message}
                   </p>
                 </div>
-                
-                {/* Close Button */}
+
                 <button
+                  type="button"
                   onClick={onClose}
-                  className="flex-shrink-0 p-1 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-colors"
+                  className="shrink-0 p-1 rounded-md border border-white/10 bg-white/5 hover:bg-white/10 transition-colors"
+                  aria-label="Dismiss notification"
                 >
-                  <X className="h-4 w-4 text-zinc-400" />
+                  <X className="h-3.5 w-3.5 text-zinc-400" />
                 </button>
               </div>
-            </div>
+            </motion.div>
           </motion.div>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );
 };
 
 export default ElegantNotification;
-

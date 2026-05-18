@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { ChallengeData } from '@/lib/firebase/firestore';
 import { checkResultDeadline } from '@/lib/firebase/firestore';
+import { isOfficialMatchLive } from '@/lib/utils/warmup-phase';
 
 /**
  * Hook to monitor and enforce result submission deadlines
@@ -15,7 +16,9 @@ export function useResultDeadlines(challenges: ChallengeData[]) {
     // Filter to only in-progress challenges with deadlines
     const inProgressChallenges = challenges.filter(
       (c) =>
-        (c.status === 'active' || c.status === 'in-progress') && c.resultDeadline
+        (c.status === 'active' || c.status === 'in-progress') &&
+        c.resultDeadline &&
+        isOfficialMatchLive(c)
     );
 
     if (inProgressChallenges.length === 0) return;

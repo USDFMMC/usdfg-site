@@ -31,6 +31,7 @@ import {
 import { CHALLENGE_CONFIG, ADMIN_WALLET } from '../chain/config';
 import { getExplorerTxUrl } from '../chain/explorer';
 import { broadcastLobbySystemMessage } from '../realtime/lobbyHub';
+import { isWarmupPhaseBlockingSubmit } from '@/lib/utils/warmup-phase';
 
 // Test Firestore connection
 export async function testFirestoreConnection() {
@@ -180,6 +181,14 @@ export interface ChallengeData {
   isCustomGame?: boolean;
   category?: string;                  // Game category for filtering
   platform?: string;                  // Platform (PS5, PC, Xbox, etc.) for display
+  // Warm-Up sub-phase (optional; does not change top-level status machine)
+  warmupEnabled?: boolean;
+  warmupStatus?: 'disabled' | 'waiting' | 'active' | 'completed' | 'skipped';
+  warmupCompleteBy?: Record<string, boolean>;
+  officialReadyBy?: Record<string, boolean>;
+  officialMatchStatus?: 'waiting_ready' | 'live' | 'completed';
+  officialMatchStartedAt?: Timestamp;
+  warmupStartedAt?: Timestamp;
   // REMOVED: rules, mode, creatorTag, solanaAccountId, cancelRequests
   // These are not needed for leaderboard and increase storage costs unnecessarily
 }
@@ -2414,11 +2423,23 @@ export const joinerFund = async (challengeId: string, wallet: string) => {
       updates.tournament = sanitizeTournamentState(tournamentState);
     }
 
-    if (isFull) {
-      // Set deadline to 2 hours from now for result submission
+    const warmupOn =
+      data.warmupEnabled === true && format !== 'tournament';
+
+    if (isFull && warmupOn) {
+      updates.warmupStatus = 'active';
+      updates.officialMatchStatus = 'waiting_ready';
+      updates.warmupCompleteBy = {};
+      updates.officialReadyBy = {};
+      updates.warmupStartedAt = Timestamp.now();
+      console.log('🎯 Warm-Up phase started — official match clock not started yet');
+    } else if (isFull) {
+      updates.warmupStatus = 'disabled';
       updates.resultDeadline = Timestamp.fromDate(new Date(Date.now() + 2 * 60 * 60 * 1000));
+      updates.officialMatchStatus = 'live';
+      updates.officialMatchStartedAt = Timestamp.now();
       console.log('⏰ Challenge is full! Result submission phase started (2-hour deadline)');
-      }
+    }
 
     await writeChallengeFields(challengeId, updates, {
       currentData: data,
@@ -2432,6 +2453,172 @@ export const joinerFund = async (challengeId: string, wallet: string) => {
     throw error;
   }
 };
+
+const OFFICIAL_MATCH_DURATION_MS = 2 * 60 * 60 * 1000;
+
+function mergeWalletAck(
+  existing: Record<string, boolean> | undefined,
+  wallet: string
+): Record<string, boolean> {
+  const next = { ...(existing || {}) };
+  next[normalizeWinnerWallet(wallet)] = true;
+  return next;
+}
+
+/**
+ * Mark a participant's warm-up phase complete. When both have acknowledged, unlock official ready phase.
+ */
+export async function acknowledgeWarmupComplete(
+  challengeId: string,
+  wallet: string
+): Promise<void> {
+  const challengeRef = doc(db, 'challenges', challengeId);
+  const snap = await getDoc(challengeRef);
+  if (!snap.exists()) {
+    throw new Error('Challenge not found');
+  }
+
+  const data = snap.data() as ChallengeData;
+  if (data.status !== 'active' && data.status !== 'in-progress') {
+    throw new Error('Warm-Up is only available during an active challenge');
+  }
+  if (!data.warmupEnabled) {
+    throw new Error('This challenge does not have Warm-Up enabled');
+  }
+  const roster = getEffectiveChallengeRoster(data);
+  if (!isParticipantWallet(roster, wallet)) {
+    throw new Error('Only participants can complete Warm-Up');
+  }
+
+  const warmupCompleteBy = mergeWalletAck(data.warmupCompleteBy, wallet);
+  const updates: Record<string, unknown> = {
+    warmupCompleteBy,
+    updatedAt: serverTimestamp(),
+  };
+
+  if (bothPlayersHaveWarmupAck(roster, warmupCompleteBy)) {
+    updates.warmupStatus = 'completed';
+    updates.officialMatchStatus = 'waiting_ready';
+    updates.officialReadyBy = data.officialReadyBy || {};
+  } else if (data.warmupStatus === 'waiting') {
+    updates.warmupStatus = 'active';
+  }
+
+  await writeChallengeFields(challengeId, updates, {
+    currentData: data,
+    actingWallet: wallet,
+  });
+}
+
+function bothPlayersHaveWarmupAck(
+  roster: string[],
+  warmupCompleteBy: Record<string, boolean>
+): boolean {
+  if (roster.length !== 2) return false;
+  return roster.every((w) => warmupCompleteBy[normalizeWinnerWallet(w)] === true);
+}
+
+function bothPlayersHaveOfficialReady(
+  roster: string[],
+  officialReadyBy: Record<string, boolean>
+): boolean {
+  if (roster.length !== 2) return false;
+  return roster.every((w) => officialReadyBy[normalizeWinnerWallet(w)] === true);
+}
+
+/**
+ * Mark a participant ready for the official match. Starts official clock when both are ready.
+ */
+export async function acknowledgeOfficialMatchReady(
+  challengeId: string,
+  wallet: string
+): Promise<void> {
+  const challengeRef = doc(db, 'challenges', challengeId);
+  const snap = await getDoc(challengeRef);
+  if (!snap.exists()) {
+    throw new Error('Challenge not found');
+  }
+
+  const data = snap.data() as ChallengeData;
+  if (data.status !== 'active' && data.status !== 'in-progress') {
+    throw new Error('Official match can only start from an active challenge');
+  }
+  if (!data.warmupEnabled) {
+    throw new Error('This challenge does not use the Warm-Up flow');
+  }
+  const warmupDone =
+    data.warmupStatus === 'completed' ||
+    data.warmupStatus === 'skipped';
+  if (!warmupDone) {
+    throw new Error('Both players must complete Warm-Up first');
+  }
+  if (data.officialMatchStatus !== 'waiting_ready') {
+    throw new Error('Official match is not waiting for ready confirmations');
+  }
+
+  const roster = getEffectiveChallengeRoster(data);
+  if (!isParticipantWallet(roster, wallet)) {
+    throw new Error('Only participants can ready up for the official match');
+  }
+
+  const officialReadyBy = mergeWalletAck(data.officialReadyBy, wallet);
+
+  if (bothPlayersHaveOfficialReady(roster, officialReadyBy)) {
+    await startOfficialMatch(challengeId, { currentData: data, actingWallet: wallet, officialReadyBy });
+    return;
+  }
+
+  await writeChallengeFields(
+    challengeId,
+    { officialReadyBy, updatedAt: serverTimestamp() },
+    { currentData: data, actingWallet: wallet }
+  );
+}
+
+/**
+ * Start the official scored match: sets deadline and officialMatchStatus live.
+ * Only this function should set resultDeadline for warm-up challenges.
+ */
+export async function startOfficialMatch(
+  challengeId: string,
+  ctx?: {
+    currentData?: ChallengeData;
+    actingWallet?: string;
+    officialReadyBy?: Record<string, boolean>;
+  }
+): Promise<void> {
+  const challengeRef = doc(db, 'challenges', challengeId);
+  let data = ctx?.currentData;
+  if (!data) {
+    const snap = await getDoc(challengeRef);
+    if (!snap.exists()) {
+      throw new Error('Challenge not found');
+    }
+    data = snap.data() as ChallengeData;
+  }
+
+  if (data.officialMatchStatus === 'live' && data.resultDeadline) {
+    return;
+  }
+
+  const now = Timestamp.now();
+  const updates: Record<string, unknown> = {
+    officialMatchStatus: 'live',
+    officialMatchStartedAt: now,
+    resultDeadline: Timestamp.fromDate(new Date(Date.now() + OFFICIAL_MATCH_DURATION_MS)),
+    updatedAt: serverTimestamp(),
+  };
+  if (ctx?.officialReadyBy) {
+    updates.officialReadyBy = ctx.officialReadyBy;
+  }
+
+  await writeChallengeFields(challengeId, updates, {
+    currentData: data,
+    actingWallet: ctx?.actingWallet,
+  });
+
+  console.log('⏰ Official match live — result deadline started:', challengeId);
+}
 
 /**
  * Auto-revert challenge if creator funding deadline expired
@@ -3185,6 +3372,12 @@ export const submitChallengeResult = async (
         throw new Error("You are not part of this challenge");
       }
 
+      if (data.warmupEnabled === true && data.officialMatchStatus !== 'live') {
+        throw new Error(
+          'Official match has not started. Complete Warm-Up and confirm ready for the official match.'
+        );
+      }
+
       const keySelf = canonicalPlayerKey(players, wallet);
       const currentResults = (data.results || {}) as Record<string, any>;
 
@@ -3545,9 +3738,7 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
       challengeId,
       {
         status: 'completed', // Keep status as completed!
-        needsPayout: true,
-        payoutTriggered: false,
-        canClaim: true,
+        ...payoutClaimReadyFields(),
         ...(hasAnyProofImageData(postWinData.results as Record<string, any>)
           ? {
               results: stripProofImageDataFromResults(
@@ -3695,6 +3886,12 @@ export const startResultSubmissionPhase = async (challengeId: string): Promise<v
     if (data.status !== 'active') {
       throw new Error(`startResultSubmissionPhase requires status active; got ${data.status}`);
     }
+    if (isWarmupPhaseBlockingSubmit(data)) {
+      console.log(
+        '⏸️ startResultSubmissionPhase skipped: warm-up enabled and official match is not live yet'
+      );
+      return;
+    }
     const deadline = Timestamp.fromDate(new Date(Date.now() + 2 * 60 * 60 * 1000));
 
     await writeChallengeFields(
@@ -3728,6 +3925,7 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
     const data = snap.data() as ChallengeData;
     
     if (!data.resultDeadline || data.status !== 'active') return;
+    if (data.warmupEnabled === true && data.officialMatchStatus !== 'live') return;
     
     const now = Timestamp.now();
     const deadlinePassed = now.toMillis() > data.resultDeadline.toMillis();
@@ -3778,9 +3976,7 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
             status: 'completed',
             winner: normalizeWinnerWallet(submittedWallet),
             resolutionType: 'auto',
-            needsPayout: true,
-            payoutTriggered: false,
-            canClaim: true,
+            ...payoutClaimReadyFields(),
             ...(hasAnyProofImageData(data.results as Record<string, any>)
               ? {
                   results: stripProofImageDataFromResults(
@@ -3812,11 +4008,7 @@ export const checkResultDeadline = async (challengeId: string): Promise<void> =>
             status: 'completed',
             winner: winnerField,
             resolutionType: winnerField === 'tie' ? 'forfeit' : 'auto',
-            ...(winnerField !== 'tie' && {
-              needsPayout: true,
-              payoutTriggered: false,
-              canClaim: true,
-            }),
+            ...(winnerField !== 'tie' && payoutClaimReadyFields()),
             ...(hasAnyProofImageData(data.results as Record<string, any>)
               ? {
                   results: stripProofImageDataFromResults(
@@ -5222,6 +5414,36 @@ export async function recalculateAllTrustScores(): Promise<void> {
 // PLAYER-PAID PAYOUT SYSTEM
 // ============================================
 
+/** Read payout status; legacy completed + needsPayout docs without payoutStatus count as pending. */
+function readEffectivePayoutStatus(
+  data: ChallengeData
+): 'pending' | 'processing' | 'paid' | undefined {
+  const raw = (data as { rawData?: Partial<ChallengeData> }).rawData;
+  const explicit = data.payoutStatus ?? raw?.payoutStatus;
+  if (explicit === 'pending' || explicit === 'processing' || explicit === 'paid') {
+    return explicit;
+  }
+  if (data.needsPayout === true && data.status === 'completed') {
+    return 'pending';
+  }
+  return undefined;
+}
+
+/** Fields required whenever escrow payout is claimable (legacy docs may omit payoutStatus). */
+function payoutClaimReadyFields(): {
+  needsPayout: true;
+  payoutTriggered: false;
+  canClaim: true;
+  payoutStatus: 'pending';
+} {
+  return {
+    needsPayout: true,
+    payoutTriggered: false,
+    canClaim: true,
+    payoutStatus: 'pending',
+  };
+}
+
 /** Age of payout lock in ms; null if unset or not parseable (callers may treat as unknown/stale). */
 function payoutLockAgeMs(data: ChallengeData): number | null {
   const at = data.payoutAttemptedAt;
@@ -5394,7 +5616,7 @@ export async function claimChallengePrize(
       return { status: 'already_claimed' };
     }
 
-    if (data.payoutStatus === 'paid') {
+    if (readEffectivePayoutStatus(data) === 'paid') {
       return { status: 'already_claimed' };
     }
 
@@ -5535,14 +5757,29 @@ export async function claimChallengePrize(
       return { status: 'error', message: e instanceof Error ? e.message : String(e) };
     }
 
+    if (
+      data.needsPayout === true &&
+      data.status === 'completed' &&
+      data.payoutStatus !== 'pending' &&
+      data.payoutStatus !== 'processing' &&
+      data.payoutStatus !== 'paid'
+    ) {
+      await updateDoc(challengeRef, {
+        payoutStatus: 'pending',
+        updatedAt: Timestamp.now(),
+      });
+      data = { ...data, payoutStatus: 'pending' };
+    }
+
     const noPayoutSig =
       data.payoutSignature == null || String(data.payoutSignature).trim() === '';
 
     const STALE_MS = 2 * 60 * 1000;
     let recoveredFromStale = false;
     const lockAgePre = payoutLockAgeMs(data);
+    const payoutStatusPre = readEffectivePayoutStatus(data);
     const stalePreTx =
-      data.payoutStatus === 'processing' &&
+      payoutStatusPre === 'processing' &&
       noPayoutSig &&
       (lockAgePre === null || lockAgePre > STALE_MS);
 
@@ -5569,7 +5806,7 @@ export async function claimChallengePrize(
       return { status: 'already_claimed' };
     }
 
-    if (data.payoutStatus === 'paid') {
+    if (readEffectivePayoutStatus(data) === 'paid') {
       return { status: 'already_claimed' };
     }
 
@@ -5604,12 +5841,13 @@ export async function claimChallengePrize(
           throw new Error('❌ Challenge not found in Firestore');
         }
         const d = txSnap.data() as ChallengeData;
+        const dPayoutStatus = readEffectivePayoutStatus(d);
 
         const hasSig =
           d.payoutSignature != null && String(d.payoutSignature).trim() !== '';
 
         if (hasSig) {
-          if (d.payoutStatus !== 'paid') {
+          if (dPayoutStatus !== 'paid') {
             tx.update(challengeRef, {
               payoutStatus: 'paid',
             });
@@ -5617,14 +5855,14 @@ export async function claimChallengePrize(
           return 'done' as const;
         }
 
-        if (d.payoutStatus === 'paid') {
+        if (dPayoutStatus === 'paid') {
           return 'done' as const;
         }
 
         const ageMs = payoutLockAgeMs(d);
 
         const staleProcessingReset =
-          d.payoutStatus === 'processing' &&
+          dPayoutStatus === 'processing' &&
           !hasSig &&
           (ageMs === null || ageMs > STALE_MS);
 
@@ -5636,7 +5874,7 @@ export async function claimChallengePrize(
             payoutLockOwner: deleteField(),
             payoutAttemptedAt: deleteField(),
           });
-        } else if (d.payoutStatus === 'processing' && !hasSig) {
+        } else if (dPayoutStatus === 'processing' && !hasSig) {
           return 'in_flight' as const;
         }
 
@@ -5669,7 +5907,7 @@ export async function claimChallengePrize(
     if (lockResult === 'in_flight') {
       const ageNow = payoutLockAgeMs(data);
       const staleNow =
-        data.payoutStatus === 'processing' &&
+        readEffectivePayoutStatus(data) === 'processing' &&
         noPayoutSig &&
         (ageNow === null || ageNow > STALE_MS);
       return { status: 'in_flight', isStale: staleNow };
@@ -5683,16 +5921,26 @@ export async function claimChallengePrize(
     }
     data = postLockSnap.data() as ChallengeData;
 
-    if (data.payoutStatus !== 'processing') {
+    const postLockPayoutStatus =
+      data.payoutStatus ??
+      (data.payoutLockOwner === lockOwner ? 'processing' : readEffectivePayoutStatus(data));
+
+    if (postLockPayoutStatus !== 'processing') {
       if (
-        data.payoutStatus === 'paid' ||
+        postLockPayoutStatus === 'paid' ||
         data.payoutTriggered === true ||
         (data.payoutSignature != null && String(data.payoutSignature).trim() !== '')
       ) {
         return { status: 'already_claimed' };
       }
       if (import.meta.env.DEV) {
-        console.warn('claim: unexpected payoutStatus after lock', challengeId, data.payoutStatus);
+        console.warn(
+          'claim: unexpected payoutStatus after lock',
+          challengeId,
+          data.payoutStatus,
+          'effective',
+          postLockPayoutStatus
+        );
       }
       return { status: 'in_flight', isStale: false };
     }
@@ -5702,7 +5950,7 @@ export async function claimChallengePrize(
       }
       const ageMismatch = payoutLockAgeMs(data);
       const staleMismatch =
-        data.payoutStatus === 'processing' &&
+        postLockPayoutStatus === 'processing' &&
         (data.payoutSignature == null || String(data.payoutSignature).trim() === '') &&
         (ageMismatch === null || ageMismatch > STALE_MS);
       return { status: 'in_flight', isStale: staleMismatch };
@@ -6139,9 +6387,7 @@ export const resolveAdminChallenge = async (
         resolvedAt: Timestamp.now(),
         adminResolutionTx: onChainTx || null,
         updatedAt: Timestamp.now(),
-        needsPayout: true,
-        payoutTriggered: false,
-        canClaim: true,
+        ...payoutClaimReadyFields(),
         ...(hasAnyProofImageData(challengeData.results as Record<string, any>)
           ? {
               results: stripProofImageDataFromResults(

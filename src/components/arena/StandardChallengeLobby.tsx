@@ -32,6 +32,18 @@ import {
   isPayoutInFlightProcessing
 } from "@/lib/utils/challenge-helpers";
 import { TrustBadge } from "@/lib/utils/trustDisplay";
+import WarmUpBadge from "@/components/arena/WarmUpBadge";
+import {
+  isWarmupEnabled,
+  getWarmupStatus,
+  getOfficialMatchStatus,
+  canSubmitOfficialResults,
+  isWarmupAwaitingComplete,
+  isWarmupComplete,
+  isWaitingOfficialReady,
+  isOfficialMatchLive,
+  hasPlayerAcknowledged,
+} from "@/lib/utils/warmup-phase";
 
 interface StandardChallengeLobbyProps {
   challenge: any;
@@ -45,6 +57,8 @@ interface StandardChallengeLobbyProps {
   onAppToast?: (message: string, type?: "info" | "warning" | "error" | "success", title?: string) => void;
   requestAppConfirm?: (opts: AppConfirmDialogOptions) => Promise<boolean>;
   onUpdateEntryFee?: (challenge: any, entryFee: number) => Promise<void>;
+  onCompleteWarmup?: (challenge: any) => Promise<void>;
+  onOfficialMatchReady?: (challenge: any) => Promise<void>;
   onClose: () => void;
   isSubmitting?: boolean;
   isClaiming?: boolean;
@@ -164,6 +178,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   onAppToast,
   requestAppConfirm,
   onUpdateEntryFee,
+  onCompleteWarmup,
+  onOfficialMatchReady,
   onClose,
   isSubmitting: externalIsSubmitting = false,
   isClaiming = false,
@@ -190,6 +206,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const [isDisputing, setIsDisputing] = useState(false);
   const [submitLockedLocal, setSubmitLockedLocal] = useState(false);
   const [submittedLocally, setSubmittedLocally] = useState(false);
+  const [warmupActionBusy, setWarmupActionBusy] = useState(false);
 
   const isAdmin = currentWallet && currentWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
   
@@ -599,8 +616,30 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           icon: '💰' 
         };
       case 'active':
+        if (warmupPhase.enabled && !warmupPhase.officialLive) {
+          if (warmupPhase.awaitingComplete) {
+            return {
+              text: 'Warm-Up Active',
+              bgClass: 'bg-gradient-to-r from-blue-500/15 to-purple-500/15',
+              borderClass: 'border-blue-400/35',
+              textClass: 'text-blue-100',
+              headerClass: 'text-blue-300',
+              icon: '🔥',
+            };
+          }
+          if (warmupPhase.waitingOfficialReady) {
+            return {
+              text: 'Ready for Official Match',
+              bgClass: 'bg-gradient-to-r from-amber-500/15 to-orange-500/15',
+              borderClass: 'border-amber-400/35',
+              textClass: 'text-amber-100',
+              headerClass: 'text-amber-300',
+              icon: '⏱️',
+            };
+          }
+        }
         return { 
-          text: 'Match Active', 
+          text: warmupPhase.enabled && warmupPhase.officialLive ? 'Official Match Live' : 'Match Active', 
           bgClass: 'bg-gradient-to-r from-green-500/20 to-emerald-500/20', 
           borderClass: 'border-green-400/40', 
           textClass: 'text-green-100',
@@ -637,8 +676,6 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     }
   };
 
-  const statusDisplay = getStatusDisplay();
-  
   // Wallet-based participant checks (independent from UID binding)
   const isCreator = !!(currentWallet && creatorWallet && creatorWallet.toLowerCase() === currentWallet.toLowerCase());
   const isChallengerByWallet = !!(currentWallet && (
@@ -680,6 +717,27 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   const isDeadlineExpired = creatorFundingDeadline && 'toMillis' in creatorFundingDeadline ? creatorFundingDeadline.toMillis() < Date.now() : false;
   const joinerFundingDeadline = getChallengeValue<Timestamp | null>('joinerFundingDeadline', null);
   const isJoinerDeadlineExpired = joinerFundingDeadline && 'toMillis' in joinerFundingDeadline ? joinerFundingDeadline.toMillis() < Date.now() : false;
+
+  const warmupPhase = useMemo(() => {
+    const enabled = isWarmupEnabled(activeChallenge);
+    const warmupStatus = getWarmupStatus(activeChallenge);
+    const officialStatus = getOfficialMatchStatus(activeChallenge);
+    const wallet = currentWallet || '';
+    return {
+      enabled,
+      warmupStatus,
+      officialStatus,
+      awaitingComplete: enabled && isWarmupAwaitingComplete(activeChallenge),
+      warmupDone: isWarmupComplete(activeChallenge),
+      waitingOfficialReady: isWaitingOfficialReady(activeChallenge),
+      officialLive: isOfficialMatchLive(activeChallenge),
+      canSubmitResults: canSubmitOfficialResults(activeChallenge),
+      myWarmupDone: wallet ? hasPlayerAcknowledged(activeChallenge, 'warmupCompleteBy', wallet) : false,
+      myOfficialReady: wallet ? hasPlayerAcknowledged(activeChallenge, 'officialReadyBy', wallet) : false,
+    };
+  }, [activeChallenge, currentWallet]);
+
+  const statusDisplay = getStatusDisplay();
   
   // CRITICAL: Explicit (status + role) decision table for CTAs
   // Do not render CTAs until role is resolved
@@ -761,7 +819,8 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       isParticipant &&
       hasEnoughPlayers &&
       !hasAlreadySubmitted &&
-      (status === 'active' || canSubmitDuringAwaitingResolution)
+      (status === 'active' || canSubmitDuringAwaitingResolution) &&
+      (status !== 'active' || canSubmitOfficialResults(activeChallenge))
     ) {
       state.showSubmit = true;
     }
@@ -775,7 +834,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     }
     
     return state;
-  }, [isRoleResolved, userRole, status, isDeadlineExpired, isJoinerDeadlineExpired, isFull, onCreatorFund, onJoinerFund, onJoinChallenge, onCancelChallenge, players, creatorWallet, challengerWallet, hasAlreadySubmitted, currentWallet, activeChallenge, joinerFundingDeadline]);
+  }, [isRoleResolved, userRole, status, isDeadlineExpired, isJoinerDeadlineExpired, isFull, onCreatorFund, onJoinerFund, onJoinChallenge, onCancelChallenge, players, creatorWallet, challengerWallet, hasAlreadySubmitted, currentWallet, activeChallenge, joinerFundingDeadline, warmupPhase.officialLive, warmupPhase.enabled]);
   
   // Extract CTA flags
   const canCreatorFund = ctaState.showCreatorFund;
@@ -1362,8 +1421,92 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         </div>
       )}
 
+      {/* Warm-Up / official match phase */}
+      {status === 'active' && isParticipant && warmupPhase.enabled && !isTournament && (
+        <div className="rounded-lg border border-white/10 bg-[#07080C]/95 p-2.5 text-xs text-white/90 ring-1 ring-purple-500/10 space-y-2">
+          {warmupPhase.awaitingComplete && (
+            <>
+              <div className="text-[10px] uppercase tracking-widest text-blue-300">
+                Warm-Up Active
+              </div>
+              {onCompleteWarmup && (
+                <button
+                  type="button"
+                  disabled={warmupActionBusy || warmupPhase.myWarmupDone}
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (warmupPhase.myWarmupDone) return;
+                    setWarmupActionBusy(true);
+                    try {
+                      await onCompleteWarmup(activeChallenge);
+                    } catch (err: unknown) {
+                      const msg = err instanceof Error ? err.message : String(err);
+                      onAppToast?.(msg, 'error', 'Warm-Up');
+                    } finally {
+                      setWarmupActionBusy(false);
+                    }
+                  }}
+                  className="w-full rounded-md bg-gradient-to-r from-blue-500/80 to-purple-500/80 hover:brightness-110 text-white px-3 py-2 text-xs font-semibold transition-all border border-blue-400/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {warmupActionBusy
+                    ? 'Updating…'
+                    : warmupPhase.myWarmupDone
+                      ? 'Warm-Up Complete — waiting for opponent'
+                      : 'Complete Warm-Up'}
+                </button>
+              )}
+            </>
+          )}
+          {warmupPhase.waitingOfficialReady && (
+            <>
+              <div className="text-[10px] uppercase tracking-widest text-amber-300">
+                Ready for Official Match
+              </div>
+              {onOfficialMatchReady && (
+                <button
+                  type="button"
+                  disabled={warmupActionBusy || warmupPhase.myOfficialReady}
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (warmupPhase.myOfficialReady) return;
+                    setWarmupActionBusy(true);
+                    try {
+                      await onOfficialMatchReady(activeChallenge);
+                    } catch (err: unknown) {
+                      const msg = err instanceof Error ? err.message : String(err);
+                      onAppToast?.(msg, 'error', 'Official match');
+                    } finally {
+                      setWarmupActionBusy(false);
+                    }
+                  }}
+                  className="w-full rounded-md bg-gradient-to-r from-amber-500/80 to-orange-500/80 hover:brightness-110 text-white px-3 py-2 text-xs font-semibold transition-all border border-amber-400/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {warmupActionBusy
+                    ? 'Starting…'
+                    : warmupPhase.myOfficialReady
+                      ? 'Ready — waiting for opponent'
+                      : 'Ready for Official Match'}
+                </button>
+              )}
+            </>
+          )}
+          {warmupPhase.officialLive && (
+            <div>
+              <div className="text-[10px] uppercase tracking-widest text-green-300 mb-1">
+                Official Match Live
+              </div>
+              <p className="text-[10px] text-white/55">
+                Result clock is running. Submit results when the official match ends.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Status Banner - Prominent display */}
-      {status === 'active' && isParticipant && opponentWallet && (
+      {status === 'active' && isParticipant && opponentWallet && !warmupPhase.enabled && (
         <div className="rounded-lg border border-white/10 bg-[#07080C]/95 p-2.5 text-xs text-white/90 ring-1 ring-purple-500/10">
           <div className="text-[10px] uppercase tracking-widest text-purple-300 mb-1.5">
             Match Active
@@ -1390,6 +1533,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
               <span>{mode}</span>
               <span>•</span>
               <span>{platform}</span>
+              <WarmUpBadge challenge={activeChallenge} />
             </div>
           </div>
           <button

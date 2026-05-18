@@ -91,6 +91,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     customRules: false,
     challengeType: 'solo' as 'solo' | 'team' | 'tournament', // Toggle between solo, team, and tournament challenge
     teamOnly: false, // For team challenges: true = only teams can accept, false = open to anyone
+    warmupEnabled: false,
     tournamentMaxPlayers: 8 as 4 | 8 | 16,
     };
   });
@@ -586,6 +587,36 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
                       : 'Solo players or teams can accept.'}
                   </p>
                 </div>
+              </div>
+            )}
+            {formData.challengeType !== 'tournament' && (
+              <div className="rounded-lg border border-white/10 bg-void-light/30 p-4 space-y-3">
+                <label className={labelClass}>Warm-Up Match</label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleInputChange('warmupEnabled', false)}
+                    className={`flex flex-1 min-h-[2.5rem] items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold transition-all duration-200 ${
+                      !formData.warmupEnabled ? segmentActive : segmentInactive
+                    }`}
+                  >
+                    Off
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleInputChange('warmupEnabled', true)}
+                    className={`flex flex-1 min-h-[2.5rem] items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold transition-all duration-200 ${
+                      formData.warmupEnabled ? segmentActive : segmentInactive
+                    }`}
+                  >
+                    On
+                  </button>
+                </div>
+                <p className={`${helperClass} !mt-0`}>
+                  {formData.warmupEnabled
+                    ? 'Optional prep round before the official scored match and result clock.'
+                    : 'Official match starts immediately after both players fund.'}
+                </p>
               </div>
             )}
             {formData.challengeType === 'tournament' && (

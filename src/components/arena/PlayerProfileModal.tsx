@@ -1024,7 +1024,7 @@ export default function PlayerProfileModal({
               }}
               className="bg-gradient-to-r from-purple-500 to-orange-500 text-white text-xs hover:brightness-110 px-6 py-2 rounded-full shadow-[0_0_14px_rgba(124,58,237,0.3)] transition-all border border-white/10"
             >
-              {hasActiveChallenge ? 'Send Challenge' : 'Challenge Player'}
+              {hasActiveChallenge ? 'Send Challenge' : 'Create Challenge First'}
             </button>
           )}
           <p className="text-[10px] text-zinc-500 tracking-wide uppercase">Non-custodial • Skill-Based • Competitive Mode</p>

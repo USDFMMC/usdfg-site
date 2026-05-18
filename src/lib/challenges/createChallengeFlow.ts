@@ -1,10 +1,7 @@
 import { ADMIN_WALLET } from "@/lib/chain/config";
 import { extractGameFromTitle, getGameCategory } from "@/lib/gameAssets";
-import {
-  isParticipantWallet,
-  walletsEqual,
-  type TournamentState,
-} from "@/lib/firebase/firestore";
+import type { TournamentState } from "@/lib/firebase/firestore";
+import { findUserBlockingActiveChallenge } from "@/lib/utils/active-challenge";
 
 /** Minimal challenge row for the “one active challenge” guard (matches prior page logic). */
 export interface FirestoreChallengeForCreateGuard {
@@ -32,6 +29,7 @@ export interface CreateChallengeFormPayload {
   founderWinnerBonus?: number;
   teamOnly?: boolean;
   platform?: string;
+  warmupEnabled?: boolean;
 }
 
 export interface CreateChallengeWalletSource {
@@ -189,23 +187,10 @@ async function runCreateChallengeFlowCore(options: {
       ? Math.max(0, Number(challengeData.founderWinnerBonus || 0))
       : 0;
 
-  const existingActive = firestoreChallenges.find((fc) => {
-    const isCreator = walletsEqual(fc.creator, currentWallet);
-    const isParticipant = isParticipantWallet(fc.players, currentWallet);
-    const status = fc.status || fc.rawData?.status || "unknown";
-    const isActive =
-      status === "active" ||
-      status === "pending_waiting_for_opponent" ||
-      status === "creator_confirmation_required" ||
-      status === "creator_funded";
-    const isCompleted =
-      status === "completed" ||
-      status === "cancelled" ||
-      status === "disputed" ||
-      status === "expired";
-    const shouldBlock = (isCreator || isParticipant) && isActive && !isCompleted;
-    return shouldBlock;
-  });
+  const existingActive = findUserBlockingActiveChallenge(
+    firestoreChallenges,
+    currentWallet
+  );
 
   if (existingActive && !isFounderChallenge) {
     const status = existingActive.status || existingActive.rawData?.status || "unknown";
@@ -278,6 +263,12 @@ async function runCreateChallengeFlowCore(options: {
     platform: challengeData.platform || "All Platforms",
     challengeType: (isTeamChallenge ? "team" : "solo") as "solo" | "team",
     teamOnly: isTeamChallenge ? challengeData.teamOnly || false : undefined,
+    warmupEnabled:
+      !isTournament &&
+      challengeData.warmupEnabled === true,
+    warmupStatus: (!isTournament && challengeData.warmupEnabled === true
+      ? 'waiting'
+      : 'disabled') as 'waiting' | 'disabled',
   };
 
   console.log("🔥 Adding challenge to Firestore...");
