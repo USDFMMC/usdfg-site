@@ -4041,6 +4041,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
       const { claimChallengePrize } = await import("@/lib/firebase/firestore");
       const claimResult = await claimChallengePrize(challenge.id, wallet, connection);
+      console.warn('Payout: claimChallengePrize result', challenge.id, claimResult);
 
       const shouldRefreshAfterClaim =
         claimResult.status === "success" ||

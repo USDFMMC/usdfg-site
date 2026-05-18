@@ -5798,6 +5798,10 @@ export async function claimChallengePrize(
       delete (nextData as unknown as Record<string, unknown>).payoutLockOwner;
       delete (nextData as unknown as Record<string, unknown>).payoutAttemptedAt;
       data = nextData;
+      console.warn('Payout: stale pre-transaction reset complete', challengeId, {
+        payoutStatus: readEffectivePayoutStatus(data),
+        needsPayout: data.needsPayout,
+      });
     }
 
     const concurrentSig =
@@ -5834,6 +5838,10 @@ export async function claimChallengePrize(
     const lockOwner = crypto.randomUUID();
     const recoveryState = { fromStale: recoveredFromStale };
     let lockResult: 'done' | 'in_flight' | 'locked';
+    console.warn('Payout: entering lock transaction', challengeId, {
+      recoveredFromStale: recoveryState.fromStale,
+      payoutStatus: readEffectivePayoutStatus(data),
+    });
     try {
       lockResult = await runTransaction(db, async (tx) => {
         const txSnap = await tx.get(challengeRef);
@@ -5870,7 +5878,12 @@ export async function claimChallengePrize(
           throw new Error('Payout not available or already processed');
         }
 
-        if (dPayoutStatus === 'processing' && !hasSig && !staleProcessingReset) {
+        if (
+          dPayoutStatus === 'processing' &&
+          !hasSig &&
+          !staleProcessingReset &&
+          !recoveryState.fromStale
+        ) {
           return 'in_flight' as const;
         }
 
@@ -5900,13 +5913,17 @@ export async function claimChallengePrize(
           message: 'Payout is not available yet.',
         };
       }
+      console.warn('Payout: lock transaction failed', challengeId, txMsg);
       return { status: 'error', message: txMsg };
     }
+
+    console.warn('Payout: lock transaction finished', challengeId, { lockResult });
 
     if (lockResult === 'done') {
       return { status: 'already_claimed' };
     }
     if (lockResult === 'in_flight') {
+      console.warn('Payout: lock in_flight (another claim holds processing)', challengeId);
       const ageNow = payoutLockAgeMs(data);
       const staleNow =
         readEffectivePayoutStatus(data) === 'processing' &&
@@ -5948,9 +5965,10 @@ export async function claimChallengePrize(
       return { status: 'in_flight', isStale: false };
     }
     if (data.payoutLockOwner !== lockOwner) {
-      if (import.meta.env.DEV) {
-        console.warn('claim: payout lock owner mismatch', challengeId);
-      }
+      console.warn('Payout: lock owner mismatch after transaction', challengeId, {
+        expected: lockOwner,
+        actual: data.payoutLockOwner,
+      });
       const ageMismatch = payoutLockAgeMs(data);
       const staleMismatch =
         postLockPayoutStatus === 'processing' &&
@@ -5999,6 +6017,10 @@ export async function claimChallengePrize(
       }
 
       const { resolveChallenge } = await import('../chain/contract');
+      console.warn('Payout: calling resolveChallenge (wallet should open)', challengeId, {
+        challengePDA,
+        winner: winnerCanonical,
+      });
       let signature: string;
       try {
         signature = await resolveChallenge(
