@@ -5934,48 +5934,72 @@ export async function claimChallengePrize(
 
     recoveredFromStale = recoveryState.fromStale;
 
-    const postLockSnap = await getDoc(challengeRef);
+    const logPostLockState = (label: string, d: ChallengeData) => {
+      const docLock = d.payoutLockOwner;
+      const owns = typeof docLock === 'string' && docLock === lockOwner;
+      console.warn(`Payout: post-lock ${label}`, challengeId, {
+        claimLockOwner: lockOwner,
+        docPayoutLockOwner: docLock ?? null,
+        ownsLock: owns,
+        payoutStatus: d.payoutStatus ?? null,
+        effectivePayoutStatus: readEffectivePayoutStatus(d),
+      });
+      return owns;
+    };
+
+    let postLockSnap = await getDoc(challengeRef);
     if (!postLockSnap.exists()) {
       return { status: 'error', message: '❌ Challenge not found in Firestore' };
     }
     data = postLockSnap.data() as ChallengeData;
+    let ownsLock = logPostLockState('read', data);
 
-    const postLockPayoutStatus =
-      data.payoutLockOwner === lockOwner
-        ? 'processing'
-        : (data.payoutStatus ?? readEffectivePayoutStatus(data));
-
-    if (postLockPayoutStatus !== 'processing') {
-      if (
-        postLockPayoutStatus === 'paid' ||
-        data.payoutTriggered === true ||
-        (data.payoutSignature != null && String(data.payoutSignature).trim() !== '')
-      ) {
-        return { status: 'already_claimed' };
+    if (!ownsLock) {
+      await new Promise((r) => setTimeout(r, 150));
+      postLockSnap = await getDoc(challengeRef);
+      if (!postLockSnap.exists()) {
+        return { status: 'error', message: '❌ Challenge not found in Firestore' };
       }
-      if (import.meta.env.DEV) {
+      data = postLockSnap.data() as ChallengeData;
+      ownsLock = logPostLockState('retry', data);
+    }
+
+    const postLockSig =
+      data.payoutSignature != null && String(data.payoutSignature).trim() !== '';
+    if (
+      postLockSig ||
+      data.payoutTriggered === true ||
+      readEffectivePayoutStatus(data) === 'paid'
+    ) {
+      return { status: 'already_claimed' };
+    }
+
+    if (!ownsLock) {
+      const foreignLock =
+        typeof data.payoutLockOwner === 'string' &&
+        data.payoutLockOwner.length > 0 &&
+        data.payoutLockOwner !== lockOwner;
+      if (foreignLock) {
+        const ageMismatch = payoutLockAgeMs(data);
+        const staleMismatch =
+          readEffectivePayoutStatus(data) === 'processing' &&
+          !postLockSig &&
+          (ageMismatch === null || ageMismatch > STALE_MS);
         console.warn(
-          'claim: unexpected payoutStatus after lock',
+          'Payout: returning in_flight — another payoutLockOwner holds the lock',
           challengeId,
-          data.payoutStatus,
-          'effective',
-          postLockPayoutStatus
+          { claimLockOwner: lockOwner, docPayoutLockOwner: data.payoutLockOwner }
         );
+        return { status: 'in_flight', isStale: staleMismatch };
       }
-      return { status: 'in_flight', isStale: false };
+      console.warn(
+        'Payout: post-lock read missed owner after locked tx — trusting transaction',
+        challengeId,
+        { claimLockOwner: lockOwner, docPayoutLockOwner: data.payoutLockOwner ?? null }
+      );
     }
-    if (data.payoutLockOwner !== lockOwner) {
-      console.warn('Payout: lock owner mismatch after transaction', challengeId, {
-        expected: lockOwner,
-        actual: data.payoutLockOwner,
-      });
-      const ageMismatch = payoutLockAgeMs(data);
-      const staleMismatch =
-        postLockPayoutStatus === 'processing' &&
-        (data.payoutSignature == null || String(data.payoutSignature).trim() === '') &&
-        (ageMismatch === null || ageMismatch > STALE_MS);
-      return { status: 'in_flight', isStale: staleMismatch };
-    }
+
+    console.warn('Payout: entering resolveChallenge (lock held by this claim)', challengeId);
 
     try {
       const isAdminResolvedDispute = !!(data as any).resolvedBy;
