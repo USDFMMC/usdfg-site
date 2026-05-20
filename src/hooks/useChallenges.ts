@@ -37,7 +37,6 @@ export const useChallenges = () => {
   const [authUid, setAuthUid] = useState<string | null | undefined>(undefined);
   const lastSyncedAtRef = useRef<Map<string, number>>(new Map());
   const inFlightSyncRef = useRef<Set<string>>(new Set());
-  const lastChallengesKeyRef = useRef<string>('');
   const devListenerActiveLoggedRef = useRef(false);
 
   useEffect(() => {
@@ -56,14 +55,12 @@ export const useChallenges = () => {
     if (authUid === null) {
       lastSyncedAtRef.current.clear();
       inFlightSyncRef.current.clear();
-      lastChallengesKeyRef.current = '';
       setChallenges([]);
       setLoading(false);
       setError(null);
       return;
     }
 
-    lastChallengesKeyRef.current = '';
     devListenerActiveLoggedRef.current = false;
 
     const unsubscribe = listenToRecentChallenges(
@@ -77,12 +74,7 @@ export const useChallenges = () => {
           console.log('[Challenges] count:', newChallenges.length);
         }
 
-        const listKey = `${newChallenges.length}\u0001${newChallenges.map((c) => c.id ?? '').join('\u0001')}`;
-        if (listKey !== lastChallengesKeyRef.current) {
-          lastChallengesKeyRef.current = listKey;
-          setChallenges(newChallenges);
-        }
-
+        setChallenges(newChallenges);
         setLoading(false);
         setError(null);
 
@@ -142,7 +134,6 @@ export const useChallenges = () => {
     return () => {
       lastSyncedAtRef.current.clear();
       inFlightSyncRef.current.clear();
-      lastChallengesKeyRef.current = '';
       unsubscribe();
     };
   }, [authUid]);
@@ -152,8 +143,6 @@ export const useChallenges = () => {
     try {
       const data = await fetchChallenges();
       if (Array.isArray(data)) {
-        const listKey = `${data.length}\u0001${data.map((c) => c.id ?? '').join('\u0001')}`;
-        lastChallengesKeyRef.current = listKey;
         setChallenges(data);
       }
       return data;

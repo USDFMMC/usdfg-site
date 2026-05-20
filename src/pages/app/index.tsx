@@ -6119,7 +6119,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               );
 
               const openChallengeLobby = (challenge: any) => {
-                const merged = mergeChallengeDataForModal(challenge, challenge.rawData ?? challenge);
+                const challengeId = challenge?.id;
+                const latest = challengeId
+                  ? firestoreChallenges.find((c) => c.id === challengeId)
+                  : undefined;
+                const merged = mergeChallengeDataForModal(
+                  challenge,
+                  latest ?? challenge.rawData ?? challenge
+                );
                 setSelectedChallenge(merged);
                 const format = (merged.rawData as any)?.format || ((merged.rawData as any)?.tournament ? "tournament" : "standard");
                 if (format === "tournament") {
