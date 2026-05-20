@@ -7,11 +7,41 @@ export const MAX_VOICE_SPEAKERS = 2;
 
 export type LobbyRole = "participant" | "spectator";
 
+function isLocalhostLobbyWsUrl(url: string): boolean {
+  try {
+    const normalized = url.replace(/^ws(s?):/i, "http$1:");
+    const { hostname } = new URL(normalized);
+    const host = hostname.toLowerCase();
+    return host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "0.0.0.0";
+  } catch {
+    return /localhost|127\.0\.0\.1|\[::1\]/i.test(url);
+  }
+}
+
+let warnedLocalhostInProd = false;
+
 export function getLobbyWsUrl(): string {
   const u = import.meta.env?.VITE_LOBBY_WS_URL;
-  if (u != null && String(u).trim() !== "") return String(u).trim();
+  if (u != null && String(u).trim() !== "") {
+    const trimmed = String(u).trim();
+    if (!import.meta.env?.DEV && isLocalhostLobbyWsUrl(trimmed)) {
+      if (!warnedLocalhostInProd) {
+        console.warn(
+          "[LobbyHub] Ignoring localhost WebSocket URL in production. Set VITE_LOBBY_WS_URL to a public wss:// endpoint.",
+        );
+        warnedLocalhostInProd = true;
+      }
+      return "";
+    }
+    return trimmed;
+  }
   if (import.meta.env?.DEV) return "ws://127.0.0.1:8787";
   return "";
+}
+
+/** True when the client may connect to the lobby WebSocket (env set, or dev default). */
+export function isLobbyWsConfigured(): boolean {
+  return getLobbyWsUrl() !== "";
 }
 
 type HubEvent =

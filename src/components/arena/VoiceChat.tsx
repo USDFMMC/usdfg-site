@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useMemo } from "react";
 import { Mic, MicOff } from "lucide-react";
 import {
   getActiveLobbyHub,
+  isLobbyWsConfigured,
   createMicRequest,
   addSpeaker,
   removeSpeaker,
@@ -666,6 +667,24 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
   };
 
   // No auto getUserMedia from effects (iOS requires user gesture for mic). Approved speakers use "Enable mic" button.
+
+  if (!isLobbyWsConfigured()) {
+    return (
+      <div className="p-3 rounded-lg border bg-gray-800 border-gray-700">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full flex-shrink-0 bg-red-500" />
+          <div className="flex flex-col min-w-0">
+            <span className="text-white text-sm font-medium">Voice unavailable</span>
+            <span className="text-xs text-gray-400">
+              {import.meta.env.DEV
+                ? "Set VITE_LOBBY_WS_URL or run npm run lobby-ws locally."
+                : "Live voice is not configured for this environment."}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (voiceDisabled) {
     return (

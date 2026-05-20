@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Send } from "lucide-react";
-import { getLobbyWsUrl, getActiveLobbyHub } from "../../lib/realtime/lobbyHub";
+import { isLobbyWsConfigured, getActiveLobbyHub } from "../../lib/realtime/lobbyHub";
 
 const linkRegex = /(https?:\/\/[^\s]+)/g;
 
@@ -64,7 +64,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
       setMessages([]);
       return;
     }
-    if (!getLobbyWsUrl()) {
+    if (!isLobbyWsConfigured()) {
       setMessages([]);
       return;
     }
@@ -119,8 +119,14 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
       return;
     }
     const hub = getActiveLobbyHub(challengeId);
-    if (!getLobbyWsUrl() || !hub?.isConnected()) {
-      onAppToast?.("Match chat server unavailable. Set VITE_LOBBY_WS_URL or run npm run lobby-ws.", "error", "Chat");
+    if (!isLobbyWsConfigured() || !hub?.isConnected()) {
+      onAppToast?.(
+        import.meta.env.DEV
+          ? "Match chat server unavailable. Set VITE_LOBBY_WS_URL or run npm run lobby-ws."
+          : "Match chat is unavailable. Lobby realtime server is not configured.",
+        "error",
+        "Chat",
+      );
       return;
     }
 
@@ -143,7 +149,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
     }
   };
 
-  const wsMissing = !getLobbyWsUrl();
+  const wsMissing = !isLobbyWsConfigured();
 
   return (
     <div className="flex flex-col h-full w-full">
@@ -154,7 +160,9 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
 
       {wsMissing && (
         <p className="text-[10px] text-amber-400/90 mb-1 px-1">
-          Live chat disabled: configure VITE_LOBBY_WS_URL (dev defaults to ws://127.0.0.1:8787 when using vite dev).
+          {import.meta.env.DEV
+            ? "Live chat disabled: configure VITE_LOBBY_WS_URL (dev defaults to ws://127.0.0.1:8787 when using vite dev)."
+            : "Live chat unavailable — lobby realtime server is not configured for production."}
         </p>
       )}
 
