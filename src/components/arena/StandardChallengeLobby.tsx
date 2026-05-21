@@ -2,18 +2,8 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { ChatBox } from "./ChatBox";
 import { VoiceChat } from "./VoiceChat";
 import { Camera, Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
-import { getPlayerStats, fetchChallengeById, resolveAdminChallenge, triggerChallengeDispute, writeChallengeFields, walletsEqual, canonicalPlayerKey, repairChallengeFinalizationIfNeeded } from "@/lib/firebase/firestore";
-import {
-  acquireLobbyHub,
-  releaseLobbyHub,
-  getActiveLobbyHub,
-  getLobbyWsUrl,
-  approveMicRequest,
-  denyMicRequest,
-  approveMicRequestReplace,
-  MAX_VOICE_SPEAKERS,
-} from "@/lib/realtime/lobbyHub";
-import { doc, onSnapshot, Timestamp } from "firebase/firestore";
+import { getPlayerStats, fetchChallengeById, resolveAdminChallenge, triggerChallengeDispute, approveMicRequest, denyMicRequest, approveMicRequestReplace, MAX_VOICE_SPEAKERS, writeChallengeFields, walletsEqual, canonicalPlayerKey, repairChallengeFinalizationIfNeeded } from "@/lib/firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, updateDoc, onSnapshot, query, where, serverTimestamp, Timestamp, getDoc, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import { ADMIN_WALLET } from "@/lib/chain/config";
 import type { AppConfirmDialogOptions } from "@/components/ui/AppConfirmModal";
@@ -81,16 +71,30 @@ const MuteAllSpectatorsButton: React.FC<{
     if (isMuting) return;
     setIsMuting(true);
     try {
-      const hub = getActiveLobbyHub(challengeId);
-      if (!hub?.isConnected()) {
-        onAppToast?.("Lobby server disconnected. Try again in a moment.", "error", "Mute failed");
-        return;
-      }
-      hub.muteAllSpectators();
+      const mutePromises = spectators.map((wallet) => {
+        const muteRef = doc(db, 'challenge_lobbies', challengeId, 'voice_controls', wallet);
+        return setDoc(muteRef, {
+          muted: true,
+          mutedBy: 'creator',
+          mutedAt: serverTimestamp(),
+        });
+      });
+      await Promise.all(mutePromises);
     } catch (error: unknown) {
-      console.error("Failed to mute all spectators:", error);
+      console.error('Failed to mute all spectators:', error);
       const errorMsg = error instanceof Error ? error.message : String(error);
-      onAppToast?.(`Failed to mute all spectators: ${errorMsg}`, "error", "Mute failed");
+      const errorCode = (error as { code?: string })?.code || 'unknown';
+      if (errorCode === 'permission-denied') {
+        onAppToast?.(
+          'You may not have permission to mute spectators. Please refresh and try again.',
+          'error',
+          'Permission denied',
+        );
+      } else if (errorCode === 'unavailable') {
+        onAppToast?.('Firestore is temporarily unavailable. Please check your connection and try again.', 'warning', 'Unavailable');
+      } else {
+        onAppToast?.(`Failed to mute all spectators: ${errorMsg}. Please try again.`, 'error', 'Mute failed');
+      }
     } finally {
       setIsMuting(false);
     }
@@ -119,32 +123,39 @@ const MuteParticipantButton: React.FC<{
   
   useEffect(() => {
     if (!challengeId || !wallet) return;
-    const hub = getActiveLobbyHub(challengeId);
-    if (!hub) return;
-    const fn = (p: unknown) => {
-      const o = p as { target?: string; muted?: boolean };
-      if (o.target?.toLowerCase() === wallet.toLowerCase()) {
-        setIsMuted(!!o.muted);
-      }
-    };
-    hub.on("voice_control", fn);
-    return () => hub.off("voice_control", fn);
+    const muteRef = doc(db, 'challenge_lobbies', challengeId, 'voice_controls', wallet);
+    const unsubscribe = onSnapshot(
+      muteRef,
+      (snapshot) => {
+        setIsMuted(snapshot.exists() && snapshot.data()?.muted === true);
+      },
+      (error) => {
+        if ((error as { code?: string }).code !== 'permission-denied' && (error as { code?: string }).code !== 'unavailable') {
+          console.error('Error checking mute status:', error);
+        }
+      },
+    );
+    return () => unsubscribe();
   }, [challengeId, wallet]);
 
   const handleToggleMute = async () => {
     if (isToggling) return;
     setIsToggling(true);
     try {
-      const hub = getActiveLobbyHub(challengeId);
-      if (!hub?.isConnected()) {
-        onAppToast?.("Lobby server disconnected.", "error", "Mute failed");
-        return;
+      const muteRef = doc(db, 'challenge_lobbies', challengeId, 'voice_controls', wallet);
+      if (isMuted) {
+        await deleteDoc(muteRef);
+      } else {
+        await setDoc(muteRef, {
+          muted: true,
+          mutedBy: 'creator',
+          mutedAt: serverTimestamp(),
+        });
       }
-      hub.sendVoiceControl(wallet, !isMuted);
     } catch (error: unknown) {
-      console.error("Failed to toggle mute:", error);
+      console.error('Failed to toggle mute:', error);
       const errorMsg = error instanceof Error ? error.message : String(error);
-      onAppToast?.(`Failed to toggle mute: ${errorMsg}`, "error", "Mute failed");
+      onAppToast?.(`Failed to toggle mute: ${errorMsg}`, 'error', 'Mute failed');
     } finally {
       setIsToggling(false);
     }
@@ -902,65 +913,156 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   });
   const participants = Array.from(participantsSet);
 
-  const isLobbyParticipant = useMemo(
-    () =>
-      !!currentWallet &&
-      participants.some((p: string) => p?.toLowerCase() === currentWallet.toLowerCase()),
-    [currentWallet, participants]
-  );
-  
   // Creator controls should be available in pre-match lobby and during active matches
   // Show when creator is viewing (even if no spectators yet, so they can see the controls are available)
   const canShowCreatorControls = isCreator && status !== 'completed' && status !== 'cancelled';
 
+  // Ephemeral spectator tracking (Firestore presence; chat history retained on leave)
   useEffect(() => {
-    if (!challengeId || !getLobbyWsUrl()) {
-      setSpectators([]);
+    if (!challengeId || !currentWallet) {
       setSpectatorCount(0);
-      setPendingMicRequests([]);
-      setSpeakerWallets([]);
-      return;
-    }
-    if (!currentWallet) {
-      setSpectators([]);
-      setSpectatorCount(0);
-      setPendingMicRequests([]);
-      setSpeakerWallets([]);
       return;
     }
 
-    const hub = acquireLobbyHub(challengeId);
-    hub.reconnectIfNeeded(currentWallet, isLobbyParticipant ? "participant" : "spectator");
+    const isParticipant = participants.some((p: string) => p?.toLowerCase() === currentWallet.toLowerCase());
 
-    const onSpec = (wallets: unknown) => {
-      const list = Array.isArray(wallets) ? (wallets as string[]) : [];
-      setSpectators(list);
-      setSpectatorCount(list.length);
-    };
+    if (!isParticipant) {
+      const spectatorRef = doc(db, 'challenge_lobbies', challengeId, 'spectators', currentWallet);
+      const statsRef = doc(db, 'challenge_lobbies', challengeId, 'stats', 'count');
+      let hasJoined = false;
 
-    const onMic = (requests: unknown) => {
-      const o = requests && typeof requests === "object" ? (requests as Record<string, string>) : {};
-      const pending = Object.entries(o)
-        .filter(([, v]) => v === "pending")
-        .map(([w]) => ({ wallet: w }));
-      setPendingMicRequests(pending);
-    };
+      getDoc(statsRef).then((snap) => {
+        const currentCount = snap.exists() ? (snap.data().spectatorCount || 0) : 0;
+        if (currentCount < MAX_SPECTATORS) {
+          Promise.all([
+            setDoc(spectatorRef, { wallet: currentWallet, joinedAt: serverTimestamp() }).catch(() => {}),
+            updateDoc(statsRef, { spectatorCount: increment(1) }).catch(async (err: { code?: string }) => {
+              if (err.code === 'not-found') {
+                await setDoc(statsRef, { spectatorCount: 1, createdAt: serverTimestamp() }).catch(() => {});
+              }
+            }),
+          ]).then(() => {
+            hasJoined = true;
+          });
+        }
+      }).catch(() => {
+        Promise.all([
+          setDoc(spectatorRef, { wallet: currentWallet, joinedAt: serverTimestamp() }).catch(() => {}),
+          updateDoc(statsRef, { spectatorCount: increment(1) }).catch(async (err: { code?: string }) => {
+            if (err.code === 'not-found') {
+              await setDoc(statsRef, { spectatorCount: 1, createdAt: serverTimestamp() }).catch(() => {});
+            }
+          }),
+        ]).then(() => {
+          hasJoined = true;
+        });
+      });
 
-    const onVoice = (list: unknown) => {
-      setSpeakerWallets(Array.isArray(list) ? (list as string[]) : []);
-    };
+      let beforeUnloadHandler: (() => void) | null = null;
+      if (typeof window !== 'undefined') {
+        beforeUnloadHandler = () => {
+          if (hasJoined) {
+            Promise.all([
+              deleteDoc(spectatorRef).catch(() => {}),
+              updateDoc(statsRef, { spectatorCount: increment(-1) }).catch(() => {}),
+            ]);
+          }
+        };
+        window.addEventListener('beforeunload', beforeUnloadHandler);
+      }
 
-    hub.on("spectators", onSpec);
-    hub.on("mic_snapshot", onMic);
-    hub.on("voice_state", onVoice);
+      return () => {
+        if (beforeUnloadHandler && typeof window !== 'undefined') {
+          window.removeEventListener('beforeunload', beforeUnloadHandler);
+        }
+        if (hasJoined) {
+          Promise.all([
+            deleteDoc(spectatorRef).catch(() => {}),
+            updateDoc(statsRef, { spectatorCount: increment(-1) }).catch(() => {}),
+          ]);
+        }
+      };
+    } else {
+      setSpectatorCount(0);
+    }
+  }, [challengeId, currentWallet, participants]);
+
+  useEffect(() => {
+    if (!challengeId) {
+      setSpectatorCount(0);
+      setSpectators([]);
+      return;
+    }
+
+    const spectatorsRef = collection(db, 'challenge_lobbies', challengeId, 'spectators');
+    let unsubscribeFn: (() => void) | null = null;
+    let isActive = true;
+    const setupTimeout = setTimeout(() => {
+      if (!isActive) return;
+      try {
+        unsubscribeFn = onSnapshot(
+          spectatorsRef,
+          (snapshot) => {
+            if (!isActive) return;
+            const spectatorWallets = snapshot.docs
+              .map((d) => d.data().wallet)
+              .filter((wallet): wallet is string => !!wallet && typeof wallet === 'string');
+            setSpectators(spectatorWallets);
+            setSpectatorCount(spectatorWallets.length);
+          },
+          (error) => {
+            if (!isActive) return;
+            if ((error as { code?: string }).code === 'permission-denied' || (error as { code?: string }).code === 'unavailable') {
+              setSpectatorCount(0);
+              setSpectators([]);
+              return;
+            }
+            console.error('Error listening to spectators:', error);
+            setSpectatorCount(0);
+            setSpectators([]);
+          },
+        );
+      } catch (error) {
+        if (!isActive) return;
+        setSpectatorCount(0);
+        setSpectators([]);
+      }
+    }, 100);
 
     return () => {
-      hub.off("spectators", onSpec);
-      hub.off("mic_snapshot", onMic);
-      hub.off("voice_state", onVoice);
-      releaseLobbyHub(challengeId);
+      isActive = false;
+      clearTimeout(setupTimeout);
+      unsubscribeFn?.();
     };
-  }, [challengeId, currentWallet, isLobbyParticipant]);
+  }, [challengeId]);
+
+  useEffect(() => {
+    if (!challengeId) return;
+    const micRef = collection(db, 'challenge_lobbies', challengeId, 'mic_requests');
+    const q = query(micRef, where('status', '==', 'pending'));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setPendingMicRequests(snap.docs.map((d) => ({ wallet: d.id })));
+      },
+      (err) => {
+        if ((err as { code?: string })?.code !== 'permission-denied' && (err as { code?: string })?.code !== 'unavailable') {
+          console.error('[Lobby] Pending mic requests listener error:', err);
+        }
+      },
+    );
+    return () => unsub();
+  }, [challengeId]);
+
+  useEffect(() => {
+    if (!challengeId) return;
+    const stateRef = doc(db, 'challenge_lobbies', challengeId, 'voice_state', 'main');
+    const unsub = onSnapshot(stateRef, (snap) => {
+      const list = snap.exists() ? (snap.data()?.speakerWallets || []) : [];
+      setSpeakerWallets(Array.isArray(list) ? list : []);
+    }, () => {});
+    return () => unsub();
+  }, [challengeId]);
   
   // Fetch participant and spectator data (display names, profile images)
   useEffect(() => {

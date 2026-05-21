@@ -30,7 +30,6 @@ import {
 } from './adminApi';
 import { CHALLENGE_CONFIG, ADMIN_WALLET } from '../chain/config';
 import { getExplorerTxUrl } from '../chain/explorer';
-import { broadcastLobbySystemMessage } from '../realtime/lobbyHub';
 import { isWarmupPhaseBlockingSubmit } from '@/lib/utils/warmup-phase';
 
 // Test Firestore connection
@@ -56,13 +55,17 @@ export async function postChallengeSystemMessage(challengeId: string, text: stri
     return;
   }
   try {
-    broadcastLobbySystemMessage(challengeId, text);
+    await addDoc(collection(db, 'challenge_lobbies', challengeId, 'challenge_chats'), {
+      text,
+      sender: 'SYSTEM',
+      timestamp: Timestamp.now(),
+    });
   } catch (error) {
-    console.warn('⚠️ Failed to broadcast system message to lobby:', error);
+    console.warn('⚠️ Failed to post system message to chat:', error);
   }
 }
 
-/** Remove legacy `voice_signals/{challengeId}` (live signaling is WebSocket-only). Safe if doc missing. */
+/** Remove `voice_signals/{challengeId}` when lobby voice session ends. Safe if doc missing. */
 export async function deleteVoiceSignalsDocument(challengeId: string): Promise<void> {
   if (!challengeId?.trim()) return;
   try {
@@ -2991,7 +2994,13 @@ export async function cleanupCompletedChallenge(id: string) {
       }
     }
     
-    // Then delete the challenge document (reuse challengeRef from above)
+    console.log('🗑️ Cleaning up chat messages for challenge:', id);
+    const chatQuery = query(collection(db, 'challenge_lobbies', id, 'challenge_chats'));
+    const chatSnapshot = await getDocs(chatQuery);
+    const chatDeletePromises = chatSnapshot.docs.map((docSnapshot) => deleteDoc(docSnapshot.ref));
+    await Promise.all(chatDeletePromises);
+    console.log(`🗑️ Deleted ${chatSnapshot.size} chat messages for challenge:`, id);
+
     await deleteDoc(challengeRef);
     console.log('🗑️ Completed challenge cleaned up:', id);
   } catch (error) {
@@ -3052,10 +3061,17 @@ export async function cleanupExpiredChallenge(id: string) {
     }
     
     console.log('🗑️ Starting complete cleanup for expired challenge:', id);
-    
+
+    console.log('🗑️ Cleaning up chat messages for expired challenge:', id);
+    const chatQuery = query(collection(db, 'challenge_lobbies', id, 'challenge_chats'));
+    const chatSnapshot = await getDocs(chatQuery);
+    const chatDeletePromises = chatSnapshot.docs.map((docSnapshot) => deleteDoc(docSnapshot.ref));
+    await Promise.all(chatDeletePromises);
+    console.log(`🗑️ Deleted ${chatSnapshot.size} chat messages for expired challenge:`, id);
+
     await deleteVoiceSignalsDocument(id);
-    
-    // 3. Delete challenge notifications
+
+    // Delete challenge notifications
     try {
       const notificationQuery = query(
         collection(db, 'challenge_notifications'),
@@ -3564,8 +3580,18 @@ export const submitChallengeResult = async (
  * Clean up chat messages for a challenge
  * Exported so it can be called when admin resolves disputes
  */
-export async function cleanupChatMessages(_challengeId: string): Promise<void> {
-  // Match chat is WebSocket-only; nothing stored in Firestore.
+export async function cleanupChatMessages(challengeId: string): Promise<void> {
+  try {
+    console.log('🗑️ Cleaning up chat messages for resolved challenge:', challengeId);
+    const chatQuery = query(collection(db, 'challenge_lobbies', challengeId, 'challenge_chats'));
+    const chatSnapshot = await getDocs(chatQuery);
+    const chatDeletePromises = chatSnapshot.docs.map((docSnapshot) => deleteDoc(docSnapshot.ref));
+    await Promise.all(chatDeletePromises);
+    console.log(`🗑️ Deleted ${chatSnapshot.size} chat messages after dispute resolution:`, challengeId);
+  } catch (error) {
+    console.error('❌ Error cleaning up chat messages:', error);
+    throw error;
+  }
 }
 
 /**
@@ -3576,9 +3602,29 @@ export async function cleanupChatMessages(_challengeId: string): Promise<void> {
  * Legal compliance: Chat kept temporarily for dispute resolution (legitimate business purpose),
  * then deleted after resolution to minimize data retention
  */
-async function cleanupChallengeData(challengeId: string, _isDispute: boolean = false): Promise<void> {
+async function cleanupChallengeData(challengeId: string, isDispute: boolean = false): Promise<void> {
   try {
+    console.log('🗑️ Cleaning up challenge data for:', challengeId, isDispute ? '(DISPUTE - keeping chat)' : '(Normal completion - deleting chat)');
+
     await deleteVoiceSignalsDocument(challengeId);
+
+    try {
+      const voiceStateRef = doc(db, 'challenge_lobbies', challengeId, 'voice_state', 'main');
+      await deleteDoc(voiceStateRef).catch(() => {});
+      const micRequestsRef = collection(db, 'challenge_lobbies', challengeId, 'mic_requests');
+      const micSnap = await getDocs(micRequestsRef);
+      await Promise.all(micSnap.docs.map((d) => deleteDoc(d.ref))).catch(() => {});
+    } catch (_) {}
+
+    if (!isDispute) {
+      const chatQuery = query(collection(db, 'challenge_lobbies', challengeId, 'challenge_chats'));
+      const chatSnapshot = await getDocs(chatQuery);
+      const chatDeletePromises = chatSnapshot.docs.map((docSnapshot) => deleteDoc(docSnapshot.ref));
+      await Promise.all(chatDeletePromises);
+      console.log(`🗑️ Deleted ${chatSnapshot.size} chat messages for challenge:`, challengeId);
+    } else {
+      console.log('📋 Keeping chat messages for dispute resolution:', challengeId);
+    }
   } catch (error) {
     console.error('❌ Error cleaning up challenge data:', error);
   }
@@ -4066,12 +4112,22 @@ export const requestCancelChallenge = async (
     const cancelRequests = challenge.cancelRequests || [];
     
     if (cancelRequests.some((w) => walletsEqual(w, walletAddress))) {
-      const shortWallet = walletAddress.slice(0, 8) + '...' + walletAddress.slice(-4);
-      const msg = `🚫 ${shortWallet} requested to cancel the challenge. Click "Agree to Cancel" button if you agree.`;
-      const sk = `usdfg_cancel_broadcast_${challengeId}_${walletAddress.toLowerCase()}`;
-      if (typeof sessionStorage !== 'undefined' && !sessionStorage.getItem(sk)) {
-        broadcastLobbySystemMessage(challengeId, msg);
-        sessionStorage.setItem(sk, '1');
+      console.log('⚠️ User already requested cancellation - checking chat for notification');
+      const chatQuery = query(
+        collection(db, 'challenge_lobbies', challengeId, 'challenge_chats'),
+        where('sender', '==', 'SYSTEM'),
+      );
+      const chatSnap = await getDocs(chatQuery);
+      const hasSystemMessage = chatSnap.docs.some((d) =>
+        d.data().text?.includes('requested to cancel'),
+      );
+      if (!hasSystemMessage) {
+        const shortWallet = walletAddress.slice(0, 8) + '...' + walletAddress.slice(-4);
+        await addDoc(collection(db, 'challenge_lobbies', challengeId, 'challenge_chats'), {
+          text: `🚫 ${shortWallet} requested to cancel the challenge. Click "Agree to Cancel" button if you agree.`,
+          sender: 'SYSTEM',
+          timestamp: Timestamp.now(),
+        });
       }
       return;
     }
@@ -4093,10 +4149,11 @@ export const requestCancelChallenge = async (
         { currentData: challenge, actingWallet: walletAddress }
       );
       
-      broadcastLobbySystemMessage(
-        challengeId,
-        '🤝 Both players agreed to cancel. Challenge cancelled, challenge amounts will be returned.'
-      );
+      await addDoc(collection(db, 'challenge_lobbies', challengeId, 'challenge_chats'), {
+        text: '🤝 Both players agreed to cancel. Challenge cancelled, challenge amounts will be returned.',
+        sender: 'SYSTEM',
+        timestamp: Timestamp.now(),
+      });
     } else {
       // Just one player requested so far
       console.log('⏳ Cancel requested, waiting for other player to agree');
@@ -4110,10 +4167,11 @@ export const requestCancelChallenge = async (
       );
       
       const shortWallet = walletAddress.slice(0, 8) + '...' + walletAddress.slice(-4);
-      broadcastLobbySystemMessage(
-        challengeId,
-        `🚫 ${shortWallet} requested to cancel the challenge. Click "Agree to Cancel" button if you agree.`
-      );
+      await addDoc(collection(db, 'challenge_lobbies', challengeId, 'challenge_chats'), {
+        text: `🚫 ${shortWallet} requested to cancel the challenge. Click "Agree to Cancel" button if you agree.`,
+        sender: 'SYSTEM',
+        timestamp: Timestamp.now(),
+      });
     }
   } catch (error) {
     console.error('❌ Error requesting cancel:', error);
@@ -6486,12 +6544,97 @@ export const resolveAdminChallenge = async (
   }
 };
 
-export {
-  MAX_VOICE_SPEAKERS,
-  createMicRequest,
-  approveMicRequest,
-  approveMicRequestReplace,
-  denyMicRequest,
-  addSpeaker,
-  removeSpeaker,
-} from '../realtime/lobbyHub';
+// --- Spectator mic request (Firestore-backed lobby voice) ---
+const MAX_VOICE_SPEAKERS = 2;
+
+/** Create or reset a spectator mic request (pending). */
+export async function createMicRequest(challengeId: string, wallet: string): Promise<void> {
+  if (!challengeId || !wallet) return;
+  const ref = doc(db, 'challenge_lobbies', challengeId, 'mic_requests', wallet.toLowerCase());
+  await setDoc(ref, {
+    status: 'pending',
+    requestedAt: serverTimestamp(),
+  });
+}
+
+/** Approve a spectator mic request; adds to speaker list only if fewer than MAX_VOICE_SPEAKERS. Returns true if added. */
+export async function approveMicRequest(
+  challengeId: string,
+  wallet: string,
+  respondedBy: string,
+): Promise<boolean> {
+  if (!challengeId || !wallet) return false;
+  const stateRef = doc(db, 'challenge_lobbies', challengeId, 'voice_state', 'main');
+  const requestRef = doc(db, 'challenge_lobbies', challengeId, 'mic_requests', wallet.toLowerCase());
+  const snap = await getDoc(stateRef);
+  const list: string[] = snap.exists() ? (snap.data()?.speakerWallets || []) : [];
+  if (list.length >= MAX_VOICE_SPEAKERS) return false;
+  const lower = wallet.toLowerCase();
+  if (list.some((w: string) => w.toLowerCase() === lower)) {
+    await updateDoc(requestRef, { status: 'approved', respondedAt: serverTimestamp(), respondedBy });
+    return true;
+  }
+  await setDoc(stateRef, { speakerWallets: [...list, wallet] }, { merge: true });
+  await setDoc(requestRef, { status: 'approved', respondedAt: serverTimestamp(), respondedBy }, { merge: true });
+  return true;
+}
+
+/** Approve a spectator mic request by replacing an active speaker. Removed speaker loses mic (listen-only). */
+export async function approveMicRequestReplace(
+  challengeId: string,
+  requesterWallet: string,
+  replaceWallet: string,
+  respondedBy: string,
+): Promise<void> {
+  if (!challengeId || !requesterWallet || !replaceWallet) return;
+  const stateRef = doc(db, 'challenge_lobbies', challengeId, 'voice_state', 'main');
+  const requestRef = doc(db, 'challenge_lobbies', challengeId, 'mic_requests', requesterWallet.toLowerCase());
+  const snap = await getDoc(stateRef);
+  const list: string[] = snap.exists() ? (snap.data()?.speakerWallets || []) : [];
+  const next = list.filter((w: string) => w.toLowerCase() !== replaceWallet.toLowerCase());
+  if (next.length === list.length) return;
+  const requesterLower = requesterWallet.toLowerCase();
+  if (next.some((w: string) => w.toLowerCase() === requesterLower)) {
+    await setDoc(requestRef, { status: 'approved', respondedAt: serverTimestamp(), respondedBy }, { merge: true });
+    return;
+  }
+  await setDoc(stateRef, { speakerWallets: [...next, requesterWallet] }, { merge: true });
+  await setDoc(requestRef, { status: 'approved', respondedAt: serverTimestamp(), respondedBy }, { merge: true });
+}
+
+/** Deny a spectator mic request. */
+export async function denyMicRequest(
+  challengeId: string,
+  wallet: string,
+  respondedBy: string,
+): Promise<void> {
+  if (!challengeId || !wallet) return;
+  const requestRef = doc(db, 'challenge_lobbies', challengeId, 'mic_requests', wallet.toLowerCase());
+  await setDoc(requestRef, { status: 'denied', respondedAt: serverTimestamp(), respondedBy }, { merge: true });
+}
+
+/** Add wallet to speaker list if under cap. Call when participant or approved spectator connects. */
+export async function addSpeaker(challengeId: string, wallet: string): Promise<boolean> {
+  if (!challengeId || !wallet) return false;
+  const stateRef = doc(db, 'challenge_lobbies', challengeId, 'voice_state', 'main');
+  const snap = await getDoc(stateRef);
+  const list: string[] = snap.exists() ? (snap.data()?.speakerWallets || []) : [];
+  if (list.length >= MAX_VOICE_SPEAKERS) return false;
+  const lower = wallet.toLowerCase();
+  if (list.some((w: string) => w.toLowerCase() === lower)) return true;
+  await setDoc(stateRef, { speakerWallets: [...list, wallet] }, { merge: true });
+  return true;
+}
+
+/** Remove wallet from speaker list. Call when participant or approved spectator disconnects. */
+export async function removeSpeaker(challengeId: string, wallet: string): Promise<void> {
+  if (!challengeId || !wallet) return;
+  const stateRef = doc(db, 'challenge_lobbies', challengeId, 'voice_state', 'main');
+  const snap = await getDoc(stateRef);
+  const list: string[] = snap.exists() ? (snap.data()?.speakerWallets || []) : [];
+  const next = list.filter((w: string) => w.toLowerCase() !== wallet.toLowerCase());
+  if (next.length === 0) await deleteDoc(stateRef);
+  else await setDoc(stateRef, { speakerWallets: next }, { merge: true });
+}
+
+export { MAX_VOICE_SPEAKERS };
