@@ -106,6 +106,9 @@ import {
   canCancelChallenge,
   isChallengeRewardClaimed,
   isPayoutStaleProcessing,
+  getTournamentRoster,
+  isWalletInTournamentRoster,
+  isTournamentChallenge,
 } from "@/lib/utils/challenge-helpers";
 import ElegantButton from "@/components/ui/ElegantButton";
 import ElegantModal from "@/components/ui/ElegantModal";
@@ -653,7 +656,12 @@ const ArenaHome: React.FC = () => {
       prizePool: firestoreChallenge.prizePool ?? cardChallenge.prizePool,
       status: firestoreChallenge.status || cardChallenge.status,
       rawData: firestoreChallenge,
-      players: firestoreChallenge.players?.length || cardChallenge.players,
+      players: (() => {
+        const fs = firestoreChallenge.players;
+        if (Array.isArray(fs)) return fs;
+        const card = cardChallenge.players ?? cardChallenge.rawData?.players;
+        return Array.isArray(card) ? card : [];
+      })(),
       capacity: firestoreChallenge.maxPlayers || cardChallenge.capacity,
     };
   }, []);
@@ -1740,16 +1748,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     
     const currentWallet = publicKey.toString();
     
-    // Check for tournament challenges where user is a participant
+    // Check for tournament challenges where user is on the canonical roster
     const myTournamentChallenges = firestoreChallenges.filter((challenge: any) => {
       const format = challenge.format || (challenge.tournament ? 'tournament' : 'standard');
       if (format !== 'tournament') return false;
-      
-      const playersRaw = challenge.players;
-      const players = Array.isArray(playersRaw) ? playersRaw : [];
-      const isParticipant = isParticipantWallet(players, currentWallet);
-      
-      return isParticipant;
+      return isWalletInTournamentRoster(challenge, currentWallet);
     });
     
     // Auto-open tournament lobby if user is in a tournament and modal isn't already open
@@ -2035,17 +2038,26 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     };
 
     const maxPlayers = challenge.maxPlayers || getMaxPlayers(mode);
-    // Same logic as lobby: count creator + challenger + pendingJoiner + players (dedupe)
     const creatorWallet = challenge.creator || challenge.rawData?.creator;
-    const challengerWallet = challenge.challenger || challenge.rawData?.challenger;
-    const pendingJoinerWallet = challenge.pendingJoiner || challenge.rawData?.pendingJoiner;
-    const playersArr = Array.isArray(challenge.players) ? challenge.players : (Array.isArray(challenge.rawData?.players) ? challenge.rawData.players : []);
-    const participantSet = new Set<string>();
-    if (creatorWallet) participantSet.add(creatorWallet.toLowerCase());
-    if (challengerWallet) participantSet.add(challengerWallet.toLowerCase());
-    if (pendingJoinerWallet) participantSet.add(pendingJoinerWallet.toLowerCase());
-    playersArr.forEach((p: string) => p && participantSet.add(p.toLowerCase()));
-    const currentPlayers = Math.min(participantSet.size || 1, maxPlayers);
+    const isTournamentFmt =
+      challenge.format === 'tournament' || !!challenge.tournament || challenge.rawData?.format === 'tournament';
+    const currentPlayers = isTournamentFmt
+      ? Math.min(getTournamentRoster(challenge).length, maxPlayers)
+      : (() => {
+          const challengerWallet = challenge.challenger || challenge.rawData?.challenger;
+          const pendingJoinerWallet = challenge.pendingJoiner || challenge.rawData?.pendingJoiner;
+          const playersArr = Array.isArray(challenge.players)
+            ? challenge.players
+            : Array.isArray(challenge.rawData?.players)
+              ? challenge.rawData.players
+              : [];
+          const participantSet = new Set<string>();
+          if (creatorWallet) participantSet.add(creatorWallet.toLowerCase());
+          if (challengerWallet) participantSet.add(challengerWallet.toLowerCase());
+          if (pendingJoinerWallet) participantSet.add(pendingJoinerWallet.toLowerCase());
+          playersArr.forEach((p: string) => p && participantSet.add(p.toLowerCase()));
+          return Math.min(participantSet.size || 1, maxPlayers);
+        })();
     const creatorLc = ((creatorWallet as string) || "").toLowerCase();
     const creatorStats = creatorClientStatsMap[creatorLc];
     const existingSticky = creatorDisplayTrustStickyRef.current[creatorLc];
@@ -6347,6 +6359,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                             <span className="text-[10px] font-semibold text-white/80">
                               {(() => {
                                 const maxPlayers = challenge.capacity || challenge.maxPlayers || 2;
+                                if (isTournamentChallenge(challenge)) {
+                                  const count = getTournamentRoster(challenge).length;
+                                  return `${Math.min(count, maxPlayers)}/${maxPlayers}`;
+                                }
                                 if (typeof challenge.players === 'number') {
                                   return `${Math.min(challenge.players, maxPlayers)}/${maxPlayers}`;
                                 }
@@ -6551,15 +6567,23 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                   const creator = (challenge.creator ?? challenge.rawData?.creator) ?? '';
                                   const challenger = (challenge.challenger ?? challenge.rawData?.challenger) ?? '';
                                   const pk = publicKey?.toString() ?? '';
-                                  const playersList = Array.isArray(challenge.players) ? challenge.players : (Array.isArray(challenge.rawData?.players) ? challenge.rawData.players : []);
-                                  const isParticipant =
-                                    !!pk &&
-                                    (walletsEqual(creator, pk) ||
-                                      walletsEqual(challenger, pk) ||
-                                      isParticipantWallet(playersList, pk));
-                                  const isAdmin = !!publicKey && walletsEqual(publicKey.toString(), ADMIN_WALLET.toString());
                                   const fmt = challenge.format || challenge.rawData?.format;
                                   const isTournament = fmt === 'tournament' || !!challenge.tournament || !!challenge.rawData?.tournament;
+                                  const isParticipant = !!pk && (
+                                    isTournament
+                                      ? isWalletInTournamentRoster(challenge, pk)
+                                      : (walletsEqual(creator, pk) ||
+                                          walletsEqual(challenger, pk) ||
+                                          isParticipantWallet(
+                                            Array.isArray(challenge.players)
+                                              ? challenge.players
+                                              : Array.isArray(challenge.rawData?.players)
+                                                ? challenge.rawData.players
+                                                : [],
+                                            pk,
+                                          ))
+                                  );
+                                  const isAdmin = !!publicKey && walletsEqual(publicKey.toString(), ADMIN_WALLET.toString());
                                   const fee = challenge.entryFee ?? challenge.rawData?.entryFee ?? 0;
                                   const founderPart = challenge.founderParticipantReward ?? challenge.rawData?.founderParticipantReward ?? 0;
                                   const founderWin = challenge.founderWinnerBonus ?? challenge.rawData?.founderWinnerBonus ?? 0;
@@ -7456,8 +7480,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             ((selectedChallenge.rawData as any)?.tournament ? "tournament" : "standard");
           const isTournament = format === "tournament";
           const currentWallet = publicKey?.toString()?.toLowerCase();
-          const playersRaw = (selectedChallenge.rawData as any)?.players ?? (selectedChallenge as any).players;
-          const players = Array.isArray(playersRaw) ? playersRaw : [];
+          const tournamentRoster = isTournament ? getTournamentRoster(selectedChallenge) : [];
 
           if (isTournament) {
             // Render tournament lobby modal - persistent room
@@ -7471,14 +7494,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                   }}
                   title={`${selectedChallenge.title || "Tournament"} Bracket`}
                   className="max-w-none w-full sm:max-w-[92vw] md:max-w-[88vw] lg:max-w-[85vw] xl:max-w-6xl"
-                  players={players.map((wallet: string) => ({ wallet }))}
+                  players={tournamentRoster.map((wallet: string) => ({ wallet }))}
                   gameName={selectedChallenge.title || "Tournament"}
                   voiceChatChallengeId={selectedChallenge.id}
                   voiceChatCurrentWallet={publicKey?.toString() || ""}
                 >
                   <TournamentBracketView
                     tournament={selectedChallenge.rawData?.tournament}
-                    players={players}
+                    players={tournamentRoster}
                     currentWallet={publicKey?.toString() || null}
                     challengeId={selectedChallenge.id}
                     onAppToast={showAppToast}
@@ -7590,7 +7613,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             
             // Render submit result modal for tournament matches - overlay on lobby
             if (showSubmitResultModal && tournamentMatchData) {
-              const tournamentParticipants = Array.isArray(selectedChallenge.rawData?.players) ? selectedChallenge.rawData.players : (Array.isArray(selectedChallenge.players) ? selectedChallenge.players : []);
+              const tournamentParticipants = getTournamentRoster(selectedChallenge);
               const tournamentCreator = selectedChallenge.creator || selectedChallenge.rawData?.creator || "";
               return (
                 <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-400"></div></div>}>

@@ -242,6 +242,50 @@ export function isTournamentChallenge(challenge: any): boolean {
   return getChallengeFormat(challenge) === 'tournament';
 }
 
+function addWalletToRosterMap(map: Map<string, string>, wallet: unknown): void {
+  if (typeof wallet !== 'string') return;
+  const trimmed = wallet.trim();
+  if (!trimmed) return;
+  const key = trimmed.toLowerCase();
+  if (!map.has(key)) map.set(key, trimmed);
+}
+
+/**
+ * Canonical tournament roster: deduped wallets from `players`, plus round-1 bracket
+ * slots while `waiting_for_players` (covers legacy drift between bracket and players).
+ */
+export function getTournamentRoster(challenge: any): string[] {
+  if (!challenge) return [];
+
+  const playersRaw = challenge.players ?? challenge.rawData?.players;
+  const players = Array.isArray(playersRaw) ? playersRaw : [];
+
+  const tournament = challenge.tournament ?? challenge.rawData?.tournament;
+  const stage = tournament?.stage;
+
+  const map = new Map<string, string>();
+  players.forEach((w) => addWalletToRosterMap(map, w));
+
+  if (stage === 'waiting_for_players' && Array.isArray(tournament?.bracket) && tournament.bracket.length > 0) {
+    const round1 =
+      tournament.bracket.find((r: { roundNumber?: number }) => r.roundNumber === 1) ??
+      tournament.bracket[0];
+    for (const match of round1?.matches ?? []) {
+      addWalletToRosterMap(map, match.player1);
+      addWalletToRosterMap(map, match.player2);
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+/** True if wallet is on the canonical tournament roster. */
+export function isWalletInTournamentRoster(challenge: any, wallet: string): boolean {
+  if (!wallet) return false;
+  const lower = wallet.toLowerCase();
+  return getTournamentRoster(challenge).some((p) => p.toLowerCase() === lower);
+}
+
 /** Stale `payoutStatus: processing` threshold (matches claimChallengePrize). */
 export const PAYOUT_STALE_PROCESSING_MS = 2 * 60 * 1000;
 

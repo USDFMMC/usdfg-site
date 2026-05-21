@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import type { TournamentState } from "@/lib/firebase/firestore";
 import { devFillTournamentWithTestPlayers, advanceBracketWinner } from "@/lib/firebase/firestore";
 import { Keypair } from "@solana/web3.js";
@@ -7,7 +7,7 @@ import { VoiceChat } from "./VoiceChat";
 import { ChatBox } from "./ChatBox";
 import { ADMIN_WALLET } from "@/lib/chain/config";
 import type { AppConfirmDialogOptions } from "@/components/ui/AppConfirmModal";
-import { isChallengeRewardClaimed } from "@/lib/utils/challenge-helpers";
+import { getTournamentRoster, isChallengeRewardClaimed } from "@/lib/utils/challenge-helpers";
 
 const isDevTestEnv =
   typeof window !== "undefined" &&
@@ -183,8 +183,15 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
   onAppToast,
   requestAppConfirm,
 }: TournamentBracketViewProps) => {
-  // Ensure players is always an array (parent may pass number or malformed data)
-  const playersList = Array.isArray(players) ? players : [];
+  const roster = useMemo(
+    () =>
+      getTournamentRoster({
+        ...challenge,
+        tournament: tournament ?? challenge?.tournament ?? challenge?.rawData?.tournament,
+        players: challenge?.players ?? challenge?.rawData?.players ?? (Array.isArray(players) ? players : []),
+      }),
+    [challenge, tournament, players],
+  );
 
   if (!tournament || !tournament.bracket?.length) {
     return (
@@ -266,8 +273,8 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
     Number(
       tournament.maxPlayers ||
         (challenge?.maxPlayers ?? challenge?.capacity ?? challenge?.rawData?.maxPlayers ?? challenge?.rawData?.capacity)
-    ) || playersList.length;
-  const currentPlayers = playersList.length;
+    ) || roster.length;
+  const currentPlayers = roster.length;
   const isWaitingForPlayers = stage === 'waiting_for_players';
   const isCompleted = stage === 'completed';
   const champion = tournament.champion;
@@ -307,24 +314,14 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
     currentWallet &&
     creatorWallet &&
     currentWallet.toLowerCase() === creatorWallet.toLowerCase();
-  const nonCreatorPlayers = playersList.filter((wallet) => {
+  const nonCreatorPlayers = roster.filter((wallet) => {
     if (!wallet || !creatorWallet) return Boolean(wallet);
     return wallet.toLowerCase() !== creatorWallet.toLowerCase();
   });
   const canCancelTournament =
     Boolean(isCreator) && isWaitingForPlayers && nonCreatorPlayers.length === 0;
 
-  const uniqueParticipants = (() => {
-    const map = new Map<string, string>();
-    playersList.forEach((wallet) => {
-      if (!wallet) return;
-      const key = wallet.toLowerCase();
-      if (!map.has(key)) {
-        map.set(key, wallet);
-      }
-    });
-    return Array.from(map.values());
-  })();
+  const uniqueParticipants = roster;
 
   const [opsTab, setOpsTab] = useState<"chat" | "info" | "proof">("chat");
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
@@ -513,7 +510,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
           <p className="mt-1 text-xs text-white/55">
             The tournament will start automatically when all {maxPlayers} players join. Share the challenge link to invite others!
           </p>
-          {onJoinTournament && currentWallet && currentPlayers < maxPlayers && !playersList.some(p => p && p.toLowerCase() === currentWallet.toLowerCase()) && (
+          {onJoinTournament && currentWallet && currentPlayers < maxPlayers && !roster.some(p => p && p.toLowerCase() === currentWallet.toLowerCase()) && (
             <button
               onClick={async () => {
                 try {
@@ -928,9 +925,9 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
                   challengeId={challengeId}
                   currentWallet={currentWallet || ""}
                   challengeStatus={stage === "waiting_for_players" ? "pending_waiting_for_opponent" : stage === "round_in_progress" ? "active" : "completed"}
-                  isSpectator={Boolean(currentWallet && !playersList.some((p) => p && p.toLowerCase() === currentWallet.toLowerCase()))}
+                  isSpectator={Boolean(currentWallet && !roster.some((p) => p && p.toLowerCase() === currentWallet.toLowerCase()))}
                   isCreator={Boolean(isCreator)}
-                  participants={playersList.filter(Boolean)}
+                  participants={roster}
                   spectators={[]}
                 />
               </div>
@@ -940,7 +937,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
                   challengeId={challengeId}
                   currentWallet={currentWallet || ""}
                   status={stage === "round_in_progress" ? "active" : undefined}
-                  playersCount={playersList.length}
+                  playersCount={roster.length}
                   onAppToast={onAppToast}
                 />
               </div>
