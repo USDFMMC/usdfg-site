@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Helmet } from "react-helmet";
+import SeoHead from "@/components/SeoHead";
+import { absoluteUrl } from "@/lib/seo";
 import { useParams, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -118,10 +119,11 @@ const PlayerProfile: React.FC = () => {
 
   return (
     <>
-      <Helmet>
-        <title>{profile.displayName} - Player Profile | USDFG.PRO</title>
-        <meta name="description" content={`View ${profile.displayName}'s gaming stats and challenge history in the USDFG Arena.`} />
-      </Helmet>
+      <SeoHead
+        title={`${profile.displayName} — Player Profile | USDFG.PRO`}
+        description={`View ${profile.displayName}'s gaming stats and challenge history in the USDFG Arena.`}
+        url={absoluteUrl(`/app/profile/${address}`)}
+      />
 
       <div className="min-h-screen relative bg-void">
         <ParticleBackground />

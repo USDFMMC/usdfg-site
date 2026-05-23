@@ -2,8 +2,8 @@
   "name": "USDFG Gaming",
   "description": "Skill-based competitive gaming on Solana.",
   "url": "https://usdfg.pro/app/",
-  "icon": "https://usdfg.pro/usdfglogo.png",
+  "icon": "https://usdfg.pro/og-image.png?v=2",
   "icons": [
-    "https://usdfg.pro/usdfglogo.png"
+    "https://usdfg.pro/og-image.png?v=2"
   ]
 }

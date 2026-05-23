@@ -16,11 +16,11 @@ const Navigation = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const navLinks = [
+  const navLinks: { name: string; href?: string; to?: string }[] = [
     { name: 'Arena', href: '#features' },
-    { name: 'Battles', href: '#matches' },
+    { name: 'Battles', to: '/#battles' },
     { name: 'Legends', href: '#leaderboard' },
-    { name: 'Games', href: '#games' },
+    { name: 'Games', to: '/#battles' },
   ];
 
   const scrollToSection = (href: string) => {
@@ -29,6 +29,52 @@ const Navigation = () => {
       element.scrollIntoView({ behavior: 'smooth' });
     }
     setIsMobileMenuOpen(false);
+  };
+
+  const navLinkClass =
+    'relative font-body font-medium text-sm text-white/70 hover:text-white transition-colors group';
+
+  const handleHashNavClick = (e: React.MouseEvent, to: string) => {
+    const id = to.includes('#') ? to.split('#')[1] : '';
+    const onHome =
+      window.location.pathname === '/' || window.location.pathname === '/home';
+    if (onHome && id) {
+      e.preventDefault();
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+      window.history.replaceState(null, '', `/#${id}`);
+    }
+    setIsMobileMenuOpen(false);
+  };
+
+  const renderNavLink = (link: { name: string; href?: string; to?: string }) => {
+    const underline = (
+      <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-purple to-orange group-hover:w-full transition-all duration-300" />
+    );
+    if (link.to) {
+      const to = link.to;
+      return (
+        <Link
+          key={link.name}
+          to={to}
+          className={navLinkClass}
+          onClick={(e) => handleHashNavClick(e, to)}
+        >
+          {link.name}
+          {underline}
+        </Link>
+      );
+    }
+    return (
+      <button
+        key={link.name}
+        type="button"
+        onClick={() => scrollToSection(link.href!)}
+        className={navLinkClass}
+      >
+        {link.name}
+        {underline}
+      </button>
+    );
   };
 
   return (
@@ -63,16 +109,7 @@ const Navigation = () => {
 
             {/* Desktop Navigation */}
             <div className="hidden lg:flex items-center gap-8">
-              {navLinks.map((link) => (
-                <button
-                  key={link.name}
-                  onClick={() => scrollToSection(link.href)}
-                  className="relative font-body font-medium text-sm text-white/70 hover:text-white transition-colors group"
-                >
-                  {link.name}
-                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-purple to-orange group-hover:w-full transition-all duration-300" />
-                </button>
-              ))}
+              {navLinks.map((link) => renderNavLink(link))}
             </div>
 
             {/* CTA Buttons */}
@@ -114,15 +151,27 @@ const Navigation = () => {
         />
         <div className="absolute top-20 left-0 right-0 p-6">
           <div className="flex flex-col gap-4">
-            {navLinks.map((link) => (
-              <button
-                key={link.name}
-                onClick={() => scrollToSection(link.href)}
-                className="font-display font-semibold text-2xl text-white/80 hover:text-white text-left py-3 border-b border-purple/20"
-              >
-                {link.name}
-              </button>
-            ))}
+            {navLinks.map((link) =>
+              link.to ? (
+                <Link
+                  key={link.name}
+                  to={link.to}
+                  className="font-display font-semibold text-2xl text-white/80 hover:text-white text-left py-3 border-b border-purple/20"
+                  onClick={(e) => handleHashNavClick(e, link.to!)}
+                >
+                  {link.name}
+                </Link>
+              ) : (
+                <button
+                  key={link.name}
+                  type="button"
+                  onClick={() => scrollToSection(link.href!)}
+                  className="font-display font-semibold text-2xl text-white/80 hover:text-white text-left py-3 border-b border-purple/20"
+                >
+                  {link.name}
+                </button>
+              ),
+            )}
             <div className="flex flex-col gap-3 mt-6">
               <Button asChild className="w-full font-display font-semibold bg-gradient-to-r from-purple to-orange text-white">
                 <Link to="/app" onClick={() => setIsMobileMenuOpen(false)}>

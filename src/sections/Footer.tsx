@@ -12,11 +12,11 @@ const Footer = () => {
       { name: 'Wallet-Based Records', href: '#' },
     ],
     games: [
-      { name: 'FC 26', href: '#' },
-      { name: 'Valorant', href: '#' },
-      { name: 'CS2', href: '#' },
-      { name: '2K26', href: '#' },
-      { name: 'Call of Duty', href: '#' },
+      { name: 'FC 26', href: '/#battles' },
+      { name: 'Valorant', href: '/#battles' },
+      { name: 'CS2', href: '/#battles' },
+      { name: '2K26', href: '/#battles' },
+      { name: 'Call of Duty', href: '/#battles' },
     ],
     company: [
       { name: 'Whitepaper', to: '/whitepaper' },

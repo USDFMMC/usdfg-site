@@ -133,7 +133,7 @@ const LiveMatches = () => {
   return (
     <section
       ref={sectionRef}
-      id="matches"
+      id="battles"
       className="relative py-24 lg:py-32 w-full"
     >
       {/* Background */}

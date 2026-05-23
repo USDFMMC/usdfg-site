@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo, Suspense, lazy, useRef } from "react";
-import { Helmet } from "react-helmet";
+import SeoHead from "@/components/SeoHead";
+import { buildChallengeSharePayload, challengeSeoFromTitle } from "@/lib/seo";
 import ElegantNotification from "@/components/ui/ElegantNotification";
 import { AppConfirmModal } from "@/components/ui/AppConfirmModal";
 import { Link, useLocation } from "react-router-dom";
@@ -2403,20 +2404,24 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
   const handleShareChallenge = async (challenge: any) => {
     try {
-      // Create shareable URL
-      const shareUrl = `${window.location.origin}/app?challenge=${challenge.id}`;
-      
-      // Create share text
-      const shareText = `🎮 Join my USDFG Arena challenge!\n\n"${challenge.title}"\n💰 ${challenge.entryFee} USDFG Entry • 🏆 ${challenge.prizePool} USDFG Reward\n🎯 ${extractGameFromTitle(challenge.title)} • ${getGameCategory(extractGameFromTitle(challenge.title))}\n\nJoin now: ${shareUrl}`;
-      
+      const game = extractGameFromTitle(challenge.title);
+      const { title, text, url } = buildChallengeSharePayload({
+        id: challenge.id,
+        title: challenge.title,
+        entryFee: challenge.entryFee,
+        prizePool: challenge.prizePool,
+        gameLabel: game,
+        categoryLabel: getGameCategory(game),
+      });
+
       // Try to use Web Share API if available (mobile)
       // CRITICAL FIX: Check both navigator.share existence AND that it's a function
       if (typeof navigator !== 'undefined' && navigator.share && typeof navigator.share === 'function') {
         try {
           await navigator.share({
-            title: `USDFG Arena Challenge: ${challenge.title}`,
-            text: shareText,
-            url: shareUrl
+            title,
+            text,
+            url,
           });
           // If share succeeds, return early (user shared successfully)
           return;
@@ -2434,22 +2439,26 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       try {
         // Check if clipboard API is available
         if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-          await navigator.clipboard.writeText(shareText);
+          await navigator.clipboard.writeText(`${text}\n\n${url}`);
           showAppToast("Challenge link copied to clipboard. Share it with your friends.", "success", "Copied");
         } else {
           // Last resort: show share text in prompt (works everywhere)
           throw new Error('Clipboard not available');
         }
       } catch (clipboardError: any) {
-        const shareUrl = `${window.location.origin}/app?challenge=${challenge.id}`;
-        const shareText = `🎮 Join my USDFG Arena challenge!\n\n"${challenge.title}"\n💰 ${challenge.entryFee} USDFG Entry • 🏆 ${challenge.prizePool} USDFG Reward\n🎯 ${extractGameFromTitle(challenge.title)} • ${getGameCategory(extractGameFromTitle(challenge.title))}\n\nJoin now: ${shareUrl}`;
-        showAppToast(`${shareText}\n\n(Copy the text above if needed.)`, "info", "Share this challenge");
+        showAppToast(`${text}\n\n${url}\n\n(Copy the text above if needed.)`, "info", "Share this challenge");
       }
     } catch (error: any) {
       console.error('Error sharing challenge:', error);
-      const shareUrl = `${window.location.origin}/app?challenge=${challenge.id}`;
-      const shareText = `🎮 Join my USDFG Arena challenge!\n\n"${challenge.title}"\n💰 ${challenge.entryFee} USDFG Entry • 🏆 ${challenge.prizePool} USDFG Reward\n🎯 ${extractGameFromTitle(challenge.title)} • ${getGameCategory(extractGameFromTitle(challenge.title))}\n\nJoin now: ${shareUrl}`;
-      showAppToast(`${shareText}\n\n(Copy the text above if needed.)`, "info", "Share this challenge");
+      const { text, url } = buildChallengeSharePayload({
+        id: challenge.id,
+        title: challenge.title,
+        entryFee: challenge.entryFee,
+        prizePool: challenge.prizePool,
+        gameLabel: extractGameFromTitle(challenge.title),
+        categoryLabel: getGameCategory(extractGameFromTitle(challenge.title)),
+      });
+      showAppToast(`${text}\n\n${url}\n\n(Copy the text above if needed.)`, "info", "Share this challenge");
     }
   };
   
@@ -5652,12 +5661,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     );
   };
 
+  const challengeSeo =
+    selectedChallenge?.id && selectedChallenge?.title
+      ? challengeSeoFromTitle(selectedChallenge.title, selectedChallenge.id)
+      : null;
+
   return (
     <>
-      <Helmet>
-        <title>USDFG Arena | USDFG.PRO</title>
-        <meta name="description" content="Enter the USDFG Arena - Compete in skill-based challenges, earn USDFG, and prove your gaming prowess." />
-      </Helmet>
+      {challengeSeo ? <SeoHead {...challengeSeo} /> : null}
 
       <div className="relative min-h-screen w-full bg-void text-zinc-100 overflow-x-hidden">
         <ParticleBackground />

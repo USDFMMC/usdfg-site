@@ -1,4 +1,6 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
+import SeoHead from '@/components/SeoHead';
+import { seoForPath } from '@/lib/seo';
 import Landing from './pages/Landing';
 import ArenaRoute from './pages/ArenaRoute';
 import ArenaApp from './pages/ArenaApp';
@@ -19,8 +21,13 @@ import AdminLayout from './layouts/AdminLayout';
  * match deep links and the catch-all can behave incorrectly.
  */
 function App() {
+  const location = useLocation();
+  const seo = seoForPath(location.pathname, location.search);
+
   return (
-    <Routes>
+    <>
+      <SeoHead {...seo} />
+      <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/home" element={<Landing />} />
 
@@ -47,6 +54,7 @@ function App() {
 
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
+    </>
   );
 }
 

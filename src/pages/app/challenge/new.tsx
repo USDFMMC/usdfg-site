@@ -1,5 +1,4 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { Helmet } from "react-helmet";
 import { Link, useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Button } from "@/components/ui/button";
@@ -133,14 +132,6 @@ const CreateChallenge: React.FC = () => {
         type={notification.type}
         duration={5000}
       />
-      <Helmet>
-        <title>Start Match - USDFG Arena | USDFG.PRO</title>
-        <meta
-          name="description"
-          content="Create a new skill-based gaming challenge in the USDFG Arena."
-        />
-      </Helmet>
-
       <div className="min-h-screen relative bg-void">
         <ParticleBackground />
         <header className="border-b border-soft bg-background-2/80 backdrop-blur-sm neocore-panel relative z-10">
