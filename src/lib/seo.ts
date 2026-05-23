@@ -5,7 +5,7 @@ export const SITE_ORIGIN =
 
 /** Dedicated Open Graph image — black-background USDFG logo (public/og-image.png). */
 export const OG_IMAGE_PATH = '/og-image.png';
-export const OG_IMAGE_VERSION = '2';
+export const OG_IMAGE_VERSION = '3';
 export const OG_IMAGE_URL = `${SITE_ORIGIN}${OG_IMAGE_PATH}?v=${OG_IMAGE_VERSION}`;
 
 export const OG_IMAGE_WIDTH = 1024;
