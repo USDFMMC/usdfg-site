@@ -4,6 +4,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Trophy, FileText } from 'lucide-react';
+import { isIOSSafari, prefersReducedMotion, runAfterFirstPaint } from '@/lib/utils/device';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -17,89 +18,100 @@ const Hero = () => {
   const imageRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const ctx = gsap.context(() => {
-      // Initial states
-      gsap.set(titleRef.current, { opacity: 0, y: 60 });
-      gsap.set(subtitleRef.current, { opacity: 0, y: 40 });
-      gsap.set(ctaRef.current, { opacity: 0, y: 30 });
-      gsap.set(statsRef.current, { opacity: 0, y: 30 });
-      gsap.set(imageRef.current, { scale: 1.2, opacity: 0 });
-
-      // Entrance timeline
-      const tl = gsap.timeline({ delay: 0.3 });
-
-      tl.to(imageRef.current, {
-        scale: 1,
+  if (prefersReducedMotion()) {
+      gsap.set([titleRef.current, subtitleRef.current, ctaRef.current, statsRef.current], {
         opacity: 1,
-        duration: 1.8,
-        ease: 'power3.out',
-      })
-        .to(
-          titleRef.current,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 1,
-            ease: 'power3.out',
-          },
-          '-=1.2'
-        )
-        .to(
-          subtitleRef.current,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.8,
-            ease: 'power3.out',
-          },
-          '-=0.6'
-        )
-        .to(
-          ctaRef.current,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.6,
-            ease: 'back.out(1.7)',
-          },
-          '-=0.4'
-        )
-        .to(
-          statsRef.current,
-          {
-            opacity: 1,
-            y: 0,
-            duration: 0.6,
-            ease: 'power3.out',
-          },
-          '-=0.3'
-        );
-
-      // Scroll parallax
-      gsap.to(contentRef.current, {
-        y: -100,
-        ease: 'none',
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: 'top top',
-          end: 'bottom top',
-          scrub: 1,
-        },
+        y: 0,
       });
+      gsap.set(imageRef.current, { scale: 1, opacity: 1 });
+      return;
+    }
 
-      gsap.to(imageRef.current, {
-        y: 50,
-        ease: 'none',
-        scrollTrigger: {
-          trigger: sectionRef.current,
-          start: 'top top',
-          end: 'bottom top',
-          scrub: 1,
-        },
-      });
-    }, sectionRef);
+    return runAfterFirstPaint(() => {
+      const ctx = gsap.context(() => {
+        const lite = isIOSSafari();
+        gsap.set(titleRef.current, { opacity: 0, y: lite ? 24 : 60 });
+        gsap.set(subtitleRef.current, { opacity: 0, y: lite ? 16 : 40 });
+        gsap.set(ctaRef.current, { opacity: 0, y: lite ? 12 : 30 });
+        gsap.set(statsRef.current, { opacity: 0, y: lite ? 12 : 30 });
+        gsap.set(imageRef.current, { scale: lite ? 1.05 : 1.2, opacity: 0 });
 
-    return () => ctx.revert();
+        const tl = gsap.timeline({ delay: lite ? 0.05 : 0.3 });
+
+        tl.to(imageRef.current, {
+          scale: 1,
+          opacity: 1,
+          duration: lite ? 0.9 : 1.8,
+          ease: 'power3.out',
+        })
+          .to(
+            titleRef.current,
+            {
+              opacity: 1,
+              y: 0,
+              duration: lite ? 0.6 : 1,
+              ease: 'power3.out',
+            },
+            lite ? '-=0.5' : '-=1.2'
+          )
+          .to(
+            subtitleRef.current,
+            {
+              opacity: 1,
+              y: 0,
+              duration: lite ? 0.5 : 0.8,
+              ease: 'power3.out',
+            },
+            '-=0.4'
+          )
+          .to(
+            ctaRef.current,
+            {
+              opacity: 1,
+              y: 0,
+              duration: 0.6,
+              ease: lite ? 'power3.out' : 'back.out(1.7)',
+            },
+            '-=0.3'
+          )
+          .to(
+            statsRef.current,
+            {
+              opacity: 1,
+              y: 0,
+              duration: 0.6,
+              ease: 'power3.out',
+            },
+            '-=0.3'
+          );
+
+        if (!lite) {
+          gsap.to(contentRef.current, {
+            y: -100,
+            ease: 'none',
+            scrollTrigger: {
+              trigger: sectionRef.current,
+              start: 'top top',
+              end: 'bottom top',
+              scrub: 1,
+            },
+          });
+
+          gsap.to(imageRef.current, {
+            y: 50,
+            ease: 'none',
+            scrollTrigger: {
+              trigger: sectionRef.current,
+              start: 'top top',
+              end: 'bottom top',
+              scrub: 1,
+            },
+          });
+        }
+      }, sectionRef);
+
+      return () => ctx.revert();
+    });
   }, []);
 
   const stats = [
@@ -123,6 +135,10 @@ const Hero = () => {
           src="/hero-bg.jpg"
           alt="Esports Arena"
           className="w-full h-full object-cover"
+          width={1344}
+          height={768}
+          decoding="async"
+          fetchPriority="high"
         />
         {/* Gradient Overlays */}
         <div className="absolute inset-0 bg-gradient-to-r from-void via-void/80 to-transparent" />
@@ -152,7 +168,7 @@ const Hero = () => {
       >
         <div className="max-w-4xl">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 mb-6 glass rounded-full border border-purple/30">
+          <div className="inline-flex items-center gap-2 px-4 py-2 mb-6 glass rounded-full border border-purple/30 max-md:backdrop-blur-sm">
             <Trophy className="w-4 h-4 text-orange" />
             <span className="font-body text-sm text-white/80">
               Skill-Based Esports Arena
@@ -226,9 +242,12 @@ const Hero = () => {
       {/* Decorative Elements */}
       <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-void to-transparent z-[5]" />
       
-      {/* Floating Orbs */}
-      <div className="absolute top-1/4 right-1/4 w-64 h-64 bg-purple/20 rounded-full blur-[100px] animate-pulse-glow" />
-      <div className="absolute bottom-1/3 right-1/3 w-48 h-48 bg-orange/10 rounded-full blur-[80px] animate-pulse-glow" style={{ animationDelay: '1s' }} />
+      {/* Floating Orbs — reduced blur on mobile Safari */}
+      <div className="absolute top-1/4 right-1/4 w-64 h-64 bg-purple/20 rounded-full blur-[100px] animate-pulse-glow max-md:blur-[60px] max-md:opacity-60" />
+      <div
+        className="absolute bottom-1/3 right-1/3 w-48 h-48 bg-orange/10 rounded-full blur-[80px] animate-pulse-glow max-md:blur-[48px] max-md:opacity-50"
+        style={{ animationDelay: '1s' }}
+      />
     </section>
   );
 };

@@ -213,6 +213,10 @@ const Leaderboard = () => {
                           src={player.avatar}
                           alt={player.name}
                           className="w-full h-full object-cover animate-float"
+                          loading="lazy"
+                          decoding="async"
+                          width={256}
+                          height={256}
                         />
                       </div>
                     </div>

@@ -3,6 +3,7 @@ import {
   DEFAULT_DESCRIPTION,
   DEFAULT_TITLE,
   DEFAULT_TWITTER_DESCRIPTION,
+  OG_IMAGE_ALT,
   OG_IMAGE_HEIGHT,
   OG_IMAGE_URL,
   OG_IMAGE_WIDTH,
@@ -42,13 +43,14 @@ export default function SeoHead({
       <meta property="og:image:type" content="image/png" />
       <meta property="og:image:width" content={String(OG_IMAGE_WIDTH)} />
       <meta property="og:image:height" content={String(OG_IMAGE_HEIGHT)} />
-      <meta property="og:image:alt" content={`${SITE_NAME} logo`} />
+      <meta property="og:image:alt" content={OG_IMAGE_ALT} />
 
-      <meta name="twitter:card" content="summary" />
+      <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:site" content="@usdfgaming" />
       <meta name="twitter:title" content={title} />
       <meta name="twitter:description" content={DEFAULT_TWITTER_DESCRIPTION} />
       <meta name="twitter:image" content={OG_IMAGE_URL} />
+      <meta name="twitter:image:alt" content={OG_IMAGE_ALT} />
     </Helmet>
   );
 }

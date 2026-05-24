@@ -3,13 +3,14 @@ export const SITE_ORIGIN =
   (import.meta.env.VITE_SITE_ORIGIN as string | undefined)?.replace(/\/$/, '') ||
   'https://usdfg.pro';
 
-/** Dedicated Open Graph image — black-background USDFG logo (public/og-image.png). */
+/** Dedicated Open Graph image — 1200×630 black USDFG banner (public/og-image.png). */
 export const OG_IMAGE_PATH = '/og-image.png';
-export const OG_IMAGE_VERSION = '3';
+export const OG_IMAGE_VERSION = '4';
 export const OG_IMAGE_URL = `${SITE_ORIGIN}${OG_IMAGE_PATH}?v=${OG_IMAGE_VERSION}`;
 
-export const OG_IMAGE_WIDTH = 1024;
-export const OG_IMAGE_HEIGHT = 1024;
+export const OG_IMAGE_WIDTH = 1200;
+export const OG_IMAGE_HEIGHT = 630;
+export const OG_IMAGE_ALT = 'USDFG — Skill-Based Esports Arena';
 
 export const SITE_NAME = 'USDFG';
 

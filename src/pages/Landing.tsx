@@ -11,6 +11,7 @@ import SupportedGames from '../sections/SupportedGames';
 import CTA from '../sections/CTA';
 import Footer from '../sections/Footer';
 import ParticleBackground from '../components/ParticleBackground';
+import { runAfterFirstPaint } from '@/lib/utils/device';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -19,11 +20,12 @@ function Landing() {
   const mainRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const ctx = gsap.context(() => {
-      ScrollTrigger.refresh();
-    }, mainRef);
-
-    return () => ctx.revert();
+    return runAfterFirstPaint(() => {
+      const ctx = gsap.context(() => {
+        ScrollTrigger.refresh();
+      }, mainRef);
+      return () => ctx.revert();
+    });
   }, []);
 
   useEffect(() => {
