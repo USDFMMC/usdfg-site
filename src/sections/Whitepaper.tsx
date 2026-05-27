@@ -304,32 +304,28 @@ const Whitepaper = () => {
               <div className="glass border border-purple/20 rounded-xl p-4">
                 <p className="font-display font-bold text-lg text-white mb-2">65% Public Trading</p>
                 <p className="font-body text-white/70 text-sm">
-                  Non-custodial, open market supply. No presale, no early access, no staking. Equal
-                  acquisition opportunity via public decentralized exchanges.
+                  Non-custodial, open market supply. No presale, no early access, no staking. Public acquisition
+                  through decentralized exchanges.
                 </p>
               </div>
               <div className="glass border border-purple/20 rounded-xl p-4">
-                <p className="font-display font-bold text-lg text-white mb-2">15% Core Reserve</p>
+                <p className="font-display font-bold text-lg text-white mb-2">15% Founder Allocation</p>
                 <p className="font-body text-white/70 text-sm">
-                  Reserved for long-term ecosystem growth, platform expansion, strategic initiatives,
-                  and founder alignment. This allocation reflects long-term commitment to the
-                  platform and may be utilized responsibly to support continued development,
-                  sustainability, and operational needs. Allocation remains transparent and
-                  on-chain.
+                  Allocated to the founder of USDFG as a transparent long-term ownership allocation. Allocation
+                  remains visible and on-chain.
                 </p>
               </div>
               <div className="glass border border-purple/20 rounded-xl p-4">
                 <p className="font-display font-bold text-lg text-white mb-2">10% Development & Operations</p>
                 <p className="font-body text-white/70 text-sm">
-                  Platform development, infrastructure, scaling, and operations. Includes allocation
-                  for external contributors and technical partners.
+                  Platform development, infrastructure, scaling, and operational support.
                 </p>
               </div>
               <div className="glass border border-purple/20 rounded-xl p-4">
                 <p className="font-display font-bold text-lg text-white mb-2">10% Rewards & Challenges</p>
                 <p className="font-body text-white/70 text-sm">
-                  Skill-based tournaments, no-entry-fee promotions, new player incentives, and
-                  limited challenge events.
+                  Skill-based tournaments, no-entry-fee promotions, player incentives, and limited challenge
+                  events.
                 </p>
               </div>
             </div>
