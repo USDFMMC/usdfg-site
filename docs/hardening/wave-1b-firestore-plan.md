@@ -1,14 +1,10 @@
 # Wave 1B — Firestore rules plan (plan only)
 
-> ## ⚠️ Production hardening incomplete without Wave 1B
->
-> Wave 1A **does not** fully lock `status` or replace the broad gameplay exception.  
-> **Production hardening is not complete** until Wave 1B ships and QA re-runs.  
-> **Do not implement** until `qa-results-template.md` is collected on staging.
+> **Plan only.** Wave 1A does not fully lock `status`. Implement when devnet flows are stable on Preview.
 
 **Status:** Not implemented. Builds on Wave 1A (`safety/prelaunch-hardening-p0`).  
 **Goal:** Close remaining integrity gaps without breaking devnet gameplay.  
-**Prerequisite:** Complete `qa-results-template.md` on staging with Wave 1A rules deployed.
+**Prerequisite:** Smoke-test create/join/play on devnet after Wave 1A (see [`README.md`](./README.md)).
 
 ---
 
@@ -29,7 +25,7 @@
 2. **Replace broad gameplay helper** with **named transition allowlists** (one helper per transition).
 3. **Prevent participant-forged terminal completion** — `completed` only via allowed transitions that include required co-fields.
 4. **Reserve terminal resolution fields** for server + claim paths only (see table below).
-5. **Preserve devnet flows** in `qa-results-template.md` flows 1–12.
+5. **Preserve devnet flows** (create, join, fund, active, results, claim).
 
 ---
 
@@ -89,7 +85,7 @@ Remove monolithic `isParticipantGameplayResolutionUpdate()`.
 | **1B-2** | Split gameplay helper into T4–T7 allowlists | Medium |
 | **1B-3** | Tighten completion: require prior `results` keys or `awaiting_auto_resolution` for `completed` | Medium |
 | **1B-4** | Optional: callable `enableChallengePayout` for T9 instead of client | Low–medium |
-| **1B-5** | Rules emulator tests + full `qa-results-template.md` re-run | — |
+| **1B-5** | Rules emulator + devnet smoke re-run | — |
 
 ---
 

@@ -1,13 +1,10 @@
 # P0.3 — Dispute resolution unification plan (plan only)
 
-> ## ⚠️ Lobby Firestore-only admin resolve — deprecated for QA sign-off
->
-> Until P0.3 is implemented, QA must use **`/admin/disputes` only** for flow 9.  
-> Lobby `resolveAdminChallenge()` (no on-chain tx) must **not** count as Pass.
+> **Plan only.** Until implemented, use **`/admin/disputes`** for disputes — not lobby Firestore-only resolve.
 
 **Status:** Not implemented.  
 **Goal:** Single canonical admin dispute path; eliminate Firestore-only lobby resolve.  
-**Prerequisite:** Wave 1A on staging; recommend Wave 1B status work in parallel or after P0.3.
+**Prerequisite:** Wave 1A on `usdfg-app`; optional Wave 1B in parallel.
 
 ---
 

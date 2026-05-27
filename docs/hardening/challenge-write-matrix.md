@@ -1,7 +1,7 @@
 # Challenge write matrix (source of truth)
 
-> **Wave 1A:** `status` not fully locked — **Wave 1B required** for production hardening.  
-> **QA:** Lobby `resolveAdminChallenge` = deprecated; canonical admin path = `/admin/disputes`.
+> **Wave 1A:** `status` not fully locked — see [`wave-1b-firestore-plan.md`](./wave-1b-firestore-plan.md).  
+> **Disputes:** `/admin/disputes` only — not lobby `resolveAdminChallenge`. Overview: [`README.md`](./README.md).
 
 **Purpose:** Map every `challenges/{id}` write path for Firestore rules hardening (Wave 1A+).  
 **Last updated:** Pre-launch hardening Phase 1.  
