@@ -92,7 +92,7 @@ Admin selects winner in Dispute Console
 
 ## Devnet testing after P0.3
 
-Re-run QA template flows:
+Re-run devnet smoke flows:
 
 - **7** Trigger dispute  
 - **9** Admin resolve **only** via `/admin/disputes`  

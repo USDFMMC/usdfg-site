@@ -102,7 +102,7 @@ Remove monolithic `isParticipantGameplayResolutionUpdate()`.
 
 - Abuse test **H** (`status: completed` only) → **Deny**
 - Abuse forged `completed` + `winner` + `needsPayout` without valid prior state → **Deny**
-- All 12 gameplay flows in QA template still **Pass** on devnet
+- Devnet smoke flows still **Pass** (create through claim)
 
 ---
 
