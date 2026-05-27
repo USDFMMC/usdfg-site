@@ -1,7 +1,14 @@
 # Devnet QA results — pre-launch hardening
 
+> ## ⚠️ QA sign-off rules
+>
+> - **Lobby Firestore-only admin resolve** (`StandardChallengeLobby` “Creator wins / Challenger wins”) is **deprecated** — **do not** mark flow **9** Pass if used.
+> - **Flow 9 Pass** requires **`/admin/disputes`** only (on-chain → `finalizeAdminChallengeDispute` → Firestore).
+> - **Wave 1A** does **not** fully lock `status` — abuse test **H** may **Allow**; document it.
+> - **Wave 1B is required** before production hardening is complete. Do **not** implement 1B/P0.3 until this template is filled and reviewed.
+
 **Purpose:** Record pass/fail evidence for `safety/prelaunch-hardening-p0` before merge to `main`.  
-**Related:** `challenge-write-matrix.md`, `firestore.rules` (Wave 1A).
+**Related:** `qa-execution-order.md`, `staging-devnet-qa-runbook.md`, `challenge-write-matrix.md`, `firestore.rules` (Wave 1A).
 
 ---
 
@@ -155,7 +162,7 @@
 | **Route** | `/admin/disputes` or `/console-7x9a/disputes` |
 | **Wallet role** | Admin (`admins/{auth.uid}` in Firebase + wallet signature) |
 | **Expected flow** | 1) On-chain `resolve_admin` 2) `finalizeAdminChallengeDispute` 3) Firestore `completed` + payout flags |
-| **Do not use** | Lobby “resolve dispute” buttons (Firestore-only — expected **permission-denied** under Wave 1A rules) |
+| **Do not use** | ⛔ Lobby “Creator wins / Challenger wins” — **deprecated for QA sign-off** (Firestore-only; not canonical) |
 | **Expected Firestore** | `status: completed`, `winner`, `needsPayout`, `canClaim`, `payoutStatus: pending`, `resolutionType: admin`, `adminResolutionTx` |
 | **Actual result** | |
 | **Console errors** | |

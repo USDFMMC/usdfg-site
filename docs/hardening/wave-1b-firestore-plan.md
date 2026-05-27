@@ -1,5 +1,11 @@
 # Wave 1B — Firestore rules plan (plan only)
 
+> ## ⚠️ Production hardening incomplete without Wave 1B
+>
+> Wave 1A **does not** fully lock `status` or replace the broad gameplay exception.  
+> **Production hardening is not complete** until Wave 1B ships and QA re-runs.  
+> **Do not implement** until `qa-results-template.md` is collected on staging.
+
 **Status:** Not implemented. Builds on Wave 1A (`safety/prelaunch-hardening-p0`).  
 **Goal:** Close remaining integrity gaps without breaking devnet gameplay.  
 **Prerequisite:** Complete `qa-results-template.md` on staging with Wave 1A rules deployed.

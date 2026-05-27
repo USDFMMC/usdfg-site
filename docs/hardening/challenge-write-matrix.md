@@ -1,5 +1,8 @@
 # Challenge write matrix (source of truth)
 
+> **Wave 1A:** `status` not fully locked — **Wave 1B required** for production hardening.  
+> **QA:** Lobby `resolveAdminChallenge` = deprecated; canonical admin path = `/admin/disputes`.
+
 **Purpose:** Map every `challenges/{id}` write path for Firestore rules hardening (Wave 1A+).  
 **Last updated:** Pre-launch hardening Phase 1.  
 **Rules file:** `firestore.rules` (`challengePrivilegedFieldsOk` and helpers).
