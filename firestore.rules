@@ -156,28 +156,22 @@ service cloud.firestore {
      * Wave 1A — block forging privileged payout/admin fields; preserve gameplay + claim paths above.
      */
     function challengePrivilegedFieldsOk() {
-      if (isAdminUser()) {
-        return true;
-      }
-      if (isParticipantPayoutClaimUpdate()) {
-        return true;
-      }
-      if (isParticipantGameplayResolutionUpdate()) {
-        return true;
-      }
-      return !challengeUpdateDiff().hasAny([
-        'winner',
-        'payoutStatus',
-        'payoutLockOwner',
-        'needsPayout',
-        'canClaim',
-        'payoutTriggered',
-        'prizeClaimedAt',
-        'resolvedBy',
-        'resolvedAt',
-        'adminResolutionTx',
-        'statsApplied'
-      ]);
+      return isAdminUser()
+        || isParticipantPayoutClaimUpdate()
+        || isParticipantGameplayResolutionUpdate()
+        || !challengeUpdateDiff().hasAny([
+          'winner',
+          'payoutStatus',
+          'payoutLockOwner',
+          'needsPayout',
+          'canClaim',
+          'payoutTriggered',
+          'prizeClaimedAt',
+          'resolvedBy',
+          'resolvedAt',
+          'adminResolutionTx',
+          'statsApplied'
+        ]);
     }
 
     // Canonical user
