@@ -71,7 +71,8 @@ service cloud.firestore {
           'status',
           'pendingJoiner',
           'opponentWallet',
-          'creatorFundingDeadline'
+          'creatorFundingDeadline',
+          'updatedAt'
         ]);
     }
 

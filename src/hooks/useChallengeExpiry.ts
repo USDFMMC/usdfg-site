@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { updateChallengeStatus, cleanupExpiredChallenge, cleanupCompletedChallenge, archiveChallenge, revertCreatorTimeout } from "../lib/firebase/firestore";
+import { updateChallengeStatus, cleanupCompletedChallenge, archiveChallenge, revertCreatorTimeout } from "../lib/firebase/firestore";
 
 /**
  * Watches all active challenges and auto-marks them completed when expired.
@@ -90,23 +90,8 @@ export function useChallengeExpiry(challenges: any[]) {
           }
         }
         
-        // Auto-cleanup expired challenges (delete immediately to save storage)
-        if (challenge.status === "expired" && !archiveTimers.current.has(challenge.id) && !processedChallenges.current.has(challenge.id + '_cleanup')) {
-          console.log("🗑️ Found expired challenge that needs cleanup:", challenge.id);
-          processedChallenges.current.add(challenge.id + '_cleanup');
-
-          // Cleanup immediately (no need to wait since it's already expired)
-          setTimeout(async () => {
-            try {
-              await cleanupExpiredChallenge(challenge.id);
-              console.log("🏁 Expired challenge cleaned up:", challenge.id);
-              processedChallenges.current.delete(challenge.id + '_cleanup');
-            } catch (error) {
-              console.error("❌ Failed to cleanup expired challenge:", error);
-              processedChallenges.current.delete(challenge.id + '_cleanup');
-            }
-          }, 1000); // Short delay to show "Expired" status
-        }
+        // Wave 1A: client cleanupExpiredChallenge disabled (allow delete: if false on challenges).
+        // Expired rows may remain until server-side cleanup is implemented.
 
         // Auto-cleanup completed challenges (delete after short retention window)
         if (challenge.status === "completed" && !archiveTimers.current.has(challenge.id) && !processedChallenges.current.has(challenge.id + '_cleanup_completed')) {

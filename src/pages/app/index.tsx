@@ -30,7 +30,6 @@ import {
   revertCreatorTimeout,
   revertJoinerTimeout,
   expirePendingChallenge,
-  cleanupExpiredChallenge,
   submitChallengeResult,
   acknowledgeWarmupComplete,
   acknowledgeOfficialMatchReady,
@@ -4881,6 +4880,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
   // Auto-delete expired challenges to save Firebase storage
   useEffect(() => {
+    // Wave 1A: client deleteDoc on challenges is denied — disable until Admin SDK cleanup exists.
+    return;
     if (!challenges.length || showMyChallenges) return; // Don't delete user's own challenges
     
     const now = Date.now();
