@@ -12,7 +12,7 @@ const navItems = [
   { id: 'trust-badges', label: 'Trust & Compliance Badges' },
   { id: 'vision', label: 'Vision & Mission' },
   { id: 'token-utility', label: 'Token Utility & Legal Framing' },
-  { id: 'tokenomics', label: 'Tokenomics & Distribution' },
+  { id: 'tokenomics', label: 'Supply & Allocation' },
   { id: 'security', label: 'Security & Self-Custody' },
   { id: 'roadmap', label: 'Roadmap' },
   { id: 'policies', label: 'Related Policies' },
@@ -295,7 +295,7 @@ const Whitepaper = () => {
           <section id="tokenomics" className="mb-12">
             <h3 className="font-display font-bold text-2xl text-white mb-4 flex items-center gap-2">
               <Coins className="w-6 h-6 text-purple" />
-              Tokenomics & Distribution
+              Supply & Allocation
             </h3>
             <p className="font-body text-white/80 font-semibold mb-6">
               Total Supply: 21,000,000 USDFG (Fixed, non-inflationary)
@@ -311,19 +311,19 @@ const Whitepaper = () => {
               <div className="glass border border-purple/20 rounded-xl p-4">
                 <p className="font-display font-bold text-lg text-white mb-2">15% Founder Allocation</p>
                 <p className="font-body text-white/70 text-sm">
-                  Transparent, long-term founder ownership allocation. Remains visible and on-chain.
+                  Transparent founder allocation. Visible and on-chain.
                 </p>
               </div>
               <div className="glass border border-purple/20 rounded-xl p-4">
                 <p className="font-display font-bold text-lg text-white mb-2">10% Development & Operations</p>
                 <p className="font-body text-white/70 text-sm">
-                  Core platform development, infrastructure, scaling, and operations.
+                  Platform development, infrastructure, scaling, and operations.
                 </p>
               </div>
               <div className="glass border border-purple/20 rounded-xl p-4">
                 <p className="font-display font-bold text-lg text-white mb-2">10% Rewards & Challenges</p>
                 <p className="font-body text-white/70 text-sm">
-                  Skill-based tournaments, no-entry-fee promotions, player incentives, and limited challenge events.
+                  Skill-based tournaments, no-entry-fee events, skill-based rewards, and limited challenge events.
                 </p>
               </div>
             </div>
