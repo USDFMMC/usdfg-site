@@ -147,6 +147,12 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
 
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 3;
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [currentStep]);
   const [connecting, setConnecting] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [attemptedNext, setAttemptedNext] = useState(false);

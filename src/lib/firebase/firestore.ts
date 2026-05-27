@@ -2826,11 +2826,8 @@ export const expirePendingChallenge = async (challengeId: string): Promise<boole
       return false;
     }
     
-    // Delete expired challenge immediately to save Firebase storage
-    await cleanupExpiredChallenge(challengeId);
-    
-    console.log('✅ Pending challenge expired and deleted:', challengeId);
-    return true;
+    // Wave 1A: client delete disabled — defer cleanup to Admin SDK job.
+    return false;
   } catch (error) {
     console.error('❌ Error deleting expired pending challenge:', error);
     return false;
@@ -2943,6 +2940,8 @@ export async function addChallengeDoc(data: any) {
 
 // Auto-cleanup for completed challenges (delete after short retention window)
 export async function cleanupCompletedChallenge(id: string) {
+  // Wave 1A: challenges/{id} client delete denied — no-op until server cleanup exists.
+  return;
   try {
     // CRITICAL: Double-check this is not an active tournament before deleting
     const challengeRef = doc(db, "challenges", id);
@@ -3010,6 +3009,8 @@ export async function cleanupCompletedChallenge(id: string) {
 
 // Auto-cleanup for expired challenges (delete immediately, except Founder Tournaments/Challenges)
 export async function cleanupExpiredChallenge(id: string) {
+  // Wave 1A: challenges/{id} client delete denied — no-op until server cleanup exists.
+  return;
   try {
     // CRITICAL: Double-check this is not an active tournament before deleting
     const challengeRef = doc(db, "challenges", id);

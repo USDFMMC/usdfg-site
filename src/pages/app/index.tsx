@@ -1249,11 +1249,20 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     fetchUsdfgPrice();
   }, [fetchUsdfgPrice]);
 
+  const lastUsdfgBalanceFetchRef = useRef(0);
+  const USDFG_BALANCE_MIN_INTERVAL_MS = 45_000;
+
   // Function to refresh USDFG balance (reusable)
-  const refreshUSDFGBalance = useCallback(async (): Promise<void> => {
+  const refreshUSDFGBalance = useCallback(async (options?: { force?: boolean }): Promise<void> => {
     if (!isConnected || !publicKey || !connection) {
       return;
     }
+
+    const now = Date.now();
+    if (!options?.force && now - lastUsdfgBalanceFetchRef.current < USDFG_BALANCE_MIN_INTERVAL_MS) {
+      return;
+    }
+    lastUsdfgBalanceFetchRef.current = now;
     
     try {
       const tokenAccount = await getAssociatedTokenAddress(USDFG_MINT, publicKey);
@@ -1282,7 +1291,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   /** After claim, align list + wallet + trust readout without a full reload (realtime listener may lag). */
   const resyncAfterClaimData = useCallback(async (): Promise<ChallengeData[] | null> => {
     const challenges = await refetchChallenges();
-    await refreshUSDFGBalance().catch(() => {});
+    await refreshUSDFGBalance({ force: true }).catch(() => {});
     const w = effectivePublicKey?.toString();
     if (w) {
       try {
@@ -1492,7 +1501,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     checkTimeouts();
 
     // Then check every 30 seconds
-    const interval = setInterval(checkTimeouts, 30000);
+    const interval = setInterval(checkTimeouts, 60000);
 
     return () => clearInterval(interval);
   }, [firestoreChallenges]);

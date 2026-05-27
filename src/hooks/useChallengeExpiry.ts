@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { updateChallengeStatus, cleanupCompletedChallenge, archiveChallenge, revertCreatorTimeout } from "../lib/firebase/firestore";
+import { updateChallengeStatus, revertCreatorTimeout } from "../lib/firebase/firestore";
 
 /**
  * Watches all active challenges and auto-marks them completed when expired.
@@ -8,8 +8,6 @@ import { updateChallengeStatus, cleanupCompletedChallenge, archiveChallenge, rev
 export function useChallengeExpiry(challenges: any[]) {
   const processedChallenges = useRef(new Set<string>());
   const archiveTimers = useRef(new Map<string, NodeJS.Timeout>());
-  const completedRetentionHours = 2;
-
   useEffect(() => {
     if (!challenges?.length) return;
 
@@ -69,21 +67,7 @@ export function useChallengeExpiry(challenges: any[]) {
             await updateChallengeStatus(challenge.id, "expired");
             console.log("✅ Challenge marked as expired:", challenge.id);
 
-            // Schedule archival after 5 seconds
-            const timer = setTimeout(async () => {
-              try {
-                await archiveChallenge(challenge.id);
-                console.log("🏁 Challenge archived:", challenge.id);
-                processedChallenges.current.delete(challenge.id);
-                archiveTimers.current.delete(challenge.id);
-              } catch (error) {
-                console.error("❌ Failed to archive challenge:", error);
-                processedChallenges.current.delete(challenge.id);
-                archiveTimers.current.delete(challenge.id);
-              }
-            }, 5000);
-
-            archiveTimers.current.set(challenge.id, timer);
+            // Wave 1A: client delete disabled — keep expired status only (no archive/delete).
           } catch (error) {
             console.error("❌ Failed to mark challenge as expired:", error);
             processedChallenges.current.delete(challenge.id);
@@ -93,72 +77,7 @@ export function useChallengeExpiry(challenges: any[]) {
         // Wave 1A: client cleanupExpiredChallenge disabled (allow delete: if false on challenges).
         // Expired rows may remain until server-side cleanup is implemented.
 
-        // Auto-cleanup completed challenges (delete after short retention window)
-        if (challenge.status === "completed" && !archiveTimers.current.has(challenge.id) && !processedChallenges.current.has(challenge.id + '_cleanup_completed')) {
-          // Check if this is a Founder Tournament or Founder Challenge
-          const entryFee = challenge.entryFee || 0;
-          const isFree = entryFee === 0 || entryFee < 0.000000001;
-          const raw = challenge.rawData;
-          const format = challenge.format ?? raw?.format;
-          const isTournament =
-            format === 'tournament' ||
-            challenge.tournament != null ||
-            raw?.tournament != null;
-          const founderParticipantReward = challenge.founderParticipantReward || 0;
-          const founderWinnerBonus = challenge.founderWinnerBonus || 0;
-          
-          // Import ADMIN_WALLET dynamically to check if creator is admin
-          let isFounderTournamentOrChallenge = false;
-          try {
-            const { ADMIN_WALLET } = await import("../lib/chain/config");
-            const creatorWallet = challenge.creator || '';
-            const isAdminCreator = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
-            
-            // Check if Founder Tournament (tournament with founder rewards)
-            const isFounderTournament = isTournament && 
-              isAdminCreator && 
-              isFree && 
-              (founderParticipantReward > 0 || founderWinnerBonus > 0);
-            
-            // Check if Founder Challenge (non-tournament, no PDA, admin creator, free)
-            const isFounderChallenge = !isTournament && 
-              !challenge.pda && 
-              (isFree || isAdminCreator);
-            
-            isFounderTournamentOrChallenge = isFounderTournament || isFounderChallenge;
-          } catch (error) {
-            console.error("Error checking Founder status:", error);
-          }
-          
-          // Use 24 hours retention for Founder Tournaments/Challenges, 2 hours for others
-          const retentionHours = isFounderTournamentOrChallenge ? 24 : completedRetentionHours;
-          
-          const completedTime = challenge.results
-            ? Math.max(
-                ...Object.values(
-                  challenge.results as Record<string, { submittedAt: { toMillis: () => number } }>
-                ).map((r) => r.submittedAt.toMillis())
-              )
-            : challenge.createdAt.toMillis();
-          
-          const hoursSinceCompletion = (Date.now() - completedTime) / (1000 * 60 * 60);
-          
-          if (hoursSinceCompletion >= retentionHours) {
-            console.log(`🗑️ Found completed challenge that needs cleanup (${retentionHours}h old):`, challenge.id);
-            processedChallenges.current.add(challenge.id + '_cleanup_completed');
-
-            setTimeout(async () => {
-              try {
-                await cleanupCompletedChallenge(challenge.id);
-                console.log(`🏁 Completed challenge cleaned up (${retentionHours}h old):`, challenge.id);
-                processedChallenges.current.delete(challenge.id + '_cleanup_completed');
-              } catch (error) {
-                console.error("❌ Failed to cleanup completed challenge:", error);
-                processedChallenges.current.delete(challenge.id + '_cleanup_completed');
-              }
-            }, 1000);
-          }
-        }
+        // Wave 1A: completed auto-cleanup off until server job exists.
       }
     };
 
@@ -166,7 +85,7 @@ export function useChallengeExpiry(challenges: any[]) {
     checkExpired();
 
     // Then check every 30 seconds
-    const interval = setInterval(checkExpired, 30000);
+    const interval = setInterval(checkExpired, 60000);
 
     return () => {
       clearInterval(interval);

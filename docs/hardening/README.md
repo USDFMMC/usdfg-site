@@ -29,7 +29,7 @@ Practical notes for `safety/prelaunch-hardening-p0`. **Not** a formal QA pipelin
 
 1. Work on `safety/prelaunch-hardening-p0` until stable; **do not merge `main`** until you choose to.
 2. `npm run dev` or Cloudflare **Preview** from the safety branch.
-3. Phantom on **devnet**; set `VITE_SOLANA_RPC_ENDPOINT` to a dedicated devnet RPC if public RPC rate-limits.
+3. Phantom on **devnet**; set `VITE_SOLANA_RPC_ENDPOINT` in Preview (e.g. Helius devnet URL) — avoids 429 on public RPC.
 4. After rules changes: `firebase deploy --only firestore:rules --project usdfg-app`
 5. Smoke: create → join → fund → play → results / dispute / admin / claim as needed.
 
