@@ -14,6 +14,7 @@ import CategoryDetailPage from './pages/app/category/[category]';
 import DisputeConsole from './pages/admin/DisputeConsole';
 import NotFoundPage from './pages/NotFoundPage';
 import AdminLayout from './layouts/AdminLayout';
+import StalePagesDeployBanner from '@/components/StalePagesDeployBanner';
 
 /**
  * Admin layout routes use `/*` on the parent so React Router v7 matches nested paths
@@ -27,6 +28,7 @@ function App() {
   return (
     <>
       <SeoHead {...seo} />
+      <StalePagesDeployBanner />
       <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/home" element={<Landing />} />

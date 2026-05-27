@@ -15,6 +15,9 @@ interface ImportMetaEnv {
   readonly VITE_USDFG_MINT?: string;
   readonly VITE_USDFG_ADMIN_WALLET?: string;
   readonly VITE_USDFG_PLATFORM_WALLET?: string;
+  /** Optional Cloudflare Preview labels (e.g. $CF_PAGES_BRANCH in build env). */
+  readonly VITE_DEPLOY_BRANCH?: string;
+  readonly VITE_DEPLOY_COMMIT?: string;
 }
 
 interface ImportMeta {
