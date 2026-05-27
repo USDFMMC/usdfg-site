@@ -2,6 +2,8 @@
 
 interface ImportMetaEnv {
   readonly VITE_SITE_ORIGIN?: string;
+  readonly VITE_APP_ENV?: string;
+  readonly VITE_SOLANA_CLUSTER?: string;
   readonly VITE_FIREBASE_API_KEY: string;
   readonly VITE_FIREBASE_AUTH_DOMAIN: string;
   readonly VITE_FIREBASE_PROJECT_ID: string;
@@ -9,6 +11,10 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_MESSAGING_SENDER_ID: string;
   readonly VITE_FIREBASE_APP_ID: string;
   readonly VITE_SOLANA_RPC_ENDPOINT?: string;
+  readonly VITE_USDFG_PROGRAM_ID?: string;
+  readonly VITE_USDFG_MINT?: string;
+  readonly VITE_USDFG_ADMIN_WALLET?: string;
+  readonly VITE_USDFG_PLATFORM_WALLET?: string;
 }
 
 interface ImportMeta {

@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
 import { inspectAttr } from 'kimi-plugin-inspect-react'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
+import { validateProductionSolanaEnv } from './vite-plugin-validate-production-env'
 
 // https://vite.dev/config/
 // Root-relative base so built JS/CSS resolve as /assets/* on deep links (e.g. /admin/disputes).
@@ -22,7 +23,12 @@ export default defineConfig({
       'borsh',
     ],
   },
-  plugins: [nodePolyfills({ include: ['stream'], globals: { Buffer: true, process: true } }), inspectAttr(), react()],
+  plugins: [
+    validateProductionSolanaEnv(),
+    nodePolyfills({ include: ['stream'], globals: { Buffer: true, process: true } }),
+    inspectAttr(),
+    react(),
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

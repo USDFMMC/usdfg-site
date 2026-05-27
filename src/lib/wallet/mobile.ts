@@ -16,6 +16,7 @@
  */
 
 import nacl from "tweetnacl";
+import { getPhantomClusterParam } from '../chain/environment';
 import { 
   isPhantomConnecting, 
   getPhantomConnectTimestamp, 
@@ -120,7 +121,7 @@ export function phantomMobileConnect() {
     `&dapp_encryption_public_key=${encodeURIComponent(dappPublicKeyBase64)}` +
     `&nonce=${encodeURIComponent(nonceBase64)}` +
     `&redirect_link=${encodeURIComponent(appUrl)}` +
-    `&cluster=devnet` +
+    `&cluster=${encodeURIComponent(getPhantomClusterParam())}` +
     `&scope=${encodeURIComponent("wallet:sign,wallet:signMessage,wallet:decrypt")}` +
     `&app_metadata_url=${encodeURIComponent(appMetadataUrl)}`;
 
@@ -155,7 +156,7 @@ export function phantomMobileConnect() {
   console.log("✅ dapp_encryption_public_key length:", dappPublicKeyBase64.length);
   console.log("✅ nonce length:", nonceBase64.length);
   console.log("✅ redirect_link:", appUrl);
-  console.log("✅ cluster: devnet");
+  console.log("✅ cluster:", getPhantomClusterParam());
   console.log("✅ scope: wallet:sign,wallet:signMessage,wallet:decrypt");
   console.log("✅ app_metadata_url:", appMetadataUrl);
   console.log("✅ All 7 required parameters included");

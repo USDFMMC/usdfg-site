@@ -1,53 +1,35 @@
 /**
- * Centralized RPC Configuration
- * 
- * Use environment variable VITE_SOLANA_RPC_ENDPOINT for custom RPC
- * Falls back to public devnet (rate-limited)
+ * Solana RPC endpoint resolution (environment-driven).
  */
 
 import { clusterApiUrl } from '@solana/web3.js';
+import { solanaCluster } from './environment';
 
-/**
- * Get the Solana RPC endpoint
- * Priority:
- * 1. Custom RPC from environment variable (recommended for production)
- * 2. Public devnet (rate-limited - development only)
- * 
- * To use a custom RPC, add to .env:
- * VITE_SOLANA_RPC_ENDPOINT=https://your-rpc-endpoint.com
- * 
- * Free RPC providers:
- * - Helius: https://www.helius.dev/ (100k requests/day free)
- * - QuickNode: https://www.quicknode.com/ (generous free tier)
- * - Alchemy: https://www.alchemy.com/ (300M compute units/month free)
- */
 export function getRpcEndpoint(): string {
-  // Check for custom RPC in environment
-  const customRpc = import.meta.env.VITE_SOLANA_RPC_ENDPOINT;
-  
+  const customRpc = import.meta.env.VITE_SOLANA_RPC_ENDPOINT?.trim();
   if (customRpc) {
-    console.log('✅ Using custom RPC endpoint');
+    if (import.meta.env.DEV) {
+      console.log(`✅ Using custom RPC (${solanaCluster})`);
+    }
     return customRpc;
   }
-  
-  // Fallback to public devnet (rate-limited)
-  console.warn('⚠️ Using public devnet RPC (rate-limited). Consider using a custom RPC for production.');
-  return clusterApiUrl('devnet');
+
+  if (import.meta.env.DEV) {
+    console.warn(
+      `⚠️ Using public ${solanaCluster} RPC (rate-limited). Set VITE_SOLANA_RPC_ENDPOINT for a dedicated endpoint.`
+    );
+  }
+  return clusterApiUrl(solanaCluster);
 }
 
-/**
- * Get the cluster name for display purposes
- */
+/** Cluster label for UI / logging. */
 export function getClusterName(): string {
-  const customRpc = import.meta.env.VITE_SOLANA_RPC_ENDPOINT;
-  
+  const customRpc = import.meta.env.VITE_SOLANA_RPC_ENDPOINT?.trim();
   if (customRpc) {
     if (customRpc.includes('mainnet')) return 'mainnet-beta';
     if (customRpc.includes('testnet')) return 'testnet';
     if (customRpc.includes('devnet')) return 'devnet';
     return 'custom';
   }
-  
-  return 'devnet';
+  return solanaCluster;
 }
-

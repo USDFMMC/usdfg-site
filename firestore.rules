@@ -75,6 +75,111 @@ service cloud.firestore {
         ]);
     }
 
+    function challengeUpdateDiff() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    /** Wave 1A — never client-writable except via Admin SDK / Cloud Functions. */
+    function challengeAdminOnlyFieldsUntouched() {
+      return !challengeUpdateDiff().hasAny([
+        'resolvedBy',
+        'resolvedAt',
+        'adminResolutionTx',
+        'statsApplied'
+      ]);
+    }
+
+    function isValidWinnerAssignmentInUpdate() {
+      return !('winner' in challengeUpdateDiff())
+        || request.resource.data.winner == null
+        || request.resource.data.winner == 'forfeit'
+        || request.resource.data.winner == 'tie'
+        || request.resource.data.winner == 'cancelled'
+        || (
+          request.resource.data.players is list
+          && request.resource.data.winner in request.resource.data.players
+        );
+    }
+
+    /**
+     * Match resolution writes from participants (results, loss auto-window, dispute open, completion payout enablement).
+     * Wave 1B will replace this with stricter per-transition allowlists.
+     */
+    function isParticipantGameplayResolutionUpdate() {
+      return (isChallengeParticipant() || isListedInPlayersUid())
+        && challengeAdminOnlyFieldsUntouched()
+        && !challengeUpdateDiff().hasAny(['payoutLockOwner', 'payoutTriggered', 'prizeClaimedAt'])
+        && isValidWinnerAssignmentInUpdate()
+        && (
+          request.resource.data.status == 'awaiting_auto_resolution'
+          || (request.resource.data.status == 'disputed' && request.resource.data.winner == null)
+          || request.resource.data.status == 'completed'
+        );
+    }
+
+    /** Winner claim lock + post-chain payout fields (completed + needsPayout). */
+    function isParticipantPayoutClaimUpdate() {
+      let d = challengeUpdateDiff();
+      return (isChallengeParticipant() || isListedInPlayersUid())
+        && resource.data.status == 'completed'
+        && (resource.data.needsPayout == true || resource.data.payoutStatus == 'processing')
+        && challengeAdminOnlyFieldsUntouched()
+        && !d.hasAny([
+          'winner',
+          'resolvedBy',
+          'resolvedAt',
+          'adminResolutionTx',
+          'statsApplied',
+          'canClaim',
+          'status',
+          'results',
+          'players',
+          'playersUid',
+          'createdByUid',
+          'opponentUid',
+          'pda',
+          'entryFee'
+        ])
+        && d.hasAny([
+          'payoutStatus',
+          'payoutLockOwner',
+          'payoutAttemptedAt',
+          'payoutSignature',
+          'payoutTriggered',
+          'prizeClaimedAt',
+          'needsPayout'
+        ])
+        && (!('needsPayout' in d) || request.resource.data.needsPayout == false);
+    }
+
+    /**
+     * Wave 1A — block forging privileged payout/admin fields; preserve gameplay + claim paths above.
+     */
+    function challengePrivilegedFieldsOk() {
+      if (isAdminUser()) {
+        return true;
+      }
+      if (isParticipantPayoutClaimUpdate()) {
+        return true;
+      }
+      if (isParticipantGameplayResolutionUpdate()) {
+        return true;
+      }
+      return !challengeUpdateDiff().hasAny([
+        'winner',
+        'payoutStatus',
+        'payoutLockOwner',
+        'needsPayout',
+        'canClaim',
+        'payoutTriggered',
+        'prizeClaimedAt',
+        'resolvedBy',
+        'resolvedAt',
+        'adminResolutionTx',
+        'statsApplied'
+      ]);
+    }
+
     // Canonical user
     match /users/{uid} {
       allow read: if isSignedIn();
@@ -117,7 +222,8 @@ service cloud.firestore {
           || (isAdminUser() && resource.data.status == 'disputed')
         )
         && challengePdaImmutableAfterSet()
-        && challengePayoutSignatureImmutable();
+        && challengePayoutSignatureImmutable()
+        && challengePrivilegedFieldsOk();
 
       // Client deletes disabled; use Admin SDK / scheduled functions if cleanup is required.
       allow delete: if false;

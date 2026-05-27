@@ -10,6 +10,7 @@
 
 import nacl from "tweetnacl";
 import { PublicKey } from '@solana/web3.js';
+import { getPhantomClusterParam } from '../chain/environment';
 import { isPhantomConnecting, setPhantomConnecting } from "../utils/wallet-state";
 
 const PHANTOM_DEEPLINK_BASE = 'https://phantom.app/ul/v1/connect';
@@ -138,7 +139,7 @@ export function launchPhantomDeepLink(): void {
     
     // Build deep link URL with properly encoded parameters
     // Format matches Phantom's expected structure exactly
-    const deepLinkUrl = `https://phantom.app/ul/v1/connect?app_url=${appUrl}&redirect_link=${redirectLink}&dapp_encryption_public_key=${encodeURIComponent(dappPublicKeyBase64)}&nonce=${encodeURIComponent(nonce)}&cluster=devnet&scope=${encodeURIComponent("wallet:sign,wallet:signMessage,wallet:decrypt")}&app_metadata_url=${appMetadataUrl}`;
+    const deepLinkUrl = `https://phantom.app/ul/v1/connect?app_url=${appUrl}&redirect_link=${redirectLink}&dapp_encryption_public_key=${encodeURIComponent(dappPublicKeyBase64)}&nonce=${encodeURIComponent(nonce)}&cluster=${encodeURIComponent(getPhantomClusterParam())}&scope=${encodeURIComponent("wallet:sign,wallet:signMessage,wallet:decrypt")}&app_metadata_url=${appMetadataUrl}`;
 
     // CRITICAL LOG - This shows EXACTLY what redirect URL is being sent to Phantom
         console.log('🔗 Redirecting Phantom to (/app):', `${currentOrigin}/app`);
