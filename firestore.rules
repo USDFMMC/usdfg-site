@@ -121,62 +121,41 @@ service cloud.firestore {
      * by privileged-field gates and other helpers.
      */
     function challengeStatusTransitionOk() {
-      // No change — ok.
-      if (request.resource.data.status == resource.data.status) {
-        return true;
-      }
-
-      // Join intent transition is already allowlisted by isJoinIntentUpdate().
-      if (
-        resource.data.status == "pending_waiting_for_opponent"
-        && request.resource.data.status == "creator_confirmation_required"
-      ) {
-        return true;
-      }
-
-      // Creator funds: creator_confirmation_required -> creator_funded.
-      if (
-        resource.data.status == "creator_confirmation_required"
-        && request.resource.data.status == "creator_funded"
-      ) {
-        return true;
-      }
-
-      // Joiner funds: creator_funded -> active (paid challenges must set PDA before active).
-      if (
-        resource.data.status == "creator_funded"
-        && request.resource.data.status == "active"
-        && request.resource.data.pda != null
-      ) {
-        return true;
-      }
-
-      // Loss report: active/in-progress -> awaiting_auto_resolution.
-      if (
-        (resource.data.status == "active" || resource.data.status == "in-progress")
-        && request.resource.data.status == "awaiting_auto_resolution"
-      ) {
-        return true;
-      }
-
-      // Clear provisional window when both results arrive: awaiting_auto_resolution -> active.
-      if (
-        resource.data.status == "awaiting_auto_resolution"
-        && request.resource.data.status == "active"
-      ) {
-        return true;
-      }
-
-      // Participant escalates within window: awaiting_auto_resolution -> disputed.
-      if (
-        resource.data.status == "awaiting_auto_resolution"
-        && request.resource.data.status == "disputed"
-      ) {
-        return true;
-      }
-
-      // Terminal resolutions are constrained further by gameplay resolution helper.
-      return false;
+      return (
+        // No change — ok.
+        request.resource.data.status == resource.data.status
+        // Join intent (also checked by isJoinIntentUpdate()).
+        || (
+          resource.data.status == "pending_waiting_for_opponent"
+          && request.resource.data.status == "creator_confirmation_required"
+        )
+        // Creator funds.
+        || (
+          resource.data.status == "creator_confirmation_required"
+          && request.resource.data.status == "creator_funded"
+        )
+        // Joiner funds (paid challenges must have PDA).
+        || (
+          resource.data.status == "creator_funded"
+          && request.resource.data.status == "active"
+          && request.resource.data.pda != null
+        )
+        // Loss report.
+        || (
+          (resource.data.status == "active" || resource.data.status == "in-progress")
+          && request.resource.data.status == "awaiting_auto_resolution"
+        )
+        // Clear provisional window.
+        || (
+          resource.data.status == "awaiting_auto_resolution"
+          && request.resource.data.status == "active"
+        )
+        // Escalate dispute within window.
+        || (
+          resource.data.status == "awaiting_auto_resolution"
+          && request.resource.data.status == "disputed"
+        )
+      );
     }
 
     function challengeUpdateDiff() {
