@@ -113,6 +113,72 @@ service cloud.firestore {
         ]);
     }
 
+    /**
+     * Wave 1B (minimal slice for launch): restrict client-driven status transitions
+     * to the known 1v1 lifecycle so participants cannot self-complete from pending states.
+     *
+     * NOTE: This only constrains status changes. Non-status field writes are still governed
+     * by privileged-field gates and other helpers.
+     */
+    function challengeStatusTransitionOk() {
+      // No change — ok.
+      if (request.resource.data.status == resource.data.status) {
+        return true;
+      }
+
+      // Join intent transition is already allowlisted by isJoinIntentUpdate().
+      if (
+        resource.data.status == "pending_waiting_for_opponent"
+        && request.resource.data.status == "creator_confirmation_required"
+      ) {
+        return true;
+      }
+
+      // Creator funds: creator_confirmation_required -> creator_funded.
+      if (
+        resource.data.status == "creator_confirmation_required"
+        && request.resource.data.status == "creator_funded"
+      ) {
+        return true;
+      }
+
+      // Joiner funds: creator_funded -> active (paid challenges must set PDA before active).
+      if (
+        resource.data.status == "creator_funded"
+        && request.resource.data.status == "active"
+        && request.resource.data.pda != null
+      ) {
+        return true;
+      }
+
+      // Loss report: active/in-progress -> awaiting_auto_resolution.
+      if (
+        (resource.data.status == "active" || resource.data.status == "in-progress")
+        && request.resource.data.status == "awaiting_auto_resolution"
+      ) {
+        return true;
+      }
+
+      // Clear provisional window when both results arrive: awaiting_auto_resolution -> active.
+      if (
+        resource.data.status == "awaiting_auto_resolution"
+        && request.resource.data.status == "active"
+      ) {
+        return true;
+      }
+
+      // Participant escalates within window: awaiting_auto_resolution -> disputed.
+      if (
+        resource.data.status == "awaiting_auto_resolution"
+        && request.resource.data.status == "disputed"
+      ) {
+        return true;
+      }
+
+      // Terminal resolutions are constrained further by gameplay resolution helper.
+      return false;
+    }
+
     function challengeUpdateDiff() {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
@@ -148,6 +214,12 @@ service cloud.firestore {
         && challengeAdminOnlyFieldsUntouched()
         && !challengeUpdateDiff().hasAny(['payoutLockOwner', 'payoutTriggered', 'prizeClaimedAt'])
         && isValidWinnerAssignmentInUpdate()
+        // Prevent self-complete/resolve from pending/funding states.
+        && (
+          resource.data.status == 'active'
+          || resource.data.status == 'in-progress'
+          || resource.data.status == 'awaiting_auto_resolution'
+        )
         && (
           request.resource.data.status == 'awaiting_auto_resolution'
           || (request.resource.data.status == 'disputed' && request.resource.data.winner == null)
@@ -257,7 +329,13 @@ service cloud.firestore {
         )
         && challengePdaImmutableAfterSet()
         && challengePayoutSignatureImmutable()
-        && challengePrivilegedFieldsOk();
+        && challengePrivilegedFieldsOk()
+        && (
+          // Admin path may override status transitions while disputed.
+          (isAdminUser() && resource.data.status == 'disputed')
+          || isJoinIntentUpdate()
+          || challengeStatusTransitionOk()
+        );
 
       // Client deletes disabled; use Admin SDK / scheduled functions if cleanup is required.
       allow delete: if false;
