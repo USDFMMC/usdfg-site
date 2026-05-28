@@ -30,7 +30,6 @@ import {
   revertCreatorTimeout,
   revertJoinerTimeout,
   expirePendingChallenge,
-  cleanupExpiredChallenge,
   submitChallengeResult,
   acknowledgeWarmupComplete,
   acknowledgeOfficialMatchReady,
@@ -4879,77 +4878,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
   }, [publicKey, connection, signTransaction, signAllTransactions, isAirdropping, challenges, getFounderTournamentRecipients, requestAppConfirm, showAppToast]);
 
-  // Auto-delete expired challenges to save Firebase storage
+  // Client deleteDoc on challenges is denied by rules — auto-delete disabled.
   useEffect(() => {
-    if (!challenges.length || showMyChallenges) return; // Don't delete user's own challenges
-    
-    const now = Date.now();
-    const expiredIds: string[] = [];
-    
-    challenges.forEach(challenge => {
-      // CRITICAL: Never delete active tournaments or active challenges
-      const isTournament = challenge.format === 'tournament' || challenge.tournament;
-      const tournamentStage = challenge.tournament?.stage || challenge.rawData?.tournament?.stage;
-      const isActiveTournament = isTournament && (
-        tournamentStage === 'round_in_progress' || 
-        tournamentStage === 'awaiting_results' ||
-        challenge.status === 'active'
-      );
-      const isActiveChallenge = challenge.status === 'active';
-      
-      // Skip active tournaments and active challenges - never delete them
-      if (isActiveTournament || isActiveChallenge) {
-        return;
-      }
-      
-      // Founder Tournaments (admin-created, free entry, founder rewards): never auto-delete; admin deletes manually
-      const creatorWallet = (challenge.creator ?? challenge.rawData?.creator ?? '').toString().toLowerCase();
-      const isAdminCreator = creatorWallet === ADMIN_WALLET.toString().toLowerCase();
-      const isFree = (challenge.entryFee ?? challenge.rawData?.entryFee ?? 0) === 0 || (challenge.entryFee ?? 0) < 0.000000001;
-      const hasFounderRewards = (challenge.founderParticipantReward ?? challenge.rawData?.founderParticipantReward ?? 0) > 0 || (challenge.founderWinnerBonus ?? challenge.rawData?.founderWinnerBonus ?? 0) > 0;
-      const isFounderTournament = isTournament && isAdminCreator && isFree && hasFounderRewards;
-      if (isFounderTournament) return;
-      
-      const expiresAtMs =
-        challenge.expiresAt != null
-          ? typeof challenge.expiresAt === 'number'
-            ? challenge.expiresAt
-            : (challenge.expiresAt as Timestamp).toMillis()
-          : null;
-      const rawTimer = challenge.rawData?.expirationTimer as Timestamp | number | undefined;
-      const expirationTimerMs =
-        rawTimer != null
-          ? typeof rawTimer === 'number'
-            ? rawTimer
-            : rawTimer.toMillis()
-          : null;
-      const isExpired =
-        challenge.status === 'cancelled' ||
-        (expiresAtMs != null && expiresAtMs < now) ||
-        (expirationTimerMs != null && expirationTimerMs < now);
-      
-      // For tournaments, only delete if completed or cancelled
-      if (isTournament) {
-        const isCompleted = tournamentStage === 'completed' || challenge.status === 'completed';
-        const isCancelled = challenge.status === 'cancelled';
-        if (!isCompleted && !isCancelled) {
-          return; // Don't delete active or in-progress tournaments
-        }
-      }
-      
-      if (isExpired && challenge.id) {
-        expiredIds.push(challenge.id);
-      }
-    });
-    
-    // Delete expired challenges asynchronously
-    if (expiredIds.length > 0) {
-      expiredIds.forEach(challengeId => {
-        cleanupExpiredChallenge(challengeId).catch(err => {
-          console.error('Failed to delete expired challenge:', challengeId, err);
-        });
-      });
-    }
+    return;
   }, [challenges, showMyChallenges]);
 
   // Memoize unique games and categories
