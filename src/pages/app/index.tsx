@@ -29,7 +29,6 @@ import {
   joinerFund,
   revertCreatorTimeout,
   revertJoinerTimeout,
-  expirePendingChallenge,
   submitChallengeResult,
   acknowledgeWarmupComplete,
   acknowledgeOfficialMatchReady,
@@ -1484,13 +1483,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             }
           }
 
-          // Check pending expiration (pending_waiting_for_opponent state)
-          if (status === 'pending_waiting_for_opponent') {
-            const expirationTimer = challenge.rawData?.expirationTimer;
-            if (expirationTimer && expirationTimer.toMillis() < Date.now()) {
-              await expirePendingChallenge(challengeId);
-            }
-          }
+          // Client auto-expire delete disabled (devnet QA / Wave 1A).
         } catch (error) {
           console.error(`Error checking timeout for challenge ${challengeId}:`, error);
         }
