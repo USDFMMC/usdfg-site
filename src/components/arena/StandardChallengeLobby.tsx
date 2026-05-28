@@ -1462,21 +1462,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                 e.stopPropagation();
                 if (onJoinChallenge) {
                   try {
-                    // Force immediate local UI transition while Firestore listener catches up.
-                    if (currentWallet) {
-                      setLiveChallenge((prev: any) => ({
-                        ...(prev || activeChallenge),
-                        status: 'creator_confirmation_required',
-                        pendingJoiner: currentWallet,
-                        rawData: {
-                          ...((prev?.rawData || activeChallenge?.rawData || {})),
-                          status: 'creator_confirmation_required',
-                          pendingJoiner: currentWallet,
-                        },
-                      }));
-                    }
                     await onJoinChallenge(activeChallenge);
-                    // Force refresh from source of truth after join success.
                     if (activeChallenge?.id) {
                       const refreshed = await fetchChallengeById(activeChallenge.id);
                       if (refreshed) {

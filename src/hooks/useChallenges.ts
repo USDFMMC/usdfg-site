@@ -74,7 +74,14 @@ export const useChallenges = () => {
           console.log('[Challenges] count:', newChallenges.length);
         }
 
-        setChallenges(newChallenges);
+        const seen = new Set<string>();
+        const deduped = newChallenges.filter((c) => {
+          const id = c.id;
+          if (!id || seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        });
+        setChallenges(deduped);
         setLoading(false);
         setError(null);
 
@@ -96,6 +103,14 @@ export const useChallenges = () => {
             snapStatus === 'awaiting_auto_resolution'
           ) {
             void repairChallengeFinalizationIfNeeded(challengeId).catch(() => {});
+          }
+
+          if (
+            snapStatus === 'pending_waiting_for_opponent' ||
+            snapStatus === 'creator_confirmation_required' ||
+            snapStatus === 'creator_funded'
+          ) {
+            continue;
           }
 
           const challengePDA = (challenge.rawData as any)?.pda || (challenge as any).pda;

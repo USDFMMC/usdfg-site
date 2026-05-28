@@ -109,8 +109,13 @@ service cloud.firestore {
           'pendingJoiner',
           'opponentWallet',
           'creatorFundingDeadline',
-          'updatedAt'
-        ]);
+          'updatedAt',
+          'opponentUid'
+        ])
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['opponentUid'])
+          || request.resource.data.opponentUid == request.auth.uid
+        );
     }
 
     /**

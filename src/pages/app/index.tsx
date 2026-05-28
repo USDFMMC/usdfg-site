@@ -4539,8 +4539,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     });
 
     const visibleChallenges = orderedWithIdx.map(({ __idx: _i, ...rest }) => rest);
+    const seenIds = new Set<string>();
+    const dedupedVisible = visibleChallenges.filter((c) => {
+      if (!c.id || seenIds.has(c.id)) return false;
+      seenIds.add(c.id);
+      return true;
+    });
 
-    return { visibleChallenges, trustBrowseUsedFallback };
+    return { visibleChallenges: dedupedVisible, trustBrowseUsedFallback };
   }, [challenges, currentUserDisplayTrust, showMyChallenges, publicKey]);
 
   // Memoize filtered challenges to prevent unnecessary re-renders
@@ -6131,7 +6137,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 Other: []
               };
 
+              const listedIds = new Set<string>();
               filteredChallenges.forEach(challenge => {
+                if (!challenge.id || listedIds.has(challenge.id)) return;
+                listedIds.add(challenge.id);
                 const category = categorizeChallenge(challenge);
                 if (categoryGroups[category]) {
                   categoryGroups[category].push(challenge);
@@ -6272,7 +6281,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                       className="absolute inset-0 h-full w-full object-cover scale-110"
                       loading="lazy"
                       draggable={false}
-                      key={`${challenge.id}-${gameName}-${imagePath}`}
+                      key={challenge.id}
                                       onError={(e) => {
                                         const target = e.currentTarget as HTMLImageElement;
                         // Only log errors in development

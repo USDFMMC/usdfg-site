@@ -2232,11 +2232,34 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
       updatedAt: serverTimestamp(),
     };
 
+    // Join intent must match Firestore isJoinIntentUpdate() field allowlist — no hybrid merge extras.
     await writeChallengeFields(challengeId, updates, {
       currentData: data,
       actingWallet: wallet,
+      skipParticipantHybridMerge: true,
     });
-    
+
+    const joinerUid = auth.currentUser?.uid ?? null;
+    if (joinerUid) {
+      const afterJoinSnap = await getDoc(challengeRef);
+      const afterJoin = afterJoinSnap.exists()
+        ? (afterJoinSnap.data() as ChallengeData)
+        : data;
+      try {
+        await writeChallengeFields(
+          challengeId,
+          { opponentUid: joinerUid, updatedAt: serverTimestamp() },
+          {
+            currentData: afterJoin,
+            actingWallet: wallet,
+            actingUid: joinerUid,
+          }
+        );
+      } catch (bindErr) {
+        console.warn('⚠️ opponentUid bind after join intent failed (non-fatal):', bindErr);
+      }
+    }
+
     // CRITICAL: Verify the update was applied
     const verifySnap = await getDoc(challengeRef);
     if (verifySnap.exists()) {
@@ -2246,8 +2269,16 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
       // Double-check the status was actually updated
       if (verifiedData.status !== 'creator_confirmation_required') {
         console.error('❌ Status update failed! Expected creator_confirmation_required, got:', verifiedData.status);
-        // Force update again
-        await writeChallengeFields(challengeId, { status: 'creator_confirmation_required' });
+        await writeChallengeFields(
+          challengeId,
+          {
+            status: 'creator_confirmation_required',
+            pendingJoiner: wallet,
+            opponentWallet: wallet,
+            updatedAt: serverTimestamp(),
+          },
+          { currentData: verifiedData, actingWallet: wallet, skipParticipantHybridMerge: true }
+        );
       }
     }
 
@@ -2269,8 +2300,14 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
 
     console.log('✅ Join intent expressed successfully (NO PAYMENT):', challengeId);
     return true;
-  } catch (error) {
-    console.error('❌ Error expressing join intent:', error);
+  } catch (error: unknown) {
+    const err = error as { code?: string; message?: string };
+    console.error('❌ Error expressing join intent:', {
+      challengeId,
+      wallet,
+      code: err?.code,
+      message: err?.message ?? String(error),
+    });
     throw error;
   }
 };
