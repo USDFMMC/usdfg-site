@@ -6,6 +6,43 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    /** Wave 1A+ — forbid privileged/admin/payout terminal fields on client create. */
+    function challengeCreatePrivilegedFieldsAbsent() {
+      return !('winner' in request.resource.data)
+        && !('needsPayout' in request.resource.data)
+        && !('canClaim' in request.resource.data)
+        && !('payoutStatus' in request.resource.data)
+        && !('payoutLockOwner' in request.resource.data)
+        && !('payoutTriggered' in request.resource.data)
+        && !('prizeClaimedAt' in request.resource.data)
+        && !('payoutSignature' in request.resource.data)
+        && !('resolvedBy' in request.resource.data)
+        && !('resolvedAt' in request.resource.data)
+        && !('adminResolutionTx' in request.resource.data)
+        && !('statsApplied' in request.resource.data);
+    }
+
+    function challengeCreateSafeDefaultsOk() {
+      return request.resource.data.status == "pending_waiting_for_opponent"
+        // New challenges must not carry results or dispute markers.
+        && !('results' in request.resource.data)
+        && !('disputedBy' in request.resource.data)
+        && !('disputedAt' in request.resource.data)
+        && !('disputeReason' in request.resource.data)
+        // On-chain identity is established only after funding; PDA must be absent/null at creation.
+        && (!('pda' in request.resource.data) || request.resource.data.pda == null);
+    }
+
+    function challengeCreateIdentityOk() {
+      return request.resource.data.createdByUid == request.auth.uid
+        // Creator wallet must be present and mirrored in players[0] for 1v1 (and matches existing create flow).
+        && request.resource.data.creator is string
+        && request.resource.data.creator.size() > 0
+        && request.resource.data.players is list
+        && request.resource.data.players.size() >= 1
+        && request.resource.data.players[0] == request.resource.data.creator;
+    }
+
     /** Active admin doc at admins/{auth.uid} (used by client isAdmin / dispute console). */
     function isAdminUser() {
       return isSignedIn()
@@ -205,7 +242,9 @@ service cloud.firestore {
       allow read: if isSignedIn();
 
       allow create: if isSignedIn()
-        && request.resource.data.createdByUid == request.auth.uid;
+        && challengeCreateIdentityOk()
+        && challengeCreateSafeDefaultsOk()
+        && challengeCreatePrivilegedFieldsAbsent();
 
       allow update: if isSignedIn()
         && (
