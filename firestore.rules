@@ -259,7 +259,16 @@ service cloud.firestore {
           'prizeClaimedAt',
           'needsPayout'
         ])
-        && (!('needsPayout' in d) || request.resource.data.needsPayout == false);
+        && (!('needsPayout' in d) || request.resource.data.needsPayout == false)
+        // Never allow marking paid without a non-empty signature (or explicit already-processed sentinel).
+        && (
+          request.resource.data.payoutStatus != 'paid'
+          || (
+            request.resource.data.payoutTriggered == true
+            && request.resource.data.payoutSignature is string
+            && request.resource.data.payoutSignature.size() > 0
+          )
+        );
     }
 
     /**
