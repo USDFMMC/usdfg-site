@@ -32,6 +32,7 @@ import { CHALLENGE_CONFIG, ADMIN_WALLET } from '../chain/config';
 import { getExplorerTxUrl } from '../chain/explorer';
 import { isWarmupPhaseBlockingSubmit } from '@/lib/utils/warmup-phase';
 import { logClientCleanupDisabledOnce } from './clientCleanupGate';
+import { ensureFirebaseSignedIn } from './ensureFirebaseSignedIn';
 
 // Test Firestore connection
 export async function testFirestoreConnection() {
@@ -1795,6 +1796,7 @@ export interface ChallengeNotification {
 // Challenge operations
 export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'createdAt'>) => {
   try {
+    const authUser = await ensureFirebaseSignedIn();
     const creatorWallet = challengeData.creator;
     const creatorKey = normalizeWinnerWallet(creatorWallet);
     const playerRef = doc(db, 'player_stats', creatorKey);
@@ -1859,13 +1861,11 @@ export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'cr
       throw new Error("CreatedAt timestamp is required");
     }
 
-    const creatorUid = auth.currentUser?.uid ?? null;
+    const creatorUid = authUser.uid;
     challengePayload.creatorWallet = challengePayload.creator;
-    if (creatorUid) {
-      challengePayload.createdByUid = creatorUid;
-    }
+    challengePayload.createdByUid = creatorUid;
     challengePayload.playersUid = initialPlayers.map((w) =>
-      creatorUid && walletEq(w, challengePayload.creator) ? creatorUid : null
+      walletEq(w, challengePayload.creator) ? creatorUid : null
     );
     
     console.log("🔥 Adding challenge to Firestore with payload:", {
@@ -2117,6 +2117,7 @@ export const fetchChallengeById = async (challengeId: string): Promise<Challenge
 // Moves challenge to creator_confirmation_required state
 export const expressJoinIntent = async (challengeId: string, wallet: string, isFounderChallenge: boolean = false, isTeam?: boolean) => {
   try {
+    await ensureFirebaseSignedIn();
     const challengeRef = doc(db, "challenges", challengeId);
     const snap = await getDoc(challengeRef);
     
