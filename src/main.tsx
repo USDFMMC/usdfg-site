@@ -1,3 +1,4 @@
+import '@/lib/buildMarker'
 import '@/lib/firebase/config'
 import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'

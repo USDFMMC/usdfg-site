@@ -23,3 +23,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** Injected by vite.config.ts `define` at build time. */
+declare const __USDFG_BUILD_COMMIT__: string;
