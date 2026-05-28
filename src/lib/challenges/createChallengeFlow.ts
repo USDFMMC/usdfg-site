@@ -1,5 +1,6 @@
 import { ADMIN_WALLET } from "@/lib/chain/config";
 import { extractGameFromTitle, getGameCategory } from "@/lib/gameAssets";
+import { ensureFirebaseSignedIn } from "@/lib/firebase/config";
 import type { TournamentState } from "@/lib/firebase/firestore";
 import { findUserBlockingActiveChallenge } from "@/lib/utils/active-challenge";
 
@@ -108,6 +109,7 @@ export async function runCreateChallengeFlow(
   } = options;
 
   try {
+    await ensureFirebaseSignedIn();
     return await runCreateChallengeFlowCore({
       raw,
       wallet,

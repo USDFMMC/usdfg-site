@@ -21,7 +21,7 @@ import {
   deleteField,
   runTransaction
 } from 'firebase/firestore';
-import { db, auth } from './config';
+import { db, auth, ensureFirebaseSignedIn } from './config';
 import {
   invokeApplyMatchStats,
   invokeUpdatePlayerProfile,
@@ -1795,6 +1795,7 @@ export interface ChallengeNotification {
 // Challenge operations
 export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'createdAt'>) => {
   try {
+    const creatorUid = await ensureFirebaseSignedIn();
     const creatorWallet = challengeData.creator;
     const creatorKey = normalizeWinnerWallet(creatorWallet);
     const playerRef = doc(db, 'player_stats', creatorKey);
@@ -1859,11 +1860,8 @@ export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'cr
       throw new Error("CreatedAt timestamp is required");
     }
 
-    const creatorUid = auth.currentUser?.uid ?? null;
     challengePayload.creatorWallet = challengePayload.creator;
-    if (creatorUid) {
-      challengePayload.createdByUid = creatorUid;
-    }
+    challengePayload.createdByUid = creatorUid;
     challengePayload.playersUid = initialPlayers.map((w) =>
       creatorUid && walletEq(w, challengePayload.creator) ? creatorUid : null
     );
@@ -2117,6 +2115,7 @@ export const fetchChallengeById = async (challengeId: string): Promise<Challenge
 // Moves challenge to creator_confirmation_required state
 export const expressJoinIntent = async (challengeId: string, wallet: string, isFounderChallenge: boolean = false, isTeam?: boolean) => {
   try {
+    await ensureFirebaseSignedIn();
     const challengeRef = doc(db, "challenges", challengeId);
     const snap = await getDoc(challengeRef);
     
@@ -2922,7 +2921,7 @@ export function listenActiveForCreator(creator: string, cb: (active: any[]) => v
 }
 
 export async function addChallengeDoc(data: any) {
-  const uid = auth.currentUser?.uid ?? null;
+  const uid = await ensureFirebaseSignedIn();
   const creator = data.creator || data.creatorWallet;
   const players = Array.isArray(data.players) && data.players.length ? data.players : creator ? [creator] : [];
   const payload: Record<string, any> = {
@@ -2933,8 +2932,8 @@ export async function addChallengeDoc(data: any) {
   };
   if (creator) {
     payload.creatorWallet = creator;
-    if (uid) payload.createdByUid = uid;
-    payload.playersUid = players.map((w: string) => (uid && walletEq(w, creator) ? uid : null));
+    payload.createdByUid = uid;
+    payload.playersUid = players.map((w: string) => (walletEq(w, creator) ? uid : null));
   }
   const docRef = await addDoc(collection(db, "challenges"), payload);
   console.log('CHALLENGE WRITE:', { challengeId: docRef.id, uid, wallet: creator ?? null });
