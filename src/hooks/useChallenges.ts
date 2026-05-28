@@ -74,7 +74,14 @@ export const useChallenges = () => {
           console.log('[Challenges] count:', newChallenges.length);
         }
 
-        setChallenges(newChallenges);
+        const seen = new Set<string>();
+        const deduped = newChallenges.filter((c) => {
+          const id = c.id;
+          if (!id || seen.has(id)) return false;
+          seen.add(id);
+          return true;
+        });
+        setChallenges(deduped);
         setLoading(false);
         setError(null);
 
@@ -83,9 +90,6 @@ export const useChallenges = () => {
         for (const challenge of newChallenges) {
           const challengeId = challenge.id;
           if (!challengeId) continue;
-          if (import.meta.env.DEV) {
-            console.log("CHALLENGE SNAPSHOT", challenge.id, challenge.status, challenge.pendingJoiner);
-          }
 
           if (!challengeParticipantUidMatches(challenge, authUid)) continue;
 
@@ -96,6 +100,14 @@ export const useChallenges = () => {
             snapStatus === 'awaiting_auto_resolution'
           ) {
             void repairChallengeFinalizationIfNeeded(challengeId).catch(() => {});
+          }
+
+          if (
+            snapStatus === 'pending_waiting_for_opponent' ||
+            snapStatus === 'creator_confirmation_required' ||
+            snapStatus === 'creator_funded'
+          ) {
+            continue;
           }
 
           const challengePDA = (challenge.rawData as any)?.pda || (challenge as any).pda;

@@ -29,8 +29,6 @@ import {
   joinerFund,
   revertCreatorTimeout,
   revertJoinerTimeout,
-  expirePendingChallenge,
-  cleanupExpiredChallenge,
   submitChallengeResult,
   acknowledgeWarmupComplete,
   acknowledgeOfficialMatchReady,
@@ -1250,11 +1248,20 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     fetchUsdfgPrice();
   }, [fetchUsdfgPrice]);
 
+  const lastUsdfgBalanceFetchRef = useRef(0);
+  const USDFG_BALANCE_MIN_INTERVAL_MS = 45_000;
+
   // Function to refresh USDFG balance (reusable)
-  const refreshUSDFGBalance = useCallback(async (): Promise<void> => {
+  const refreshUSDFGBalance = useCallback(async (options?: { force?: boolean }): Promise<void> => {
     if (!isConnected || !publicKey || !connection) {
       return;
     }
+
+    const now = Date.now();
+    if (!options?.force && now - lastUsdfgBalanceFetchRef.current < USDFG_BALANCE_MIN_INTERVAL_MS) {
+      return;
+    }
+    lastUsdfgBalanceFetchRef.current = now;
     
     try {
       const tokenAccount = await getAssociatedTokenAddress(USDFG_MINT, publicKey);
@@ -1283,7 +1290,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   /** After claim, align list + wallet + trust readout without a full reload (realtime listener may lag). */
   const resyncAfterClaimData = useCallback(async (): Promise<ChallengeData[] | null> => {
     const challenges = await refetchChallenges();
-    await refreshUSDFGBalance().catch(() => {});
+    await refreshUSDFGBalance({ force: true }).catch(() => {});
     const w = effectivePublicKey?.toString();
     if (w) {
       try {
@@ -1476,13 +1483,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             }
           }
 
-          // Check pending expiration (pending_waiting_for_opponent state)
-          if (status === 'pending_waiting_for_opponent') {
-            const expirationTimer = challenge.rawData?.expirationTimer;
-            if (expirationTimer && expirationTimer.toMillis() < Date.now()) {
-              await expirePendingChallenge(challengeId);
-            }
-          }
+          // Client auto-expire delete disabled (devnet QA / Wave 1A).
         } catch (error) {
           console.error(`Error checking timeout for challenge ${challengeId}:`, error);
         }
@@ -1493,7 +1494,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     checkTimeouts();
 
     // Then check every 30 seconds
-    const interval = setInterval(checkTimeouts, 30000);
+    const interval = setInterval(checkTimeouts, 60000);
 
     return () => clearInterval(interval);
   }, [firestoreChallenges]);
@@ -2712,58 +2713,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         }
       }
       
-      // Express intent in Firestore first
-      console.log("JOIN WRITE PAYLOAD", {
-        challengeId: challenge.id,
-        wallet: walletAddr,
-        status: "creator_confirmation_required",
-        pendingJoiner: walletAddr,
-        opponentWallet: walletAddr,
-      });
-      try {
-        const res = await expressJoinIntent(challenge.id, walletAddr);
-        console.log("JOIN WRITE SUCCESS", { challengeId: challenge.id, wallet: walletAddr, res });
-      } catch (error) {
-        console.error("JOIN WRITE FAILED", error);
-        throw error;
-      }
-      // DEBUG: Disable optimistic UI so we can inspect real backend state only.
-      // const optimisticUpdate = {
-      //   ...challenge,
-      //   status: 'creator_confirmation_required',
-      //   pendingJoiner: walletAddr,
-      //   creatorFundingDeadline: { toMillis: () => Date.now() + (5 * 60 * 1000) }, // 5 minutes from now
-      //   rawData: {
-      //     ...(challenge.rawData || challenge),
-      //     status: 'creator_confirmation_required',
-      //     pendingJoiner: walletAddr,
-      //     creatorFundingDeadline: { toMillis: () => Date.now() + (5 * 60 * 1000) }
-      //   }
-      // };
-      //
-      // setSelectedChallenge({
-      //   id: optimisticUpdate.id,
-      //   title: optimisticUpdate.title || extractGameFromTitle(optimisticUpdate.title || '') || "Challenge",
-      //   ...optimisticUpdate,
-      //   rawData: optimisticUpdate.rawData || optimisticUpdate
-      // });
-      //
-      // if (firestoreChallenges) {
-      //   const updatedChallenges = firestoreChallenges.map((c: any) =>
-      //     c.id === challenge.id ? optimisticUpdate : c
-      //   );
-      // }
+      await expressJoinIntent(challenge.id, walletAddr);
 
-      // Read-after-write validation
-      const fresh = await fetchChallengeById(challenge.id);
-      console.log("POST-JOIN FETCH", {
-        status: fresh?.status,
-        pendingJoiner: (fresh as any)?.pendingJoiner,
-        opponentWallet: (fresh as any)?.opponentWallet,
-      });
-
-      // Fetch fresh data to ensure we have the latest (real-time listener will also update)
-      const updatedChallenge = fresh || await fetchChallengeById(challenge.id);
+      const updatedChallenge = await fetchChallengeById(challenge.id);
       if (updatedChallenge) {
         setSelectedChallenge({
           id: updatedChallenge.id,
@@ -2785,10 +2737,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       });
       setShowStandardLobby(true);
     } catch (err: any) {
-      if ((err as any)?.code) {
-        console.error("JOIN WRITE FAILED CODE", (err as any).code);
-      }
-      console.error("JOIN WRITE FAILED FULL", err);
       console.error("❌ Express join intent failed:", err);
       const errorMessage = err.message || err.toString() || 'Failed to express join intent. Please try again.';
       showAppToast("Failed to express join intent: " + errorMessage, "error", "Join failed");
@@ -4538,8 +4486,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     });
 
     const visibleChallenges = orderedWithIdx.map(({ __idx: _i, ...rest }) => rest);
+    const seenIds = new Set<string>();
+    const dedupedVisible = visibleChallenges.filter((c) => {
+      if (!c.id || seenIds.has(c.id)) return false;
+      seenIds.add(c.id);
+      return true;
+    });
 
-    return { visibleChallenges, trustBrowseUsedFallback };
+    return { visibleChallenges: dedupedVisible, trustBrowseUsedFallback };
   }, [challenges, currentUserDisplayTrust, showMyChallenges, publicKey]);
 
   // Memoize filtered challenges to prevent unnecessary re-renders
@@ -4879,77 +4833,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
   }, [publicKey, connection, signTransaction, signAllTransactions, isAirdropping, challenges, getFounderTournamentRecipients, requestAppConfirm, showAppToast]);
 
-  // Auto-delete expired challenges to save Firebase storage
+  // Wave 1A: client deleteDoc on challenges is denied — auto-delete disabled until Admin SDK cleanup.
   useEffect(() => {
-    if (!challenges.length || showMyChallenges) return; // Don't delete user's own challenges
-    
-    const now = Date.now();
-    const expiredIds: string[] = [];
-    
-    challenges.forEach(challenge => {
-      // CRITICAL: Never delete active tournaments or active challenges
-      const isTournament = challenge.format === 'tournament' || challenge.tournament;
-      const tournamentStage = challenge.tournament?.stage || challenge.rawData?.tournament?.stage;
-      const isActiveTournament = isTournament && (
-        tournamentStage === 'round_in_progress' || 
-        tournamentStage === 'awaiting_results' ||
-        challenge.status === 'active'
-      );
-      const isActiveChallenge = challenge.status === 'active';
-      
-      // Skip active tournaments and active challenges - never delete them
-      if (isActiveTournament || isActiveChallenge) {
-        return;
-      }
-      
-      // Founder Tournaments (admin-created, free entry, founder rewards): never auto-delete; admin deletes manually
-      const creatorWallet = (challenge.creator ?? challenge.rawData?.creator ?? '').toString().toLowerCase();
-      const isAdminCreator = creatorWallet === ADMIN_WALLET.toString().toLowerCase();
-      const isFree = (challenge.entryFee ?? challenge.rawData?.entryFee ?? 0) === 0 || (challenge.entryFee ?? 0) < 0.000000001;
-      const hasFounderRewards = (challenge.founderParticipantReward ?? challenge.rawData?.founderParticipantReward ?? 0) > 0 || (challenge.founderWinnerBonus ?? challenge.rawData?.founderWinnerBonus ?? 0) > 0;
-      const isFounderTournament = isTournament && isAdminCreator && isFree && hasFounderRewards;
-      if (isFounderTournament) return;
-      
-      const expiresAtMs =
-        challenge.expiresAt != null
-          ? typeof challenge.expiresAt === 'number'
-            ? challenge.expiresAt
-            : (challenge.expiresAt as Timestamp).toMillis()
-          : null;
-      const rawTimer = challenge.rawData?.expirationTimer as Timestamp | number | undefined;
-      const expirationTimerMs =
-        rawTimer != null
-          ? typeof rawTimer === 'number'
-            ? rawTimer
-            : rawTimer.toMillis()
-          : null;
-      const isExpired =
-        challenge.status === 'cancelled' ||
-        (expiresAtMs != null && expiresAtMs < now) ||
-        (expirationTimerMs != null && expirationTimerMs < now);
-      
-      // For tournaments, only delete if completed or cancelled
-      if (isTournament) {
-        const isCompleted = tournamentStage === 'completed' || challenge.status === 'completed';
-        const isCancelled = challenge.status === 'cancelled';
-        if (!isCompleted && !isCancelled) {
-          return; // Don't delete active or in-progress tournaments
-        }
-      }
-      
-      if (isExpired && challenge.id) {
-        expiredIds.push(challenge.id);
-      }
-    });
-    
-    // Delete expired challenges asynchronously
-    if (expiredIds.length > 0) {
-      expiredIds.forEach(challengeId => {
-        cleanupExpiredChallenge(challengeId).catch(err => {
-          console.error('Failed to delete expired challenge:', challengeId, err);
-        });
-      });
-    }
+    return;
   }, [challenges, showMyChallenges]);
 
   // Memoize unique games and categories
@@ -6198,7 +6084,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                 Other: []
               };
 
+              const listedIds = new Set<string>();
               filteredChallenges.forEach(challenge => {
+                if (!challenge.id || listedIds.has(challenge.id)) return;
+                listedIds.add(challenge.id);
                 const category = categorizeChallenge(challenge);
                 if (categoryGroups[category]) {
                   categoryGroups[category].push(challenge);
@@ -6339,7 +6228,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                       className="absolute inset-0 h-full w-full object-cover scale-110"
                       loading="lazy"
                       draggable={false}
-                      key={`${challenge.id}-${gameName}-${imagePath}`}
+                      key={challenge.id}
                                       onError={(e) => {
                                         const target = e.currentTarget as HTMLImageElement;
                         // Only log errors in development

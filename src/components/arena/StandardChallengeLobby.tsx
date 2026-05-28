@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { ChatBox } from "./ChatBox";
 import { VoiceChat } from "./VoiceChat";
 import { Camera, Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
-import { getPlayerStats, fetchChallengeById, resolveAdminChallenge, triggerChallengeDispute, approveMicRequest, denyMicRequest, approveMicRequestReplace, MAX_VOICE_SPEAKERS, writeChallengeFields, walletsEqual, canonicalPlayerKey, repairChallengeFinalizationIfNeeded } from "@/lib/firebase/firestore";
+import { getPlayerStats, fetchChallengeById, triggerChallengeDispute, approveMicRequest, denyMicRequest, approveMicRequestReplace, MAX_VOICE_SPEAKERS, writeChallengeFields, walletsEqual, canonicalPlayerKey, repairChallengeFinalizationIfNeeded } from "@/lib/firebase/firestore";
 import { collection, doc, setDoc, deleteDoc, updateDoc, onSnapshot, query, where, serverTimestamp, Timestamp, getDoc, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import { ADMIN_WALLET } from "@/lib/chain/config";
@@ -572,29 +572,12 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     }
   };
 
-  const handleResolveDispute = async (winnerWallet: string) => {
-    if (!isAdmin || !currentWallet) {
-      onAppToast?.("Only the admin wallet can resolve disputes.", "warning", "Admin only");
-      return;
-    }
-    if (resolvingWinner) return;
-    setResolvingWinner(winnerWallet);
-    try {
-      // Admin only updates Firestore (designates winner). No on-chain tx = no SOL fee for admin.
-      // The winner will claim their reward themselves (they pay gas when they click Claim).
-      await resolveAdminChallenge(
-        activeChallenge.id,
-        winnerWallet,
-        "lobby",
-        "wallet:" + currentWallet,
-        undefined
-      );
-    } catch (err: any) {
-      console.error("Error resolving dispute:", err);
-      onAppToast?.(err.message || "Failed to resolve dispute. Try Admin Console if needed.", "error", "Resolve failed");
-    } finally {
-      setResolvingWinner(null);
-    }
+  const handleResolveDispute = async (_winnerWallet: string) => {
+    onAppToast?.(
+      "Admin resolution is disabled in the lobby. Use /admin/disputes to resolve safely.",
+      "warning",
+      "Admin"
+    );
   };
 
   const getStatusDisplay = () => {
@@ -1479,21 +1462,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                 e.stopPropagation();
                 if (onJoinChallenge) {
                   try {
-                    // Force immediate local UI transition while Firestore listener catches up.
-                    if (currentWallet) {
-                      setLiveChallenge((prev: any) => ({
-                        ...(prev || activeChallenge),
-                        status: 'creator_confirmation_required',
-                        pendingJoiner: currentWallet,
-                        rawData: {
-                          ...((prev?.rawData || activeChallenge?.rawData || {})),
-                          status: 'creator_confirmation_required',
-                          pendingJoiner: currentWallet,
-                        },
-                      }));
-                    }
                     await onJoinChallenge(activeChallenge);
-                    // Force refresh from source of truth after join success.
                     if (activeChallenge?.id) {
                       const refreshed = await fetchChallengeById(activeChallenge.id);
                       if (refreshed) {
@@ -2149,78 +2118,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         </div>
       )}
 
-      {/* Admin: Resolve dispute – show both submissions’ proof images, then pick winner */}
-      {status === 'disputed' && isAdmin && creatorWallet && (
-        <div className="rounded-lg border border-white/10 bg-[#07080C]/95 p-3 ring-1 ring-purple-500/10">
-          <h3 className="text-sm font-bold text-white mb-2">Admin: Resolve dispute</h3>
-          <p className="text-[11px] text-white/60 mb-3">
-            Review what each player submitted, then choose who won. You only correct the outcome here (no SOL fee). The winner will claim their reward themselves and pay the network fee.
-          </p>
-          {(() => {
-            const getResultForWallet = (wallet: string) => {
-              if (!results || typeof results !== 'object') return null;
-              const key = canonicalPlayerKey(players, wallet);
-              return results[key] ?? null;
-            };
-            const creatorResult = getResultForWallet(creatorWallet);
-            const challengerResult = challengerWallet ? getResultForWallet(challengerWallet) : null;
-            return (
-              <>
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                  <div className="rounded-lg border border-white/20 bg-black/30 p-2">
-                    <div className="text-[10px] font-semibold text-emerald-300 mb-1">Creator’s submission</div>
-                    {creatorResult?.proofImageData ? (
-                      <img src={creatorResult.proofImageData} alt="Creator proof" className="w-full aspect-video object-contain rounded bg-black/50" />
-                    ) : (
-                      <div className="w-full aspect-video rounded bg-black/50 flex items-center justify-center text-[10px] text-white/50">No image</div>
-                    )}
-                    <div className="text-[10px] text-white/70 mt-1">{creatorResult?.didWin ? 'Claimed: I won' : 'Claimed: I lost'}</div>
-                  </div>
-                  <div className="rounded-lg border border-white/20 bg-black/30 p-2">
-                    <div className="text-[10px] font-semibold text-rose-300 mb-1">Challenger’s submission</div>
-                    {challengerResult?.proofImageData ? (
-                      <img src={challengerResult.proofImageData} alt="Challenger proof" className="w-full aspect-video object-contain rounded bg-black/50" />
-                    ) : (
-                      <div className="w-full aspect-video rounded bg-black/50 flex items-center justify-center text-[10px] text-white/50">No image</div>
-                    )}
-                    <div className="text-[10px] text-white/70 mt-1">{challengerResult ? (challengerResult.didWin ? 'Claimed: I won' : 'Claimed: I lost') : '—'}</div>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {creatorWallet && (
-                    <button
-                      type="button"
-                      disabled={!!resolvingWinner}
-                      onClick={() => handleResolveDispute(creatorWallet)}
-                      className="px-3 py-2 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 text-xs font-semibold hover:bg-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {resolvingWinner === creatorWallet ? (
-                        <span className="inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Resolving…</span>
-                      ) : (
-                        <>Creator wins</>
-                      )}
-                    </button>
-                  )}
-                  {challengerWallet && (
-                    <button
-                      type="button"
-                      disabled={!!resolvingWinner}
-                      onClick={() => handleResolveDispute(challengerWallet)}
-                      className="px-3 py-2 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-200 text-xs font-semibold hover:bg-rose-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {resolvingWinner === challengerWallet ? (
-                        <span className="inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Resolving…</span>
-                      ) : (
-                        <>Challenger wins</>
-                      )}
-                    </button>
-                  )}
-                </div>
-              </>
-            );
-          })()}
-        </div>
-      )}
+      {/* Admin resolution intentionally disabled in lobby; use /admin/disputes. */}
 
       {/* Status message when can't submit or claim */}
       {!canSubmitResult && !canClaimPrize && status !== 'disputed' && (

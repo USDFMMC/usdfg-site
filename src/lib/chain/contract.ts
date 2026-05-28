@@ -10,6 +10,7 @@
 import { Connection, PublicKey, Keypair, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction, TransactionInstruction, VersionedTransaction } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } from '@solana/spl-token';
 import { PROGRAM_ID, USDFG_MINT, SEEDS, usdfgToLamports } from './config';
+import { getExplorerTxUrl, PLATFORM_WALLET } from './environment';
 import { normalizeWinnerWallet } from '../firebase/firestore';
 
 /**
@@ -243,7 +244,7 @@ export async function createChallenge(
   
   console.log('✅ Challenge created successfully!');
   console.log(`📍 Challenge account: ${challengeAddress.toString()}`);
-  console.log(`🔗 Transaction: https://explorer.solana.com/tx/${signature}?cluster=devnet`);
+  console.log(`🔗 Transaction: ${getExplorerTxUrl(signature)}`);
   
   return challengeAddress.toString();
 }
@@ -749,11 +750,11 @@ export async function creatorFund(
       expectedAmount: `${entryFeeUsdfg} USDFG`,
       transferSuccessful: escrowBalance >= entryFeeUsdfg,
       creatorBalanceAfter: `${creatorBalanceAfter} USDFG`,
-      transactionUrl: `https://explorer.solana.com/tx/${signature}?cluster=devnet`
+      transactionUrl: `${getExplorerTxUrl(signature)}`
     });
     
     if (escrowBalance < entryFeeUsdfg) {
-      const errorMsg = `❌ WARNING: Escrow balance (${escrowBalance} USDFG) is less than expected (${entryFeeUsdfg} USDFG). The USDFG transfer may have failed. Please check the transaction: https://explorer.solana.com/tx/${signature}?cluster=devnet`;
+      const errorMsg = `❌ WARNING: Escrow balance (${escrowBalance} USDFG) is less than expected (${entryFeeUsdfg} USDFG). The USDFG transfer may have failed. Please check the transaction: ${getExplorerTxUrl(signature)}`;
       console.error(errorMsg);
       throw new Error(errorMsg);
     }
@@ -763,7 +764,7 @@ export async function creatorFund(
     // If verification fails, log but don't throw - transaction may have succeeded
     // User can check explorer to verify
     console.warn('⚠️ Could not verify escrow balance:', error);
-    console.log(`📊 Check transaction on explorer: https://explorer.solana.com/tx/${signature}?cluster=devnet`);
+    console.log(`📊 Check transaction on explorer: ${getExplorerTxUrl(signature)}`);
   }
   
   return signature;
@@ -946,11 +947,11 @@ export async function joinerFund(
       expectedEscrowBalance: `${expectedEscrowBalance} USDFG (both players)`,
       challengerBalanceAfter: `${challengerBalanceAfter} USDFG`,
       transferSuccessful: escrowBalance >= expectedEscrowBalance,
-      transactionUrl: `https://explorer.solana.com/tx/${signature}?cluster=devnet`
+      transactionUrl: `${getExplorerTxUrl(signature)}`
     });
     
     if (escrowBalance < expectedEscrowBalance) {
-      const errorMsg = `❌ WARNING: Escrow balance (${escrowBalance} USDFG) is less than expected (${expectedEscrowBalance} USDFG). The USDFG transfer may have failed. Please check the transaction: https://explorer.solana.com/tx/${signature}?cluster=devnet`;
+      const errorMsg = `❌ WARNING: Escrow balance (${escrowBalance} USDFG) is less than expected (${expectedEscrowBalance} USDFG). The USDFG transfer may have failed. Please check the transaction: ${getExplorerTxUrl(signature)}`;
       console.error(errorMsg);
       // Don't throw - challenge might still be active, just log the warning
       console.warn('⚠️ Continuing despite escrow balance mismatch - please verify on explorer');
@@ -960,7 +961,7 @@ export async function joinerFund(
   } catch (error: any) {
     // If verification fails, log but don't throw - transaction may have succeeded
     console.warn('⚠️ Could not verify escrow balance:', error);
-    console.log(`📊 Check transaction on explorer: https://explorer.solana.com/tx/${signature}?cluster=devnet`);
+    console.log(`📊 Check transaction on explorer: ${getExplorerTxUrl(signature)}`);
   }
   
   return signature;
@@ -1122,7 +1123,7 @@ export async function resolveChallenge(
   console.log('✅ Caller wallet verified:', caller.toString());
   
   // Platform wallet is hardcoded in the contract
-  const platformWallet = new PublicKey('AcEV5t9TJdZP91ttbgKieWoWUxwUb4PT4MxvggDjjkkq');
+  const platformWallet = PLATFORM_WALLET;
   
   console.log('📍 Platform wallet:', platformWallet.toString());
   
@@ -1276,7 +1277,7 @@ export async function resolveChallenge(
   }
   
   console.log('✅ Challenge resolved! Winner paid out!');
-  console.log('🔗 Transaction:', `https://explorer.solana.com/tx/${signature}?cluster=devnet`);
+  console.log('🔗 Transaction:', `${getExplorerTxUrl(signature)}`);
   console.log('💰 Winner received payout:', winnerAddress);
   
   return signature;
@@ -1379,7 +1380,7 @@ export async function transferTournamentEntryFee(
   await connection.confirmTransaction(signature);
   
   console.log('✅ Tournament challenge amount transferred to escrow!');
-  console.log('🔗 Transaction:', `https://explorer.solana.com/tx/${signature}?cluster=devnet`);
+  console.log('🔗 Transaction:', `${getExplorerTxUrl(signature)}`);
   
   return signature;
 }
@@ -1430,7 +1431,7 @@ export async function resolveAdminChallengeOnChain(
   }
 
   // Platform wallet is hardcoded in the contract
-  const platformWallet = new PublicKey('AcEV5t9TJdZP91ttbgKieWoWUxwUb4PT4MxvggDjjkkq');
+  const platformWallet = PLATFORM_WALLET;
   
   // Derive escrow token account PDA
   const [escrowTokenAccountPDA, escrowTokenBump] = PublicKey.findProgramAddressSync(
@@ -1498,7 +1499,7 @@ export async function resolveAdminChallengeOnChain(
   await connection.confirmTransaction(signature, 'confirmed');
   
   console.log('✅ Admin challenge resolved! Winner paid out!');
-  console.log('🔗 Transaction:', `https://explorer.solana.com/tx/${signature}?cluster=devnet`);
+  console.log('🔗 Transaction:', `${getExplorerTxUrl(signature)}`);
   
   return signature;
 }

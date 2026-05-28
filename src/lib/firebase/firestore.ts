@@ -31,6 +31,7 @@ import {
 import { CHALLENGE_CONFIG, ADMIN_WALLET } from '../chain/config';
 import { getExplorerTxUrl } from '../chain/explorer';
 import { isWarmupPhaseBlockingSubmit } from '@/lib/utils/warmup-phase';
+import { logClientCleanupDisabledOnce } from './clientCleanupGate';
 
 // Test Firestore connection
 export async function testFirestoreConnection() {
@@ -2231,11 +2232,34 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
       updatedAt: serverTimestamp(),
     };
 
+    // Join intent must match Firestore isJoinIntentUpdate() field allowlist — no hybrid merge extras.
     await writeChallengeFields(challengeId, updates, {
       currentData: data,
       actingWallet: wallet,
+      skipParticipantHybridMerge: true,
     });
-    
+
+    const joinerUid = auth.currentUser?.uid ?? null;
+    if (joinerUid) {
+      const afterJoinSnap = await getDoc(challengeRef);
+      const afterJoin = afterJoinSnap.exists()
+        ? (afterJoinSnap.data() as ChallengeData)
+        : data;
+      try {
+        await writeChallengeFields(
+          challengeId,
+          { opponentUid: joinerUid, updatedAt: serverTimestamp() },
+          {
+            currentData: afterJoin,
+            actingWallet: wallet,
+            actingUid: joinerUid,
+          }
+        );
+      } catch (bindErr) {
+        console.warn('⚠️ opponentUid bind after join intent failed (non-fatal):', bindErr);
+      }
+    }
+
     // CRITICAL: Verify the update was applied
     const verifySnap = await getDoc(challengeRef);
     if (verifySnap.exists()) {
@@ -2245,8 +2269,16 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
       // Double-check the status was actually updated
       if (verifiedData.status !== 'creator_confirmation_required') {
         console.error('❌ Status update failed! Expected creator_confirmation_required, got:', verifiedData.status);
-        // Force update again
-        await writeChallengeFields(challengeId, { status: 'creator_confirmation_required' });
+        await writeChallengeFields(
+          challengeId,
+          {
+            status: 'creator_confirmation_required',
+            pendingJoiner: wallet,
+            opponentWallet: wallet,
+            updatedAt: serverTimestamp(),
+          },
+          { currentData: verifiedData, actingWallet: wallet, skipParticipantHybridMerge: true }
+        );
       }
     }
 
@@ -2268,8 +2300,14 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
 
     console.log('✅ Join intent expressed successfully (NO PAYMENT):', challengeId);
     return true;
-  } catch (error) {
-    console.error('❌ Error expressing join intent:', error);
+  } catch (error: unknown) {
+    const err = error as { code?: string; message?: string };
+    console.error('❌ Error expressing join intent:', {
+      challengeId,
+      wallet,
+      code: err?.code,
+      message: err?.message ?? String(error),
+    });
     throw error;
   }
 };
@@ -2791,50 +2829,8 @@ export const revertJoinerTimeout = async (challengeId: string): Promise<boolean>
 /**
  * Auto-delete expired pending challenges after 60 minutes (saves Firebase storage)
  */
-export const expirePendingChallenge = async (challengeId: string): Promise<boolean> => {
-  try {
-    const challengeRef = doc(db, "challenges", challengeId);
-    const snap = await getDoc(challengeRef);
-      
-    if (!snap.exists()) {
-      return false;
-    }
-
-    const data = snap.data() as ChallengeData;
-    
-    // Only delete if in pending_waiting_for_opponent state
-    if (data.status !== 'pending_waiting_for_opponent') {
-      return false;
-    }
-    
-    if (!data.expirationTimer || data.expirationTimer.toMillis() > Date.now()) {
-      return false; // Not expired yet
-    }
-    
-    // Never auto-delete Founder Tournaments (admin-created). Only manual or after airdrop + match ended.
-    const isTournament = data.format === 'tournament' || !!data.tournament;
-    const entryFee = data.entryFee || 0;
-    const isFree = entryFee === 0 || entryFee < 0.000000001;
-    const founderParticipantReward = (data.founderParticipantReward ?? 0) as number;
-    const founderWinnerBonus = (data.founderWinnerBonus ?? 0) as number;
-    const { ADMIN_WALLET } = await import('../chain/config');
-    const creatorWallet = (data.creator || '').toLowerCase();
-    const isAdminCreator = creatorWallet === ADMIN_WALLET.toString().toLowerCase();
-    const isFounderTournament = isTournament && isAdminCreator && isFree && (founderParticipantReward > 0 || founderWinnerBonus > 0);
-    if (isFounderTournament) {
-      console.log('⚠️ Skipping auto-delete of Founder Tournament (pending expired):', challengeId);
-      return false;
-    }
-    
-    // Delete expired challenge immediately to save Firebase storage
-    await cleanupExpiredChallenge(challengeId);
-    
-    console.log('✅ Pending challenge expired and deleted:', challengeId);
-    return true;
-  } catch (error) {
-    console.error('❌ Error deleting expired pending challenge:', error);
-    return false;
-  }
+export const expirePendingChallenge = async (_challengeId: string): Promise<boolean> => {
+  return false;
 };
 
 /**
@@ -2941,165 +2937,19 @@ export async function addChallengeDoc(data: any) {
   return docRef.id;
 }
 
-// Auto-cleanup for completed challenges (delete after short retention window)
-export async function cleanupCompletedChallenge(id: string) {
-  try {
-    // CRITICAL: Double-check this is not an active tournament before deleting
-    const challengeRef = doc(db, "challenges", id);
-    const challengeSnap = await getDoc(challengeRef);
-    
-    if (challengeSnap.exists()) {
-      const data = challengeSnap.data() as ChallengeData;
-      const isTournament = data.format === 'tournament' || data.tournament;
-      const tournamentStage = data.tournament?.stage;
-      const isActiveTournament = isTournament && (
-        tournamentStage === 'round_in_progress' || 
-        tournamentStage === 'awaiting_results' ||
-        data.status === 'active'
-      );
-      
-      if (isActiveTournament) {
-        console.log('⚠️ Skipping cleanup of active tournament:', id);
-        return; // Don't delete active tournaments
-      }
-      
-      // Check if this is a Founder Tournament or Founder Challenge
-      const entryFee = data.entryFee || 0;
-      const isFree = entryFee === 0 || entryFee < 0.000000001;
-      const founderParticipantReward = data.founderParticipantReward || 0;
-      const founderWinnerBonus = data.founderWinnerBonus || 0;
-      
-      // Import ADMIN_WALLET to check if creator is admin
-      const { ADMIN_WALLET } = await import('../chain/config');
-      const creatorWallet = data.creator || '';
-      const isAdminCreator = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
-      
-      // Check if Founder Tournament (tournament with founder rewards)
-      const isFounderTournament = isTournament && 
-        isAdminCreator && 
-        isFree && 
-        (founderParticipantReward > 0 || founderWinnerBonus > 0);
-      
-      // Check if Founder Challenge (non-tournament, no PDA, admin creator, free)
-      const isFounderChallenge = !isTournament && 
-        !data.pda && 
-        (isFree || isAdminCreator);
-      
-      const isFounderTournamentOrChallenge = isFounderTournament || isFounderChallenge;
-      
-      if (isFounderTournamentOrChallenge) {
-        // Never auto-delete Founder Tournaments/Challenges; admin deletes manually.
-        console.log('⚠️ Skipping auto-delete of Founder Tournament/Challenge (admin deletes manually):', id);
-        return;
-      }
-    }
-    
-    console.log('🗑️ Cleaning up chat messages for challenge:', id);
-    const chatQuery = query(collection(db, 'challenge_lobbies', id, 'challenge_chats'));
-    const chatSnapshot = await getDocs(chatQuery);
-    const chatDeletePromises = chatSnapshot.docs.map((docSnapshot) => deleteDoc(docSnapshot.ref));
-    await Promise.all(chatDeletePromises);
-    console.log(`🗑️ Deleted ${chatSnapshot.size} chat messages for challenge:`, id);
-
-    await deleteDoc(challengeRef);
-    console.log('🗑️ Completed challenge cleaned up:', id);
-  } catch (error) {
-    console.error('❌ Failed to cleanup completed challenge:', error);
-  }
+/** Client auto-delete disabled (Wave 1A). Server cleanup TBD. */
+export async function cleanupCompletedChallenge(_id: string): Promise<void> {
+  logClientCleanupDisabledOnce();
 }
 
-// Auto-cleanup for expired challenges (delete immediately, except Founder Tournaments/Challenges)
-export async function cleanupExpiredChallenge(id: string) {
-  try {
-    // CRITICAL: Double-check this is not an active tournament before deleting
-    const challengeRef = doc(db, "challenges", id);
-    const challengeSnap = await getDoc(challengeRef);
-    
-    if (challengeSnap.exists()) {
-      const data = challengeSnap.data() as ChallengeData;
-      const isTournament = data.format === 'tournament' || data.tournament;
-      const tournamentStage = data.tournament?.stage;
-      const isActiveTournament = isTournament && (
-        tournamentStage === 'round_in_progress' || 
-        tournamentStage === 'awaiting_results' ||
-        data.status === 'active'
-      );
-      
-      if (isActiveTournament) {
-        console.log('⚠️ Skipping cleanup of active tournament:', id);
-        return; // Don't delete active tournaments
-      }
-      
-      // Check if this is a Founder Tournament or Founder Challenge
-      const entryFee = data.entryFee || 0;
-      const isFree = entryFee === 0 || entryFee < 0.000000001;
-      const founderParticipantReward = data.founderParticipantReward || 0;
-      const founderWinnerBonus = data.founderWinnerBonus || 0;
-      
-      // Import ADMIN_WALLET to check if creator is admin
-      const { ADMIN_WALLET } = await import('../chain/config');
-      const creatorWallet = data.creator || '';
-      const isAdminCreator = creatorWallet.toLowerCase() === ADMIN_WALLET.toString().toLowerCase();
-      
-      // Check if Founder Tournament (tournament with founder rewards)
-      const isFounderTournament = isTournament && 
-        isAdminCreator && 
-        isFree && 
-        (founderParticipantReward > 0 || founderWinnerBonus > 0);
-      
-      // Check if Founder Challenge (non-tournament, no PDA, admin creator, free)
-      const isFounderChallenge = !isTournament && 
-        !data.pda && 
-        (isFree || isAdminCreator);
-      
-      const isFounderTournamentOrChallenge = isFounderTournament || isFounderChallenge;
-      
-      if (isFounderTournamentOrChallenge) {
-        // Never auto-delete Founder Tournaments/Challenges; admin deletes manually (even if no one joined).
-        return;
-      }
-    }
-    
-    console.log('🗑️ Starting complete cleanup for expired challenge:', id);
-
-    console.log('🗑️ Cleaning up chat messages for expired challenge:', id);
-    const chatQuery = query(collection(db, 'challenge_lobbies', id, 'challenge_chats'));
-    const chatSnapshot = await getDocs(chatQuery);
-    const chatDeletePromises = chatSnapshot.docs.map((docSnapshot) => deleteDoc(docSnapshot.ref));
-    await Promise.all(chatDeletePromises);
-    console.log(`🗑️ Deleted ${chatSnapshot.size} chat messages for expired challenge:`, id);
-
-    await deleteVoiceSignalsDocument(id);
-
-    // Delete challenge notifications
-    try {
-      const notificationQuery = query(
-        collection(db, 'challenge_notifications'),
-        where('challengeId', '==', id)
-      );
-      const notificationSnapshot = await getDocs(notificationQuery);
-      const notificationDeletePromises = notificationSnapshot.docs.map(docSnapshot =>
-        deleteDoc(doc(db, 'challenge_notifications', docSnapshot.id))
-      );
-      await Promise.all(notificationDeletePromises);
-      console.log(`🗑️ Deleted ${notificationSnapshot.size} challenge notifications for expired challenge:`, id);
-    } catch (notificationError) {
-      console.log('ℹ️ No challenge notifications to delete for challenge:', id);
-    }
-    
-    // 4. Finally, delete the challenge document itself (reuse challengeRef from above)
-    await deleteDoc(challengeRef);
-    console.log('✅ Expired challenge and all related data cleaned up:', id);
-  } catch (error) {
-    console.error('❌ Failed to cleanup expired challenge:', error);
-    throw error;
-  }
+/** Client auto-delete disabled (Wave 1A). Server cleanup TBD. */
+export async function cleanupExpiredChallenge(_id: string): Promise<void> {
+  logClientCleanupDisabledOnce();
 }
 
-// Legacy function - now redirects to cleanup
-export async function archiveChallenge(id: string) {
-  console.log('⚠️ archiveChallenge is deprecated, using cleanup instead');
-  await cleanupCompletedChallenge(id);
+/** Client auto-delete disabled (Wave 1A). Server cleanup TBD. */
+export async function archiveChallenge(_id: string): Promise<void> {
+  logClientCleanupDisabledOnce();
 }
 
 // ============================================
