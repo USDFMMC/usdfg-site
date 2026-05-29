@@ -2115,7 +2115,7 @@ export const fetchChallengeById = async (challengeId: string): Promise<Challenge
 // Moves challenge to creator_confirmation_required state
 export const expressJoinIntent = async (challengeId: string, wallet: string, isFounderChallenge: boolean = false, isTeam?: boolean) => {
   try {
-    await ensureFirebaseSignedIn();
+    const joinerUid = await ensureFirebaseSignedIn();
     const challengeRef = doc(db, "challenges", challengeId);
     const snap = await getDoc(challengeRef);
     
@@ -2222,11 +2222,13 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
     // Calculate creator funding deadline (5 minutes from now)
     const creatorFundingDeadline = Timestamp.fromDate(new Date(Date.now() + (5 * 60 * 1000)));
 
-    // Update challenge to express join intent - NO PAYMENT
+    // Update challenge to express join intent - NO PAYMENT.
+    // Deterministic key set (no hybrid merge) so it matches isJoinIntentUpdate() allowlist exactly.
     const updates: any = {
       status: 'creator_confirmation_required',
       pendingJoiner: wallet,
       opponentWallet: wallet,
+      opponentUid: joinerUid,
       creatorFundingDeadline,
       updatedAt: serverTimestamp(),
     };
@@ -2234,6 +2236,8 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
     await writeChallengeFields(challengeId, updates, {
       currentData: data,
       actingWallet: wallet,
+      actingUid: joinerUid,
+      skipParticipantHybridMerge: true,
     });
     
     // CRITICAL: Verify the update was applied
