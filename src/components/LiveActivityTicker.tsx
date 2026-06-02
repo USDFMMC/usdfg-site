@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from "react";
-import { listenToRecentChallenges } from "@/lib/firebase/firestore";
+import React, { useMemo } from "react";
 import type { ChallengeData } from "@/lib/firebase/firestore";
 
 type ActivityType = "create" | "complete" | "leaderboard" | "generic" | "funded" | "active";
@@ -7,6 +6,11 @@ type ActivityType = "create" | "complete" | "leaderboard" | "generic" | "funded"
 interface ActivityItem {
   text: string;
   type: ActivityType;
+}
+
+interface LiveActivityTickerProps {
+  /** Parent arena feed (useChallenges) — avoids a second Firestore listener. */
+  challenges?: ChallengeData[];
 }
 
 function shortWallet(wallet: string): string {
@@ -53,21 +57,20 @@ const typeColor: Record<ActivityType, string> = {
   active: "text-purple-300/85",
 };
 
-const TICKER_LIMIT = 20;
+/** How many recent challenges to turn into ticker lines (subset of parent feed). */
+const TICKER_ACTIVITY_LIMIT = 20;
 
-export default function LiveActivityTicker() {
-  const [activityItems, setActivityItems] = useState<ActivityItem[]>(FALLBACK_ITEMS);
-
-  useEffect(() => {
-    const unsubscribe = listenToRecentChallenges(TICKER_LIMIT, (challenges) => {
-      const items: ActivityItem[] = [];
-      for (const c of challenges) {
-        items.push(...challengeToActivityItems(c as ChallengeData & { id?: string }));
-      }
-      setActivityItems(items.length > 0 ? items : FALLBACK_ITEMS);
-    });
-    return () => unsubscribe();
-  }, []);
+export default function LiveActivityTicker({ challenges }: LiveActivityTickerProps) {
+  const activityItems = useMemo(() => {
+    if (!challenges?.length) {
+      return FALLBACK_ITEMS;
+    }
+    const items: ActivityItem[] = [];
+    for (const c of challenges.slice(0, TICKER_ACTIVITY_LIMIT)) {
+      items.push(...challengeToActivityItems(c as ChallengeData & { id?: string }));
+    }
+    return items.length > 0 ? items : FALLBACK_ITEMS;
+  }, [challenges]);
 
   const displayItems = activityItems.concat(activityItems);
 

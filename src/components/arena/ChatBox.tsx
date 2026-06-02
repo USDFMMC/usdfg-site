@@ -76,12 +76,12 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
 
     // Store chat under the challenge lobby to avoid composite-index requirements.
     const messagesRef = collection(db, "challenge_lobbies", challengeId, "challenge_chats");
-    // Realtime listener (keep last ~200 messages for performance).
+    // Realtime listener (keep last ~50 messages for performance).
     // Query descending + reverse to display oldest→newest.
     const q = query(
       messagesRef,
       orderBy("timestamp", "desc"),
-      limit(200)
+      limit(50)
     );
     let quotaRetryUsed = false;
     let quotaRetryTimer: ReturnType<typeof setTimeout> | null = null;

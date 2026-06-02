@@ -115,6 +115,11 @@ import ElegantModal from "@/components/ui/ElegantModal";
 import CreateChallengeForm from "@/components/arena/CreateChallengeForm";
 import ElegantNavbar from "@/components/layout/ElegantNavbar";
 import LiveActivityTicker from "@/components/LiveActivityTicker";
+import {
+  readLeaderboardTop5Cache,
+  writeLeaderboardTop5Cache,
+  clearLeaderboardTop5Cache,
+} from "@/lib/utils/leaderboard-cache";
 import LiveChallengesGrid from "@/components/arena/LiveChallengesGrid";
 import WarmUpBadge from "@/components/arena/WarmUpBadge";
 // Lazy load heavy modals for better performance on all devices
@@ -1075,18 +1080,18 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     return lockValue === normalizedCurrentWallet ? currentLockTarget : null;
   }, [normalizedCurrentWallet, currentLockTarget, userLocks]);
 
-  const refreshTopTeams = useCallback(async (limitOverride?: number, includeAllOverride?: boolean) => {
+  const refreshTopTeams = useCallback(async (limitOverride?: number) => {
     const shouldToggleLoading = leaderboardView === 'teams';
     try {
       if (shouldToggleLoading) {
         setLoadingTopTeams(true);
       }
-      const includeAll = includeAllOverride ?? showAllPlayers;
-      const limit = includeAll ? limitOverride : (limitOverride ?? (showAllPlayers ? leaderboardLimit : 5));
-      const teams = await getLeaderboardTeams(limit, 'totalEarned', includeAll);
+      const limit = limitOverride ?? (showAllPlayers ? leaderboardLimit : 5);
+      // MVP: never full-collection scan (includeAll disabled).
+      const teams = await getLeaderboardTeams(limit > 0 ? limit : 30, "totalEarned", false);
       setTopTeams(teams);
     } catch (error) {
-      console.error('Failed to refresh team leaderboard:', error);
+      console.error("Failed to refresh team leaderboard:", error);
     } finally {
       if (shouldToggleLoading) {
         setLoadingTopTeams(false);
@@ -1094,17 +1099,29 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
   }, [leaderboardView, showAllPlayers, leaderboardLimit]);
 
-  const loadTopPlayers = useCallback(async (limitOverride?: number, includeAllOverride?: boolean) => {
-    try {
-      const includeAll = includeAllOverride ?? showAllPlayers;
-      const limit = includeAll ? limitOverride : (limitOverride ?? (showAllPlayers ? leaderboardLimit : 5));
-      const players = await getLeaderboardPlayers(limit, 'totalEarned', includeAll);
-      setTopPlayers(players);
-    } catch (error) {
-      console.error('Failed to load top players:', error);
-      setTopPlayers([]);
-    }
-  }, [showAllPlayers, leaderboardLimit]);
+  const loadTopPlayers = useCallback(
+    async (limitOverride?: number, opts?: { bypassCache?: boolean }) => {
+      try {
+        const limit = limitOverride ?? (showAllPlayers ? leaderboardLimit : 5);
+        if (limit === 5 && !opts?.bypassCache) {
+          const cached = readLeaderboardTop5Cache();
+          if (cached?.length) {
+            setTopPlayers(cached);
+            return;
+          }
+        }
+        const players = await getLeaderboardPlayers(limit > 0 ? limit : 30, "totalEarned", false);
+        setTopPlayers(players);
+        if (limit === 5) {
+          writeLeaderboardTop5Cache(players);
+        }
+      } catch (error) {
+        console.error("Failed to load top players:", error);
+        setTopPlayers([]);
+      }
+    },
+    [showAllPlayers, leaderboardLimit]
+  );
 
   const handleLeaderboardViewChange = useCallback((view: 'individual' | 'teams') => {
     if (leaderboardView === view) {
@@ -1724,9 +1741,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Debounce refresh to avoid too many calls (wait for stats to be updated)
       const timeoutId = setTimeout(async () => {
         try {
-          const limit = showAllPlayers ? leaderboardLimit : 5;
-          const players = await getLeaderboardPlayers(limit, 'totalEarned', showAllPlayers);
-          setTopPlayers(players);
+          clearLeaderboardTop5Cache();
+          await loadTopPlayers(5, { bypassCache: true });
         } catch (error) {
           console.error('Failed to refresh leaderboard:', error);
         }
@@ -1734,7 +1750,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       return () => clearTimeout(timeoutId);
     }
-  }, [firestoreChallenges, completedChallengeIds, showAllPlayers, leaderboardLimit]);
+  }, [firestoreChallenges, completedChallengeIds, loadTopPlayers]);
   
   // Auto-expire challenges after 2 hours
   useChallengeExpiry(firestoreChallenges);
@@ -3814,9 +3830,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
         setTimeout(async () => {
         try {
-          const limit = showAllPlayers ? leaderboardLimit : 5;
-          const players = await getLeaderboardPlayers(limit, 'totalEarned', showAllPlayers);
-          setTopPlayers(players);
+          clearLeaderboardTop5Cache();
+          await loadTopPlayers(5, { bypassCache: true });
         } catch (error) {
           console.error('Failed to refresh leaderboard after trust review:', error);
         }
@@ -5810,7 +5825,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         </ElegantNavbar>
 
         {/* Live Activity Ticker */}
-        <LiveActivityTicker />
+        <LiveActivityTicker challenges={firestoreChallenges} />
 
         {/* Elegant Notification */}
         <ElegantNotification
@@ -7270,13 +7285,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                             event.preventDefault();
                             event.stopPropagation();
                             setShowAllPlayers(false);
-                            setLeaderboardLimit(30); // Reset to default
+                            setLeaderboardLimit(5);
                             setLeaderboardLoading(true);
                             try {
                               if (isTeamsView) {
-                                await refreshTopTeams(5, false);
+                                await refreshTopTeams(5);
                               } else {
-                                await loadTopPlayers(5, false);
+                                clearLeaderboardTop5Cache();
+                                await loadTopPlayers(5);
                               }
                             } catch (error) {
                               console.error('Failed to load top 5:', error);
@@ -7301,9 +7317,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                               setLeaderboardLimit(newLimit);
                               try {
                                 if (isTeamsView) {
-                                  await refreshTopTeams(newLimit, true);
+                                  await refreshTopTeams(newLimit);
                                 } else {
-                                  await loadTopPlayers(newLimit, true);
+                                  await loadTopPlayers(newLimit);
                                 }
                               } catch (error) {
                                 console.error('Failed to load more players:', error);
@@ -7325,16 +7341,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           event.preventDefault();
                           event.stopPropagation();
                           setShowAllPlayers(true);
-                          setLeaderboardLimit(0); // 0 = no limit (show all)
+                          setLeaderboardLimit(30);
                           setLeaderboardLoading(true);
                           try {
                             if (isTeamsView) {
-                              await refreshTopTeams(0, true);
+                              await refreshTopTeams(30);
                             } else {
-                              await loadTopPlayers(0, true);
+                              await loadTopPlayers(30);
                             }
                           } catch (error) {
-                            console.error('Failed to load all players:', error);
+                            console.error('Failed to load extended leaderboard:', error);
                           } finally {
                             setLeaderboardLoading(false);
                           }
@@ -7342,7 +7358,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                         disabled={isLoadingLeaderboard}
                         className="w-full py-2.5 rounded-xl font-display font-semibold text-sm border border-purple/35 bg-purple/[0.08] text-white hover:bg-purple/20 hover:border-purple/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {isLoadingLeaderboard ? 'Loading...' : `View All ${leaderboardEntityLabel} →`}
+                        {isLoadingLeaderboard ? 'Loading...' : `Show Top 30 ${leaderboardEntityLabel} →`}
                       </button>
                     )}
                   </div>
@@ -7785,9 +7801,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               if (publicKey) {
                 try {
                   await updatePlayerDisplayName(publicKey.toString(), newName);
-                  const limit = showAllPlayers ? 50 : 5;
-                  const players = await getLeaderboardPlayers(limit, 'totalEarned', showAllPlayers);
-                  setTopPlayers(players);
+                  clearLeaderboardTop5Cache();
+                  const limit = showAllPlayers ? leaderboardLimit : 5;
+                  await loadTopPlayers(limit > 0 ? limit : 5, { bypassCache: true });
                 } catch (error) {
                   console.error('Failed to update display name in Firestore:', error);
                 }
@@ -7826,10 +7842,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     // Also save to localStorage as backup
                     setWalletScopedValue(PROFILE_STORAGE_KEYS.profileImage, walletKey, imageURL);
                     
-                    // Refresh leaderboard to show updated image
-                    const limit = showAllPlayers ? 50 : 5;
-                    const players = await getLeaderboardPlayers(limit, 'totalEarned', showAllPlayers);
-                    setTopPlayers(players);
+                    clearLeaderboardTop5Cache();
+                    const limit = showAllPlayers ? leaderboardLimit : 5;
+                    await loadTopPlayers(limit > 0 ? limit : 5, { bypassCache: true });
                   } catch (error) {
                     console.error('❌ Failed to upload profile image:', error);
                     showAppToast("Failed to upload profile image. Please try again.", "error", "Upload failed");
@@ -7841,10 +7856,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     setUserProfileImage(null);
                   clearWalletScopedValue(PROFILE_STORAGE_KEYS.profileImage, walletKey);
                     
-                    // Refresh leaderboard
-                    const limit = showAllPlayers ? 50 : 5;
-                    const players = await getLeaderboardPlayers(limit, 'totalEarned', showAllPlayers);
-                    setTopPlayers(players);
+                    clearLeaderboardTop5Cache();
+                    const limit = showAllPlayers ? leaderboardLimit : 5;
+                    await loadTopPlayers(limit > 0 ? limit : 5, { bypassCache: true });
                   } catch (error) {
                     console.error('❌ Failed to remove profile image:', error);
                     showAppToast("Failed to remove profile image. Please try again.", "error", "Remove failed");

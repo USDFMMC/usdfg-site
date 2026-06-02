@@ -275,9 +275,6 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
     // Use includeMetadataChanges to get updates faster
     const unsubscribe = onSnapshot(
       challengeRef,
-      {
-        includeMetadataChanges: true // Get updates even for metadata changes (faster)
-      },
       async (snapshot) => {
         if (snapshot.exists()) {
           const updatedData = { id: snapshot.id, ...snapshot.data(), rawData: snapshot.data() };

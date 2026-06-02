@@ -1,7 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import type { ChallengeData } from '@/lib/firebase/firestore';
-import { listenToRecentChallenges, listenToUserChallenges, fetchChallenges, repairChallengeFinalizationIfNeeded } from '@/lib/firebase/firestore';
+import {
+  listenToRecentChallenges,
+  listenToUserChallenges,
+  fetchChallenges,
+  repairChallengeFinalizationIfNeeded,
+  RECENT_CHALLENGES_FEED_LIMIT,
+} from '@/lib/firebase/firestore';
 import { auth } from '@/lib/firebase/config';
 
 function challengeParticipantUidMatches(challenge: ChallengeData, uid: string | null): boolean {
@@ -138,7 +144,7 @@ export const useChallenges = () => {
     };
   }, [authUid]);
 
-  /** One-shot fetch to align with Firestore when the realtime snapshot lags (same query as listener, limit 100). */
+  /** One-shot fetch to align with Firestore when the realtime snapshot lags (same query as listener). */
   const refetchChallenges = useCallback(async (): Promise<ChallengeData[] | null> => {
     try {
       const data = await fetchChallenges();

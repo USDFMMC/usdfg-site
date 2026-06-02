@@ -33,11 +33,21 @@ import { getExplorerTxUrl } from '../chain/explorer';
 import { isWarmupPhaseBlockingSubmit } from '@/lib/utils/warmup-phase';
 import { logClientCleanupDisabledOnce } from './clientCleanupGate';
 
-// Test Firestore connection
+/** Max challenges in the arena realtime feed (useChallenges / refetch). */
+export const RECENT_CHALLENGES_FEED_LIMIT = 30;
+
+// Lightweight Firestore connectivity check (1 doc max — no full collection scan).
 export async function testFirestoreConnection() {
   try {
-    const querySnapshot = await getDocs(collection(db, "challenges"));
-    console.log("✅ Firestore connected. Challenges found:", querySnapshot.size);
+    const q = query(
+      collection(db, "challenges"),
+      orderBy("createdAt", "desc"),
+      limit(1)
+    );
+    await getDocs(q);
+    if (import.meta.env.DEV) {
+      console.log("✅ Firestore connected.");
+    }
     return true;
   } catch (error) {
     console.error("❌ Firestore connection failed:", error);
@@ -2073,7 +2083,11 @@ export const listenToRecentChallenges = (
 // One-time fetch operations
 export const fetchChallenges = async (): Promise<ChallengeData[]> => {
   try {
-    const q = query(collection(db, "challenges"), orderBy('createdAt', 'desc'), limit(100));
+    const q = query(
+      collection(db, "challenges"),
+      orderBy("createdAt", "desc"),
+      limit(RECENT_CHALLENGES_FEED_LIMIT)
+    );
     const snapshot = await getDocs(q);
     
     const challenges = snapshot.docs.map(doc => ({
