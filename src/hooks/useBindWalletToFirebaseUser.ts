@@ -33,6 +33,14 @@ export function useBindWalletToFirebaseUser(): void {
     return publicKey.toString();
   }, [connected, publicKey]);
 
+  // Wallet is USDFG's canonical identity. Index/lookup keys are normalized to lowercase so the
+  // binding is stable regardless of address casing and matches the lowercase `winner` field used
+  // by Firestore payout rules. The original-case address is preserved in the document body.
+  const walletKey = useMemo(
+    () => (walletAddress ? walletAddress.toLowerCase() : null),
+    [walletAddress]
+  );
+
   const [uid, setUid] = useState<string | null>(auth.currentUser?.uid ?? null);
 
   useEffect(() => {
@@ -48,15 +56,15 @@ export function useBindWalletToFirebaseUser(): void {
 
   useEffect(() => {
     console.log("ATTEMPT BIND:", { uid, walletAddress });
-    if (!uid || !walletAddress) return;
-    if (walletBindBlocked.has(walletAddress)) return;
+    if (!uid || !walletAddress || !walletKey) return;
+    if (walletBindBlocked.has(walletKey)) return;
 
     let cancelled = false;
 
     (async () => {
       try {
-        // Step B — check wallet is not already linked
-        const walletRef = doc(db, "usersByWallet", walletAddress);
+        // Step B — check wallet is not already linked (canonical lowercase index)
+        const walletRef = doc(db, "usersByWallet", walletKey);
         const walletSnap = await getDoc(walletRef);
 
         if (cancelled) return;
@@ -65,7 +73,7 @@ export function useBindWalletToFirebaseUser(): void {
           const data = walletSnap.data() as { uid?: unknown } | undefined;
           const linkedUid = typeof data?.uid === "string" ? data.uid : "";
           if (linkedUid !== uid) {
-            walletBindBlocked.add(walletAddress);
+            walletBindBlocked.add(walletKey);
             console.warn("Wallet already linked to another user");
             return;
           }
@@ -115,6 +123,6 @@ export function useBindWalletToFirebaseUser(): void {
     return () => {
       cancelled = true;
     };
-  }, [uid, walletAddress]);
+  }, [uid, walletAddress, walletKey]);
 }
 

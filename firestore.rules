@@ -36,6 +36,29 @@ service cloud.firestore {
     }
 
     /**
+     * Wallet-only identity: the uid CANONICALLY BOUND to the winner wallet may finalize payout.
+     * USDFG's real identity is the Solana wallet; the anonymous Firebase uid can drift across
+     * sessions/devices, so payout authorization is anchored to the wallet binding, not the
+     * (possibly stale) createdByUid/opponentUid stored at create/join time.
+     *
+     * Security:
+     * - winner is stored lowercase (normalizeWinnerWallet); usersByWallet is keyed by lowercase
+     *   wallet, so the lookup resolves to the winner wallet's canonical owner.
+     * - Only that owner (uid == usersByWallet[winner].uid) passes — NOT other participants,
+     *   NOT the loser, NOT the public. Non-winners cannot acquire the payout lock.
+     * - Only applies once a winner is set (completed challenges), so it never broadens
+     *   pre-result access.
+     * - pda / payoutSignature immutability still apply (ANDed below), so this cannot be used
+     *   to swap the escrow PDA or spoof/overwrite a payout signature.
+     */
+    function isWinnerWalletBindingOwner() {
+      return isSignedIn()
+        && resource.data.get('winner', null) != null
+        && exists(/databases/$(database)/documents/usersByWallet/$(resource.data.winner))
+        && get(/databases/$(database)/documents/usersByWallet/$(resource.data.winner)).data.uid == request.auth.uid;
+    }
+
+    /**
      * First opponent bind: writeChallengeFields sets opponentUid in the same update as join intent
      * (resource.opponentUid was unset; createdByUid unchanged).
      */
@@ -118,6 +141,8 @@ service cloud.firestore {
           || isListedInPlayersUid()
           || isOpponentUidFirstBind()
           || isJoinIntentUpdate()
+          // Winner-only payout path: uid canonically bound to the winner wallet (survives uid drift).
+          || isWinnerWalletBindingOwner()
           // Dispute console: admin may update while challenge is disputed (resolveAdminChallenge).
           || (isAdminUser() && resource.data.status == 'disputed')
         )

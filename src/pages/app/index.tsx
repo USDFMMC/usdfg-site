@@ -1501,7 +1501,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     if (!publicKey) {
       return;
     }
-    ensureUserLockDocument(publicKey.toString()).catch((error) => {
+    // Lowercase key: user_locks rule resolves identity via usersByWallet, now lowercase-canonical.
+    ensureUserLockDocument(publicKey.toString().toLowerCase()).catch((error) => {
       console.error('❌ Failed to ensure user lock document:', error);
     });
   }, [publicKey]);
