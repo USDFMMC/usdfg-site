@@ -88,7 +88,7 @@ const ElegantNotification: React.FC<ElegantNotificationProps> = ({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -8, scale: 0.96 }}
           transition={{ duration: 0.2, ease: "easeOut" }}
-          className="fixed z-[100] pointer-events-none top-4 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-sm sm:left-auto sm:right-4 sm:translate-x-0 sm:w-full sm:max-w-md"
+          className="fixed z-[100] pointer-events-none top-[calc(env(safe-area-inset-top,0px)+12px)] left-[max(1rem,env(safe-area-inset-left))] right-[max(1rem,env(safe-area-inset-right))] max-w-[calc(100vw-2rem)] md:top-4 md:left-auto md:right-4 md:w-full md:max-w-md"
           role="status"
           aria-live="polite"
         >
