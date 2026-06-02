@@ -3536,6 +3536,30 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     [selectedChallenge, publicKey, showStandardLobby, showAppToast]
   );
 
+  /**
+   * Force a fresh re-read + rebind of the open challenge doc into selectedChallenge.
+   * Used after result/trust-review so the claim-ready state appears even if the realtime
+   * listener is stalled (e.g. by a blocked securetoken token refresh). Trust review is NOT
+   * required for payout state — this always runs and never throws.
+   */
+  const forceRebindSelectedChallenge = useCallback(
+    async (challengeId?: string) => {
+      const id = challengeId || selectedChallenge?.id;
+      if (!id) return;
+      try {
+        const { fetchChallengeById } = await import("@/lib/firebase/firestore");
+        const refreshed = await fetchChallengeById(id);
+        if (refreshed) {
+          setSelectedChallenge({ ...refreshed, rawData: refreshed });
+          if (!showStandardLobby) setShowStandardLobby(true);
+        }
+      } catch (error) {
+        console.warn("forceRebindSelectedChallenge failed (non-blocking):", error);
+      }
+    },
+    [selectedChallenge?.id, showStandardLobby]
+  );
+
   const handleTrustReviewClose = useCallback(() => {
     const snap = pendingMatchResultRef.current;
     setShowTrustReview(false);
@@ -3548,8 +3572,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         opponentWallet: snap.opponentWallet,
       });
     }
+    // Always rebind to the latest doc so claim-ready shows without a manual refresh.
+    void forceRebindSelectedChallenge(snap?.challengeId);
     setPendingMatchResult(null);
-  }, [standardResultPostSubmitUx]);
+  }, [standardResultPostSubmitUx, forceRebindSelectedChallenge]);
 
   const handleCompleteWarmup = useCallback(
     async (challenge: { id: string }) => {
@@ -3811,6 +3837,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         });
       }
 
+      // Rebind to the latest challenge doc so claim-ready appears without a refresh.
+      void forceRebindSelectedChallenge(challengeId);
+
       setPendingMatchResult(null);
 
     } catch (error: any) {
@@ -3837,6 +3866,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       setShowTrustReview(false);
       setTrustReviewOpponent("");
       pendingMatchResultRef.current = null;
+
+      // Trust review failed (e.g. blocked securetoken refresh), but the result is already
+      // finalized in Firestore. Force the lobby to rebind so the claim button still appears.
+      void forceRebindSelectedChallenge(challengeId);
+
       setPendingMatchResult(null);
     }
   };
