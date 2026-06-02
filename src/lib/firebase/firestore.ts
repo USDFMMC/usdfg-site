@@ -3716,7 +3716,25 @@ export const syncChallengeStatus = async (challengeId: string, challengePDA: str
     if (snap.exists()) {
       const currentData = snap.data();
       const currentStatus = currentData.status as string | undefined;
-      
+
+      // Post-result / terminal states are authoritative in Firestore. The on-chain status byte
+      // only encodes pending/confirm/funded/active/completed/cancelled/disputed and does NOT
+      // represent these local states, so a background chain read must never revert them.
+      // Reverting awaiting_auto_resolution -> active blocks auto-resolution and hides the Claim button.
+      const PROTECTED_LOCAL_STATUSES = [
+        'awaiting_auto_resolution',
+        'completed',
+        'disputed',
+        'cancelled',
+        'expired',
+      ];
+      if (currentStatus && PROTECTED_LOCAL_STATUSES.includes(currentStatus)) {
+        console.log(
+          `⏭️  Skipping sync: local status '${currentStatus}' is authoritative; not overwriting with chain '${onChainStatus}'`
+        );
+        return;
+      }
+
       // Don't overwrite 'completed' status with 'active' from on-chain
       // This happens because Firestore marks as completed when both submit, but on-chain is still Active
       if (currentStatus === 'completed' && onChainStatus === 'active') {
