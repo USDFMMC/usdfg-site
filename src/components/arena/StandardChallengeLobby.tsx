@@ -337,6 +337,16 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         if (error.code !== 'permission-denied' && error.code !== 'unavailable') {
           console.error('Error listening to challenge updates:', error);
         }
+        // The realtime stream can stall (e.g. a blocked securetoken token refresh).
+        // Pull the latest doc once so the lobby still rebinds to claim-ready state
+        // (completed/winner/claim flags) without requiring a manual page refresh.
+        getDoc(challengeRef)
+          .then((snap) => {
+            if (snap.exists()) {
+              setLiveChallenge({ id: snap.id, ...snap.data(), rawData: snap.data() });
+            }
+          })
+          .catch(() => {});
       }
     );
     
