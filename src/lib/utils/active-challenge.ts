@@ -37,6 +37,41 @@ export function getFirestoreChallengeStatus(
   return challenge.status || challenge.rawData?.status || "unknown";
 }
 
+/** Pre-funding statuses that should expire (no money committed yet). */
+const PRE_FUNDING_STATUSES = new Set([
+  "pending_waiting_for_opponent",
+  "creator_confirmation_required",
+]);
+
+/** Read a Firestore Timestamp / number / date-like into epoch ms, or null. */
+function toMillis(value: unknown): number | null {
+  if (value == null) return null;
+  const v = value as { toMillis?: () => number; seconds?: number };
+  if (typeof v.toMillis === "function") return v.toMillis();
+  if (typeof value === "number") return value;
+  if (typeof v.seconds === "number") return v.seconds * 1000;
+  const d = new Date(value as string | number | Date);
+  return Number.isNaN(d.getTime()) ? null : d.getTime();
+}
+
+/**
+ * A pre-funding challenge is "stale" once its TTL (expirationTimer, else expiresAt) has passed.
+ * Client/server cleanup may be disabled, so old pending docs can linger with a live-looking status;
+ * those must NOT block new challenge creation. Funded/active challenges never expire this way.
+ */
+export function isStalePendingChallenge(challenge: FirestoreChallengeRow): boolean {
+  const status = getFirestoreChallengeStatus(challenge);
+  if (!PRE_FUNDING_STATUSES.has(status)) return false;
+  const raw = challenge as unknown as Record<string, unknown>;
+  const rawData = (raw.rawData as Record<string, unknown> | undefined) ?? {};
+  const expiry =
+    toMillis(raw.expirationTimer) ??
+    toMillis(raw.expiresAt) ??
+    toMillis(rawData.expirationTimer) ??
+    toMillis(rawData.expiresAt);
+  return expiry !== null && expiry < Date.now();
+}
+
 export function isCreatorInviteActiveStatus(status: string): boolean {
   return (CREATOR_INVITE_ACTIVE_STATUSES as readonly string[]).includes(status);
 }
@@ -102,6 +137,9 @@ export function findUserBlockingActiveChallenge(
         status === "cancelled" ||
         status === "disputed" ||
         status === "expired";
+
+      // Old pending/confirmation docs past their TTL must not block new creation.
+      if (isStalePendingChallenge(fc)) return false;
 
       return isCreatorInviteActiveStatus(status) && !isCompleted;
     }) ?? null

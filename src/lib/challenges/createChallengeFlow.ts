@@ -253,7 +253,9 @@ async function runCreateChallengeFlowCore(options: {
       challengeData.format === "tournament"
         ? (challengeData.tournament as TournamentState | undefined)
         : undefined,
-    pda: isFounderChallenge ? null : undefined,
+    // Always persist pda as null at creation (not undefined) so the field exists.
+    // Firestore rules read resource.data.pda; an absent field made update rules error -> deny.
+    pda: null,
     prizePool,
     founderParticipantReward:
       isFounderChallenge && isTournament ? founderParticipantReward : undefined,

@@ -47,16 +47,18 @@ service cloud.firestore {
         && request.resource.data.opponentUid == request.auth.uid;
     }
 
-    /** On-chain PDA: set once; never change (escrow identity lock). */
+    /** On-chain PDA: set once; never change (escrow identity lock).
+     *  Uses .get() so challenges without a pda field (non-founder docs) don't error -> deny. */
     function challengePdaImmutableAfterSet() {
-      return resource.data.pda == null
-        || request.resource.data.pda == resource.data.pda;
+      return resource.data.get('pda', null) == null
+        || request.resource.data.get('pda', null) == resource.data.get('pda', null);
     }
 
-    /** Payout tx id: set once; never change (idempotency / no double-claim swap). */
+    /** Payout tx id: set once; never change (idempotency / no double-claim swap).
+     *  Uses .get() so challenges without a payoutSignature field don't error -> deny. */
     function challengePayoutSignatureImmutable() {
-      return request.resource.data.payoutSignature == resource.data.payoutSignature
-        || resource.data.payoutSignature == null;
+      return resource.data.get('payoutSignature', null) == null
+        || request.resource.data.get('payoutSignature', null) == resource.data.get('payoutSignature', null);
     }
 
     function isJoinIntentUpdate() {
