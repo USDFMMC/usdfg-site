@@ -223,12 +223,47 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   
   // Real-time challenge data - ensures button visibility updates immediately
   const [liveChallenge, setLiveChallenge] = useState<any>(challenge);
-  
-  // Initialize liveChallenge immediately when challenge prop changes (for faster button visibility)
+
+  // Track which challenge id we've initialized liveChallenge from.
+  const liveChallengeInitIdRef = useRef<string | undefined>(challenge?.id);
+
+  // Sync liveChallenge from the prop, BUT never let a stale parent-provided snapshot
+  // downgrade an already-resolved/post-result state. The parent rebuilds
+  // selectedChallenge from the challenge LIST, which lags behind this lobby's direct
+  // doc listener (and determineWinner briefly writes a transient `active` status before
+  // `completed`). Without this guard, a late list-derived `active` prop could overwrite
+  // the doc listener's `completed` + `winner` state and hide the Claim button until a
+  // manual refresh.
   useEffect(() => {
-    if (challenge) {
+    if (!challenge) return;
+
+    // Always (re)initialize when a different challenge is opened.
+    if (challenge.id !== liveChallengeInitIdRef.current) {
+      liveChallengeInitIdRef.current = challenge.id;
       setLiveChallenge(challenge);
+      return;
     }
+
+    // Same challenge: don't allow the prop to revert a protected/post-result status.
+    const POST_RESULT_STATUSES = [
+      'completed',
+      'awaiting_auto_resolution',
+      'disputed',
+      'cancelled',
+      'expired',
+    ];
+    setLiveChallenge((prev: any) => {
+      const prevStatus = prev ? getChallengeStatus(prev) : null;
+      const incomingStatus = getChallengeStatus(challenge);
+      if (
+        prevStatus &&
+        POST_RESULT_STATUSES.includes(prevStatus) &&
+        !POST_RESULT_STATUSES.includes(incomingStatus)
+      ) {
+        return prev;
+      }
+      return challenge;
+    });
   }, [challenge]);
   
   // Listen to real-time challenge updates to ensure button visibility is always accurate
