@@ -55,11 +55,13 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll chat list only (do not scroll the lobby panel)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = messagesScrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
   }, [messages]);
 
   // Load messages once when lobby opens; poll every 15s only while lobby is open (no realtime listener)
@@ -158,14 +160,18 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full w-full">
+    <div className="flex flex-col min-h-0 h-full w-full">
       <div className="flex items-center justify-between mb-1.5 px-1">
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Match Chat</p>
         <span className="text-[10px] text-gray-500">{messages.length}</span>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto space-y-1.5 mb-1.5 min-h-0 scrollbar-thin scrollbar-thumb-gray-700/50 scrollbar-track-transparent scrollbar-thumb-rounded">
+      <div
+        ref={messagesScrollRef}
+        className="max-h-44 sm:max-h-52 min-h-0 overflow-y-auto space-y-1.5 mb-1.5 scrollbar-thin scrollbar-thumb-gray-700/50 scrollbar-track-transparent scrollbar-thumb-rounded overscroll-contain"
+        style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
+      >
         {/* Automatic gamer tag exchange message - shown when challenge is active or disputed */}
         {(status === 'active' || status === 'disputed') && playersCount && playersCount >= 2 && (
           <div className="flex justify-center my-1">
@@ -226,7 +232,6 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
             );
           })
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}

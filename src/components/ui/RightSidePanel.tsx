@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, Suspense } from 'react';
+import React, { useCallback, useEffect, useRef, useState, Suspense } from 'react';
 import { X, ChevronUp } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { getPlayerStats } from '@/lib/firebase/firestore';
@@ -37,6 +37,7 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
   voiceChatCurrentWallet,
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
+  const scrollContentRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -91,6 +92,13 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
     }
   }, [isMinimized, isMobile, safePlayers]);
 
+  const resetLobbyScrollTop = useCallback(() => {
+    const el = scrollContentRef.current;
+    if (el) {
+      el.scrollTop = 0;
+    }
+  }, []);
+
   // Reset minimized state when panel closes
   useEffect(() => {
     if (!isOpen) {
@@ -98,8 +106,28 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
       setIsMinimized(false);
       setDragY(0);
       setIsDragging(false);
+      resetLobbyScrollTop();
     }
-  }, [isOpen]);
+  }, [isOpen, resetLobbyScrollTop]);
+
+  // Keep lobby at top when opened, challenge changes, or expanded from pill
+  useEffect(() => {
+    if (!isOpen || isMinimized) return;
+
+    resetLobbyScrollTop();
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      resetLobbyScrollTop();
+      raf2 = requestAnimationFrame(resetLobbyScrollTop);
+    });
+    const afterContent = window.setTimeout(resetLobbyScrollTop, 200);
+
+    return () => {
+      cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+      window.clearTimeout(afterContent);
+    };
+  }, [isOpen, isMinimized, voiceChatChallengeId, resetLobbyScrollTop]);
 
   // Handle drag start
   const handleDragStart = (clientY: number) => {
@@ -441,7 +469,11 @@ const RightSidePanel: React.FC<RightSidePanelProps> = ({
         )}
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto min-h-0">
+        <div
+          ref={scrollContentRef}
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
+          style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}
+        >
           <div className="p-4">
             {children}
           </div>
