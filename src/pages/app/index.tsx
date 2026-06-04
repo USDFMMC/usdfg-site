@@ -6258,7 +6258,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               };
 
               // Discovery card component
+              const TAP_MOVE_THRESHOLD_PX = 8;
+
               const DiscoveryCard = ({ challenge, onSelect }: { challenge: any; onSelect: () => void }) => {
+                const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+                const movedBeyondTapRef = useRef(false);
+
                 const gameName = resolveGameName(challenge.game, challenge.title);
                 const imagePath = getGameImage(gameName, { isCustomGame: isChallengeCustomGame(challenge) });
                 const isOwner = isChallengeOwner(challenge);
@@ -6285,16 +6290,34 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                       role="button"
                       tabIndex={0}
                       className={`relative text-left rounded-xl border overflow-hidden p-3 pb-4 transition active:scale-[0.99] w-[176px] min-h-[200px] sm:w-[180px] sm:min-h-[200px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-500/45 ${edgeGlow}`}
+                      onPointerDown={(e) => {
+                        if (e.pointerType === 'mouse' && e.button !== 0) return;
+                        pointerStartRef.current = { x: e.clientX, y: e.clientY };
+                        movedBeyondTapRef.current = false;
+                      }}
+                      onPointerMove={(e) => {
+                        const start = pointerStartRef.current;
+                        if (!start || movedBeyondTapRef.current) return;
+                        const dx = e.clientX - start.x;
+                        const dy = e.clientY - start.y;
+                        if (Math.hypot(dx, dy) > TAP_MOVE_THRESHOLD_PX) {
+                          movedBeyondTapRef.current = true;
+                        }
+                      }}
+                      onPointerUp={() => {
+                        pointerStartRef.current = null;
+                      }}
+                      onPointerCancel={() => {
+                        pointerStartRef.current = null;
+                        movedBeyondTapRef.current = false;
+                      }}
                       onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onSelect();
-                      }}
-                      onTouchStart={(e) => {
-                        // Ensure touch events work on mobile
-                        e.stopPropagation();
-                      }}
-                      onTouchEnd={(e) => {
+                        if (movedBeyondTapRef.current) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          movedBeyondTapRef.current = false;
+                          return;
+                        }
                         e.preventDefault();
                         e.stopPropagation();
                         onSelect();

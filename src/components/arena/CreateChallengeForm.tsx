@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { Info, User, Users, Trophy, Globe, Sparkles } from 'lucide-react';
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
@@ -371,6 +371,36 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     setCurrentStep(prev => Math.max(prev - 1, 1));
   };
 
+  const formRootRef = useRef<HTMLDivElement>(null);
+  const skipStepScrollRef = useRef(true);
+
+  useEffect(() => {
+    if (skipStepScrollRef.current) {
+      skipStepScrollRef.current = false;
+      return;
+    }
+    const frame = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const root = formRootRef.current;
+        if (!root) return;
+        let el: HTMLElement | null = root.parentElement;
+        while (el) {
+          const { overflowY } = window.getComputedStyle(el);
+          if (
+            (overflowY === 'auto' || overflowY === 'scroll') &&
+            el.scrollHeight > el.clientHeight
+          ) {
+            el.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+          }
+          el = el.parentElement;
+        }
+        root.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [currentStep]);
+
   // Helper function to get game category
   const getGameCategory = (game: string) => {
     if (!game) return 'Sports';
@@ -477,7 +507,7 @@ const CreateChallengeForm: React.FC<CreateChallengeFormProps> = ({
     'border-white/10 bg-void-light/40 text-white/70 hover:border-white/18 hover:bg-white/[0.04]';
 
   return (
-    <div className="font-body space-y-8 text-white/90">
+    <div ref={formRootRef} className="font-body space-y-8 text-white/90">
       {/* Progress */}
       <div>
         <p className="font-display text-[11px] uppercase tracking-[0.2em] text-white/40 mb-3">
