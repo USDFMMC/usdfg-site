@@ -72,6 +72,7 @@ import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
 import { ADMIN_WALLET, USDFG_MINT, PROGRAM_ID, SEEDS, CHALLENGE_CONFIG } from '@/lib/chain/config';
 import { getExplorerTxUrl } from '@/lib/chain/explorer';
+import { presentTransactionFailure } from '@/lib/chain/transaction-errors';
 import { PublicKey, Transaction } from '@solana/web3.js';
 import { createAssociatedTokenAccountInstruction, createTransferInstruction, getAccount, getAssociatedTokenAddress } from '@solana/spl-token';
 import { getWalletScopedValue, setWalletScopedValue, clearWalletScopedValue, PROFILE_STORAGE_KEYS } from "@/lib/storage/profile";
@@ -2927,8 +2928,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       showAppToast("Challenge funded successfully. Match is now active.", "success", "Funded");
     } catch (err: any) {
-      console.error("❌ Joiner funding failed:", err);
-      showAppToast("Failed to fund challenge: " + (err.message || "Unknown error"), "error", "Funding failed");
+      const { message, type, title } = presentTransactionFailure(err, 'fund');
+      showAppToast(message, type, title);
     } finally {
       // CRITICAL: Always clear funding state, even on error
       setIsJoinerFunding(null);
@@ -3384,8 +3385,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       showAppToast("Challenge funded successfully. Waiting for opponent to fund.", "success", "Funded");
     } catch (err: any) {
-      console.error("❌ Creator funding failed:", err);
-      
       const errorMessage = err.message || err.toString() || 'Failed to fund challenge. Please try again.';
       const errorString = errorMessage.toLowerCase();
       
@@ -3399,7 +3398,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           "Deadline expired"
         );
       } else {
-        showAppToast("Failed to fund challenge: " + errorMessage, "error", "Funding failed");
+        const { message, type, title } = presentTransactionFailure(err, 'fund');
+        showAppToast(message, type, title);
       }
     } finally {
       // CRITICAL: Always clear funding state, even on error
@@ -4190,11 +4190,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               refreshUSDFGBalance().catch(() => {});
             }, 2000);
           } else {
-            showAppToast(
-              claimResult.message || "Retry claim failed.",
-              "error",
-              "Claim failed"
+            const { message, type, title } = presentTransactionFailure(
+              claimResult.message || 'Retry claim failed.',
+              'claim'
             );
+            showAppToast(message, type, title);
           }
           break;
         case "already_claimed":
@@ -4231,15 +4231,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           );
           break;
         case "error": {
-          let errorMessage = claimResult.message || "Unknown error";
           if (claimResult.walletRejected) {
-            showAppToast(
-              "Claim cancelled in wallet. You can try again when ready.",
-              "warning",
-              "Wallet rejected"
+            const { message, type, title } = presentTransactionFailure(
+              claimResult.message,
+              'claim',
+              { walletRejected: true }
             );
+            showAppToast(message, type, title);
             break;
           }
+          let errorMessage = claimResult.message || "Unknown error";
           if (
             errorMessage.includes("ChallengeExpired") ||
             errorMessage.includes("6005") ||
@@ -4255,21 +4256,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             errorMessage =
               "❌ Challenge is not in progress. It may have already been completed or cancelled.";
           }
-          showAppToast("Failed to claim reward: " + errorMessage, "error", "Claim failed");
+          const { message, type, title } = presentTransactionFailure(errorMessage, 'claim');
+          showAppToast(message, type, title);
           break;
         }
-        default:
-          showAppToast("Failed to claim reward.", "error", "Claim failed");
       }
     } catch (error) {
-      console.error("❌ Failed to claim reward:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      showAppToast(
-        "Failed to claim reward: " + errorMessage,
-        "error",
-        "Claim failed"
-      );
+      const { message, type, title } = presentTransactionFailure(error, 'claim');
+      showAppToast(message, type, title);
     } finally {
       setClaimingPrize(null);
     }
