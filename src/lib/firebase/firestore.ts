@@ -4709,8 +4709,15 @@ export async function storeTrustReview(
     
     console.log(`✅ Trust review stored for ${opponent.slice(0, 8)}... by ${reviewer.slice(0, 8)}... (challenge: ${challengeId.slice(0, 8)}...)`);
     
-    // Update the opponent's trust score in player_stats
-    await updatePlayerTrustScore(opponent);
+    // Trust score sync is best-effort (e.g. Secure Token refresh may be blocked on some origins)
+    try {
+      await updatePlayerTrustScore(opponent);
+    } catch (scoreError) {
+      console.error(
+        `❌ Trust review saved but trust score sync failed for ${opponent.slice(0, 8)}...:`,
+        scoreError
+      );
+    }
   } catch (error) {
     console.error('❌ Error storing trust review:', error);
     throw error;

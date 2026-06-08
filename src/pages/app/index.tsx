@@ -3857,36 +3857,49 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
       setPendingMatchResult(null);
 
-    } catch (error: any) {
-      console.error("❌ Failed to save trust review:", error);
-
-      if (error?.message?.includes('already submitted') ||
-          error?.message?.includes('already been processed')) {
-        showAppToast("Your result was already on record. Trust review may not have been saved.", "info", "Already submitted");
-      } else if (error?.message?.includes('permission') || error?.message?.includes('Missing or insufficient permissions')) {
-        console.warn("⚠️ Trust review failed due to permissions; match result is already on record for standard challenges");
-        showAppToast(
-          "Trust review could not be saved (permission issue). Your match result is already on record.",
-          'warning',
-          'Trust review'
-        );
-      } else {
-        showAppToast(
-          "Failed to save trust review. Your match result is already on record.",
-          'error',
-          'Trust review'
-        );
-      }
+    } catch (error: unknown) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      const errCode =
+        error && typeof error === 'object' && 'code' in error
+          ? String((error as { code?: string }).code)
+          : undefined;
+      console.error('❌ Trust review save failed (match result unchanged):', error);
+      console.error('Trust review error details:', { code: errCode, message: errMsg });
 
       setShowTrustReview(false);
-      setTrustReviewOpponent("");
+      setTrustReviewOpponent('');
       pendingMatchResultRef.current = null;
 
-      // Trust review failed (e.g. blocked securetoken refresh), but the result is already
-      // finalized in Firestore. Force the lobby to rebind so the claim button still appears.
+      // Result is already in Firestore — rebind lobby so claim stays available.
       void forceRebindSelectedChallenge(challengeId);
-
       setPendingMatchResult(null);
+
+      if (snap.resultAlreadyWritten) {
+        showAppToast(
+          'Result submitted. Review could not be saved.',
+          'warning',
+          'Result saved'
+        );
+        return;
+      }
+
+      if (
+        errMsg.includes('already submitted') ||
+        errMsg.includes('already been processed')
+      ) {
+        showAppToast(
+          'Result submitted. Review could not be saved.',
+          'info',
+          'Result saved'
+        );
+        return;
+      }
+
+      showAppToast(
+        'Result submitted. Review could not be saved.',
+        'warning',
+        'Result saved'
+      );
     }
   };
 
