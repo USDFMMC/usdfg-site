@@ -6,7 +6,7 @@ import { getPlayerStats, fetchChallengeById, resolveAdminChallenge, triggerChall
 import { collection, doc, setDoc, deleteDoc, updateDoc, onSnapshot, query, where, serverTimestamp, Timestamp, getDoc, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import { ADMIN_WALLET } from "@/lib/chain/config";
-import { presentTransactionFailure } from "@/lib/chain/transaction-errors";
+import { dispatchTransactionFailureToast } from "@/lib/chain/transaction-errors";
 import type { AppConfirmDialogOptions } from "@/components/ui/AppConfirmModal";
 import { 
   getChallengeStatus, 
@@ -926,8 +926,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         );
       }
     } catch (error: any) {
-      const { message, type, title } = presentTransactionFailure(error, 'fund');
-      onAppToast?.(message, type, title);
+      dispatchTransactionFailureToast(onAppToast, error, 'fund');
     }
   };
   
@@ -1446,8 +1445,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                   try {
                     await onJoinerFund(activeChallenge);
                   } catch (error: any) {
-                    const { message, type, title } = presentTransactionFailure(error, 'fund');
-                    onAppToast?.(message, type, title);
+                    dispatchTransactionFailureToast(onAppToast, error, 'fund');
                   }
                 }
               }}

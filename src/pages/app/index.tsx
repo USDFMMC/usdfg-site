@@ -72,7 +72,7 @@ import { useConnection } from '@solana/wallet-adapter-react';
 // Oracle removed - no longer needed
 import { ADMIN_WALLET, USDFG_MINT, PROGRAM_ID, SEEDS, CHALLENGE_CONFIG } from '@/lib/chain/config';
 import { getExplorerTxUrl } from '@/lib/chain/explorer';
-import { presentTransactionFailure } from '@/lib/chain/transaction-errors';
+import { dispatchTransactionFailureToast } from '@/lib/chain/transaction-errors';
 import { PublicKey, Transaction } from '@solana/web3.js';
 import { createAssociatedTokenAccountInstruction, createTransferInstruction, getAccount, getAssociatedTokenAddress } from '@solana/spl-token';
 import { getWalletScopedValue, setWalletScopedValue, clearWalletScopedValue, PROFILE_STORAGE_KEYS } from "@/lib/storage/profile";
@@ -2315,10 +2315,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         );
       }
     } catch (error) {
-      console.error("❌ Failed to create challenge:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       if (!errorMessage.includes("Opening team management")) {
-        showAppToast("Failed to create challenge: " + errorMessage, "error", "Create failed");
+        dispatchTransactionFailureToast(showAppToast, error, 'create');
       }
     } finally {
       setIsCreatingChallenge(false);
@@ -2928,8 +2927,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       showAppToast("Challenge funded successfully. Match is now active.", "success", "Funded");
     } catch (err: any) {
-      const { message, type, title } = presentTransactionFailure(err, 'fund');
-      showAppToast(message, type, title);
+      dispatchTransactionFailureToast(showAppToast, err, 'fund');
     } finally {
       // CRITICAL: Always clear funding state, even on error
       setIsJoinerFunding(null);
@@ -3398,8 +3396,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           "Deadline expired"
         );
       } else {
-        const { message, type, title } = presentTransactionFailure(err, 'fund');
-        showAppToast(message, type, title);
+        dispatchTransactionFailureToast(showAppToast, err, 'fund');
       }
     } finally {
       // CRITICAL: Always clear funding state, even on error
@@ -4190,11 +4187,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               refreshUSDFGBalance().catch(() => {});
             }, 2000);
           } else {
-            const { message, type, title } = presentTransactionFailure(
+            dispatchTransactionFailureToast(
+              showAppToast,
               claimResult.message || 'Retry claim failed.',
               'claim'
             );
-            showAppToast(message, type, title);
           }
           break;
         case "already_claimed":
@@ -4232,12 +4229,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           break;
         case "error": {
           if (claimResult.walletRejected) {
-            const { message, type, title } = presentTransactionFailure(
-              claimResult.message,
-              'claim',
-              { walletRejected: true }
-            );
-            showAppToast(message, type, title);
+            dispatchTransactionFailureToast(showAppToast, claimResult.message, 'claim', {
+              walletRejected: true,
+            });
             break;
           }
           let errorMessage = claimResult.message || "Unknown error";
@@ -4256,14 +4250,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             errorMessage =
               "❌ Challenge is not in progress. It may have already been completed or cancelled.";
           }
-          const { message, type, title } = presentTransactionFailure(errorMessage, 'claim');
-          showAppToast(message, type, title);
+          dispatchTransactionFailureToast(showAppToast, errorMessage, 'claim');
           break;
         }
       }
     } catch (error) {
-      const { message, type, title } = presentTransactionFailure(error, 'claim');
-      showAppToast(message, type, title);
+      dispatchTransactionFailureToast(showAppToast, error, 'claim');
     } finally {
       setClaimingPrize(null);
     }

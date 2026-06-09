@@ -9,6 +9,7 @@ import {
   RECENT_CHALLENGES_FEED_LIMIT,
 } from '@/lib/firebase/firestore';
 import { auth } from '@/lib/firebase/config';
+import { isLikelyRpcNetworkError } from '@/lib/chain/transaction-errors';
 
 function challengeParticipantUidMatches(challenge: ChallengeData, uid: string | null): boolean {
   if (!uid) return false;
@@ -129,6 +130,11 @@ export const useChallenges = () => {
         if ((err as any)?.code === 'resource-exhausted') {
           console.warn('[Firestore] quota hit — switching to fail-soft mode');
           setError(null);
+          setLoading(false);
+          return;
+        }
+        console.error('[Challenges] listener error:', err);
+        if (isLikelyRpcNetworkError(err)) {
           setLoading(false);
           return;
         }

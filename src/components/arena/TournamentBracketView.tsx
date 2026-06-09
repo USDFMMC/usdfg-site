@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { VoiceChat } from "./VoiceChat";
 import { ChatBox } from "./ChatBox";
 import { ADMIN_WALLET } from "@/lib/chain/config";
-import { presentTransactionFailure } from "@/lib/chain/transaction-errors";
+import { dispatchTransactionFailureToast } from "@/lib/chain/transaction-errors";
 import type { AppConfirmDialogOptions } from "@/components/ui/AppConfirmModal";
 import { getTournamentRoster, isChallengeRewardClaimed } from "@/lib/utils/challenge-helpers";
 
@@ -446,8 +446,7 @@ const TournamentBracketView: React.FC<TournamentBracketViewProps> = ({
                         try {
                           await onClaimPrize(challenge);
                         } catch (error: any) {
-                          const { message, type, title } = presentTransactionFailure(error, 'claim');
-                          onAppToast?.(message, type, title);
+                          dispatchTransactionFailureToast(onAppToast, error, 'claim');
                         }
                       }
                     }}

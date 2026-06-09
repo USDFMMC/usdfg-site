@@ -8,6 +8,7 @@ import CreateChallengeForm from "@/components/arena/CreateChallengeForm";
 import ParticleBackground from "@/components/ParticleBackground";
 import { useChallenges } from "@/hooks/useChallenges";
 import { runCreateChallengeFlow } from "@/lib/challenges/createChallengeFlow";
+import { dispatchTransactionFailureToast } from "@/lib/chain/transaction-errors";
 import { getWalletScopedValue, PROFILE_STORAGE_KEYS } from "@/lib/storage/profile";
 import ElegantNotification from "@/components/ui/ElegantNotification";
 
@@ -114,9 +115,7 @@ const CreateChallenge: React.FC = () => {
       }
       navigate("/app");
     } catch (error) {
-      console.error("❌ Failed to create challenge:", error);
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      showAppToast("Failed to create challenge: " + errorMessage, "error", "Create failed");
+      dispatchTransactionFailureToast(showAppToast, error, 'create');
     } finally {
       setIsCreatingChallenge(false);
     }

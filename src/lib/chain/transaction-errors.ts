@@ -1,6 +1,9 @@
 export const TRANSACTION_DELAYED_USER_MESSAGE =
   'Transaction delayed due to network traffic. You can retry now or return later.';
 
+const CONGESTION_TOAST_DEBOUNCE_MS = 15_000;
+let lastCongestionToastAt = 0;
+
 const NETWORK_ERROR_PATTERNS = [
   '429',
   'rate limit',
@@ -18,6 +21,8 @@ const NETWORK_ERROR_PATTERNS = [
   'failed to fetch',
   'network request failed',
   'network error',
+  'networkerror when attempting to fetch resource',
+  'attempting to fetch resource',
   'service unavailable',
   '503',
   '502',
@@ -35,6 +40,24 @@ const NETWORK_ERROR_PATTERNS = [
   'devnet.solana.com',
   'api.devnet.solana.com',
   'public devnet rpc',
+  'cors',
+  'cross-origin',
+  'status code 0',
+  'null status',
+  'access-control',
+  'transport errored',
+  'webchannel',
+  'listen stream',
+  'stream errored',
+  'unavailable',
+  'deadline-exceeded',
+  'client is offline',
+  'failed to get document',
+  'could not reach cloud firestore',
+  'account info',
+  'getaccountinfo',
+  'getlatestblockhash',
+  'getbalance',
 ];
 
 function collectErrorText(error: unknown): string {
@@ -61,6 +84,11 @@ function collectErrorText(error: unknown): string {
       return;
     }
     if (typeof value === 'object') {
+      const obj = value as Record<string, unknown>;
+      if (typeof obj.code === 'string' || typeof obj.code === 'number') {
+        parts.push(String(obj.code));
+      }
+      if (typeof obj.message === 'string') parts.push(obj.message);
       try {
         parts.push(JSON.stringify(value));
       } catch {
@@ -79,7 +107,13 @@ export function isLikelyRpcNetworkError(error: unknown): boolean {
   return NETWORK_ERROR_PATTERNS.some((pattern) => haystack.includes(pattern));
 }
 
-export type TransactionFailureKind = 'fund' | 'claim';
+export type TransactionFailureKind = 'fund' | 'claim' | 'create';
+
+export type TransactionToastFn = (
+  message: string,
+  type?: 'info' | 'warning' | 'error' | 'success',
+  title?: string
+) => void;
 
 export function presentTransactionFailure(
   error: unknown,
@@ -115,11 +149,39 @@ export function presentTransactionFailure(
         ? error.message
         : String(error ?? 'Unknown error');
 
-  const title = kind === 'claim' ? 'Claim failed' : 'Funding failed';
-  const prefix = kind === 'claim' ? 'Failed to claim reward: ' : 'Failed to fund challenge: ';
+  const title =
+    kind === 'claim' ? 'Claim failed' : kind === 'create' ? 'Create failed' : 'Funding failed';
+  const prefix =
+    kind === 'claim'
+      ? 'Failed to claim reward: '
+      : kind === 'create'
+        ? 'Failed to create challenge: '
+        : 'Failed to fund challenge: ';
   return {
     message: `${prefix}${raw}`,
     type: 'error',
     title,
   };
+}
+
+/** Show fund/claim/create failure toast; debounces identical congestion warnings. */
+export function dispatchTransactionFailureToast(
+  showToast: TransactionToastFn | undefined,
+  error: unknown,
+  kind: TransactionFailureKind,
+  options?: { walletRejected?: boolean }
+): void {
+  if (!showToast) return;
+
+  const { message, type, title } = presentTransactionFailure(error, kind, options);
+
+  if (message === TRANSACTION_DELAYED_USER_MESSAGE) {
+    const now = Date.now();
+    if (now - lastCongestionToastAt < CONGESTION_TOAST_DEBOUNCE_MS) {
+      return;
+    }
+    lastCongestionToastAt = now;
+  }
+
+  showToast(message, type, title);
 }
