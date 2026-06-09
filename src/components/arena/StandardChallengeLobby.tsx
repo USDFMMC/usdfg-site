@@ -851,9 +851,11 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       }
     }
     
-    // Cancel button: creator + (pending OR deadline expired)
+    // Cancel/remove button: creator + pending, expired pre-fund, or confirmation deadline passed
     if (userRole === 'creator' && onCancelChallenge) {
       if (status === 'pending_waiting_for_opponent') {
+        state.showCancel = true;
+      } else if (status === 'expired') {
         state.showCancel = true;
       } else if (status === 'creator_confirmation_required' && isDeadlineExpired) {
         state.showCancel = true;
@@ -1358,19 +1360,14 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
         <div className="rounded-lg border border-red-400/30 bg-red-500/10 p-2.5 space-y-2">
           <div className="text-center">
           <div className="text-xs font-semibold text-red-200 mb-1.5">
-            Challenge expired — no funds were charged
-          </div>
-          <div className="text-[10px] text-red-100/90 font-medium mb-1">
-            No wallet required
+            Challenge expired before funding. No funds were charged.
           </div>
           <div className="text-[10px] text-red-100/80 mb-2">
-              The challenge has been reverted to waiting for opponent. You can now join as challenger or cancel the challenge.
+              Remove this challenge from your list when you are done.
           </div>
           </div>
           
-          {/* Action Buttons for Creator */}
           <div className="flex flex-col gap-1.5">
-            {/* Cancel/Delete Challenge Button */}
             {canCreatorCancel && (
               <button
                 type="button"
@@ -1379,9 +1376,9 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                   e.stopPropagation();
                   if (onCancelChallenge && requestAppConfirm) {
                     const ok = await requestAppConfirm({
-                      title: "Cancel challenge?",
-                      message: "Are you sure you want to cancel/delete this challenge? This action cannot be undone.",
-                      confirmLabel: "Delete",
+                      title: "Remove expired challenge?",
+                      message: "Remove this expired challenge from your list? No funds were charged.",
+                      confirmLabel: "Remove",
                       cancelLabel: "Keep",
                       destructive: true,
                     });
@@ -1389,17 +1386,36 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                     try {
                       await onCancelChallenge(activeChallenge);
                     } catch (error: any) {
-                      console.error('Failed to cancel challenge:', error);
-                      onAppToast?.(error.message || "Failed to cancel challenge. Please try again.", "error", "Cancel failed");
+                      console.error('Failed to remove challenge:', error);
+                      onAppToast?.(error.message || "Failed to remove challenge. Please try again.", "error", "Remove failed");
                     }
                   }
                 }}
                 className="w-full rounded-md bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-3 py-2 text-xs font-semibold transition-all shadow-[0_0_10px_rgba(239,68,68,0.4)] hover:shadow-[0_0_15px_rgba(239,68,68,0.6)] border border-red-400/30"
               >
-                Cancel/Delete Challenge
+                Remove expired challenge
               </button>
             )}
           </div>
+        </div>
+      )}
+
+      {isCreator && status === 'expired' && canCreatorCancel && (
+        <div className="rounded-lg border border-red-400/30 bg-red-500/10 p-2.5 space-y-2">
+          <div className="text-center text-xs font-semibold text-red-200 mb-1.5">
+            Challenge expired before funding. No funds were charged.
+          </div>
+          <button
+            type="button"
+            onClick={async (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (onCancelChallenge) await onCancelChallenge(activeChallenge);
+            }}
+            className="w-full rounded-md bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-3 py-2 text-xs font-semibold transition-all border border-red-400/30"
+          >
+            Remove expired challenge
+          </button>
         </div>
       )}
       

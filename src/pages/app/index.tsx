@@ -59,7 +59,7 @@ import {
   fetchChallengeById,
   postChallengeSystemMessage,
   submitTournamentMatchResult,
-  deleteChallenge,
+  dismissPreFundChallenge,
   joinTournament,
   verifyPaidTournamentEscrowAndActivate,
   testFirestoreConnection,
@@ -2325,10 +2325,22 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   };
 
   const handleDeleteChallenge = async (challengeId: string, challenge?: any): Promise<boolean> => {
+    const challengeStatus = challenge?.status || challenge?.rawData?.status;
+    const creatorFundingDeadline = challenge?.rawData?.creatorFundingDeadline || challenge?.creatorFundingDeadline;
+    const expirationTimer = challenge?.rawData?.expirationTimer || challenge?.expirationTimer;
+    const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
+    const isTimerExpired = expirationTimer && expirationTimer.toMillis() < Date.now();
+    const isExpiredPreFund =
+      challengeStatus === 'expired' ||
+      (challengeStatus === 'creator_confirmation_required' && isDeadlineExpired) ||
+      (challengeStatus === 'pending_waiting_for_opponent' && isTimerExpired);
+
     const confirmedDelete = await requestAppConfirm({
-      title: "Delete challenge?",
-      message: "Are you sure you want to cancel/delete this challenge? This action cannot be undone.",
-      confirmLabel: "Delete",
+      title: isExpiredPreFund ? "Remove expired challenge?" : "Cancel challenge?",
+      message: isExpiredPreFund
+        ? "Remove this expired challenge from your list? No funds were charged."
+        : "Cancel this challenge? No funds were charged.",
+      confirmLabel: isExpiredPreFund ? "Remove" : "Cancel",
       cancelLabel: "Keep",
       destructive: true,
     });
@@ -2336,28 +2348,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       return false;
     }
     try {
-        // Check if challenge has on-chain PDA (not a Founder Challenge)
         const challengePDA = challenge?.pda || challenge?.rawData?.pda;
-        const challengeStatus = challenge?.status || challenge?.rawData?.status;
         const isCreator = challenge?.creator === currentWallet || challenge?.rawData?.creator === currentWallet;
         
-        // Check for expired states
-        const creatorFundingDeadline = challenge?.rawData?.creatorFundingDeadline || challenge?.creatorFundingDeadline;
-        const expirationTimer = challenge?.rawData?.expirationTimer || challenge?.expirationTimer;
-        const pendingJoiner = challenge?.rawData?.pendingJoiner || challenge?.pendingJoiner;
-        
-        const isDeadlineExpired = creatorFundingDeadline && creatorFundingDeadline.toMillis() < Date.now();
-        const isChallengeExpired = expirationTimer && expirationTimer.toMillis() < Date.now();
-        
-        // Allow cancellation if:
-        // 1. User is the creator
-        // 2. Challenge is in pending_waiting_for_opponent state (before anyone expresses intent)
-        // OR: Confirmation deadline expired (regardless of pendingJoiner - challenge will revert)
-        // OR: Challenge expired (60 minutes) and no one joined
         const canCancel = isCreator && (
           challengeStatus === 'pending_waiting_for_opponent' ||
-          (challengeStatus === 'creator_confirmation_required' && isDeadlineExpired) ||
-          (challengeStatus === 'pending_waiting_for_opponent' && isChallengeExpired && !pendingJoiner)
+          challengeStatus === 'expired' ||
+          (challengeStatus === 'creator_confirmation_required' && isDeadlineExpired)
         );
         
         if (!canCancel) {
@@ -2376,7 +2373,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           return false;
         }
         
-        // If challenge has on-chain PDA, cancel on-chain first
         if (challengePDA && challengePDA !== 'founder_' && !challengePDA.startsWith('founder_')) {
           try {
             const { cancelChallenge } = await import("@/lib/chain/contract");
@@ -2395,24 +2391,21 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             console.log("✅ Challenge cancelled on-chain");
           } catch (onChainError) {
             console.error("❌ Failed to cancel on-chain:", onChainError);
-            // Continue to delete from Firestore even if on-chain cancel fails
-            // (challenge might already be cancelled or not exist on-chain)
           }
         }
         
-        // Delete from Firestore
-        const { deleteChallenge } = await import("@/lib/firebase/firestore");
-        await deleteChallenge(challengeId);
-        console.log("✅ Challenge deleted from Firestore");
-        
-        showAppToast("Challenge cancelled and deleted successfully!", "success");
+        await dismissPreFundChallenge(challengeId, currentWallet, {
+          allowPendingCancel: challengeStatus === 'pending_waiting_for_opponent',
+        });
+        window.dispatchEvent(new Event('challengeUpdated'));
+        showAppToast("Challenge removed.", "success", "Removed");
         return true;
       } catch (error) {
-        console.error("❌ Failed to delete challenge:", error);
+        console.error("❌ Failed to remove challenge:", error);
         showAppToast(
-          "Failed to delete challenge: " + (error instanceof Error ? error.message : "Unknown error"),
+          "Failed to remove challenge: " + (error instanceof Error ? error.message : "Unknown error"),
           "error",
-          "Delete failed"
+          "Remove failed"
         );
         return false;
       }
@@ -2966,11 +2959,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         return;
       }
     } else {
-      // For standard challenges, use existing logic
       const isDeadlineExpired = isCreatorFundingDeadlineExpired(challenge);
-      
-      // Only allow cancel if deadline expired or challenge is still pending (no one joined)
-      if (status !== 'pending_waiting_for_opponent' && status !== 'creator_confirmation_required') {
+      const canRemove =
+        status === 'expired' ||
+        status === 'pending_waiting_for_opponent' ||
+        (status === 'creator_confirmation_required' && isDeadlineExpired);
+
+      if (!canRemove) {
         if (status === 'creator_confirmation_required' && !isDeadlineExpired) {
           showAppToast(
             "Cannot cancel challenge while waiting for your confirmation. Either fund the challenge or wait for the deadline to expire.",
@@ -2982,26 +2977,22 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         }
         return;
       }
-
-      // First, revert if deadline expired and status hasn't updated yet
-      if (status === 'creator_confirmation_required' && isDeadlineExpired) {
-        await revertCreatorTimeout(challenge.id);
-      }
     }
 
     try {
-      // Delete the challenge
-      await deleteChallenge(challenge.id);
-      
-      // Close the lobby
+      await dismissPreFundChallenge(challenge.id, publicKey.toString(), {
+        allowPendingCancel: status === 'pending_waiting_for_opponent',
+      });
+
       setShowStandardLobby(false);
       setShowTournamentLobby(false);
       setSelectedChallenge(null);
-      
-      showAppToast("Challenge cancelled and deleted successfully.", "success", "Cancelled");
+      window.dispatchEvent(new Event('challengeUpdated'));
+
+      showAppToast("Challenge removed.", "success", "Removed");
     } catch (err: any) {
-      console.error("❌ Cancel challenge failed:", err);
-      showAppToast("Failed to cancel challenge: " + (err.message || "Unknown error"), "error", "Cancel failed");
+      console.error("❌ Remove challenge failed:", err);
+      showAppToast("Failed to remove challenge: " + (err.message || "Unknown error"), "error", "Remove failed");
     }
   };
 
@@ -4642,13 +4633,29 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               null
           : null;
       const timeExpired = (expMs != null && expMs < now) || (timerMs != null && timerMs < now);
+      const creatorFundingDeadline = challenge.rawData?.creatorFundingDeadline;
+      const creatorDeadlineMs =
+        creatorFundingDeadline != null
+          ? typeof creatorFundingDeadline === 'number'
+            ? creatorFundingDeadline
+            : (creatorFundingDeadline as { toMillis?: () => number })?.toMillis?.() ?? null
+          : null;
+      const creatorDeadlineExpired = creatorDeadlineMs != null && creatorDeadlineMs < now;
       // Only treat time as "expired" for pre-match states.
       // Active matches may legitimately run past `expiresAt` if the backend didn't flip statuses promptly.
       const isPreMatch =
         status === 'pending_waiting_for_opponent' ||
         status === 'creator_confirmation_required' ||
         status === 'creator_funded';
-      const isExpired = status === 'cancelled' || (isPreMatch && timeExpired);
+      const isExpired =
+        status === 'cancelled' ||
+        status === 'expired' ||
+        (status === 'creator_confirmation_required' && creatorDeadlineExpired) ||
+        (isPreMatch && timeExpired);
+
+      if (showMyChallenges && (status === 'cancelled' || status === 'expired')) {
+        return false;
+      }
       
       // Also exclude completed and disputed challenges from joinable list
       const isCompleted = status === 'completed' || status === 'disputed';
@@ -5399,9 +5406,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             {/* Show deadline expired message for creators */}
             {isOwner && status === 'creator_confirmation_required' && isDeadlineExpired && (
               <div className="mt-5 w-full rounded-xl bg-red-500/10 border border-red-500/30 p-4 text-red-200 text-sm">
-                <div className="font-semibold mb-1">⚠️ Confirmation Deadline Expired</div>
+                <div className="font-semibold mb-1">Challenge expired before funding</div>
                 <p className="text-xs text-red-200/80 mb-3">
-                  The 5-minute deadline to confirm and fund has passed. The challenge will automatically revert to waiting for opponent (the same user can rejoin).
+                  No funds were charged. Remove this challenge from your list when you are done.
                 </p>
                 <button
                   type="button"
@@ -5411,7 +5418,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                   }}
                   className="w-full rounded-lg bg-red-700/30 border border-red-600/50 py-2 text-red-200 text-sm font-semibold hover:bg-red-700/40 transition-colors"
                 >
-                  🗑️ Delete Challenge
+                  Remove expired challenge
                 </button>
               </div>
             )}
@@ -5424,9 +5431,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               return isExpired && !hasPendingJoiner; // Only show if expired and no one joined
             })() && (
               <div className="mt-5 w-full rounded-xl bg-[#07080C]/95 border border-white/10 p-4 text-white/85 text-sm">
-                <div className="font-semibold mb-1 text-orange-300/90">⏰ Challenge Expired</div>
+                <div className="font-semibold mb-1 text-orange-300/90">Challenge expired before funding</div>
                 <p className="text-xs text-white/60 mb-3">
-                  This challenge has expired (60 minutes) and no one has joined. It will be automatically deleted soon.
+                  No funds were charged. Remove this challenge from your list when you are done.
                 </p>
                 <button
                   type="button"
@@ -5436,7 +5443,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                   }}
                   className="w-full rounded-lg bg-orange-600/20 border border-orange-500/40 py-2 text-orange-100 text-sm font-semibold hover:bg-orange-600/30 transition-colors"
                 >
-                  🗑️ Delete Challenge
+                  Remove expired challenge
                 </button>
               </div>
             )}

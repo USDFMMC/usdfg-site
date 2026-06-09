@@ -2017,6 +2017,80 @@ export const deleteChallenge = async (challengeId: string) => {
   }
 };
 
+const NON_DISMISSIBLE_PRE_FUND_STATUSES = new Set([
+  'creator_funded',
+  'active',
+  'completed',
+  'disputed',
+  'awaiting_auto_resolution',
+]);
+
+function hasFundedOnChainPda(data: ChallengeData): boolean {
+  const pda = data.pda;
+  if (!pda || typeof pda !== 'string') return false;
+  const trimmed = pda.trim();
+  return trimmed.length >= 32 && !trimmed.startsWith('founder_');
+}
+
+/** Pre-fund challenge the creator may remove (status update — client delete is rules-denied). */
+export function canDismissPreFundChallenge(
+  data: ChallengeData,
+  options?: { allowPendingCancel?: boolean }
+): boolean {
+  if (hasFundedOnChainPda(data)) return false;
+  const status = data.status;
+  if (NON_DISMISSIBLE_PRE_FUND_STATUSES.has(status)) return false;
+  if (status === 'cancelled') return false;
+
+  const now = Date.now();
+  if (status === 'expired') return true;
+  if (status === 'creator_confirmation_required') {
+    return !!(data.creatorFundingDeadline && data.creatorFundingDeadline.toMillis() < now);
+  }
+  if (status === 'pending_waiting_for_opponent') {
+    if (options?.allowPendingCancel) return true;
+    const exp = data.expirationTimer ?? data.expiresAt;
+    return !!(exp && exp.toMillis() < now);
+  }
+  return false;
+}
+
+/** Mark an expired/unfunded challenge as cancelled so it leaves live lists (no deleteDoc). */
+export async function dismissPreFundChallenge(
+  challengeId: string,
+  actingWallet?: string | null,
+  options?: { allowPendingCancel?: boolean }
+): Promise<boolean> {
+  const challengeRef = doc(db, 'challenges', challengeId);
+  const snap = await getDoc(challengeRef);
+  if (!snap.exists()) return false;
+  const data = snap.data() as ChallengeData;
+
+  if (data.status === 'cancelled') return true;
+
+  if (!canDismissPreFundChallenge(data, options)) {
+    throw new Error('This challenge cannot be removed in its current state.');
+  }
+
+  await writeChallengeFields(
+    challengeId,
+    {
+      status: 'cancelled',
+      pendingJoiner: null,
+      challenger: null,
+      opponentWallet: deleteField(),
+      opponentUid: deleteField(),
+      creatorFundingDeadline: null,
+      joinerFundingDeadline: null,
+      updatedAt: Timestamp.now(),
+    },
+    { currentData: data, actingWallet: actingWallet ?? null, skipParticipantHybridMerge: true }
+  );
+
+  console.log('✅ Pre-fund challenge dismissed (cancelled):', challengeId);
+  return true;
+}
+
 // Real-time listeners
 export const listenToChallenges = (callback: (challenges: ChallengeData[]) => void) => {
   const q = query(collection(db, "challenges"), orderBy('createdAt', 'desc'));
