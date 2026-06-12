@@ -23,6 +23,10 @@ import {
 } from 'firebase/firestore';
 import { db, auth, ensureFirebaseSignedIn } from './config';
 import {
+  getCompletedActivityExpiresAtMs,
+  isLegacyCreateTimeExpiresAt,
+} from '@/lib/utils/challenge-visibility';
+import {
   invokeApplyMatchStats,
   invokeUpdatePlayerProfile,
   invokeUpdatePlayerMeta,
@@ -31,8 +35,6 @@ import {
 import { CHALLENGE_CONFIG, ADMIN_WALLET } from '../chain/config';
 import { getExplorerTxUrl } from '../chain/explorer';
 import { isWarmupPhaseBlockingSubmit } from '@/lib/utils/warmup-phase';
-import { logClientCleanupDisabledOnce } from './clientCleanupGate';
-
 /** Max challenges in the arena realtime feed (useChallenges / refetch). */
 export const RECENT_CHALLENGES_FEED_LIMIT = 30;
 
@@ -2104,6 +2106,44 @@ export async function dismissPreFundChallenge(
   return true;
 }
 
+/**
+ * One-time repair: completed docs created before 02d51f7f7 may have create-time expiresAt.
+ * Rewrites expiresAt to completion + 2h (public activity feed only).
+ */
+export async function repairLegacyCompletedActivityExpiresAt(
+  challengeId: string
+): Promise<boolean> {
+  const challengeRef = doc(db, 'challenges', challengeId);
+  const snap = await getDoc(challengeRef);
+  if (!snap.exists()) return false;
+
+  const data = snap.data() as ChallengeData;
+  const input = { ...data, rawData: data };
+  if (!isLegacyCreateTimeExpiresAt(input)) return false;
+
+  const effectiveMs = getCompletedActivityExpiresAtMs(input);
+  if (effectiveMs == null) return false;
+
+  const currentMs = data.expiresAt?.toMillis?.() ?? null;
+  if (currentMs != null && Math.abs(currentMs - effectiveMs) < 60_000) {
+    return false;
+  }
+
+  await writeChallengeFields(
+    challengeId,
+    {
+      expiresAt: Timestamp.fromMillis(effectiveMs),
+      updatedAt: Timestamp.now(),
+    },
+    { currentData: data, skipParticipantHybridMerge: true }
+  );
+
+  if (import.meta.env.DEV) {
+    console.log('[repair] legacy completed expiresAt', challengeId, effectiveMs);
+  }
+  return true;
+}
+
 // Real-time listeners
 export const listenToChallenges = (callback: (challenges: ChallengeData[]) => void) => {
   const q = query(collection(db, "challenges"), orderBy('createdAt', 'desc'));
@@ -2894,35 +2934,6 @@ export const revertJoinerTimeout = async (challengeId: string): Promise<boolean>
 };
 
 /**
- * Pending matchmaking window elapsed — doc remains; visibility handled in UI filters.
- */
-export const expirePendingChallenge = async (challengeId: string): Promise<boolean> => {
-  try {
-    const challengeRef = doc(db, "challenges", challengeId);
-    const snap = await getDoc(challengeRef);
-
-    if (!snap.exists()) {
-      return false;
-    }
-
-    const data = snap.data() as ChallengeData;
-
-    if (data.status !== 'pending_waiting_for_opponent') {
-      return false;
-    }
-
-    if (!data.expirationTimer || data.expirationTimer.toMillis() > Date.now()) {
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('❌ Error checking pending challenge expiration:', error);
-    return false;
-  }
-};
-
-/**
  * Record actual USDFG transfer given to player from Founder Challenge
  * This should be called when the actual token transfer happens (from admin/backend)
  * 
@@ -3024,21 +3035,6 @@ export async function addChallengeDoc(data: any) {
   console.log('CHALLENGE WRITE:', { challengeId: docRef.id, uid, wallet: creator ?? null });
   console.log('✅ Challenge document created with ID:', docRef.id);
   return docRef.id;
-}
-
-/** Client auto-delete disabled (rules deny delete on challenges). */
-export async function cleanupCompletedChallenge(_id: string): Promise<void> {
-  logClientCleanupDisabledOnce();
-}
-
-/** Client auto-delete disabled (rules deny delete on challenges). */
-export async function cleanupExpiredChallenge(_id: string): Promise<void> {
-  logClientCleanupDisabledOnce();
-}
-
-/** Client auto-delete disabled (rules deny delete on challenges). */
-export async function archiveChallenge(_id: string): Promise<void> {
-  logClientCleanupDisabledOnce();
 }
 
 // ============================================

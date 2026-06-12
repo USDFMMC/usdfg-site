@@ -6,8 +6,10 @@ import {
   listenToUserChallenges,
   fetchChallenges,
   repairChallengeFinalizationIfNeeded,
+  repairLegacyCompletedActivityExpiresAt,
   RECENT_CHALLENGES_FEED_LIMIT,
 } from '@/lib/firebase/firestore';
+import { isLegacyCreateTimeExpiresAt } from '@/lib/utils/challenge-visibility';
 import { auth } from '@/lib/firebase/config';
 import { isLikelyRpcNetworkError } from '@/lib/chain/transaction-errors';
 
@@ -44,6 +46,7 @@ export const useChallenges = () => {
   const [authUid, setAuthUid] = useState<string | null | undefined>(undefined);
   const lastSyncedAtRef = useRef<Map<string, number>>(new Map());
   const inFlightSyncRef = useRef<Set<string>>(new Set());
+  const legacyExpiresRepairRef = useRef<Set<string>>(new Set());
   const devListenerActiveLoggedRef = useRef(false);
 
   useEffect(() => {
@@ -84,6 +87,18 @@ export const useChallenges = () => {
         setChallenges(newChallenges);
         setLoading(false);
         setError(null);
+
+        for (const challenge of newChallenges) {
+          const challengeId = challenge.id;
+          if (!challengeId || challenge.status !== 'completed') continue;
+          if (legacyExpiresRepairRef.current.has(challengeId)) continue;
+          const legacyInput = { ...challenge, rawData: challenge };
+          if (!isLegacyCreateTimeExpiresAt(legacyInput)) continue;
+          legacyExpiresRepairRef.current.add(challengeId);
+          void repairLegacyCompletedActivityExpiresAt(challengeId).catch(() => {
+            legacyExpiresRepairRef.current.delete(challengeId);
+          });
+        }
 
         const now = Date.now();
         const minIntervalMs = 30_000;
@@ -146,6 +161,7 @@ export const useChallenges = () => {
     return () => {
       lastSyncedAtRef.current.clear();
       inFlightSyncRef.current.clear();
+      legacyExpiresRepairRef.current.clear();
       unsubscribe();
     };
   }, [authUid]);

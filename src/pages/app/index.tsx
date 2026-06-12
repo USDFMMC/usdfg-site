@@ -29,7 +29,6 @@ import {
   joinerFund,
   revertCreatorTimeout,
   revertJoinerTimeout,
-  expirePendingChallenge,
   submitChallengeResult,
   acknowledgeWarmupComplete,
   acknowledgeOfficialMatchReady,
@@ -91,7 +90,8 @@ import {
   isCompletedActivityFeedHidden,
   isPublicJoinDiscoveryBlocked,
   getExpirationTimerMs,
-  getExpiresAtMs,
+  getCompletedActivityExpiresAtMs,
+  arenaChallengeToVisibilityInput,
 } from "@/lib/utils/challenge-visibility";
 import { extractGameFromTitle, getGameCategory, getGameImage, isChallengeCustomGame, resolveGameName } from "@/lib/gameAssets";
 import { runCreateChallengeFlow } from "@/lib/challenges/createChallengeFlow";
@@ -1497,14 +1497,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             const deadline = challenge.rawData?.joinerFundingDeadline;
             if (deadline && deadline.toMillis() < Date.now()) {
               await revertJoinerTimeout(challengeId);
-            }
-          }
-
-          // Check pending expiration (pending_waiting_for_opponent state)
-          if (status === 'pending_waiting_for_opponent') {
-            const expirationTimer = challenge.rawData?.expirationTimer;
-            if (expirationTimer && expirationTimer.toMillis() < Date.now()) {
-              await expirePendingChallenge(challengeId);
             }
           }
         } catch (error) {
@@ -4621,10 +4613,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       const status = (challenge.status ?? challenge.rawData?.status) as string | undefined;
 
-      const discoveryBlocked = isPublicJoinDiscoveryBlocked(
-        { status, rawData: challenge.rawData, expirationTimer: challenge.rawData?.expirationTimer, creatorFundingDeadline: challenge.rawData?.creatorFundingDeadline },
-        now
-      );
+      const visibilityInput = arenaChallengeToVisibilityInput(challenge);
+
+      const discoveryBlocked = isPublicJoinDiscoveryBlocked(visibilityInput, now);
 
       if (showMyChallenges && (status === 'cancelled' || status === 'expired')) {
         return false;
@@ -4632,7 +4623,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
       const isCompleted = status === 'completed' || status === 'disputed';
       const completedHiddenFromActivity =
-        status === 'completed' && isCompletedActivityFeedHidden({ status, expiresAt: challenge.expiresAt, rawData: challenge.rawData }, now);
+        status === 'completed' && isCompletedActivityFeedHidden(visibilityInput, now);
 
       const isJoinable = !discoveryBlocked && !isCompleted;
       
@@ -4667,7 +4658,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const adminSeesExpiredFounder =
         isAdmin &&
         isFounderTournamentOrChallenge &&
-        (discoveryBlocked || isPendingMatchmakingExpired({ status, rawData: challenge.rawData, expirationTimer: challenge.rawData?.expirationTimer }, now));
+        (discoveryBlocked || isPendingMatchmakingExpired(visibilityInput, now));
       
       // Show completed/disputed challenges to participants so they can re-open lobby (chat/mic)
       const isParticipant =
@@ -5162,7 +5153,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     const getExpiresText = () => {
       const st = challenge.status || challenge.rawData?.status;
       if (st === 'completed') {
-        const expMs = getExpiresAtMs({ expiresAt: challenge.expiresAt, rawData: challenge.rawData });
+        const expMs = getCompletedActivityExpiresAtMs(arenaChallengeToVisibilityInput(challenge));
         if (expMs != null && expMs > Date.now()) {
           const minutes = Math.max(0, Math.floor((expMs - Date.now()) / (1000 * 60)));
           if (minutes < 60) return `${minutes}m`;
@@ -6539,12 +6530,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                   const status = (challenge.status ?? challenge.rawData?.status) as string | undefined;
                                   if (
                                     isPublicJoinDiscoveryBlocked(
-                                      {
-                                        status,
-                                        rawData: challenge.rawData,
-                                        expirationTimer: challenge.rawData?.expirationTimer,
-                                        creatorFundingDeadline: challenge.rawData?.creatorFundingDeadline,
-                                      },
+                                      arenaChallengeToVisibilityInput(challenge),
                                       now
                                     )
                                   ) {
