@@ -1302,14 +1302,23 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
 
       {/* Waiting message for joiner - Firestore-only, no on-chain steps */}
       {userRole === 'pending_joiner' && status === 'creator_confirmation_required' && (
-        <div className="rounded-lg border border-blue-400/30 bg-blue-500/10 p-2.5">
+        <div className={`rounded-lg border p-2.5 ${isDeadlineExpired ? 'border-red-400/30 bg-red-500/10' : 'border-blue-400/30 bg-blue-500/10'}`}>
           <div className="text-center">
-            <div className="text-xs font-semibold text-blue-200 mb-1.5">
-              Waiting for creator to fund
+            <div className={`text-xs font-semibold mb-1.5 ${isDeadlineExpired ? 'text-red-200' : 'text-blue-200'}`}>
+              {isDeadlineExpired
+                ? 'Creator did not fund in time'
+                : 'Waiting for creator to fund'}
             </div>
-            <div className="text-[10px] text-blue-100/90 font-medium mb-1">
-              No transaction required
-            </div>
+            {!isDeadlineExpired && (
+              <div className="text-[10px] text-blue-100/90 font-medium mb-1">
+                No transaction required
+              </div>
+            )}
+            {isDeadlineExpired && (
+              <div className="text-[10px] text-red-100/90 font-medium mb-2">
+                This challenge will be cancelled automatically. No funds were charged.
+              </div>
+            )}
             {creatorFundingDeadline && (
               <div className="text-[10px] text-blue-300/70 mb-2">
                 Creator deadline: {(() => {
@@ -1328,7 +1337,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
                   }
                 })()}
                 {isDeadlineExpired && (
-                  <span className="ml-2 text-red-300">(Expired - challenge will revert soon)</span>
+                  <span className="ml-2 text-red-300">(Expired — challenge will be cancelled)</span>
                 )}
               </div>
             )}

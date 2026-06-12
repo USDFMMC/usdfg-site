@@ -2106,6 +2106,81 @@ export async function dismissPreFundChallenge(
   return true;
 }
 
+/** Join intent bound on a creator_confirmation_required doc (pending joiner or opponent wallet). */
+export function hasCreatorFundingJoinerBound(data: ChallengeData): boolean {
+  const pending = data.pendingJoiner;
+  if (pending != null && String(pending).trim() !== '') return true;
+  const opponent = data.opponentWallet;
+  return opponent != null && String(opponent).trim() !== '';
+}
+
+function isExpiredCreatorFundingDoc(data: ChallengeData): boolean {
+  if (data.status !== 'creator_confirmation_required') return false;
+  const deadline = data.creatorFundingDeadline;
+  return !!(deadline && deadline.toMillis() < Date.now());
+}
+
+/** Creator or bound joiner on a pre-fund challenge (Firestore rules participant). */
+export function canActOnChallengeAsParticipant(
+  data: ChallengeData,
+  actingWallet: string | null | undefined
+): boolean {
+  if (!actingWallet) return false;
+  const w = actingWallet.toLowerCase();
+  if (data.creator?.toLowerCase() === w) return true;
+  if (data.pendingJoiner?.toLowerCase() === w) return true;
+  if (data.opponentWallet?.toLowerCase() === w) return true;
+  return false;
+}
+
+/**
+ * Auto-cancel unfunded creator_confirmation_required when funding deadline passed and a joiner exists.
+ * Uses dismissPreFundChallenge() as the sole write path (canDismiss + hasFundedOnChainPda guards).
+ */
+export async function autoCancelExpiredCreatorFunding(
+  challengeId: string,
+  actingWallet: string | null | undefined
+): Promise<boolean> {
+  if (!actingWallet) return false;
+
+  const challengeRef = doc(db, 'challenges', challengeId);
+  const snap = await getDoc(challengeRef);
+  if (!snap.exists()) return false;
+  const data = snap.data() as ChallengeData;
+
+  if (data.status === 'cancelled') return true;
+  if (!isExpiredCreatorFundingDoc(data)) return false;
+  if (!hasCreatorFundingJoinerBound(data)) return false;
+  if (!canActOnChallengeAsParticipant(data, actingWallet)) return false;
+  if (!canDismissPreFundChallenge(data)) return false;
+
+  try {
+    await dismissPreFundChallenge(challengeId, actingWallet);
+  } catch (error) {
+    console.warn('Auto-cancel skipped:', challengeId, error);
+    return false;
+  }
+
+  if (data.targetPlayer) {
+    try {
+      await upsertChallengeNotification({
+        challengeId,
+        creator: data.creator,
+        targetPlayer: data.targetPlayer,
+        challengeTitle: data.title,
+        entryFee: data.entryFee,
+        prizePool: data.prizePool,
+        status: 'expired',
+      });
+    } catch (notifyError) {
+      console.warn('Failed to update challenge notification after auto-cancel:', notifyError);
+    }
+  }
+
+  console.log('✅ Auto-cancelled abandoned creator funding:', challengeId);
+  return true;
+}
+
 /**
  * One-time repair: completed docs created before 02d51f7f7 may have create-time expiresAt.
  * Rewrites expiresAt to completion + 2h (public activity feed only).
@@ -2283,32 +2358,22 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
     
     if (isCreator) {
       if (deadlineExpired && data.status === 'creator_confirmation_required') {
-        // Deadline expired and status is still creator_confirmation_required - auto-revert first
-        try {
-          await revertCreatorTimeout(challengeId);
-          // Single re-fetch after revert (optimized - removed redundant checks)
-          const updatedSnap = await getDoc(challengeRef);
-          if (updatedSnap.exists()) {
-            data = updatedSnap.data() as ChallengeData;
-            console.log('✅ Challenge auto-reverted, creator can now rejoin');
-          } else {
-            throw new Error("Challenge not found after revert. Please refresh and try again.");
-          }
-        } catch (revertError: any) {
-          console.error('Failed to auto-revert challenge:', revertError);
-          // Single check if already reverted (optimized)
-          const currentSnap = await getDoc(challengeRef);
-          if (currentSnap.exists()) {
-            const currentData = currentSnap.data() as ChallengeData;
-            if (currentData.status === 'pending_waiting_for_opponent') {
-              data = currentData;
-              console.log('✅ Challenge already reverted, creator can now rejoin');
-            } else {
-              throw new Error("Challenge state mismatch. Please refresh and try again.");
-            }
-          } else {
-            throw new Error("Challenge not found. Please refresh and try again.");
-          }
+        const result = await handleExpiredCreatorFundingDeadline(challengeId, wallet);
+        const updatedSnap = await getDoc(challengeRef);
+        if (updatedSnap.exists()) {
+          data = updatedSnap.data() as ChallengeData;
+        }
+        if (result === 'cancelled') {
+          throw new Error('Funding deadline expired. This challenge was cancelled.');
+        }
+        if (result === 'reverted') {
+          console.log('✅ Challenge auto-reverted, creator can now rejoin');
+        } else if (data.status === 'pending_waiting_for_opponent') {
+          console.log('✅ Challenge already reverted after deadline, creator can now rejoin');
+        } else if (!deadlineExpired) {
+          throw new Error("Cannot join your own challenge");
+        } else {
+          throw new Error("Challenge state mismatch. Please refresh and try again.");
         }
       } else if (deadlineExpired && data.status === 'pending_waiting_for_opponent') {
         // Deadline expired and already reverted - creator can rejoin
@@ -2842,6 +2907,30 @@ export const revertCreatorTimeout = async (challengeId: string): Promise<boolean
     return false;
   }
 };
+
+/**
+ * Creator funding deadline elapsed: cancel when joiner bound, else revert to open matchmaking.
+ * Participant-gated for the cancel path (Firestore rules).
+ */
+export async function handleExpiredCreatorFundingDeadline(
+  challengeId: string,
+  actingWallet?: string | null
+): Promise<'cancelled' | 'reverted' | false> {
+  const challengeRef = doc(db, 'challenges', challengeId);
+  const snap = await getDoc(challengeRef);
+  if (!snap.exists()) return false;
+  const data = snap.data() as ChallengeData;
+
+  if (!isExpiredCreatorFundingDoc(data)) return false;
+
+  if (hasCreatorFundingJoinerBound(data)) {
+    const cancelled = await autoCancelExpiredCreatorFunding(challengeId, actingWallet);
+    return cancelled ? 'cancelled' : false;
+  }
+
+  const reverted = await revertCreatorTimeout(challengeId);
+  return reverted ? 'reverted' : false;
+}
 
 /**
  * Auto-refund creator and revert challenge if joiner funding deadline expired

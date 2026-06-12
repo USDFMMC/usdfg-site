@@ -27,8 +27,8 @@ import {
   expressJoinIntent,
   creatorFund,
   joinerFund,
-  revertCreatorTimeout,
   revertJoinerTimeout,
+  handleExpiredCreatorFundingDeadline,
   submitChallengeResult,
   acknowledgeWarmupComplete,
   acknowledgeOfficialMatchReady,
@@ -902,6 +902,18 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     []
   );
 
+  const handleCreatorFundingAutoCancelled = useCallback(
+    (_challengeId: string) => {
+      window.dispatchEvent(new Event('challengeUpdated'));
+      showAppToast(
+        'Funding deadline passed. The challenge was cancelled because the creator did not fund in time.',
+        'info',
+        'Challenge cancelled'
+      );
+    },
+    [showAppToast]
+  );
+
   const requestAppConfirm = useCallback(
     (opts: {
       title: string;
@@ -1484,14 +1496,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         if (!challengeId) continue;
 
         try {
-          // Check creator timeout (creator_confirmation_required state)
-          if (status === 'creator_confirmation_required') {
-            const deadline = challenge.rawData?.creatorFundingDeadline;
-            if (deadline && deadline.toMillis() < Date.now()) {
-              await revertCreatorTimeout(challengeId);
-            }
-          }
-
           // Check joiner timeout (creator_funded state)
           if (status === 'creator_funded') {
             const deadline = challenge.rawData?.joinerFundingDeadline;
@@ -1752,8 +1756,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
   }, [firestoreChallenges, completedChallengeIds, loadTopPlayers]);
   
-  // Auto-expire challenges after 2 hours
-  useChallengeExpiry(firestoreChallenges);
+  // Creator funding deadline: auto-cancel (joiner bound) or revert (no joiner)
+  useChallengeExpiry(
+    firestoreChallenges,
+    publicKey?.toString() ?? null,
+    handleCreatorFundingAutoCancelled
+  );
   
   // Monitor result submission deadlines
   useResultDeadlines(firestoreChallenges);
@@ -2657,13 +2665,23 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       return;
     }
 
-    // If creator and deadline expired, revert first
+    // If creator and deadline expired, cancel (joiner bound) or revert (no joiner)
     if (isCreator && status === 'creator_confirmation_required' && isDeadlineExpired) {
       try {
-        await revertCreatorTimeout(challenge.id);
-        console.log('✅ Challenge reverted, creator can now join');
+        const result = await handleExpiredCreatorFundingDeadline(challenge.id, walletAddr);
+        if (result === 'cancelled') {
+          showAppToast(
+            'Funding deadline passed. This challenge was cancelled.',
+            'warning',
+            'Challenge cancelled'
+          );
+          return;
+        }
+        if (result === 'reverted') {
+          console.log('✅ Challenge reverted, creator can now join');
+        }
       } catch (revertError) {
-        console.error('Failed to revert challenge:', revertError);
+        console.error('Failed to handle expired creator funding deadline:', revertError);
       }
     }
     
@@ -2691,11 +2709,20 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // If user is already a pending joiner, nothing to do
       if (isAlreadyPendingJoiner) {
         if (isDeadlineExpired) {
-          showAppToast(
-            "Confirmation deadline expired. The challenge will automatically revert to open status soon. Please wait a moment and try joining again.",
-            "warning",
-            "Deadline expired"
-          );
+          const result = await handleExpiredCreatorFundingDeadline(challenge.id, walletAddr);
+          if (result === 'cancelled') {
+            showAppToast(
+              'The creator did not fund in time. This challenge was cancelled.',
+              'warning',
+              'Challenge cancelled'
+            );
+          } else {
+            showAppToast(
+              'The creator did not fund in time. This challenge will be cancelled when you or the creator next open the app.',
+              'warning',
+              'Funding deadline passed'
+            );
+          }
           setShowDetailSheet(false);
           return;
         }
@@ -2706,7 +2733,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       // If deadline expired and user is NOT the pending joiner, don't try to join
       if (currentStatus === 'creator_confirmation_required' && isDeadlineExpired) {
-        throw new Error('⚠️ Confirmation deadline expired. The challenge will automatically revert to open status soon. Please wait a moment and try joining again.');
+        throw new Error('Funding deadline expired. This challenge was or will be cancelled because the creator did not fund in time.');
       }
       
       // Check team restrictions
@@ -3189,7 +3216,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       // Check deadline before attempting transaction
       const deadline = freshChallenge.creatorFundingDeadline;
       if (deadline && deadline.toMillis() < Date.now()) {
-        throw new Error('⚠️ Confirmation deadline expired. The challenge has been reverted to waiting for opponent.');
+        throw new Error('Funding deadline expired. The creator did not fund in time — this challenge cannot be funded.');
       }
 
       // Validate pending joiner exists

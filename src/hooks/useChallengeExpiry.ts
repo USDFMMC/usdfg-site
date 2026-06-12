@@ -1,11 +1,18 @@
 import { useEffect, useRef } from "react";
-import { revertCreatorTimeout } from "../lib/firebase/firestore";
+import {
+  canActOnChallengeAsParticipant,
+  handleExpiredCreatorFundingDeadline,
+} from "../lib/firebase/firestore";
 
 /**
- * Creator funding deadline: auto-revert when joiner never bound (no joiner on doc).
- * Matchmaking (expirationTimer) and completed activity (expiresAt) are UI-only in filters.
+ * Creator funding deadline: auto-cancel when joiner bound; auto-revert when no joiner.
+ * Participant-gated for cancel path (Firestore rules).
  */
-export function useChallengeExpiry(challenges: any[]) {
+export function useChallengeExpiry(
+  challenges: any[],
+  actingWallet: string | null | undefined,
+  onCreatorFundingCancelled?: (challengeId: string) => void
+) {
   const processedChallenges = useRef(new Set<string>());
 
   useEffect(() => {
@@ -15,30 +22,35 @@ export function useChallengeExpiry(challenges: any[]) {
       const now = Date.now();
 
       for (const challenge of challenges) {
-        if (challenge.status === "creator_confirmation_required" && challenge.creatorFundingDeadline) {
-          const deadlineMs = challenge.creatorFundingDeadline.toMillis
-            ? challenge.creatorFundingDeadline.toMillis()
-            : challenge.creatorFundingDeadline;
-          if (deadlineMs < now) {
-            if (!processedChallenges.current.has(challenge.id + '_revert_creator')) {
-              processedChallenges.current.add(challenge.id + '_revert_creator');
+        if (challenge.status !== "creator_confirmation_required") continue;
+        const deadline = challenge.creatorFundingDeadline;
+        if (!deadline) continue;
 
-              revertCreatorTimeout(challenge.id)
-                .then(() => {
-                  processedChallenges.current.delete(challenge.id + '_revert_creator');
-                })
-                .catch((error) => {
-                  console.error("❌ Failed to revert challenge after deadline:", error);
-                  processedChallenges.current.delete(challenge.id + '_revert_creator');
-                });
+        const deadlineMs = deadline.toMillis ? deadline.toMillis() : deadline;
+        if (deadlineMs >= now) continue;
+
+        if (!canActOnChallengeAsParticipant(challenge, actingWallet)) continue;
+
+        const processKey = `${challenge.id}_creator_funding_expiry`;
+        if (processedChallenges.current.has(processKey)) continue;
+        processedChallenges.current.add(processKey);
+
+        handleExpiredCreatorFundingDeadline(challenge.id, actingWallet)
+          .then((result) => {
+            processedChallenges.current.delete(processKey);
+            if (result === "cancelled") {
+              onCreatorFundingCancelled?.(challenge.id);
             }
-          }
-        }
+          })
+          .catch((error) => {
+            console.error("❌ Failed to handle creator funding deadline:", error);
+            processedChallenges.current.delete(processKey);
+          });
       }
     };
 
     checkExpired();
     const interval = setInterval(checkExpired, 60000);
     return () => clearInterval(interval);
-  }, [challenges]);
+  }, [challenges, actingWallet, onCreatorFundingCancelled]);
 }
