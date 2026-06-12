@@ -54,6 +54,30 @@ export function getChallengePDA(challenge: any): string | null {
   return challenge?.pda || challenge?.rawData?.pda || null;
 }
 
+/** On-chain challenge PDA with escrow (excludes founder placeholder PDAs). */
+export function challengeHasRecoverableEscrowPda(challenge: any): boolean {
+  const pda = getChallengePDA(challenge);
+  if (!pda || typeof pda !== 'string') return false;
+  const trimmed = pda.trim();
+  return trimmed.length >= 32 && !trimmed.startsWith('founder_');
+}
+
+export function getEscrowRecoveredAt(challenge: any): unknown {
+  return challenge?.escrowRecoveredAt ?? challenge?.rawData?.escrowRecoveredAt ?? null;
+}
+
+/** Creator-owned cancelled challenge with escrow not yet recovered on-chain. */
+export function isCreatorEscrowRecoveryPending(
+  challenge: any,
+  wallet: string | null | undefined
+): boolean {
+  if (!wallet) return false;
+  if (getChallengeStatus(challenge) !== 'cancelled') return false;
+  if (getEscrowRecoveredAt(challenge)) return false;
+  if (!challengeHasRecoverableEscrowPda(challenge)) return false;
+  return isChallengeCreator(challenge, wallet);
+}
+
 /**
  * Get challenge challenger wallet address
  */

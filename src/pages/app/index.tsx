@@ -112,6 +112,8 @@ import {
   isChallengeInProgress,
   canCancelChallenge,
   isChallengeRewardClaimed,
+  isCreatorEscrowRecoveryPending,
+  challengeHasRecoverableEscrowPda,
   isPayoutStaleProcessing,
   getTournamentRoster,
   isWalletInTournamentRoster,
@@ -821,6 +823,7 @@ const ArenaHome: React.FC = () => {
   // CRITICAL: Button disabling states - set immediately on click to prevent double-submission
   const [isCreatorFunding, setIsCreatorFunding] = useState<string | null>(null);
   const [isJoinerFunding, setIsJoinerFunding] = useState<string | null>(null);
+  const [isRecoveringEscrow, setIsRecoveringEscrow] = useState<string | null>(null);
   const [topPlayers, setTopPlayers] = useState<PlayerStats[]>([]);
   const [showPlayerProfile, setShowPlayerProfile] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerStats | null>(null);
@@ -914,15 +917,27 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   );
 
   const handleJoinerFundingExpired = useCallback(
-    (_challengeId: string) => {
+    (challengeId: string) => {
       window.dispatchEvent(new Event('challengeUpdated'));
-      showAppToast(
-        'Joiner funding deadline passed. The challenge was updated — creators with escrowed funds may need to cancel on-chain for a refund.',
-        'info',
-        'Joiner deadline expired'
-      );
+      const challenge = firestoreChallenges.find((c) => c.id === challengeId);
+      const wallet = publicKey?.toString();
+      const isCreator =
+        !!wallet && !!challenge && isChallengeCreator(challenge, wallet);
+      if (isCreator) {
+        showAppToast(
+          'Joiner did not fund in time. Your USDFG is still in escrow — open the challenge and tap Recover USDFG.',
+          'info',
+          'Recover your funds'
+        );
+      } else {
+        showAppToast(
+          'Joiner funding deadline passed. The challenge was cancelled. No funds were charged to you.',
+          'info',
+          'Challenge cancelled'
+        );
+      }
     },
-    [showAppToast]
+    [showAppToast, firestoreChallenges, publicKey]
   );
 
   const requestAppConfirm = useCallback(
@@ -1453,6 +1468,23 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     
     setUnclaimedPrizeChallenges(unclaimed);
   }, [firestoreChallenges, publicKey, isConnected]);
+
+  const escrowRecoveryChallenges = useMemo(() => {
+    if (!publicKey) return [];
+    const wallet = publicKey.toString();
+    return firestoreChallenges.filter((c) => isCreatorEscrowRecoveryPending(c, wallet));
+  }, [firestoreChallenges, publicKey]);
+
+  const openEscrowRecoveryLobby = useCallback(
+    (challenge: any) => {
+      const merged = mergeChallengeDataForModal(challenge, challenge);
+      setSelectedChallenge(merged);
+      setShowDetailSheet(false);
+      setShowTournamentLobby(false);
+      setShowStandardLobby(true);
+    },
+    [mergeChallengeDataForModal]
+  );
   
   // Calculate active challenges count from real-time data
   useEffect(() => {
@@ -3001,6 +3033,73 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     } catch (err: any) {
       console.error("❌ Remove challenge failed:", err);
       showAppToast("Failed to remove challenge: " + (err.message || "Unknown error"), "error", "Remove failed");
+    }
+  };
+
+  const handleRecoverEscrow = async (challenge: any) => {
+    if (!publicKey || !connection) {
+      showAppToast("Please connect your wallet first.", "warning", "Wallet");
+      return;
+    }
+
+    const challengeId = challenge?.id;
+    if (!challengeId) return;
+    if (isRecoveringEscrow === challengeId) return;
+
+    const currentWallet = publicKey.toString();
+    if (!isChallengeCreator(challenge, currentWallet)) {
+      showAppToast("Only the challenge creator can recover escrow.", "warning", "Cannot recover");
+      return;
+    }
+
+    const challengePDA = getChallengePDA(challenge);
+    if (!challengeHasRecoverableEscrowPda(challenge)) {
+      showAppToast("This challenge has no recoverable on-chain escrow.", "warning", "Nothing to recover");
+      return;
+    }
+
+    const { signTransaction } = wallet;
+    if (!signTransaction) {
+      showAppToast("Wallet does not support transaction signing.", "error", "Wallet");
+      return;
+    }
+
+    const entryFee = getChallengeEntryFee(challenge);
+    const confirmed = await requestAppConfirm({
+      title: "Recover USDFG from escrow?",
+      message: `Your ${entryFee} USDFG is still held in escrow from this cancelled challenge — it was not lost. Confirm in your wallet to return it to your wallet.`,
+      confirmLabel: "Recover USDFG",
+      cancelLabel: "Not now",
+    });
+    if (!confirmed) return;
+
+    setIsRecoveringEscrow(challengeId);
+    try {
+      const { cancelChallenge } = await import("@/lib/chain/contract");
+      await cancelChallenge({ signTransaction, publicKey }, connection, challengePDA!);
+
+      const { writeChallengeFields } = await import("@/lib/firebase/firestore");
+      const fresh = (await fetchChallengeById(challengeId)) ?? challenge;
+      await writeChallengeFields(
+        challengeId,
+        {
+          escrowRecoveredAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        },
+        { actingWallet: currentWallet, currentData: fresh }
+      );
+
+      window.dispatchEvent(new Event("challengeUpdated"));
+      showAppToast(
+        `Your ${entryFee} USDFG has been returned to your wallet.`,
+        "success",
+        "Escrow recovered"
+      );
+    } catch (error) {
+      console.error("❌ Escrow recovery failed:", error);
+      dispatchTransactionFailureToast(showAppToast, error, "fund");
+    } finally {
+      setIsRecoveringEscrow(null);
     }
   };
 
@@ -4626,7 +4725,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
       const discoveryBlocked = isPublicJoinDiscoveryBlocked(visibilityInput, now);
 
-      if (showMyChallenges && (status === 'cancelled' || status === 'expired')) {
+      const needsEscrowRecovery =
+        !!connectedWallet && isCreatorEscrowRecoveryPending(challenge, connectedWallet);
+
+      if (showMyChallenges && (status === 'cancelled' || status === 'expired') && !needsEscrowRecovery) {
         return false;
       }
 
@@ -4678,12 +4780,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
       const participantSeesCompleted = isParticipant && isCompleted && categoryMatch && gameMatch;
 
+      const creatorSeesEscrowRecovery =
+        needsEscrowRecovery && categoryMatch && gameMatch;
+
       const showCompletedInPublicFeed =
         (status === 'completed' && !completedHiddenFromActivity) || status === 'disputed';
       
       // If user is participant in ACTIVE or creator_funded challenge, ALWAYS show it (so they can find their in-progress match)
       const participantInActive = isParticipant && (status === 'active' || status === 'creator_funded');
-      const shouldShow = participantInActive || (showMyChallenges 
+      const shouldShow = participantInActive || creatorSeesEscrowRecovery || (showMyChallenges 
         ? (categoryMatch && gameMatch && myChallengesMatch) 
         : (adminSeesExpiredFounder || (categoryMatch && gameMatch && (isJoinable || showCompletedInPublicFeed || adminShouldSeeCompletedFounderTournament || participantSeesCompleted))));
       
@@ -6010,6 +6115,34 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     className="bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-all shadow-[0_0_15px_rgba(34,197,94,0.5)] hover:shadow-[0_0_25px_rgba(34,197,94,0.7)]"
                   >
                     Claim Now
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Escrow recovery — creator-funded challenges cancelled after joiner timeout */}
+            {isConnected && escrowRecoveryChallenges.length > 0 && (
+              <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/15 border border-amber-400/45 rounded-xl p-4 max-w-md mx-auto mt-5 shadow-[0_0_20px_rgba(245,158,11,0.18)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="text-2xl shrink-0">🔐</div>
+                    <div className="min-w-0 text-left">
+                      <p className="text-amber-100 font-bold text-sm">
+                        {escrowRecoveryChallenges.length === 1
+                          ? 'USDFG waiting in escrow'
+                          : `${escrowRecoveryChallenges.length} escrows to recover`}
+                      </p>
+                      <p className="text-amber-200/80 text-xs mt-1 leading-snug">
+                        Your funds were not lost. Recover them with one wallet confirmation.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openEscrowRecoveryLobby(escrowRecoveryChallenges[0])}
+                    className="shrink-0 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-all shadow-[0_0_15px_rgba(245,158,11,0.35)]"
+                  >
+                    Recover USDFG
                   </button>
                 </div>
               </div>
@@ -7678,6 +7811,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     onCreatorFund={handleDirectCreatorFund}
                     onJoinerFund={handleDirectJoinerFund}
                     onCancelChallenge={handleCancelChallenge}
+                    onRecoverEscrow={handleRecoverEscrow}
                     onAppToast={showAppToast}
                     requestAppConfirm={requestAppConfirm}
                     onUpdateEntryFee={handleUpdateEntryFee}
@@ -7691,6 +7825,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                     isClaiming={claimingPrize === selectedChallenge.id}
                     isCreatorFunding={isCreatorFunding === selectedChallenge.id}
                     isJoinerFunding={isJoinerFunding === selectedChallenge.id}
+                    isRecoveringEscrow={isRecoveringEscrow === selectedChallenge.id}
                     onPlayerClick={async (wallet: string) => {
                       try {
                         const playerStats = await getPlayerStats(wallet);

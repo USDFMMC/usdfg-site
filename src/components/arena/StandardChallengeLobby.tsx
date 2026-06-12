@@ -20,7 +20,9 @@ import {
   isCreatorFundingDeadlineExpired,
   isChallengeRewardClaimed,
   isPayoutStaleProcessing,
-  isPayoutInFlightProcessing
+  isPayoutInFlightProcessing,
+  challengeHasRecoverableEscrowPda,
+  getEscrowRecoveredAt,
 } from "@/lib/utils/challenge-helpers";
 import { TrustBadge } from "@/lib/utils/trustDisplay";
 import WarmUpBadge from "@/components/arena/WarmUpBadge";
@@ -45,6 +47,7 @@ interface StandardChallengeLobbyProps {
   onCreatorFund?: (challenge: any) => Promise<void>;
   onJoinerFund?: (challenge: any) => Promise<void>;
   onCancelChallenge?: (challenge: any) => Promise<void>;
+  onRecoverEscrow?: (challenge: any) => Promise<void>;
   onAppToast?: (message: string, type?: "info" | "warning" | "error" | "success", title?: string) => void;
   requestAppConfirm?: (opts: AppConfirmDialogOptions) => Promise<boolean>;
   onUpdateEntryFee?: (challenge: any, entryFee: number) => Promise<void>;
@@ -55,6 +58,7 @@ interface StandardChallengeLobbyProps {
   isClaiming?: boolean;
   isCreatorFunding?: boolean;
   isJoinerFunding?: boolean;
+  isRecoveringEscrow?: boolean;
   onPlayerClick?: (wallet: string) => void; // Callback when player wallet is clicked
 }
 
@@ -187,6 +191,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   onCreatorFund,
   onJoinerFund,
   onCancelChallenge,
+  onRecoverEscrow,
   onAppToast,
   requestAppConfirm,
   onUpdateEntryFee,
@@ -197,6 +202,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
   isClaiming = false,
   isCreatorFunding = false,
   isJoinerFunding = false,
+  isRecoveringEscrow = false,
   onPlayerClick,
 }) => {
   const [showSubmitForm, setShowSubmitForm] = useState(false);
@@ -710,6 +716,20 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
           icon: '🏆' 
         };
       case 'cancelled':
+        if (
+          isCreator &&
+          challengeHasRecoverableEscrowPda(activeChallenge) &&
+          !getEscrowRecoveredAt(activeChallenge)
+        ) {
+          return {
+            text: 'Cancelled — escrow recoverable',
+            bgClass: 'bg-amber-500/10',
+            borderClass: 'border-amber-400/35',
+            textClass: 'text-amber-100',
+            headerClass: 'text-amber-300',
+            icon: '🔐',
+          };
+        }
         return { 
           text: 'Challenge cancelled', 
           bgClass: 'bg-red-500/10', 
@@ -1429,6 +1449,55 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       )}
       
       {/* Show join button for others after expiry (challenge reverted to pending OR deadline expired but status not updated yet) */}
+
+      {isCreator && status === 'creator_funded' && isJoinerDeadlineExpired && (
+        <div className="rounded-lg border border-amber-400/35 bg-amber-500/10 p-2.5 space-y-2">
+          <div className="text-center">
+            <div className="text-xs font-semibold text-amber-200 mb-1.5">
+              Joiner did not fund in time
+            </div>
+            <div className="text-[10px] text-amber-100/90 font-medium mb-2 leading-relaxed">
+              Your {entryFee} USDFG is still in escrow — it was not lost. This challenge will be cancelled shortly; use Recover USDFG to return it to your wallet.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isCreator &&
+        status === 'cancelled' &&
+        challengeHasRecoverableEscrowPda(activeChallenge) &&
+        !getEscrowRecoveredAt(activeChallenge) &&
+        onRecoverEscrow && (
+        <div className="rounded-lg border border-amber-400/35 bg-amber-500/10 p-2.5 space-y-2">
+          <div className="text-center">
+            <div className="text-xs font-semibold text-amber-200 mb-1.5">
+              Your USDFG is still in escrow
+            </div>
+            <div className="text-[10px] text-amber-100/90 font-medium mb-2 leading-relaxed">
+              The joiner did not fund in time. Your {entryFee} USDFG was not lost — confirm in your wallet to return it.
+            </div>
+            <button
+              type="button"
+              disabled={isRecoveringEscrow}
+              onClick={async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                try {
+                  await onRecoverEscrow(activeChallenge);
+                } catch (error: unknown) {
+                  const msg = error instanceof Error ? error.message : 'Recovery failed';
+                  onAppToast?.(msg, 'error', 'Recovery failed');
+                }
+              }}
+              className={`w-full rounded-md bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white px-3 py-2 text-xs font-semibold transition-all shadow-[0_0_10px_rgba(245,158,11,0.35)] border border-amber-400/30 ${
+                isRecoveringEscrow ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              {isRecoveringEscrow ? 'Recovering… Confirm in wallet' : `Recover ${entryFee} USDFG`}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Creator waiting for challenger to fund */}
       {isCreator && status === 'creator_funded' && !isJoinerDeadlineExpired && (

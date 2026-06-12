@@ -185,6 +185,8 @@ export interface ChallengeData {
   payoutTriggered?: boolean;          // Whether reward has been claimed
   payoutSignature?: string;            // Transaction signature of reward claim
   payoutTimestamp?: Timestamp;        // When reward was claimed
+  /** Set after creator successfully calls cancelChallenge to recover pre-match escrow. */
+  escrowRecoveredAt?: Timestamp;
   pda?: string | null;                // Challenge PDA for smart contract (null for founder flows)
   prizePool?: number;                 // Total challenge reward amount
   founderParticipantReward?: number;  // Founder tournament reward per participant
