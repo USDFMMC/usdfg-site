@@ -4,6 +4,10 @@ import {
   handleExpiredCreatorFundingDeadline,
   handleExpiredJoinerFundingDeadline,
 } from "../lib/firebase/firestore";
+import {
+  isCreatorFundingInFlight,
+  isJoinerFundingInFlight,
+} from "../lib/challenges/funding-in-flight";
 
 /**
  * Pre-fund funding deadlines: auto-cancel/revert when expired.
@@ -33,6 +37,7 @@ export function useChallengeExpiry(
           if (!deadline) continue;
           const deadlineMs = deadline.toMillis ? deadline.toMillis() : deadline;
           if (deadlineMs >= now) continue;
+          if (isCreatorFundingInFlight(challenge.id)) continue;
 
           const processKey = `${challenge.id}_creator_funding_expiry`;
           if (processedChallenges.current.has(processKey)) continue;
@@ -57,6 +62,7 @@ export function useChallengeExpiry(
           if (!deadline) continue;
           const deadlineMs = deadline.toMillis ? deadline.toMillis() : deadline;
           if (deadlineMs >= now) continue;
+          if (isJoinerFundingInFlight(challenge.id)) continue;
 
           const processKey = `${challenge.id}_joiner_funding_expiry`;
           if (processedChallenges.current.has(processKey)) continue;

@@ -14,6 +14,10 @@ import StandardChallengeLobby from "@/components/arena/StandardChallengeLobby";
 import RightSidePanel from "@/components/ui/RightSidePanel";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
+import {
+  markCreatorFundingInFlight,
+  markJoinerFundingInFlight,
+} from "@/lib/challenges/funding-in-flight";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
 import ParticleBackground from "@/components/ParticleBackground";
 import type {
@@ -1769,13 +1773,18 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   }, [firestoreChallenges, completedChallengeIds, loadTopPlayers]);
   
   // Pre-fund funding deadlines (participant-gated)
+  const challengeExpiryCallbacks = useMemo(
+    () => ({
+      onCreatorFundingCancelled: handleCreatorFundingAutoCancelled,
+      onJoinerFundingExpired: handleJoinerFundingExpired,
+    }),
+    [handleCreatorFundingAutoCancelled, handleJoinerFundingExpired]
+  );
+
   useChallengeExpiry(
     firestoreChallenges,
     publicKey?.toString() ?? null,
-    {
-      onCreatorFundingCancelled: handleCreatorFundingAutoCancelled,
-      onJoinerFundingExpired: handleJoinerFundingExpired,
-    }
+    challengeExpiryCallbacks
   );
   
   // Monitor result submission deadlines
@@ -2890,6 +2899,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
 
     // CRITICAL: Set funding state IMMEDIATELY before any async operations
+    markJoinerFundingInFlight(challenge.id);
     setIsJoinerFunding(challenge.id);
 
     try {
@@ -2963,6 +2973,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     } catch (err: any) {
       dispatchTransactionFailureToast(showAppToast, err, 'fund');
     } finally {
+      markJoinerFundingInFlight(null);
       // CRITICAL: Always clear funding state, even on error
       setIsJoinerFunding(null);
     }
@@ -3295,6 +3306,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
 
     // CRITICAL: Set funding state IMMEDIATELY before any async operations
+    markCreatorFundingInFlight(challenge.id);
     setIsCreatorFunding(challenge.id);
 
     try {
@@ -3506,6 +3518,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         dispatchTransactionFailureToast(showAppToast, err, 'fund');
       }
     } finally {
+      markCreatorFundingInFlight(null);
       // CRITICAL: Always clear funding state, even on error
       setIsCreatorFunding(null);
     }

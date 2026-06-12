@@ -35,6 +35,10 @@ import {
 import { CHALLENGE_CONFIG, ADMIN_WALLET } from '../chain/config';
 import { getExplorerTxUrl } from '../chain/explorer';
 import { isWarmupPhaseBlockingSubmit } from '@/lib/utils/warmup-phase';
+import {
+  isCreatorFundingInFlight,
+  isJoinerFundingInFlight,
+} from '@/lib/challenges/funding-in-flight';
 /** Max challenges in the arena realtime feed (useChallenges / refetch). */
 export const RECENT_CHALLENGES_FEED_LIMIT = 30;
 
@@ -2147,6 +2151,7 @@ export async function autoCancelExpiredCreatorFunding(
   actingWallet: string | null | undefined
 ): Promise<boolean> {
   if (!actingWallet) return false;
+  if (isCreatorFundingInFlight(challengeId)) return false;
 
   const challengeRef = doc(db, 'challenges', challengeId);
   const snap = await getDoc(challengeRef);
@@ -2844,6 +2849,10 @@ export async function startOfficialMatch(
  */
 export const revertCreatorTimeout = async (challengeId: string): Promise<boolean> => {
   try {
+    if (isCreatorFundingInFlight(challengeId)) {
+      return false;
+    }
+
     const challengeRef = doc(db, "challenges", challengeId);
     const snap = await getDoc(challengeRef);
     
@@ -2921,6 +2930,10 @@ export async function handleExpiredCreatorFundingDeadline(
   challengeId: string,
   actingWallet?: string | null
 ): Promise<'cancelled' | 'reverted' | false> {
+  if (isCreatorFundingInFlight(challengeId)) {
+    return false;
+  }
+
   const challengeRef = doc(db, 'challenges', challengeId);
   const snap = await getDoc(challengeRef);
   if (!snap.exists()) return false;
@@ -2946,6 +2959,10 @@ export const revertJoinerTimeout = async (
   actingWallet?: string | null
 ): Promise<boolean> => {
   try {
+    if (isJoinerFundingInFlight(challengeId)) {
+      return false;
+    }
+
     const challengeRef = doc(db, "challenges", challengeId);
     const snap = await getDoc(challengeRef);
 
@@ -3019,6 +3036,9 @@ export async function handleExpiredJoinerFundingDeadline(
   challengeId: string,
   actingWallet?: string | null
 ): Promise<boolean> {
+  if (isJoinerFundingInFlight(challengeId)) {
+    return false;
+  }
   return revertJoinerTimeout(challengeId, actingWallet);
 }
 
