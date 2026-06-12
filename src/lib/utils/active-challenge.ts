@@ -37,13 +37,6 @@ export function getFirestoreChallengeStatus(
   return challenge.status || challenge.rawData?.status || "unknown";
 }
 
-/** Pre-funding statuses that should expire (no money committed yet). */
-const PRE_FUNDING_STATUSES = new Set([
-  "pending_waiting_for_opponent",
-  "creator_confirmation_required",
-]);
-
-/** Read a Firestore Timestamp / number / date-like into epoch ms, or null. */
 function toMillis(value: unknown): number | null {
   if (value == null) return null;
   const v = value as { toMillis?: () => number; seconds?: number };
@@ -54,21 +47,21 @@ function toMillis(value: unknown): number | null {
   return Number.isNaN(d.getTime()) ? null : d.getTime();
 }
 
+/** Pre-funding statuses that use the 60-minute matchmaking timer. */
+const MATCHMAKING_STATUS = "pending_waiting_for_opponent";
+
 /**
- * A pre-funding challenge is "stale" once its TTL (expirationTimer, else expiresAt) has passed.
- * Client/server cleanup may be disabled, so old pending docs can linger with a live-looking status;
- * those must NOT block new challenge creation. Funded/active challenges never expire this way.
+ * A pending open challenge is stale once expirationTimer has passed.
+ * Funded/in-flow challenges use their own deadlines; docs may linger until dismissed.
  */
 export function isStalePendingChallenge(challenge: FirestoreChallengeRow): boolean {
   const status = getFirestoreChallengeStatus(challenge);
-  if (!PRE_FUNDING_STATUSES.has(status)) return false;
+  if (status !== MATCHMAKING_STATUS) return false;
   const raw = challenge as unknown as Record<string, unknown>;
   const rawData = (raw.rawData as Record<string, unknown> | undefined) ?? {};
   const expiry =
     toMillis(raw.expirationTimer) ??
-    toMillis(raw.expiresAt) ??
-    toMillis(rawData.expirationTimer) ??
-    toMillis(rawData.expiresAt);
+    toMillis(rawData.expirationTimer);
   return expiry !== null && expiry < Date.now();
 }
 

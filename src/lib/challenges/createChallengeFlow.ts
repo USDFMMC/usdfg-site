@@ -242,7 +242,6 @@ async function runCreateChallengeFlowCore(options: {
     entryFee,
     status: "pending_waiting_for_opponent" as const,
     createdAt: Timestamp.now(),
-    expiresAt: Timestamp.fromDate(new Date(now + 2 * 60 * 60 * 1000)),
     expirationTimer,
     players: initialPlayers,
     maxPlayers: challengeData.maxPlayers || maxPlayers,

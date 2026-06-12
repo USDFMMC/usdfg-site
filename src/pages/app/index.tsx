@@ -86,6 +86,13 @@ import {
   findCreatorActiveChallenge,
   isPendingInviteToPlayer,
 } from "@/lib/utils/active-challenge";
+import {
+  isPendingMatchmakingExpired,
+  isCompletedActivityFeedHidden,
+  isPublicJoinDiscoveryBlocked,
+  getExpirationTimerMs,
+  getExpiresAtMs,
+} from "@/lib/utils/challenge-visibility";
 import { extractGameFromTitle, getGameCategory, getGameImage, isChallengeCustomGame, resolveGameName } from "@/lib/gameAssets";
 import { runCreateChallengeFlow } from "@/lib/challenges/createChallengeFlow";
 import { 
@@ -2114,7 +2121,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       rules: rules,
       createdAt: challenge.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
       timestamp: challenge.createdAt?.toDate?.()?.getTime() || Date.now(),
-      expiresAt: challenge.expiresAt?.toDate?.()?.getTime() || (Date.now() + (2 * 60 * 60 * 1000)),
+      expiresAt: challenge.expiresAt?.toDate?.()?.getTime() ?? undefined,
       status: challenge.status,
       creatorDisplayTrust,
       creatorDisputesWon,
@@ -4612,57 +4619,22 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         walletsEqual(challenge.challenger ?? challenge.rawData?.challenger, connectedWallet) ||
         playerListIncludes(challenge, connectedWallet);
       
-      // Check if challenge is expired (normalize Timestamp to ms for comparison)
       const status = (challenge.status ?? challenge.rawData?.status) as string | undefined;
-      const expVal = challenge.expiresAt as unknown;
-      const expMs =
-        expVal != null
-          ? typeof expVal === 'number'
-            ? expVal
-            : (expVal as { toMillis?: () => number; toDate?: () => Date })?.toMillis?.() ??
-              (expVal as { toDate?: () => Date })?.toDate?.()?.getTime?.() ??
-              null
-          : null;
-      const timerVal = challenge.rawData?.expirationTimer as unknown;
-      const timerMs =
-        timerVal != null
-          ? typeof timerVal === 'number'
-            ? timerVal
-            : (timerVal as { toMillis?: () => number; toDate?: () => Date })?.toMillis?.() ??
-              (timerVal as { toDate?: () => Date })?.toDate?.()?.getTime?.() ??
-              null
-          : null;
-      const timeExpired = (expMs != null && expMs < now) || (timerMs != null && timerMs < now);
-      const creatorFundingDeadline = challenge.rawData?.creatorFundingDeadline;
-      const creatorDeadlineMs =
-        creatorFundingDeadline != null
-          ? typeof creatorFundingDeadline === 'number'
-            ? creatorFundingDeadline
-            : (creatorFundingDeadline as { toMillis?: () => number })?.toMillis?.() ?? null
-          : null;
-      const creatorDeadlineExpired = creatorDeadlineMs != null && creatorDeadlineMs < now;
-      // Only treat time as "expired" for pre-match states.
-      // Active matches may legitimately run past `expiresAt` if the backend didn't flip statuses promptly.
-      const isPreMatch =
-        status === 'pending_waiting_for_opponent' ||
-        status === 'creator_confirmation_required' ||
-        status === 'creator_funded';
-      const isExpired =
-        status === 'cancelled' ||
-        status === 'expired' ||
-        (status === 'creator_confirmation_required' && creatorDeadlineExpired) ||
-        (isPreMatch && timeExpired);
+
+      const discoveryBlocked = isPublicJoinDiscoveryBlocked(
+        { status, rawData: challenge.rawData, expirationTimer: challenge.rawData?.expirationTimer, creatorFundingDeadline: challenge.rawData?.creatorFundingDeadline },
+        now
+      );
 
       if (showMyChallenges && (status === 'cancelled' || status === 'expired')) {
         return false;
       }
-      
-      // Also exclude completed and disputed challenges from joinable list
+
       const isCompleted = status === 'completed' || status === 'disputed';
-      
-      // Only show joinable challenges (unless user wants to see their own challenges)
-      // OR if admin viewing completed Founder Tournament (for payout)
-      const isJoinable = !isExpired && !isCompleted;
+      const completedHiddenFromActivity =
+        status === 'completed' && isCompletedActivityFeedHidden({ status, expiresAt: challenge.expiresAt, rawData: challenge.rawData }, now);
+
+      const isJoinable = !discoveryBlocked && !isCompleted;
       
       // Check if this is a completed Founder Tournament that admin should see
       const isAdmin = !!publicKey && walletsEqual(publicKey.toString(), ADMIN_WALLET.toString());
@@ -4692,7 +4664,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       const isCompletedFounderTournament = isCompleted && isFounderTournament && tournamentStage === 'completed';
       const adminShouldSeeCompletedFounderTournament = isAdmin && isCompletedFounderTournament;
       // Show expired Founder Tournaments/Challenges to admin so they can open and delete/manage manually
-      const adminSeesExpiredFounder = isAdmin && isFounderTournamentOrChallenge && isExpired;
+      const adminSeesExpiredFounder =
+        isAdmin &&
+        isFounderTournamentOrChallenge &&
+        (discoveryBlocked || isPendingMatchmakingExpired({ status, rawData: challenge.rawData, expirationTimer: challenge.rawData?.expirationTimer }, now));
       
       // Show completed/disputed challenges to participants so they can re-open lobby (chat/mic)
       const isParticipant =
@@ -4702,17 +4677,15 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           playerListIncludes(challenge, connectedWallet));
 
       const participantSeesCompleted = isParticipant && isCompleted && categoryMatch && gameMatch;
+
+      const showCompletedInPublicFeed =
+        (status === 'completed' && !completedHiddenFromActivity) || status === 'disputed';
       
       // If user is participant in ACTIVE or creator_funded challenge, ALWAYS show it (so they can find their in-progress match)
       const participantInActive = isParticipant && (status === 'active' || status === 'creator_funded');
-      // If showing "My Challenges", show all their challenges regardless of status
-      // OR if admin viewing completed Founder Tournament
-      // OR if admin viewing expired Founder Tournament/Challenge (so they can open and delete manually; show even when category/game filter applied)
-      // OR if user is participant in completed challenge (so they can re-open lobby to chat/mic)
-      // Otherwise show joinable OR completed (so completed challenges don't "disappear" from the list)
       const shouldShow = participantInActive || (showMyChallenges 
         ? (categoryMatch && gameMatch && myChallengesMatch) 
-        : (adminSeesExpiredFounder || (categoryMatch && gameMatch && (isJoinable || isCompleted || adminShouldSeeCompletedFounderTournament || participantSeesCompleted))));
+        : (adminSeesExpiredFounder || (categoryMatch && gameMatch && (isJoinable || showCompletedInPublicFeed || adminShouldSeeCompletedFounderTournament || participantSeesCompleted))));
       
       return shouldShow;
       } catch (err) {
@@ -5186,26 +5159,27 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       };
     }, []);
 
-    // Calculate expiration time
     const getExpiresText = () => {
-      if (challenge.expiresAt && challenge.expiresAt > Date.now()) {
-        const minutes = Math.max(0, Math.floor((challenge.expiresAt - Date.now()) / (1000 * 60)));
-        if (minutes < 60) return `${minutes}m`;
-        const hours = Math.floor(minutes / 60);
-        return `${hours}h`;
-      }
-      if (challenge.rawData?.expirationTimer) {
-        const timer = challenge.rawData.expirationTimer;
-        const now = Date.now();
-        const expires = timer.toMillis();
-        if (expires > now) {
-          const minutes = Math.max(0, Math.floor((expires - now) / (1000 * 60)));
+      const st = challenge.status || challenge.rawData?.status;
+      if (st === 'completed') {
+        const expMs = getExpiresAtMs({ expiresAt: challenge.expiresAt, rawData: challenge.rawData });
+        if (expMs != null && expMs > Date.now()) {
+          const minutes = Math.max(0, Math.floor((expMs - Date.now()) / (1000 * 60)));
           if (minutes < 60) return `${minutes}m`;
-          const hours = Math.floor(minutes / 60);
-          return `${hours}h`;
+          return `${Math.floor(minutes / 60)}h`;
         }
+        return '—';
       }
-      return 'Expired';
+      if (st === 'pending_waiting_for_opponent') {
+        const timerMs = getExpirationTimerMs({ rawData: challenge.rawData, expirationTimer: challenge.rawData?.expirationTimer });
+        if (timerMs != null && timerMs > Date.now()) {
+          const minutes = Math.max(0, Math.floor((timerMs - Date.now()) / (1000 * 60)));
+          if (minutes < 60) return `${minutes}m`;
+          return `${Math.floor(minutes / 60)}h`;
+        }
+        return 'Expired';
+      }
+      return '—';
     };
 
     const status = challenge.status || challenge.rawData?.status;
@@ -6562,26 +6536,20 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                                 challenge={challenge}
                                 onSelect={async () => {
                                   const now = Date.now();
-                                  const expMs = (() => {
-                                    const fromExpiresAt = challenge.expiresAt != null
-                                      ? (typeof challenge.expiresAt === 'number'
-                                        ? challenge.expiresAt
-                                        : (challenge.expiresAt?.toMillis?.() ?? challenge.expiresAt?.toDate?.()?.getTime?.()))
-                                      : null;
-                                    const timer = challenge.rawData?.expirationTimer;
-                                    const fromTimer = timer != null
-                                      ? (typeof timer === 'number' ? timer : (timer?.toMillis?.() ?? timer?.toDate?.()?.getTime?.()))
-                                      : null;
-                                    return fromExpiresAt ?? fromTimer ?? null;
-                                  })();
                                   const status = (challenge.status ?? challenge.rawData?.status) as string | undefined;
-                                  const timeExpired = expMs != null && expMs < now;
-                                  const isPreMatch =
-                                    status === 'pending_waiting_for_opponent' ||
-                                    status === 'creator_confirmation_required' ||
-                                    status === 'creator_funded';
-                                  const isExpired = status === 'cancelled' || (isPreMatch && timeExpired);
-                                  if (isExpired) return;
+                                  if (
+                                    isPublicJoinDiscoveryBlocked(
+                                      {
+                                        status,
+                                        rawData: challenge.rawData,
+                                        expirationTimer: challenge.rawData?.expirationTimer,
+                                        creatorFundingDeadline: challenge.rawData?.creatorFundingDeadline,
+                                      },
+                                      now
+                                    )
+                                  ) {
+                                    return;
+                                  }
 
                                   const isCompletedOrDisputed = status === "completed" || status === "disputed";
                                   const payoutTriggered = !!challenge.rawData?.payoutTriggered;
