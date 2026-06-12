@@ -27,7 +27,6 @@ import {
   expressJoinIntent,
   creatorFund,
   joinerFund,
-  revertJoinerTimeout,
   handleExpiredCreatorFundingDeadline,
   submitChallengeResult,
   acknowledgeWarmupComplete,
@@ -914,6 +913,18 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     [showAppToast]
   );
 
+  const handleJoinerFundingExpired = useCallback(
+    (_challengeId: string) => {
+      window.dispatchEvent(new Event('challengeUpdated'));
+      showAppToast(
+        'Joiner funding deadline passed. The challenge was updated — creators with escrowed funds may need to cancel on-chain for a refund.',
+        'info',
+        'Joiner deadline expired'
+      );
+    },
+    [showAppToast]
+  );
+
   const requestAppConfirm = useCallback(
     (opts: {
       title: string;
@@ -1243,6 +1254,8 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         setClaimingPrize(null);
         setMarkingPrizeTransferred(null);
         setShowMyChallenges(false);
+        setShowStandardLobby(false);
+        setShowTournamentLobby(false);
         setFriendlyMatch(null);
         setShowFriendlySubmitResult(false);
         setLockInProgress(null);
@@ -1484,40 +1497,6 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     setArenaPlayersCount(uniqueWallets.size);
   }, [firestoreChallenges]);
 
-  // Timeout monitoring: Check and revert expired challenges
-  useEffect(() => {
-    if (!firestoreChallenges || firestoreChallenges.length === 0) return;
-
-    const checkTimeouts = async () => {
-      for (const challenge of firestoreChallenges) {
-        const status = challenge.status || challenge.rawData?.status;
-        const challengeId = challenge.id;
-
-        if (!challengeId) continue;
-
-        try {
-          // Check joiner timeout (creator_funded state)
-          if (status === 'creator_funded') {
-            const deadline = challenge.rawData?.joinerFundingDeadline;
-            if (deadline && deadline.toMillis() < Date.now()) {
-              await revertJoinerTimeout(challengeId);
-            }
-          }
-        } catch (error) {
-          console.error(`Error checking timeout for challenge ${challengeId}:`, error);
-        }
-      }
-    };
-
-    // Check immediately
-    checkTimeouts();
-
-    // Then check every 30 seconds
-    const interval = setInterval(checkTimeouts, 30000);
-
-    return () => clearInterval(interval);
-  }, [firestoreChallenges]);
-  
   useEffect(() => {
     if (!publicKey) {
       return;
@@ -1756,11 +1735,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     }
   }, [firestoreChallenges, completedChallengeIds, loadTopPlayers]);
   
-  // Creator funding deadline: auto-cancel (joiner bound) or revert (no joiner)
+  // Pre-fund funding deadlines (participant-gated)
   useChallengeExpiry(
     firestoreChallenges,
     publicKey?.toString() ?? null,
-    handleCreatorFundingAutoCancelled
+    {
+      onCreatorFundingCancelled: handleCreatorFundingAutoCancelled,
+      onJoinerFundingExpired: handleJoinerFundingExpired,
+    }
   );
   
   // Monitor result submission deadlines

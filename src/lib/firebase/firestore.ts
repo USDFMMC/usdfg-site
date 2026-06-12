@@ -2128,6 +2128,7 @@ export function canActOnChallengeAsParticipant(
   if (!actingWallet) return false;
   const w = actingWallet.toLowerCase();
   if (data.creator?.toLowerCase() === w) return true;
+  if (data.challenger?.toLowerCase() === w) return true;
   if (data.pendingJoiner?.toLowerCase() === w) return true;
   if (data.opponentWallet?.toLowerCase() === w) return true;
   return false;
@@ -2933,94 +2934,86 @@ export async function handleExpiredCreatorFundingDeadline(
 }
 
 /**
- * Auto-refund creator and revert challenge if joiner funding deadline expired
- * Reverts to pending_waiting_for_opponent state
+ * Auto-revert or cancel when joiner funding deadline expired (creator_funded, challenger bound).
+ * Participant-gated (Firestore rules). On-chain escrow refund requires creator cancelChallenge separately.
  */
-export const revertJoinerTimeout = async (challengeId: string): Promise<boolean> => {
+export const revertJoinerTimeout = async (
+  challengeId: string,
+  actingWallet?: string | null
+): Promise<boolean> => {
   try {
     const challengeRef = doc(db, "challenges", challengeId);
     const snap = await getDoc(challengeRef);
-    
+
     if (!snap.exists()) {
       return false;
     }
 
     const data = snap.data() as ChallengeData;
-    if (!data) return false;
-    const status = data.status;
-    if (status !== "creator_confirmation_required" && status !== "creator_funded") {
-      console.log("Skipping revert — invalid state:", status);
-      return false;
-    }
-    if (data.creatorFundingDeadline && Date.now() < data.creatorFundingDeadline.toMillis()) {
-      console.log("Skipping revert — deadline not reached");
-      return false;
-    }
-    // Only revert if NO join ever happened
-    if (
-      data.pendingJoiner !== null ||
-      (data as any).opponentWallet !== undefined
-    ) {
-      console.log("Skipping revert — join detected");
-      return false;
-    }
-    
-    // Only revert if in creator_funded state and deadline passed
     if (data.status !== 'creator_funded') {
       return false;
     }
-    
-    if (!data.joinerFundingDeadline || data.joinerFundingDeadline.toMillis() > Date.now()) {
-      return false; // Deadline not expired yet
+    if (!data.challenger) {
+      return false;
     }
-    
-    // Note: On-chain refund happens via auto_refund_joiner_timeout contract function
-    // This Firestore function just reverts the state
-    
-    // Revert to pending state
-    const updates: any = {
-      status: 'pending_waiting_for_opponent',
-      challenger: null,
-      pendingJoiner: null,
-      joinerFundingDeadline: null,
-      fundedByCreatorAt: null,
-      updatedAt: serverTimestamp(),
-      players: [data.creator],
-      playersUid: data.createdByUid ? [data.createdByUid] : [null],
-      opponentWallet: deleteField(),
-      opponentUid: deleteField(),
-    };
+    if (!data.joinerFundingDeadline || data.joinerFundingDeadline.toMillis() > Date.now()) {
+      return false;
+    }
+    if (actingWallet && !canActOnChallengeAsParticipant(data, actingWallet)) {
+      return false;
+    }
 
-    // Critical: re-check latest doc to avoid stale reads overriding a valid join
     const latestSnap = await getDoc(challengeRef);
     const latest = latestSnap.data() as ChallengeData | undefined;
     if (!latest) return false;
-    if (
-      latest.pendingJoiner !== null ||
-      (latest as any).opponentWallet !== undefined
-    ) {
-      console.log("Abort revert — fresh data shows join");
+    if (latest.status !== 'creator_funded') {
+      return false;
+    }
+    if (!latest.joinerFundingDeadline || latest.joinerFundingDeadline.toMillis() > Date.now()) {
       return false;
     }
 
-    // Final safety guard: ensure status hasn't changed since initial read
-    if (latest.status !== "creator_funded") {
-      console.log("Abort revert — status changed");
-      return false;
+    const fundedOnChain = hasFundedOnChainPda(latest);
+    const updates: Record<string, unknown> = {
+      status: fundedOnChain ? 'cancelled' : 'pending_waiting_for_opponent',
+      challenger: null,
+      pendingJoiner: null,
+      joinerFundingDeadline: null,
+      creatorFundingDeadline: null,
+      fundedByCreatorAt: null,
+      updatedAt: serverTimestamp(),
+      players: [latest.creator],
+      opponentWallet: deleteField(),
+      opponentUid: deleteField(),
+    };
+    if (latest.createdByUid) {
+      updates.playersUid = [latest.createdByUid];
     }
 
     await writeChallengeFields(challengeId, updates, {
       currentData: data,
       skipParticipantHybridMerge: true,
     });
-    
-    console.log('✅ Joiner timeout - challenge reverted to pending (creator refunded on-chain):', challengeId);
+
+    console.log(
+      '✅ Joiner funding deadline handled:',
+      challengeId,
+      fundedOnChain ? 'cancelled (creator may cancel on-chain for refund)' : 'reverted to pending'
+    );
     return true;
   } catch (error) {
     console.error('❌ Error reverting joiner timeout:', error);
     return false;
   }
 };
+
+/** Participant-gated joiner funding deadline handler (Scenario C). */
+export async function handleExpiredJoinerFundingDeadline(
+  challengeId: string,
+  actingWallet?: string | null
+): Promise<boolean> {
+  return revertJoinerTimeout(challengeId, actingWallet);
+}
 
 /**
  * Record actual USDFG transfer given to player from Founder Challenge
