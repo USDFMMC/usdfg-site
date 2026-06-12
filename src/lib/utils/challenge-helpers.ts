@@ -66,16 +66,31 @@ export function getEscrowRecoveredAt(challenge: any): unknown {
   return challenge?.escrowRecoveredAt ?? challenge?.rawData?.escrowRecoveredAt ?? null;
 }
 
-/** Creator-owned cancelled challenge with escrow not yet recovered on-chain. */
+export function getCancelledReason(challenge: any): string | null {
+  const reason = challenge?.cancelledReason ?? challenge?.rawData?.cancelledReason;
+  return typeof reason === 'string' ? reason : null;
+}
+
+/** Cancelled specifically because joiner never funded after creator escrowed (Scenario C). */
+export function isJoinerFundingTimeoutEscrowCancel(challenge: any): boolean {
+  return getCancelledReason(challenge) === 'joiner_funding_timeout';
+}
+
+/**
+ * Joiner-funding-timeout escrow recovery only — NOT general cancelled-challenge cleanup.
+ * Requires: cancelled + creator + funded PDA + joiner_funding_timeout reason + not yet recovered.
+ */
 export function isCreatorEscrowRecoveryPending(
   challenge: any,
   wallet: string | null | undefined
 ): boolean {
   if (!wallet) return false;
   if (getChallengeStatus(challenge) !== 'cancelled') return false;
-  if (getEscrowRecoveredAt(challenge)) return false;
+  if (!isChallengeCreator(challenge, wallet)) return false;
   if (!challengeHasRecoverableEscrowPda(challenge)) return false;
-  return isChallengeCreator(challenge, wallet);
+  if (getEscrowRecoveredAt(challenge)) return false;
+  if (!isJoinerFundingTimeoutEscrowCancel(challenge)) return false;
+  return true;
 }
 
 /**

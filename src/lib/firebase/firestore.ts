@@ -187,6 +187,8 @@ export interface ChallengeData {
   payoutTimestamp?: Timestamp;        // When reward was claimed
   /** Set after creator successfully calls cancelChallenge to recover pre-match escrow. */
   escrowRecoveredAt?: Timestamp;
+  /** Why a cancelled challenge was closed (joiner timeout escrow recovery uses joiner_funding_timeout). */
+  cancelledReason?: 'joiner_funding_timeout';
   pda?: string | null;                // Challenge PDA for smart contract (null for founder flows)
   prizePool?: number;                 // Total challenge reward amount
   founderParticipantReward?: number;  // Founder tournament reward per participant
@@ -2988,6 +2990,9 @@ export const revertJoinerTimeout = async (
       opponentWallet: deleteField(),
       opponentUid: deleteField(),
     };
+    if (fundedOnChain) {
+      updates.cancelledReason = 'joiner_funding_timeout';
+    }
     if (latest.createdByUid) {
       updates.playersUid = [latest.createdByUid];
     }

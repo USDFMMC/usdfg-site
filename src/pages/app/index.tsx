@@ -824,6 +824,7 @@ const ArenaHome: React.FC = () => {
   const [isCreatorFunding, setIsCreatorFunding] = useState<string | null>(null);
   const [isJoinerFunding, setIsJoinerFunding] = useState<string | null>(null);
   const [isRecoveringEscrow, setIsRecoveringEscrow] = useState<string | null>(null);
+  const recoveringEscrowRef = useRef<string | null>(null);
   const [topPlayers, setTopPlayers] = useState<PlayerStats[]>([]);
   const [showPlayerProfile, setShowPlayerProfile] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerStats | null>(null);
@@ -925,7 +926,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         !!wallet && !!challenge && isChallengeCreator(challenge, wallet);
       if (isCreator) {
         showAppToast(
-          'Joiner did not fund in time. Your USDFG is still in escrow — open the challenge and tap Recover USDFG.',
+          'Your opponent did not fund in time. Your USDFG remains in escrow and can be recovered — open the challenge and tap Recover USDFG.',
           'info',
           'Recover your funds'
         );
@@ -3044,11 +3045,16 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
     const challengeId = challenge?.id;
     if (!challengeId) return;
-    if (isRecoveringEscrow === challengeId) return;
+    if (recoveringEscrowRef.current === challengeId || isRecoveringEscrow === challengeId) return;
 
     const currentWallet = publicKey.toString();
     if (!isChallengeCreator(challenge, currentWallet)) {
       showAppToast("Only the challenge creator can recover escrow.", "warning", "Cannot recover");
+      return;
+    }
+
+    if (!isCreatorEscrowRecoveryPending(challenge, currentWallet)) {
+      showAppToast("This challenge is not eligible for escrow recovery.", "warning", "Cannot recover");
       return;
     }
 
@@ -3067,12 +3073,14 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     const entryFee = getChallengeEntryFee(challenge);
     const confirmed = await requestAppConfirm({
       title: "Recover USDFG from escrow?",
-      message: `Your ${entryFee} USDFG is still held in escrow from this cancelled challenge — it was not lost. Confirm in your wallet to return it to your wallet.`,
+      message: `Your opponent did not fund in time. Your ${entryFee} USDFG remains in escrow and has not been lost — confirm in your wallet to return it.`,
       confirmLabel: "Recover USDFG",
       cancelLabel: "Not now",
     });
     if (!confirmed) return;
+    if (recoveringEscrowRef.current === challengeId) return;
 
+    recoveringEscrowRef.current = challengeId;
     setIsRecoveringEscrow(challengeId);
     try {
       const { cancelChallenge } = await import("@/lib/chain/contract");
@@ -3099,6 +3107,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       console.error("❌ Escrow recovery failed:", error);
       dispatchTransactionFailureToast(showAppToast, error, "fund");
     } finally {
+      recoveringEscrowRef.current = null;
       setIsRecoveringEscrow(null);
     }
   };
@@ -6133,7 +6142,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
                           : `${escrowRecoveryChallenges.length} escrows to recover`}
                       </p>
                       <p className="text-amber-200/80 text-xs mt-1 leading-snug">
-                        Your funds were not lost. Recover them with one wallet confirmation.
+                        Your opponent did not fund in time. Your USDFG remains in escrow and can be recovered.
                       </p>
                     </div>
                   </div>

@@ -23,6 +23,7 @@ import {
   isPayoutInFlightProcessing,
   challengeHasRecoverableEscrowPda,
   getEscrowRecoveredAt,
+  isJoinerFundingTimeoutEscrowCancel,
 } from "@/lib/utils/challenge-helpers";
 import { TrustBadge } from "@/lib/utils/trustDisplay";
 import WarmUpBadge from "@/components/arena/WarmUpBadge";
@@ -718,6 +719,7 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       case 'cancelled':
         if (
           isCreator &&
+          isJoinerFundingTimeoutEscrowCancel(activeChallenge) &&
           challengeHasRecoverableEscrowPda(activeChallenge) &&
           !getEscrowRecoveredAt(activeChallenge)
         ) {
@@ -1450,31 +1452,19 @@ const StandardChallengeLobby: React.FC<StandardChallengeLobbyProps> = ({
       
       {/* Show join button for others after expiry (challenge reverted to pending OR deadline expired but status not updated yet) */}
 
-      {isCreator && status === 'creator_funded' && isJoinerDeadlineExpired && (
-        <div className="rounded-lg border border-amber-400/35 bg-amber-500/10 p-2.5 space-y-2">
-          <div className="text-center">
-            <div className="text-xs font-semibold text-amber-200 mb-1.5">
-              Joiner did not fund in time
-            </div>
-            <div className="text-[10px] text-amber-100/90 font-medium mb-2 leading-relaxed">
-              Your {entryFee} USDFG is still in escrow — it was not lost. This challenge will be cancelled shortly; use Recover USDFG to return it to your wallet.
-            </div>
-          </div>
-        </div>
-      )}
-
       {isCreator &&
         status === 'cancelled' &&
+        isJoinerFundingTimeoutEscrowCancel(activeChallenge) &&
         challengeHasRecoverableEscrowPda(activeChallenge) &&
         !getEscrowRecoveredAt(activeChallenge) &&
         onRecoverEscrow && (
         <div className="rounded-lg border border-amber-400/35 bg-amber-500/10 p-2.5 space-y-2">
           <div className="text-center">
             <div className="text-xs font-semibold text-amber-200 mb-1.5">
-              Your USDFG is still in escrow
+              Your opponent did not fund in time
             </div>
             <div className="text-[10px] text-amber-100/90 font-medium mb-2 leading-relaxed">
-              The joiner did not fund in time. Your {entryFee} USDFG was not lost — confirm in your wallet to return it.
+              Your {entryFee} USDFG remains in escrow and has not been lost. Confirm in your wallet to recover it.
             </div>
             <button
               type="button"
