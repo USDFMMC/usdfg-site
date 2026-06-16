@@ -12,6 +12,7 @@ import {
 import { isLegacyCreateTimeExpiresAt } from '@/lib/utils/challenge-visibility';
 import { auth } from '@/lib/firebase/config';
 import { isLikelyRpcNetworkError } from '@/lib/chain/transaction-errors';
+import { logSyncAudit, logSyncEligibilitySummary } from '@/lib/debug/sync-audit';
 
 function challengeParticipantUidMatches(challenge: ChallengeData, uid: string | null): boolean {
   if (!uid) return false;
@@ -102,6 +103,12 @@ export const useChallenges = () => {
 
         const now = Date.now();
         const minIntervalMs = 30_000;
+        let participantWithPda = 0;
+        let skippedThrottle = 0;
+        let skippedInFlight = 0;
+        let startedSync = 0;
+        const pdaChallengeIds: string[] = [];
+
         for (const challenge of newChallenges) {
           const challengeId = challenge.id;
           if (!challengeId) continue;
@@ -123,14 +130,29 @@ export const useChallenges = () => {
           const challengePDA = (challenge.rawData as any)?.pda || (challenge as any).pda;
           if (!challengePDA) continue;
 
-          if (inFlightSyncRef.current.has(challengeId)) continue;
+          participantWithPda += 1;
+          pdaChallengeIds.push(challengeId);
+
+          if (inFlightSyncRef.current.has(challengeId)) {
+            skippedInFlight += 1;
+            continue;
+          }
 
           const last = lastSyncedAtRef.current.get(challengeId) ?? 0;
-          if (now - last < minIntervalMs) continue;
+          if (now - last < minIntervalMs) {
+            skippedThrottle += 1;
+            continue;
+          }
 
+          startedSync += 1;
           inFlightSyncRef.current.add(challengeId);
           void (async () => {
             try {
+              logSyncAudit('syncChallengeStatus-start', {
+                challengeId,
+                firestoreStatus: challenge.status ?? null,
+                pda: challengePDA,
+              });
               await syncChallengeStatusWithRetry(challengeId, challengePDA);
               lastSyncedAtRef.current.set(challengeId, Date.now());
             } catch (syncError) {
@@ -140,6 +162,17 @@ export const useChallenges = () => {
             }
           })();
         }
+
+        logSyncEligibilitySummary({
+          authUid: authUid ?? null,
+          snapshotCount: 1,
+          totalInSnapshot: newChallenges.length,
+          participantWithPda,
+          skippedThrottle,
+          skippedInFlight,
+          startedSync,
+          pdaChallengeIds,
+        });
       },
       (err) => {
         if ((err as any)?.code === 'resource-exhausted') {

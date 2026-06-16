@@ -39,6 +39,18 @@ import {
   isCreatorFundingInFlight,
   isJoinerFundingInFlight,
 } from '@/lib/challenges/funding-in-flight';
+import {
+  fundTraceChallengeSnapshot,
+  logFundTrace,
+  logFundTraceError,
+} from '@/lib/debug/fund-trace';
+import {
+  pickCanonicalAwareUid,
+  pickPlayersUidSlot,
+  resolveCanonicalUidMap,
+  resolveChallengeParticipantUid,
+  walletIndexKey,
+} from '@/lib/firebase/canonicalUid';
 /** Max challenges in the arena realtime feed (useChallenges / refetch). */
 export const RECENT_CHALLENGES_FEED_LIMIT = 30;
 
@@ -280,7 +292,8 @@ function buildPlayersUidAligned(
   players: string[],
   base: Record<string, unknown>,
   actingWallet?: string | null,
-  actingUid?: string | null
+  actingUid?: string | null,
+  canonicalByWallet?: Map<string, string>
 ): (string | null)[] {
   const curPlayers = (base.players as string[] | undefined) || [];
   const curUids = (base.playersUid as (string | null)[] | undefined) || [];
@@ -288,18 +301,23 @@ function buildPlayersUidAligned(
 
   const register = (w?: string | null, u?: string | null) => {
     if (!w) return;
-    const key = normalizeWinnerWallet(w);
-    if (u && uidByWallet.has(key) && uidByWallet.get(key) && uidByWallet.get(key) !== u) {
+    const key = walletIndexKey(w);
+    const fromCanon = canonicalByWallet?.get(key) ?? null;
+    const effective =
+      fromCanon ??
+      u ??
+      null;
+    if (effective && uidByWallet.has(key) && uidByWallet.get(key) && uidByWallet.get(key) !== effective) {
       return;
     }
-    if (u) uidByWallet.set(key, u);
+    if (effective) uidByWallet.set(key, effective);
     else if (!uidByWallet.has(key)) uidByWallet.set(key, null);
   };
 
   for (let i = 0; i < curPlayers.length; i++) {
     const w = curPlayers[i];
     const u = curUids[i];
-    if (w && u) register(w, u);
+    if (w) register(w, u);
   }
 
   const creator = (base.creator as string) || '';
@@ -325,7 +343,7 @@ function buildPlayersUidAligned(
 
   const usedUids = new Set<string>();
   return players.map((w) => {
-    let uid = uidByWallet.get(w.toLowerCase()) ?? null;
+    let uid = uidByWallet.get(walletIndexKey(w)) ?? null;
     if (uid && usedUids.has(uid)) {
       uid = null;
     }
@@ -415,16 +433,6 @@ export async function writeChallengeFields(
 
   if (originalTouches) {
     const creator = ((out.creator ?? current?.creator) as string) || '';
-    if (creator) {
-      out.creatorWallet = creator;
-      const existingC =
-        (out.createdByUid as string) ||
-        (current?.createdByUid as string) ||
-        (actingUid && walletEq(creator, ctx?.actingWallet) ? actingUid : null) ||
-        null;
-      if (existingC) out.createdByUid = existingC;
-    }
-
     const oppW =
       (
         (out.challenger ??
@@ -434,19 +442,42 @@ export async function writeChallengeFields(
           current?.pendingJoiner ??
           current?.opponentWallet) as string
       )?.trim() || '';
+    const playerWallets = Array.isArray(out.players) ? (out.players as string[]) : [];
+    const canonicalByWallet = await resolveCanonicalUidMap([creator, oppW, ...playerWallets]);
+
+    if (creator) {
+      out.creatorWallet = creator;
+      const mergedCreatorUid = pickCanonicalAwareUid(creator, {
+        canonicalByWallet,
+        storedUid: (current?.createdByUid as string) || null,
+        explicitUid: (out.createdByUid as string) || null,
+        actingWallet: ctx?.actingWallet ?? null,
+        actingUid,
+      });
+      if (mergedCreatorUid) out.createdByUid = mergedCreatorUid;
+    }
+
     if (oppW) {
       out.opponentWallet = oppW;
-      const existingO =
-        (out.opponentUid as string) ||
-        (current?.opponentUid as string) ||
-        (actingUid && walletEq(oppW, ctx?.actingWallet) ? actingUid : null) ||
-        null;
-      if (existingO) out.opponentUid = existingO;
+      const mergedOpponentUid = pickCanonicalAwareUid(oppW, {
+        canonicalByWallet,
+        storedUid: (current?.opponentUid as string) || null,
+        explicitUid: (out.opponentUid as string) || null,
+        actingWallet: ctx?.actingWallet ?? null,
+        actingUid,
+      });
+      if (mergedOpponentUid) out.opponentUid = mergedOpponentUid;
     }
 
     if (out.players && Array.isArray(out.players)) {
       const eff = { ...(current || {}), ...out } as Record<string, unknown>;
-      out.playersUid = buildPlayersUidAligned(out.players as string[], eff, ctx?.actingWallet, actingUid);
+      out.playersUid = buildPlayersUidAligned(
+        out.players as string[],
+        eff,
+        ctx?.actingWallet,
+        actingUid,
+        canonicalByWallet
+      );
     }
   }
 
@@ -1830,6 +1861,7 @@ export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'cr
   try {
     const creatorUid = await ensureFirebaseSignedIn();
     const creatorWallet = challengeData.creator;
+    const resolvedCreatorUid = await resolveChallengeParticipantUid(creatorWallet, creatorUid);
     const creatorKey = normalizeWinnerWallet(creatorWallet);
     const playerRef = doc(db, 'player_stats', creatorKey);
     const playerSnap = await getDoc(playerRef);
@@ -1894,9 +1926,9 @@ export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'cr
     }
 
     challengePayload.creatorWallet = challengePayload.creator;
-    challengePayload.createdByUid = creatorUid;
+    challengePayload.createdByUid = resolvedCreatorUid;
     challengePayload.playersUid = initialPlayers.map((w) =>
-      creatorUid && walletEq(w, challengePayload.creator) ? creatorUid : null
+      walletEq(w, challengePayload.creator) ? resolvedCreatorUid : null
     );
     
     console.log("🔥 Adding challenge to Firestore with payload:", {
@@ -1911,7 +1943,7 @@ export const addChallenge = async (challengeData: Omit<ChallengeData, 'id' | 'cr
     const docRef = await addDoc(collection(db, "challenges"), challengePayload);
     console.log('CHALLENGE WRITE:', {
       challengeId: docRef.id,
-      uid: creatorUid,
+      uid: resolvedCreatorUid,
       wallet: creatorWallet,
     });
     
@@ -2342,6 +2374,7 @@ export const fetchChallengeById = async (challengeId: string): Promise<Challenge
 export const expressJoinIntent = async (challengeId: string, wallet: string, isFounderChallenge: boolean = false, isTeam?: boolean) => {
   try {
     const joinerUid = await ensureFirebaseSignedIn();
+    const resolvedJoinerUid = await resolveChallengeParticipantUid(wallet, joinerUid);
     const challengeRef = doc(db, "challenges", challengeId);
     const snap = await getDoc(challengeRef);
     
@@ -2444,7 +2477,7 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
       status: 'creator_confirmation_required',
       pendingJoiner: wallet,
       opponentWallet: wallet,
-      opponentUid: joinerUid,
+      opponentUid: resolvedJoinerUid,
       creatorFundingDeadline,
       updatedAt: serverTimestamp(),
     };
@@ -2452,7 +2485,7 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
     await writeChallengeFields(challengeId, updates, {
       currentData: data,
       actingWallet: wallet,
-      actingUid: joinerUid,
+      actingUid: resolvedJoinerUid,
       skipParticipantHybridMerge: true,
     });
     
@@ -2467,6 +2500,31 @@ export const expressJoinIntent = async (challengeId: string, wallet: string, isF
         console.error('❌ Status update failed! Expected creator_confirmation_required, got:', verifiedData.status);
         // Force update again
         await writeChallengeFields(challengeId, { status: 'creator_confirmation_required' });
+      } else {
+        const canonicalByWallet = await resolveCanonicalUidMap([data.creator, wallet]);
+        const joinPlayers = [data.creator, wallet];
+        const joinPlayersUid = joinPlayers.map((w) =>
+          pickPlayersUidSlot(w, {
+            canonicalByWallet,
+            storedUid: walletEq(w, data.creator)
+              ? (verifiedData.createdByUid as string) ?? null
+              : resolvedJoinerUid,
+            fallbackUid: walletEq(w, wallet) ? resolvedJoinerUid : null,
+          })
+        );
+        await writeChallengeFields(
+          challengeId,
+          {
+            players: joinPlayers,
+            playersUid: joinPlayersUid,
+            updatedAt: serverTimestamp(),
+          },
+          {
+            currentData: verifiedData,
+            actingWallet: wallet,
+            actingUid: resolvedJoinerUid,
+          }
+        );
       }
     }
 
@@ -2503,6 +2561,7 @@ export const joinChallenge = expressJoinIntent;
  * Moves challenge to creator_funded state
  */
 export const creatorFund = async (challengeId: string, wallet: string) => {
+  const flow = 'creator' as const;
   try {
     const challengeRef = doc(db, "challenges", challengeId);
     const snap = await getDoc(challengeRef);
@@ -2512,9 +2571,13 @@ export const creatorFund = async (challengeId: string, wallet: string) => {
     }
 
     const data = snap.data() as ChallengeData;
+    logFundTrace(flow, 'creatorFund-firestore-read', {
+      ...fundTraceChallengeSnapshot({ id: challengeId, ...data }, wallet),
+    });
     
     // If already funded, return success (idempotent operation)
     if (data.status === 'creator_funded') {
+      logFundTrace(flow, 'creatorFund-firestore-idempotent', { challengeId });
       console.log('✅ Challenge already funded - skipping update (idempotent)');
       return true;
     }
@@ -2557,9 +2620,14 @@ export const creatorFund = async (challengeId: string, wallet: string) => {
       actingWallet: wallet,
     });
     
+    logFundTrace(flow, 'creatorFund-firestore-write-success', {
+      challengeId,
+      statusAfter: 'creator_funded',
+    });
     console.log('✅ Creator funded successfully:', challengeId);
     return true;
   } catch (error) {
+    logFundTraceError(flow, 'creatorFund-firestore-throw', error, { challengeId, wallet });
     console.error('❌ Error in creator funding:', error);
     throw error;
   }
@@ -2570,6 +2638,7 @@ export const creatorFund = async (challengeId: string, wallet: string) => {
  * Moves challenge to active state
  */
 export const joinerFund = async (challengeId: string, wallet: string) => {
+  const flow = 'joiner' as const;
   try {
     const challengeRef = doc(db, "challenges", challengeId);
     const snap = await getDoc(challengeRef);
@@ -2579,6 +2648,9 @@ export const joinerFund = async (challengeId: string, wallet: string) => {
     }
 
     const data = snap.data() as ChallengeData;
+    logFundTrace(flow, 'joinerFund-firestore-read', {
+      ...fundTraceChallengeSnapshot({ id: challengeId, ...data }, wallet),
+    });
     
     // Validate challenge is in creator_funded state
     if (data.status !== 'creator_funded') {
@@ -2669,9 +2741,14 @@ export const joinerFund = async (challengeId: string, wallet: string) => {
       actingWallet: wallet,
     });
     
+    logFundTrace(flow, 'joinerFund-firestore-write-success', {
+      challengeId,
+      statusAfter: 'active',
+    });
     console.log('✅ Joiner funded successfully. Challenge is now ACTIVE:', challengeId);
     return true;
   } catch (error) {
+    logFundTraceError(flow, 'joinerFund-firestore-throw', error, { challengeId, wallet });
     console.error('❌ Error in joiner funding:', error);
     throw error;
   }
@@ -3129,6 +3206,9 @@ export async function addChallengeDoc(data: any) {
   const uid = await ensureFirebaseSignedIn();
   const creator = data.creator || data.creatorWallet;
   const players = Array.isArray(data.players) && data.players.length ? data.players : creator ? [creator] : [];
+  const resolvedCreatorUid = creator
+    ? await resolveChallengeParticipantUid(creator, uid)
+    : uid;
   const payload: Record<string, any> = {
     ...data,
     status: data.status ?? 'pending_waiting_for_opponent',
@@ -3137,11 +3217,13 @@ export async function addChallengeDoc(data: any) {
   };
   if (creator) {
     payload.creatorWallet = creator;
-    payload.createdByUid = uid;
-    payload.playersUid = players.map((w: string) => (walletEq(w, creator) ? uid : null));
+    payload.createdByUid = resolvedCreatorUid;
+    payload.playersUid = players.map((w: string) =>
+      walletEq(w, creator) ? resolvedCreatorUid : null
+    );
   }
   const docRef = await addDoc(collection(db, "challenges"), payload);
-  console.log('CHALLENGE WRITE:', { challengeId: docRef.id, uid, wallet: creator ?? null });
+  console.log('CHALLENGE WRITE:', { challengeId: docRef.id, uid: resolvedCreatorUid, wallet: creator ?? null });
   console.log('✅ Challenge document created with ID:', docRef.id);
   return docRef.id;
 }
@@ -3853,10 +3935,24 @@ async function determineWinner(challengeId: string, data: ChallengeData): Promis
  */
 export const syncChallengeStatus = async (challengeId: string, challengePDA: string): Promise<void> => {
   try {
+    const challengeRef = doc(db, "challenges", challengeId);
+    const preSnap = await getDoc(challengeRef);
+    const preStatus = preSnap.exists()
+      ? ((preSnap.data() as ChallengeData).status as string | undefined) ?? null
+      : null;
+
+    const { recordSyncRpcCall, logSyncAudit } = await import('@/lib/debug/sync-audit');
+    logSyncAudit('syncChallengeStatus-enter', {
+      challengeId,
+      firestoreStatusBeforeRpc: preStatus,
+      pda: challengePDA,
+    });
+
     const { Connection, PublicKey } = await import('@solana/web3.js');
     const { getRpcEndpoint } = await import('../chain/rpc');
     const connection = new Connection(getRpcEndpoint(), 'confirmed');
-    
+
+    recordSyncRpcCall(challengeId, preStatus);
     const accountInfo = await connection.getAccountInfo(new PublicKey(challengePDA));
     if (!accountInfo || !accountInfo.data) {
       console.log('Challenge not found on-chain:', challengePDA);
@@ -3896,7 +3992,6 @@ export const syncChallengeStatus = async (challengeId: string, challengePDA: str
     }
     
     // Update Firestore if status differs
-    const challengeRef = doc(db, "challenges", challengeId);
     const snap = await getDoc(challengeRef);
     
     if (snap.exists()) {

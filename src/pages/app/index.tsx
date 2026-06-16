@@ -18,6 +18,11 @@ import {
   markCreatorFundingInFlight,
   markJoinerFundingInFlight,
 } from "@/lib/challenges/funding-in-flight";
+import {
+  fundTraceChallengeSnapshot,
+  logFundTrace,
+  logFundTraceError,
+} from "@/lib/debug/fund-trace";
 import { useResultDeadlines } from "@/hooks/useResultDeadlines";
 import ParticleBackground from "@/components/ParticleBackground";
 import type {
@@ -2856,18 +2861,29 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
   // Handle joiner funding from ChallengeDetailSheet
   const handleDirectJoinerFund = async (challenge: any) => {
+    const flow = 'joiner' as const;
+    const walletStr = publicKey?.toString() ?? null;
+
+    logFundTrace(flow, 'entry', {
+      ...fundTraceChallengeSnapshot(challenge, walletStr),
+      isJoinerFunding: isJoinerFunding === challenge.id,
+    });
+
     // CRITICAL: Disable button immediately on click to prevent double-submission
     if (isJoinerFunding === challenge.id) {
-      return; // Already processing
+      logFundTrace(flow, 'early-exit-already-processing', { challengeId: challenge.id });
+      return;
     }
     
     if (!publicKey || !connection) {
+      logFundTrace(flow, 'early-exit-no-wallet', { challengeId: challenge?.id });
       showAppToast("Please connect your wallet first.", "warning", "Wallet");
       return;
     }
 
     const { signTransaction } = wallet;
     if (!signTransaction) {
+      logFundTrace(flow, 'early-exit-no-signTransaction', { challengeId: challenge?.id });
       showAppToast("Wallet does not support transaction signing.", "error", "Wallet");
       return;
     }
@@ -2877,26 +2893,59 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     const isChallenger = challengerWallet && walletsEqual(challengerWallet, pk);
     
     if (!isChallenger) {
+      logFundTrace(flow, 'early-exit-not-challenger', {
+        challengeId: challenge?.id,
+        wallet: pk,
+        challengerWallet,
+      });
       showAppToast("Only the challenger who expressed intent can fund the challenge.", "warning", "Cannot fund");
       return;
     }
 
     const status = getChallengeStatus(challenge);
     if (status !== 'creator_funded') {
+      logFundTrace(flow, 'early-exit-wrong-status-prop', {
+        ...fundTraceChallengeSnapshot(challenge, pk),
+        expectedStatus: 'creator_funded',
+      });
       showAppToast(`Challenge is not waiting for joiner funding. Current status: ${status}`, "warning", "Wrong status");
       return;
     }
 
     // CRITICAL: Idempotency guard - prevent double funding
-    const freshChallenge = await fetchChallengeById(challenge.id);
+    let freshChallenge: ChallengeData | null = null;
+    try {
+      freshChallenge = await fetchChallengeById(challenge.id);
+    } catch (fetchErr) {
+      logFundTraceError(flow, 'fresh-fetch', fetchErr, { challengeId: challenge.id });
+      throw fetchErr;
+    }
+
+    logFundTrace(flow, 'fresh-fetch-success', {
+      ...fundTraceChallengeSnapshot(freshChallenge, pk),
+    });
+
     if (!freshChallenge) {
-      throw new Error('Challenge not found. It may have been cancelled or expired.');
+      const err = new Error('Challenge not found. It may have been cancelled or expired.');
+      logFundTraceError(flow, 'fresh-fetch-empty', err, { challengeId: challenge.id });
+      throw err;
     }
 
     if (freshChallenge.status === 'active' || freshChallenge.status === 'completed') {
+      logFundTrace(flow, 'early-exit-already-active', {
+        ...fundTraceChallengeSnapshot(freshChallenge, pk),
+      });
       showAppToast("Challenge already funded. Status: " + freshChallenge.status, "success", "Already funded");
       return;
     }
+
+    const joinerDeadline = freshChallenge.joinerFundingDeadline;
+    const joinerDeadlineExpired =
+      !!joinerDeadline && joinerDeadline.toMillis() < Date.now();
+    logFundTrace(flow, 'deadline-check', {
+      ...fundTraceChallengeSnapshot(freshChallenge, pk),
+      joinerDeadlineExpired,
+    });
 
     // CRITICAL: Set funding state IMMEDIATELY before any async operations
     markJoinerFundingInFlight(challenge.id);
@@ -2911,6 +2960,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         throw new Error('Challenge has no on-chain PDA.');
       }
 
+      logFundTrace(flow, 'joinerFundOnChain-start', {
+        challengePDA,
+        entryFee,
+        ...fundTraceChallengeSnapshot(freshChallenge, walletAddr),
+      });
+
       // Joiner funds on-chain
       const fundingSignature = await joinerFundOnChain(
         { signTransaction, publicKey },
@@ -2918,9 +2973,21 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         challengePDA,
         entryFee
       );
+
+      logFundTrace(flow, 'joinerFundOnChain-success', {
+        challengeId: challenge.id,
+        fundingSignature:
+          typeof fundingSignature === 'string' ? fundingSignature.slice(0, 24) : fundingSignature,
+      });
       
+      logFundTrace(flow, 'joinerFund-firestore-start', {
+        ...fundTraceChallengeSnapshot(freshChallenge, walletAddr),
+      });
+
       // Update Firestore
       await joinerFund(challenge.id, walletAddr);
+
+      logFundTrace(flow, 'joinerFund-firestore-success', { challengeId: challenge.id });
 
       const explorerUrl = fundingSignature && fundingSignature.length > 30
         ? getExplorerTxUrl(fundingSignature)
@@ -2970,7 +3037,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       }
       
       showAppToast("Challenge funded successfully. Match is now active.", "success", "Funded");
+      logFundTrace(flow, 'complete-success', { challengeId: challenge.id });
     } catch (err: any) {
+      logFundTraceError(flow, 'catch', err, {
+        ...fundTraceChallengeSnapshot(freshChallenge ?? challenge, walletStr),
+      });
       dispatchTransactionFailureToast(showAppToast, err, 'fund');
     } finally {
       markJoinerFundingInFlight(null);
@@ -3263,18 +3334,29 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
   };
 
   const handleDirectCreatorFund = async (challenge: any) => {
+    const flow = 'creator' as const;
+    const walletStr = publicKey?.toString() ?? null;
+
+    logFundTrace(flow, 'entry', {
+      ...fundTraceChallengeSnapshot(challenge, walletStr),
+      isCreatorFunding: isCreatorFunding === challenge.id,
+    });
+
     // CRITICAL: Disable button immediately on click to prevent double-submission
     if (isCreatorFunding === challenge.id) {
-      return; // Already processing
+      logFundTrace(flow, 'early-exit-already-processing', { challengeId: challenge.id });
+      return;
     }
     
     if (!publicKey || !connection) {
+      logFundTrace(flow, 'early-exit-no-wallet', { challengeId: challenge?.id });
       showAppToast("Please connect your wallet first.", "warning", "Wallet");
       return;
     }
 
     const { signTransaction } = wallet;
     if (!signTransaction) {
+      logFundTrace(flow, 'early-exit-no-signTransaction', { challengeId: challenge?.id });
       showAppToast("Wallet does not support transaction signing.", "error", "Wallet");
       return;
     }
@@ -3284,23 +3366,44 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     const isCreator = isChallengeCreator(challenge, currentWallet);
     
     if (!isCreator) {
+      logFundTrace(flow, 'early-exit-not-creator', { challengeId: challenge?.id, wallet: currentWallet });
       showAppToast("Only the challenge creator can fund the challenge.", "warning", "Cannot fund");
       return;
     }
 
     const status = getChallengeStatus(challenge);
     if (status !== 'creator_confirmation_required') {
+      logFundTrace(flow, 'early-exit-wrong-status-prop', {
+        ...fundTraceChallengeSnapshot(challenge, currentWallet),
+        expectedStatus: 'creator_confirmation_required',
+      });
       showAppToast(`Challenge is not waiting for creator funding. Current status: ${status}`, "warning", "Wrong status");
       return;
     }
 
     // CRITICAL: Idempotency guard - prevent double funding
-    const freshChallenge = await fetchChallengeById(challenge.id);
+    let freshChallenge: ChallengeData | null = null;
+    try {
+      freshChallenge = await fetchChallengeById(challenge.id);
+    } catch (fetchErr) {
+      logFundTraceError(flow, 'fresh-fetch', fetchErr, { challengeId: challenge.id });
+      throw fetchErr;
+    }
+
+    logFundTrace(flow, 'fresh-fetch-success', {
+      ...fundTraceChallengeSnapshot(freshChallenge, currentWallet),
+    });
+
     if (!freshChallenge) {
-      throw new Error('Challenge not found. It may have been cancelled or expired.');
+      const err = new Error('Challenge not found. It may have been cancelled or expired.');
+      logFundTraceError(flow, 'fresh-fetch-empty', err, { challengeId: challenge.id });
+      throw err;
     }
 
     if (freshChallenge.status === 'creator_funded' || freshChallenge.status === 'active') {
+      logFundTrace(flow, 'early-exit-already-funded', {
+        ...fundTraceChallengeSnapshot(freshChallenge, currentWallet),
+      });
       showAppToast("Challenge already funded. Status: " + freshChallenge.status, "success", "Already funded");
       return;
     }
@@ -3317,7 +3420,13 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
 
       // Check deadline before attempting transaction
       const deadline = freshChallenge.creatorFundingDeadline;
-      if (deadline && deadline.toMillis() < Date.now()) {
+      const creatorDeadlineExpired =
+        !!deadline && deadline.toMillis() < Date.now();
+      logFundTrace(flow, 'deadline-check', {
+        ...fundTraceChallengeSnapshot(freshChallenge, currentWallet),
+        creatorDeadlineExpired,
+      });
+      if (creatorDeadlineExpired) {
         throw new Error('Funding deadline expired. The creator did not fund in time — this challenge cannot be funded.');
       }
 
@@ -3341,8 +3450,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       let fundingSignature: string | null = null;
       
       if (!challengePDA) {
-        // PDA doesn't exist - create + fund in one transaction (single fee)
-        console.log('📝 Creating challenge PDA and funding on-chain (single transaction)...');
+        logFundTrace(flow, 'createAndFundChallenge-start', {
+          entryFee,
+          ...fundTraceChallengeSnapshot(freshChallenge, currentWallet),
+        });
         const { createAndFundChallenge } = await import('@/lib/chain/contract');
         try {
           const result = await createAndFundChallenge(
@@ -3353,6 +3464,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           challengePDA = result.pda;
           fundedOnChain = true;
           fundingSignature = result.signature;
+
+          logFundTrace(flow, 'createAndFundChallenge-success', {
+            challengeId: challenge.id,
+            challengePDA,
+            fundingSignature: fundingSignature?.slice(0, 24) ?? fundingSignature,
+          });
           
           // Update Firestore with PDA
           const { writeChallengeFields } = await import('@/lib/firebase/firestore');
@@ -3363,6 +3480,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
           );
           console.log('✅ Challenge PDA created:', challengePDA);
         } catch (createError: any) {
+          logFundTraceError(flow, 'createAndFundChallenge', createError, {
+            challengeId: challenge.id,
+          });
           console.error('❌ Error creating challenge PDA:', createError);
           const errorMsg = createError.message || createError.toString() || '';
           if (errorMsg.includes('InvalidProgramId') || errorMsg.includes('3008')) {
@@ -3382,6 +3502,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       });
       
       if (!fundedOnChain) {
+        logFundTrace(flow, 'creatorFundOnChain-start', {
+          challengePDA,
+          entryFee,
+          ...fundTraceChallengeSnapshot(freshChallenge, currentWallet),
+        });
         try {
           fundingSignature = await creatorFundOnChain(
             { signTransaction, publicKey },
@@ -3389,7 +3514,12 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             challengePDA,
             entryFee
           );
+          logFundTrace(flow, 'creatorFundOnChain-success', {
+            challengeId: challenge.id,
+            fundingSignature: fundingSignature?.slice(0, 24) ?? fundingSignature,
+          });
         } catch (fundError: any) {
+          logFundTraceError(flow, 'creatorFundOnChain', fundError, { challengeId: challenge.id });
           const errorMsg = fundError.message || fundError.toString() || '';
           console.error('❌ Creator funding on-chain error:', {
             error: fundError,
@@ -3440,7 +3570,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       // Update Firestore - wrap in try-catch to handle errors gracefully
       try {
+      logFundTrace(flow, 'creatorFund-firestore-start', {
+        ...fundTraceChallengeSnapshot(freshChallenge, currentWallet),
+      });
       await creatorFund(challenge.id, currentWallet);
+      logFundTrace(flow, 'creatorFund-firestore-success', { challengeId: challenge.id });
       const explorerUrl = fundingSignature && fundingSignature.length > 30
         ? getExplorerTxUrl(fundingSignature)
         : '';
@@ -3448,6 +3582,9 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
         await postChallengeSystemMessage(challenge.id, `💸 Creator funded on-chain: ${explorerUrl}`);
       }
       } catch (firestoreError: any) {
+        logFundTraceError(flow, 'creatorFund-firestore', firestoreError, {
+          challengeId: challenge.id,
+        });
         // If Firestore update fails but on-chain succeeded, we have a state mismatch
         // Check if the challenge status might have changed (e.g., already funded)
         console.error('❌ Firestore update failed after on-chain funding:', firestoreError);
@@ -3501,7 +3638,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       setShowDetailSheet(false);
       
       showAppToast("Challenge funded successfully. Waiting for opponent to fund.", "success", "Funded");
+      logFundTrace(flow, 'complete-success', { challengeId: challenge.id });
     } catch (err: any) {
+      logFundTraceError(flow, 'catch', err, {
+        ...fundTraceChallengeSnapshot(freshChallenge ?? challenge, walletStr),
+      });
       const errorMessage = err.message || err.toString() || 'Failed to fund challenge. Please try again.';
       const errorString = errorMessage.toLowerCase();
       

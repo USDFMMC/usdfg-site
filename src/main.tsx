@@ -1,4 +1,8 @@
 import '@/lib/firebase/config'
+import { installRpcAuditInstrumentation } from '@/lib/debug/rpc-audit'
+
+installRpcAuditInstrumentation()
+
 import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
