@@ -4,5 +4,6 @@
  */
 export const ARENA_ACCESS_STORAGE_KEY = 'arena-access';
 
-/** Set via Cloudflare Pages / .env.local — not committed. */
-export const ARENA_ACCESS_PASSWORD = import.meta.env.VITE_ARENA_ACCESS_PASSWORD ?? '';
+/** Override via VITE_ARENA_ACCESS_PASSWORD in Cloudflare Pages / .env.local */
+export const ARENA_ACCESS_PASSWORD =
+  import.meta.env.VITE_ARENA_ACCESS_PASSWORD ?? '6837';
