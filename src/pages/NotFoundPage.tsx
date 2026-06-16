@@ -2,6 +2,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { AlertCircle } from 'lucide-react';
 import KimiBackground from '@/components/KimiBackground';
 import { Link } from 'react-router-dom';
+import { ARENA_ENTRY_HREF } from '@/lib/navigation/arena-entry';
 
 export default function NotFoundPage() {
   return (
@@ -33,12 +34,12 @@ export default function NotFoundPage() {
             >
               Home
             </Link>
-            <Link
-              to="/app"
+            <a
+              href={ARENA_ENTRY_HREF}
               className="text-sm font-semibold text-amber-300 hover:text-amber-200 underline underline-offset-2"
             >
               Arena
-            </Link>
+            </a>
           </div>
         </CardContent>
       </Card>

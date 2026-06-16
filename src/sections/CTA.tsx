@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
 import gsap from 'gsap';
+import { ARENA_ENTRY_HREF } from '@/lib/navigation/arena-entry';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Sparkles } from 'lucide-react';
@@ -164,13 +164,13 @@ const CTA = () => {
               size="lg"
               className="relative font-display font-semibold text-base px-10 py-7 bg-gradient-to-r from-purple to-orange hover:from-purple-400 hover:to-orange-400 text-white border-0 overflow-hidden group w-full sm:w-auto"
             >
-              <Link to="/app">
+              <a href={ARENA_ENTRY_HREF}>
                 <span className="relative z-10 flex items-center justify-center gap-2">
                   Enter the Arena
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </span>
                 <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-              </Link>
+              </a>
             </Button>
             <Button
               size="lg"

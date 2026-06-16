@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ARENA_ENTRY_HREF } from '@/lib/navigation/arena-entry';
 
 const Navigation = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -115,10 +116,10 @@ const Navigation = () => {
             {/* CTA Buttons */}
             <div className="hidden lg:flex items-center gap-4">
               <Button asChild className="relative font-display font-semibold text-sm bg-gradient-to-r from-purple to-orange hover:from-purple-400 hover:to-orange-400 text-white border-0 overflow-hidden group">
-                <Link to="/app">
+                <a href={ARENA_ENTRY_HREF}>
                   <span className="relative z-10">Enter Arena</span>
                   <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500" />
-                </Link>
+                </a>
               </Button>
             </div>
 
@@ -174,9 +175,9 @@ const Navigation = () => {
             )}
             <div className="flex flex-col gap-3 mt-6">
               <Button asChild className="w-full font-display font-semibold bg-gradient-to-r from-purple to-orange text-white">
-                <Link to="/app" onClick={() => setIsMobileMenuOpen(false)}>
+                <a href={ARENA_ENTRY_HREF} onClick={() => setIsMobileMenuOpen(false)}>
                   Enter Arena
-                </Link>
+                </a>
               </Button>
             </div>
           </div>

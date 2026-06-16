@@ -9,6 +9,8 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_MESSAGING_SENDER_ID: string;
   readonly VITE_FIREBASE_APP_ID: string;
   readonly VITE_SOLANA_RPC_ENDPOINT?: string;
+  /** TEMPORARY arena gate — remove with src/temporary/arena-password-gate/ */
+  readonly VITE_ARENA_ACCESS_PASSWORD?: string;
 }
 
 interface ImportMeta {

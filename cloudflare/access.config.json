@@ -1,0 +1,35 @@
+{
+  "productionDomain": "usdfg.pro",
+  "pagesProjectSlug": "usdfg-app",
+  "sessionDuration": "24h",
+  "appLauncherVisible": false,
+  "policyName": "USDFG QA testers",
+  "allowedEmails": [],
+  "allowedEmailDomains": [],
+  "enableOneTimePin": true,
+  "applications": [
+    {
+      "name": "USDFG Arena (Production)",
+      "destinations": [
+        { "type": "public", "uri": "usdfg.pro/app" },
+        { "type": "public", "uri": "usdfg.pro/app/*" }
+      ]
+    },
+    {
+      "name": "USDFG Arena (Preview)",
+      "destinations": [
+        { "type": "public", "uri": "*.{{PAGES_PROJECT}}.pages.dev/app" },
+        { "type": "public", "uri": "*.{{PAGES_PROJECT}}.pages.dev/app/*" },
+        { "type": "public", "uri": "{{PAGES_PROJECT}}.pages.dev/app" },
+        { "type": "public", "uri": "{{PAGES_PROJECT}}.pages.dev/app/*" }
+      ]
+    }
+  ],
+  "publicPaths": [
+    "/",
+    "/whitepaper",
+    "/privacy",
+    "/terms",
+    "/cookie-policy"
+  ]
+}
