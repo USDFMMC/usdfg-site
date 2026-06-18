@@ -61,13 +61,21 @@ async function migrateChallengeUids(db, FieldValue, previousUid, newUid, key) {
     const snap = await ref.get();
     if (!snap.exists) continue;
     const data = snap.data() ?? {};
-    const creatorWallet = String(data.creator ?? data.creatorWallet ?? '').toLowerCase();
-    const opponentWallet = String(data.opponentWallet ?? data.challenger ?? '').toLowerCase();
+    const creator = String(data.creator ?? '').toLowerCase();
+    const creatorWallet = String(data.creatorWallet ?? '').toLowerCase();
+    const opponentWallet = String(data.opponentWallet ?? '').toLowerCase();
+    const challenger = String(data.challenger ?? '').toLowerCase();
+    const pendingJoiner = String(data.pendingJoiner ?? '').toLowerCase();
     const players = Array.isArray(data.players)
       ? data.players.map((w) => String(w).toLowerCase())
       : [];
     const walletInvolved =
-      creatorWallet === key || opponentWallet === key || players.includes(key);
+      creator === key ||
+      creatorWallet === key ||
+      opponentWallet === key ||
+      challenger === key ||
+      pendingJoiner === key ||
+      players.includes(key);
     if (!walletInvolved) continue;
 
     const patch = { updatedAt: FieldValue.serverTimestamp() };

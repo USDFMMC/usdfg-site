@@ -52,13 +52,19 @@ async function migrateChallengeParticipantUids(previousUid, newUid, walletKey) {
             touched = true;
         }
         // Only migrate docs that reference this wallet (avoid cross-wallet uid collisions).
-        const creatorWallet = String(data.creator ?? data.creatorWallet ?? "").toLowerCase();
-        const opponentWallet = String(data.opponentWallet ?? data.challenger ?? "").toLowerCase();
+        const creator = String(data.creator ?? "").toLowerCase();
+        const creatorWallet = String(data.creatorWallet ?? "").toLowerCase();
+        const opponentWallet = String(data.opponentWallet ?? "").toLowerCase();
+        const challenger = String(data.challenger ?? "").toLowerCase();
+        const pendingJoiner = String(data.pendingJoiner ?? "").toLowerCase();
         const players = Array.isArray(data.players)
             ? data.players.map((w) => String(w).toLowerCase())
             : [];
-        const walletInvolved = creatorWallet === walletKey ||
+        const walletInvolved = creator === walletKey ||
+            creatorWallet === walletKey ||
             opponentWallet === walletKey ||
+            challenger === walletKey ||
+            pendingJoiner === walletKey ||
             players.includes(walletKey);
         if (!walletInvolved)
             continue;
