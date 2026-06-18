@@ -33,13 +33,17 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateTrustScore = exports.updatePlayerMeta = exports.updatePlayerProfile = exports.applyMatchStats = exports.cleanupPlatformData = exports.cleanupAuditLogs = exports.finalizeProvisionalChallengeResolutions = exports.pruneStaleAdminNonces = exports.finalizeAdminTournamentDispute = exports.finalizeAdminChallengeDispute = exports.verifyAdmin = exports.createAdminNonce = void 0;
+exports.updateTrustScore = exports.updatePlayerMeta = exports.updatePlayerProfile = exports.applyMatchStats = exports.cleanupPlatformData = exports.cleanupAuditLogs = exports.finalizeProvisionalChallengeResolutions = exports.pruneStaleAdminNonces = exports.finalizeAdminTournamentDispute = exports.finalizeAdminChallengeDispute = exports.rebindWalletIdentity = exports.createWalletRecoveryNonce = exports.verifyAdmin = exports.createAdminNonce = void 0;
 const admin = __importStar(require("firebase-admin"));
 admin.initializeApp();
 var createAdminNonceHandler_1 = require("./createAdminNonceHandler");
 Object.defineProperty(exports, "createAdminNonce", { enumerable: true, get: function () { return createAdminNonceHandler_1.createAdminNonce; } });
 var verifyAdminHandler_1 = require("./verifyAdminHandler");
 Object.defineProperty(exports, "verifyAdmin", { enumerable: true, get: function () { return verifyAdminHandler_1.verifyAdmin; } });
+var createWalletRecoveryNonceHandler_1 = require("./createWalletRecoveryNonceHandler");
+Object.defineProperty(exports, "createWalletRecoveryNonce", { enumerable: true, get: function () { return createWalletRecoveryNonceHandler_1.createWalletRecoveryNonce; } });
+var rebindWalletIdentityHandler_1 = require("./rebindWalletIdentityHandler");
+Object.defineProperty(exports, "rebindWalletIdentity", { enumerable: true, get: function () { return rebindWalletIdentityHandler_1.rebindWalletIdentity; } });
 var finalizeChallenge_1 = require("./finalizeChallenge");
 Object.defineProperty(exports, "finalizeAdminChallengeDispute", { enumerable: true, get: function () { return finalizeChallenge_1.finalizeAdminChallengeDispute; } });
 var finalizeTournament_1 = require("./finalizeTournament");

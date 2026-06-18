@@ -120,6 +120,15 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Wallet identity recovery (Admin SDK + Cloud Functions only)
+    match /wallet_recovery_nonces/{nonce} {
+      allow read, write: if false;
+    }
+
+    match /wallet_identity_recovery/{docId} {
+      allow read, write: if false;
+    }
+
     // User lock state (keyed by walletAddress; identity checked via usersByWallet index)
     match /user_locks/{wallet} {
       allow read: if isSignedIn();

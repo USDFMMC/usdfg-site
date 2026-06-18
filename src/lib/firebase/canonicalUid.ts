@@ -59,7 +59,7 @@ export async function resolveChallengeParticipantUid(
   if (!canonical) return sessionUid;
   if (canonical !== sessionUid) {
     throw new Error(
-      'This wallet is linked to a different browser session. Reconnect with the wallet that originally linked it, or use a fresh wallet.'
+      'This wallet is linked to a previous session. Use "Recover wallet access" to verify wallet ownership and continue.'
     );
   }
   return canonical;

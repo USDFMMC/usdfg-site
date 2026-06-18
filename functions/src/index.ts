@@ -4,6 +4,8 @@ admin.initializeApp();
 
 export { createAdminNonce } from "./createAdminNonceHandler";
 export { verifyAdmin } from "./verifyAdminHandler";
+export { createWalletRecoveryNonce } from "./createWalletRecoveryNonceHandler";
+export { rebindWalletIdentity } from "./rebindWalletIdentityHandler";
 export { finalizeAdminChallengeDispute } from "./finalizeChallenge";
 export { finalizeAdminTournamentDispute } from "./finalizeTournament";
 export { pruneStaleAdminNonces } from "./pruneAdminNonces";

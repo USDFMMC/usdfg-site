@@ -9,8 +9,7 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase/config";
-
-const walletBindBlocked = new Set<string>();
+import { isWalletBindBlocked, markWalletBindBlocked, clearWalletBindBlocked } from "@/lib/wallet/walletBindingState";
 
 /**
  * Binds the currently connected wallet address to the current Firebase UID.
@@ -57,7 +56,7 @@ export function useBindWalletToFirebaseUser(): void {
   useEffect(() => {
     console.log("ATTEMPT BIND:", { uid, walletAddress });
     if (!uid || !walletAddress || !walletKey) return;
-    if (walletBindBlocked.has(walletKey)) return;
+    if (isWalletBindBlocked(walletKey)) return;
 
     let cancelled = false;
 
@@ -73,10 +72,11 @@ export function useBindWalletToFirebaseUser(): void {
           const data = walletSnap.data() as { uid?: unknown } | undefined;
           const linkedUid = typeof data?.uid === "string" ? data.uid : "";
           if (linkedUid !== uid) {
-            walletBindBlocked.add(walletKey);
+            markWalletBindBlocked(walletKey);
             console.warn("Wallet already linked to another user");
             return;
           }
+          clearWalletBindBlocked(walletKey);
         }
 
         // Step C — write canonical user (DO NOT overwrite createdAt)
