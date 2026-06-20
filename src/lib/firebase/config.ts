@@ -24,6 +24,16 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
+console.info("[firebase-config]", {
+  apiKey:
+    import.meta.env.VITE_FIREBASE_API_KEY?.slice(0, 8) +
+    "…" +
+    import.meta.env.VITE_FIREBASE_API_KEY?.slice(-4),
+  projectId: app.options.projectId,
+  authDomain: app.options.authDomain,
+});
+
 export { app };
 
 export const auth = getAuth(app);
