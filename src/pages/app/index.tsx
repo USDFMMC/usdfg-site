@@ -14,6 +14,7 @@ import StandardChallengeLobby from "@/components/arena/StandardChallengeLobby";
 import RightSidePanel from "@/components/ui/RightSidePanel";
 import { useChallenges } from "@/hooks/useChallenges";
 import { useChallengeExpiry } from "@/hooks/useChallengeExpiry";
+import { useWalletBalances } from "@/hooks/useWalletBalances";
 import {
   markCreatorFundingInFlight,
   markJoinerFundingInFlight,
@@ -310,8 +311,34 @@ const ArenaHome: React.FC = () => {
   const isConnected = connected || (hasStoredPhantomConnection && !!storedPhantomPublicKey);
   const location = useLocation();
   
-  // Use stored public key if adapter doesn't have one
-  const effectivePublicKey = publicKey || (storedPhantomPublicKey ? new PublicKey(storedPhantomPublicKey) : null);
+  // Use stored public key if adapter doesn't have one (stable instance per wallet string).
+  const effectivePublicKey = useMemo(() => {
+    if (publicKey) return publicKey;
+    if (!storedPhantomPublicKey) return null;
+    try {
+      return new PublicKey(storedPhantomPublicKey);
+    } catch {
+      return null;
+    }
+  }, [publicKey, storedPhantomPublicKey]);
+
+  const { solBalance, usdfgBalance, refreshWalletBalances } = useWalletBalances(
+    effectivePublicKey,
+    connection,
+    isConnected
+  );
+
+  const handleWalletConnectNotify = useCallback(() => {
+    localStorage.setItem('wallet_connected', 'true');
+    setPhantomConnectionState((prev) => ({ ...prev }));
+  }, []);
+
+  const handleWalletDisconnectNotify = useCallback(() => {
+    localStorage.removeItem('wallet_connected');
+    localStorage.removeItem('wallet_address');
+    clearPhantomConnectionState();
+    setPhantomConnectionState({ connected: false, publicKey: null });
+  }, []);
 
   const isMountedRef = useRef(true);
 
@@ -827,7 +854,6 @@ const ArenaHome: React.FC = () => {
   const [founderTransferAmount, setFounderTransferAmount] = useState<string>("");
   const [founderTransferTxSignature, setFounderTransferTxSignature] = useState<string>("");
   const [usdfgPrice, setUsdfgPrice] = useState<number>(0.15); // Mock price: $0.15 per USDFG
-  const [userUsdfgBalance, setUserUsdfgBalance] = useState<number | null>(null);
   const [isCreatingChallenge, setIsCreatingChallenge] = useState<boolean>(false);
   // CRITICAL: Button disabling states - set immediately on click to prevent double-submission
   const [isCreatorFunding, setIsCreatorFunding] = useState<string | null>(null);
@@ -1324,40 +1350,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
     fetchUsdfgPrice();
   }, [fetchUsdfgPrice]);
 
-  // Function to refresh USDFG balance (reusable)
-  const refreshUSDFGBalance = useCallback(async (): Promise<void> => {
-    if (!isConnected || !publicKey || !connection) {
-      return;
-    }
-    
-    try {
-      const tokenAccount = await getAssociatedTokenAddress(USDFG_MINT, publicKey);
-      const tokenBalance = await Promise.race([
-        connection.getTokenAccountBalance(tokenAccount, 'confirmed'),
-        new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout')), 5000) // 5s timeout
-        )
-      ]);
-      const usdfg = tokenBalance.value.uiAmount || 0;
-      setUserUsdfgBalance(usdfg);
-    } catch (err: any) {
-      // If token account doesn't exist, that's fine - just set to 0
-      if (err.message?.includes('Invalid param: could not find account') || 
-          err.message?.includes('could not find account')) {
-        setUserUsdfgBalance(0);
-        return;
-      }
-      
-      // Silently fail - don't show errors or retry
-      // Just set to 0 and let UI show "0" or nothing
-      setUserUsdfgBalance(0);
-    }
-  }, [isConnected, publicKey, connection]);
-
   /** After claim, align list + wallet + trust readout without a full reload (realtime listener may lag). */
   const resyncAfterClaimData = useCallback(async (): Promise<ChallengeData[] | null> => {
     const challenges = await refetchChallenges();
-    await refreshUSDFGBalance().catch(() => {});
+    await refreshWalletBalances().catch(() => {});
     const w = effectivePublicKey?.toString();
     if (w) {
       try {
@@ -1370,20 +1366,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       }
     }
     return challenges;
-  }, [refetchChallenges, refreshUSDFGBalance, effectivePublicKey]);
-
-  // Fetch USDFG balance when wallet is connected (non-blocking, fail gracefully)
-  useEffect(() => {
-    if (isConnected && publicKey) {
-      // Fetch balance in background (don't block UI)
-      refreshUSDFGBalance().catch(() => {
-        // Silently handle any uncaught errors
-        setUserUsdfgBalance(0);
-      });
-    } else {
-      setUserUsdfgBalance(null);
-    }
-  }, [isConnected, publicKey, refreshUSDFGBalance]);
+  }, [refetchChallenges, refreshWalletBalances, effectivePublicKey]);
 
   // Track completed challenge IDs to detect new completions
   const [completedChallengeIds, setCompletedChallengeIds] = useState<Set<string>>(new Set());
@@ -2998,7 +2981,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       // Refresh balance
       setTimeout(() => {
-        refreshUSDFGBalance().catch(() => {});
+        refreshWalletBalances(challenge.id).catch(() => {});
       }, 2000);
 
       // Close detail sheet
@@ -3631,7 +3614,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
       
       // Refresh balance
       setTimeout(() => {
-        refreshUSDFGBalance().catch(() => {});
+        refreshWalletBalances(challenge.id).catch(() => {});
       }, 2000);
 
       // Close detail sheet
@@ -4434,7 +4417,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             "Claimed"
           );
           setTimeout(() => {
-            refreshUSDFGBalance().catch(() => {});
+            refreshWalletBalances(challenge.id).catch(() => {});
           }, 2000);
           break;
         case "stale_retry":
@@ -4445,7 +4428,7 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
               "Claimed"
             );
             setTimeout(() => {
-              refreshUSDFGBalance().catch(() => {});
+              refreshWalletBalances(challenge.id).catch(() => {});
             }, 2000);
           } else {
             dispatchTransactionFailureToast(
@@ -5987,18 +5970,10 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             
             <WalletConnectSimple 
               isConnected={isConnected}
-              onConnect={() => {
-                localStorage.setItem('wallet_connected', 'true');
-                // Force state update
-                setPhantomConnectionState(prev => ({ ...prev }));
-              }}
-              onDisconnect={() => {
-                localStorage.removeItem('wallet_connected');
-                localStorage.removeItem('wallet_address');
-                clearPhantomConnectionState();
-                // Force state update
-                setPhantomConnectionState({ connected: false, publicKey: null });
-              }}
+              onConnect={handleWalletConnectNotify}
+              onDisconnect={handleWalletDisconnectNotify}
+              solBalance={solBalance}
+              usdfgBalance={usdfgBalance}
               profileAvatar={publicKey ? renderNavAvatar("md") : undefined}
               onProfileClick={() => {
                 void handleOpenProfile();
@@ -6052,17 +6027,11 @@ const [tournamentMatchData, setTournamentMatchData] = useState<{ matchId: string
             )}
             <WalletConnectSimple 
               isConnected={isConnected}
-              onConnect={() => {
-                localStorage.setItem('wallet_connected', 'true');
-                setPhantomConnectionState(prev => ({ ...prev }));
-              }}
-              onDisconnect={() => {
-                localStorage.removeItem('wallet_connected');
-                localStorage.removeItem('wallet_address');
-                clearPhantomConnectionState();
-                setPhantomConnectionState({ connected: false, publicKey: null });
-              }}
+              onConnect={handleWalletConnectNotify}
+              onDisconnect={handleWalletDisconnectNotify}
               compact={true}
+              solBalance={solBalance}
+              usdfgBalance={usdfgBalance}
               profileAvatar={publicKey ? renderNavAvatar("sm") : undefined}
               onProfileClick={() => {
                 void handleOpenProfile();

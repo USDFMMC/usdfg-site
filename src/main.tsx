@@ -1,7 +1,9 @@
 import '@/lib/firebase/config'
 import { installRpcAuditInstrumentation } from '@/lib/debug/rpc-audit'
+import { installBalanceAuditSummary } from '@/lib/debug/balance-audit'
 
 installRpcAuditInstrumentation()
+installBalanceAuditSummary()
 
 import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'

@@ -7,11 +7,12 @@ const rateLimit_1 = require("./rateLimit");
 const walletSignatureVerify_1 = require("./walletSignatureVerify");
 const migrateChallengeParticipantUids_1 = require("./migrateChallengeParticipantUids");
 const NONCE_COLLECTION = "wallet_recovery_nonces";
+const REGION = { region: "us-central1" };
 /**
  * Rebind usersByWallet to the active Firebase session after wallet signature proof.
  * Preserves usersByWallet as source of truth; updates stale anonymous UID mappings only.
  */
-exports.rebindWalletIdentity = (0, https_1.onCall)(async (request) => {
+exports.rebindWalletIdentity = (0, https_1.onCall)(REGION, async (request) => {
     const newUid = request.auth?.uid;
     if (!newUid) {
         throw new https_1.HttpsError("unauthenticated", "Sign in required");

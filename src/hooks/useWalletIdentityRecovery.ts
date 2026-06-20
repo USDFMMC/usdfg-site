@@ -91,7 +91,7 @@ export function useWalletIdentityRecovery() {
     return () => {
       cancelled = true;
     };
-  }, [walletKey, walletAddress, sessionUid]);
+  }, [walletKey, walletAddress, sessionUid, signMessage]);
 
   const recover = useCallback(async (): Promise<boolean> => {
     if (!mismatch || !signMessage) {
@@ -112,7 +112,6 @@ export function useWalletIdentityRecovery() {
       clearWalletBindBlocked(mismatch.walletKey);
       setMismatch(null);
       setPhase("recovered");
-      console.info("[wallet-recovery] rebound", result);
       return true;
     } catch (e) {
       const msg =

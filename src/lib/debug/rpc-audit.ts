@@ -7,6 +7,7 @@
  */
 
 import { Connection } from '@solana/web3.js';
+import { recordBalanceAuditCall } from '@/lib/debug/balance-audit';
 
 const PREFIX = '[rpc-audit]';
 
@@ -32,14 +33,46 @@ function trimWindow(now: number): void {
   }
 }
 
+function inferBalanceCallerFromStack(): {
+  caller: string;
+  component: string;
+} | null {
+  const stack = new Error().stack;
+  if (!stack) return null;
+  if (stack.includes('balance-audit') || stack.includes('auditedGet')) {
+    return null;
+  }
+  if (stack.includes('WalletConnectSimple')) {
+    return { component: 'WalletConnectSimple', caller: 'useEffect-balance-fetch' };
+  }
+  if (stack.includes('useWalletBalances') || stack.includes('fetchUSDFGBalance') || stack.includes('fetchSOLBalance')) {
+    return { component: 'ArenaPage', caller: 'useWalletBalances' };
+  }
+  if (stack.includes('refreshUSDFGBalance') || (stack.includes('index.tsx') && stack.includes('ArenaHome'))) {
+    return { component: 'ArenaPage', caller: 'refreshUSDFGBalance' };
+  }
+  if (stack.includes('contract.ts') || stack.includes('contract')) {
+    return { component: 'chain/contract', caller: 'preflight-token-balance' };
+  }
+  return { component: 'unknown', caller: 'unlabeled-stack' };
+}
+
 function summarizeArgs(method: AuditedMethod, args: unknown[]): Record<string, unknown> {
   if (method === 'getBalance' || method === 'getTokenAccountBalance') {
     const pk = args[0];
     const pkStr =
       pk && typeof pk === 'object' && 'toBase58' in (pk as object)
-        ? (pk as { toBase58: () => string }).toBase58().slice(0, 8) + '…'
-        : String(pk).slice(0, 12);
-    return { account: pkStr };
+        ? (pk as { toBase58: () => string }).toBase58()
+        : String(pk);
+    const inferred = inferBalanceCallerFromStack();
+    if (inferred) {
+      recordBalanceAuditCall(method, {
+        caller: `${inferred.caller} (stack-fallback)`,
+        component: inferred.component,
+        wallet: pkStr,
+      });
+    }
+    return { account: pkStr.slice(0, 8) + '…' };
   }
   if (method === 'getLatestBlockhash') {
     return { commitment: args[0] ?? 'default' };

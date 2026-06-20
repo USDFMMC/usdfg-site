@@ -9,11 +9,12 @@ const rateLimit_1 = require("./rateLimit");
 const walletSignatureVerify_1 = require("./walletSignatureVerify");
 const COLLECTION = "wallet_recovery_nonces";
 const MAX_ACTIVE_NONCES_PER_ADDRESS = 2;
+const REGION = { region: "us-central1" };
 /**
  * Creates a wallet-bound nonce before the holder signs to recover a stale usersByWallet mapping.
  * Requires Firebase Auth (anonymous is fine).
  */
-exports.createWalletRecoveryNonce = (0, https_1.onCall)(async (request) => {
+exports.createWalletRecoveryNonce = (0, https_1.onCall)(REGION, async (request) => {
     if (!request.auth?.uid) {
         throw new https_1.HttpsError("unauthenticated", "Sign in required");
     }

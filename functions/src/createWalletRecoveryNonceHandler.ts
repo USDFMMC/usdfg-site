@@ -7,12 +7,13 @@ import { WALLET_NONCE_TTL_MS } from "./walletSignatureVerify";
 
 const COLLECTION = "wallet_recovery_nonces";
 const MAX_ACTIVE_NONCES_PER_ADDRESS = 2;
+const REGION = { region: "us-central1" as const };
 
 /**
  * Creates a wallet-bound nonce before the holder signs to recover a stale usersByWallet mapping.
  * Requires Firebase Auth (anonymous is fine).
  */
-export const createWalletRecoveryNonce = onCall(async (request) => {
+export const createWalletRecoveryNonce = onCall(REGION, async (request) => {
   if (!request.auth?.uid) {
     throw new HttpsError("unauthenticated", "Sign in required");
   }

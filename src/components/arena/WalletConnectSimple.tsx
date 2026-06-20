@@ -1,9 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
-import { getAssociatedTokenAddress } from '@solana/spl-token';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
+import React, { useState, useEffect, useRef } from "react";
+import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
-import { USDFG_MINT } from '@/lib/chain/config';
 import { logWalletEvent } from '@/utils/wallet-log';
 import { useUSDFGWallet } from '@/lib/wallet/useUSDFGWallet';
 
@@ -15,6 +12,9 @@ interface WalletConnectSimpleProps {
   profileAvatar?: React.ReactNode;
   onProfileClick?: () => void;
   onAppToast?: (message: string, type?: "info" | "warning" | "error" | "success", title?: string) => void;
+  /** Shared arena balance (from useWalletBalances — no per-instance RPC). */
+  solBalance?: number | null;
+  usdfgBalance?: number | null;
 }
 
 const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
@@ -25,79 +25,39 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
   profileAvatar,
   onProfileClick,
   onAppToast,
+  solBalance = null,
+  usdfgBalance = null,
 }) => {
-  const { publicKey, connecting, connect, disconnect, connection } = useUSDFGWallet();
+  const { publicKey, connecting, connect, disconnect } = useUSDFGWallet();
   const { disconnect: disconnectAdapter } = useWallet();
   const { setVisible } = useWalletModal();
-  const [balance, setBalance] = useState<number | null>(null);
-  const [usdfgBalance, setUsdfgBalance] = useState<number | null>(null);
   const [hoveringDisconnect, setHoveringDisconnect] = useState(false);
 
-  // Fetch balances when publicKey exists
+  const onConnectRef = useRef(onConnect);
+  const onDisconnectRef = useRef(onDisconnect);
+  onConnectRef.current = onConnect;
+  onDisconnectRef.current = onDisconnect;
+
+  // Connection logging / parent notify — wallet identity only (no balance RPC).
   useEffect(() => {
-    if (!publicKey || !connection) {
-      setBalance(null);
-      setUsdfgBalance(null);
-      return;
-    }
-
-    // Fetch SOL balance
-    const fetchSOLBalance = async (): Promise<void> => {
-      try {
-        const balanceLamports = await Promise.race([
-          connection.getBalance(publicKey, 'confirmed'),
-          new Promise<never>((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout')), 5000)
-          )
-        ]);
-        const balance = balanceLamports / LAMPORTS_PER_SOL;
-        setBalance(balance);
-      } catch (err: any) {
-        setBalance(null);
-      }
-    };
-
-    // Fetch USDFG balance
-    const fetchUSDFGBalance = async (): Promise<void> => {
-      try {
-        const tokenAccount = await getAssociatedTokenAddress(USDFG_MINT, publicKey);
-        const tokenBalance = await Promise.race([
-          connection.getTokenAccountBalance(tokenAccount, 'confirmed'),
-          new Promise<never>((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout')), 5000)
-          )
-        ]);
-        const usdfg = tokenBalance.value.uiAmount || 0;
-        setUsdfgBalance(usdfg);
-      } catch (err: any) {
-        setUsdfgBalance(0);
-      }
-    };
-
-    fetchSOLBalance().catch(() => setBalance(null));
-    fetchUSDFGBalance().catch(() => setUsdfgBalance(0));
-
-    // Log connection event
+    if (!publicKey) return;
     const currentWalletString = publicKey.toString();
     const lastLoggedWallet = sessionStorage.getItem('last_logged_wallet');
     if (lastLoggedWallet !== currentWalletString) {
       logWalletEvent('connected', { wallet: currentWalletString });
       sessionStorage.setItem('last_logged_wallet', currentWalletString);
-      onConnect();
+      onConnectRef.current();
     }
-  }, [publicKey, connection, onConnect]);
+  }, [publicKey]);
 
-  // Handle disconnect cleanup
   useEffect(() => {
-    if (!publicKey) {
-      const lastLoggedWallet = sessionStorage.getItem('last_logged_wallet');
-      if (lastLoggedWallet) {
-        sessionStorage.removeItem('last_logged_wallet');
-        onDisconnect();
-      }
+    if (publicKey) return;
+    const lastLoggedWallet = sessionStorage.getItem('last_logged_wallet');
+    if (lastLoggedWallet) {
+      sessionStorage.removeItem('last_logged_wallet');
+      onDisconnectRef.current();
     }
-  }, [publicKey, onDisconnect]);
-
+  }, [publicKey]);
 
   const handleConnect = () => {
     if (publicKey) {
@@ -105,7 +65,6 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
       return;
     }
 
-    // Stuck `connecting` (adapter hung) used to make every click a silent no-op — clear and retry.
     if (connecting) {
       void (async () => {
         try {
@@ -168,15 +127,14 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     try {
       logWalletEvent('disconnecting', {});
       await disconnect();
-      onDisconnect();
+      onDisconnectRef.current();
       logWalletEvent('disconnected', {});
     } catch (error) {
       console.error('Disconnect error:', error);
-      onDisconnect();
+      onDisconnectRef.current();
     }
   };
 
-  // Show connecting state (only when connecting AND publicKey is null)
   if (connecting && !publicKey) {
     return (
       <div className="flex flex-col space-y-2">
@@ -199,7 +157,6 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     );
   }
 
-  // Show connected state if publicKey exists
   if (publicKey) {
     const shortAddress = `${publicKey.toString().slice(0, 4)}...${publicKey.toString().slice(-4)}`;
     
@@ -216,16 +173,16 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
               {profileAvatar}
             </button>
           ) : null}
-          {(usdfgBalance !== null || balance !== null) && (
+          {(usdfgBalance !== null || solBalance !== null) && (
             <div className="flex flex-col leading-tight">
               {usdfgBalance !== null && (
                 <div className="text-[11px] text-white/90 font-semibold">
                   {usdfgBalance.toLocaleString(undefined, { maximumFractionDigits: 0 })} USDFG
                 </div>
               )}
-              {balance !== null && (
+              {solBalance !== null && (
                 <div className="text-[10px] text-gray-400">
-                  {balance.toFixed(2)} SOL
+                  {solBalance.toFixed(2)} SOL
                 </div>
               )}
             </div>
@@ -255,8 +212,8 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
           <button
             type="button"
             onClick={onProfileClick}
-            className="flex items-center"
             title="View profile"
+            className="flex items-center"
           >
             {profileAvatar}
           </button>
@@ -268,7 +225,7 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
               : "Loading..."}
           </div>
           <div className="text-xs text-gray-400">
-            {balance !== null ? `${balance.toFixed(2)} SOL` : "Loading..."}
+            {solBalance !== null ? `${solBalance.toFixed(2)} SOL` : "Loading..."}
           </div>
         </div>
         <button
@@ -290,7 +247,6 @@ const WalletConnectSimple: React.FC<WalletConnectSimpleProps> = ({
     );
   }
 
-  // Disconnected state - show Connect Wallet button
   return (
     <div className="flex flex-col space-y-2">
       {compact ? (

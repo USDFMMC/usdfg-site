@@ -10,7 +10,11 @@
     "preview": "vite preview",
     "access:apply": "node scripts/setup-cloudflare-access.mjs apply",
     "access:verify": "node scripts/setup-cloudflare-access.mjs verify",
-    "access:status": "node scripts/setup-cloudflare-access.mjs status"
+    "access:status": "node scripts/setup-cloudflare-access.mjs status",
+    "firebase-key:verify-bundle": "node scripts/update-cloudflare-firebase-api-key.mjs verify-bundle",
+    "firebase-key:cloudflare-verify": "node scripts/update-cloudflare-firebase-api-key.mjs verify",
+    "firebase-key:cloudflare-apply": "node scripts/update-cloudflare-firebase-api-key.mjs apply",
+    "firebase-key:cloudflare-deploy": "node scripts/update-cloudflare-firebase-api-key.mjs deploy"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

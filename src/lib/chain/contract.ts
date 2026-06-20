@@ -11,6 +11,7 @@ import { Connection, PublicKey, Keypair, SystemProgram, SYSVAR_RENT_PUBKEY, Tran
 import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction, createTransferInstruction } from '@solana/spl-token';
 import { PROGRAM_ID, USDFG_MINT, SEEDS, usdfgToLamports } from './config';
 import { normalizeWinnerWallet } from '../firebase/firestore';
+import { auditedGetTokenAccountBalance } from '@/lib/debug/balance-audit';
 
 /**
  * Convert a number to a little-endian 8-byte buffer (replaces BN)
@@ -1341,7 +1342,12 @@ export async function transferTournamentEntryFee(
   // If we're creating the account, balance will be 0, so we'll check after creation
   if (accountExists) {
     try {
-      const accountInfo = await connection.getTokenAccountBalance(payerTokenAccount);
+      const accountInfo = await auditedGetTokenAccountBalance(connection, payerTokenAccount, {
+        caller: 'transferTournamentEntryFee.preflightBalance',
+        component: 'chain/contract',
+        wallet: payer.toString(),
+        challengeId: challengePDA,
+      });
       const balance = accountInfo.value.amount;
       if (BigInt(balance) < BigInt(entryFeeLamports)) {
         throw new Error(`Insufficient USDFG balance. Required: ${entryFeeUsdfg} USDFG, Available: ${Number(balance) / Math.pow(10, 9)} USDFG. Please acquire USDFG tokens first.`);
