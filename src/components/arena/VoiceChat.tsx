@@ -3,6 +3,20 @@ import { Mic, MicOff } from "lucide-react";
 import { doc, setDoc, onSnapshot, deleteDoc, getDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "../../lib/firebase/config";
 import { createMicRequest, addSpeaker, removeSpeaker } from "../../lib/firebase/firestore";
+import {
+  auditAudioElement,
+  auditLocalStream,
+  auditMicPermissionState,
+  auditPeerConnection,
+  auditRemoteStream,
+  voiceAudit,
+  voiceAuditCount,
+  voiceAuditError,
+  voiceAuditWarn,
+  resolveVoiceRoles,
+  voiceLifecycleMark,
+  voiceLifecycleSetGetUserMediaError,
+} from "../../lib/debug/voice-audit";
 
 interface VoiceChatProps {
   challengeId: string;
@@ -115,11 +129,26 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
   const ignoreOfferRef = useRef(false);
   const hasOfferedRef = useRef(false);
   const [needTapToHear, setNeedTapToHear] = useState(false);
+  /** Always-current participants for Firestore signaling (avoids stale closure). */
+  const participantsRef = useRef<string[]>(participants);
 
   useEffect(() => {
-    if (!challengeId || !challengeId.trim()) return;
-    console.log("VoiceChat mounted:", challengeId);
-  }, [challengeId]);
+    const prevSorted = [...participantsRef.current].map((p) => p?.toLowerCase()).filter(Boolean).sort();
+    const nextSorted = [...participants].map((p) => p?.toLowerCase()).filter(Boolean).sort();
+    const changed =
+      prevSorted.length !== nextSorted.length ||
+      prevSorted.some((w, i) => w !== nextSorted[i]);
+
+    participantsRef.current = participants;
+
+    if (changed) {
+      const roles = resolveVoiceRoles(participants, currentWallet);
+      voiceAudit('signaling', 'participants updated', {
+        ...roles,
+        previousSorted: prevSorted,
+      });
+    }
+  }, [participants, currentWallet]);
 
   // Use refs to track initialization and prevent unnecessary re-initialization
   const initializedRef = useRef(false);
@@ -132,6 +161,22 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
 
   const canConnect = !voiceDisabled && memoizedChallengeId && memoizedChallengeId.trim() !== '' &&
     (inSpeakerList || !isSpectator || !isActiveMatch);
+
+  useEffect(() => {
+    if (!challengeId || !challengeId.trim()) return;
+    voiceAudit('mount', 'VoiceChat mounted', {
+      challengeId,
+      currentWallet: currentWallet || '(empty)',
+      challengeStatus,
+      isSpectator,
+      isCreator,
+      participantCount: participants.length,
+      spectatorCount: spectators.length,
+      isActiveMatch,
+      publishMic,
+      canConnect,
+    });
+  }, [challengeId, currentWallet, challengeStatus, isSpectator, isCreator, participants.length, spectators.length, isActiveMatch, publishMic, canConnect]);
 
   // When we're no longer in the speaker list (replaced or match went active): tear down mic only, keep receiving
   useEffect(() => {
@@ -169,10 +214,29 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
     if ((initializedRef.current && currentChallengeIdRef.current === memoizedChallengeId) || initInProgressRef.current) return;
     if (!memoizedChallengeId || memoizedChallengeId.trim() === '') return;
     if (activeVoiceChatMounts.has(memoizedChallengeId)) {
-      console.warn("VoiceChat duplicate mount detected, skipping init:", memoizedChallengeId);
+      voiceAuditWarn('mount', 'duplicate mount detected — init skipped', {
+        challengeId: memoizedChallengeId,
+        currentWallet,
+      });
       return;
     }
-    if (!canConnect) return;
+    if (!canConnect) {
+      voiceAudit('state', 'init blocked — canConnect false', {
+        challengeId: memoizedChallengeId,
+        voiceDisabled,
+        isSpectator,
+        isActiveMatch,
+        inSpeakerList,
+      });
+      return;
+    }
+
+    voiceAudit('state', 'init starting', {
+      challengeId: memoizedChallengeId,
+      publishMic,
+      currentWallet,
+      participants,
+    });
 
     activeVoiceChatMounts.add(memoizedChallengeId);
     initInProgressRef.current = true;
@@ -240,26 +304,50 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
     }
 
     try {
+      const permState = await auditMicPermissionState();
+      voiceAudit('permission', 'microphone permission state', { permState });
+
       let stream: MediaStream | null = localStream.current;
       if (publishMicNow) {
         if (stream) {
           const hasActiveTrack = stream.getAudioTracks().some((t) => t.readyState === 'live');
           if (!hasActiveTrack) stream = null;
         }
-        if (!stream) {
+        // Participants: require explicit Enable mic (Safari/iOS). Spectators approved to speak may auto-try once.
+        const skipAutoGetUserMedia = !isSpectator;
+        if (!stream && !skipAutoGetUserMedia) {
           try {
+            voiceAuditCount('getUserMediaAttempts');
+            voiceAudit('getUserMedia', 'requesting audio (approved speaker auto-init)', { constraints: { audio: true } });
             stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             localStream.current = stream;
+            voiceAuditCount('getUserMediaSuccess');
+            voiceLifecycleMark('getUserMediaSucceeded');
+            voiceAudit('getUserMedia', 'success', auditLocalStream(stream));
             setMicEnabledByGesture(true);
-          } catch {
+          } catch (mediaErr) {
+            voiceAuditCount('getUserMediaErrors');
+            voiceLifecycleSetGetUserMediaError(mediaErr);
+            voiceAuditError('getUserMedia', 'auto-init failed — use Enable mic button', mediaErr, {
+              permState,
+              publishMicNow,
+              isSpectator,
+              isParticipant: !isSpectator,
+            });
             stream = null;
           }
+        } else if (!stream && skipAutoGetUserMedia) {
+          voiceAudit('getUserMedia', 'participant — skipping auto-init, await Enable mic gesture', {
+            permState,
+          });
+        } else if (stream) {
+          voiceAudit('local-track', 'reusing existing local stream', auditLocalStream(stream));
         }
         if (stream) {
           setConnected(true);
           setStatus("Mic ready, waiting for opponent...");
         } else {
-          setConnected(false);
+          setConnected(true);
           setStatus("Tap Enable mic to speak");
         }
       } else {
@@ -291,13 +379,27 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
         
         pc = new RTCPeerConnection(configuration);
         peerConnection.current = pc;
+        voiceAudit('peer-connection', 'RTCPeerConnection created', {
+          ...auditPeerConnection(pc),
+          iceServers: configuration.iceServers?.length ?? 0,
+        });
+      } else {
+        voiceAudit('peer-connection', 'reusing RTCPeerConnection', auditPeerConnection(pc));
       }
 
       if (stream && publishMicNow) {
         const existingSenders = pc.getSenders();
         const hasAudioTrack = existingSenders.some((s) => s.track?.kind === 'audio' && s.track.readyState === 'live');
         if (!hasAudioTrack) {
-          stream.getTracks().forEach((track) => pc.addTrack(track, stream!));
+          stream.getTracks().forEach((track) => {
+            pc.addTrack(track, stream!);
+            voiceAudit('local-track', 'addTrack to peer connection', {
+              trackId: track.id,
+              kind: track.kind,
+              enabled: track.enabled,
+              readyState: track.readyState,
+            });
+          });
         }
       }
 
@@ -307,32 +409,56 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
       };
       pc.ontrack = (event) => {
         const stream = event.streams?.[0];
+        voiceAuditCount('remoteTracksReceived');
+        voiceAudit('remote-track', 'ontrack fired', {
+          trackKind: event.track?.kind,
+          trackId: event.track?.id,
+          stream: auditRemoteStream(stream),
+          audioElementBefore: auditAudioElement(remoteAudioRef.current),
+        });
         if (stream) {
-          console.log("[Voice] remote track received", { streamId: stream.id, trackKind: event.track?.kind });
           if (remoteAudioRef.current) {
             remoteAudioRef.current.srcObject = stream;
+            voiceAuditCount('playbackAttempts');
             remoteAudioRef.current.play().then(() => {
+              voiceLifecycleMark('playbackStarted');
+              voiceAudit('playback', 'remote audio playing', auditAudioElement(remoteAudioRef.current));
               setNeedTapToHear(false);
             }).catch((err) => {
+              voiceAuditCount('playbackFailures');
               if (!isAutoplayRejection(err)) {
-                console.warn("[Voice] audio.play() rejected:", err instanceof Error ? err.message : err);
+                voiceAuditError('playback', 'audio.play() rejected', err, auditAudioElement(remoteAudioRef.current));
+              } else {
+                voiceAuditWarn('playback', 'autoplay blocked — tap to hear required', auditAudioElement(remoteAudioRef.current));
               }
               setNeedTapToHear(true);
             });
+          } else {
+            voiceAuditWarn('remote-track', 'remote stream received but audio element not mounted');
           }
           setPeerConnected(true);
+          voiceLifecycleMark('ontrackFired');
         }
       };
 
       // Handle ICE candidates - store in array instead of overwriting
-      const iceCandidatesRef = { sent: new Set<string>() };
       pc.onicecandidate = async (event) => {
         if (event.candidate) {
+          voiceAuditCount('iceCandidatesSent');
+          voiceAudit('ice-candidate', 'local ICE candidate generated', {
+            type: event.candidate.type,
+            protocol: event.candidate.protocol,
+            address: event.candidate.address,
+            port: event.candidate.port,
+          });
           const candidateKey = `candidate_${currentWallet}_${Date.now()}`;
           await setDoc(doc(db, "voice_signals", memoizedChallengeId), {
             [candidateKey]: event.candidate.toJSON(),
             timestamp: Date.now()
           }, { merge: true });
+          voiceAudit('signaling', 'ICE candidate written to Firestore', { candidateKey });
+        } else {
+          voiceAudit('ice-candidate', 'ICE gathering complete (null candidate)');
         }
       };
 
@@ -340,9 +466,10 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
 
       pc.onconnectionstatechange = () => {
         const state = pc.connectionState;
-        console.log("[Voice] connectionState:", state);
+        voiceAudit('connection-state', `connectionState → ${state}`, auditPeerConnection(pc));
 
         if (state === 'connected') {
+          voiceLifecycleMark('iceConnected');
           disconnectedSinceRef.current = null;
           if (recoveryTimeoutRef.current) {
             clearTimeout(recoveryTimeoutRef.current);
@@ -386,9 +513,21 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
 
       // Monitor ICE connection state
       pc.oniceconnectionstatechange = () => {
+        voiceAudit('ice-state', `iceConnectionState → ${pc.iceConnectionState}`, {
+          iceGatheringState: pc.iceGatheringState,
+          connectionState: pc.connectionState,
+        });
         if (pc.iceConnectionState === 'failed') {
-          console.error("❌ ICE connection failed - may need better TURN servers");
+          voiceAuditError('ice-state', 'ICE connection failed — TURN/NAT may be blocking', undefined, auditPeerConnection(pc));
         }
+      };
+
+      pc.onicegatheringstatechange = () => {
+        voiceAudit('ice-state', `iceGatheringState → ${pc.iceGatheringState}`);
+      };
+
+      pc.onsignalingstatechange = () => {
+        voiceAudit('signaling', `signalingState → ${pc.signalingState}`, auditPeerConnection(pc));
       };
 
       // Listen for remote signals from the shared document
@@ -415,10 +554,21 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
         const data = snapshot.data() || {};
 
         try {
-          const sortedWallets = [...participants].map((p) => p?.toLowerCase()).filter(Boolean).sort();
-          const amOfferer = sortedWallets.length === 0 || (currentWallet && currentWallet.toLowerCase() === sortedWallets[0]);
-          // Non-offerer is "polite" and will roll back on collisions
+          const liveParticipants = participantsRef.current;
+          const roles = resolveVoiceRoles(liveParticipants, currentWallet);
+          const { sortedWallets, amOfferer, offererWallet, answererWallet } = roles;
           const isPolite = !amOfferer;
+
+          voiceAudit('signaling', 'Firestore snapshot received', {
+            hasOffer: !!data.offer,
+            hasAnswer: !!data.answer,
+            offerFrom: data.offerFrom ?? null,
+            answerFrom: data.answerFrom ?? null,
+            candidateKeyCount: Object.keys(data).filter((k) => k.startsWith('candidate_')).length,
+            ...roles,
+            isPolite,
+            signalingState: pc.signalingState,
+          });
 
           const renegotiate = async () => {
             if (!pc) return;
@@ -435,6 +585,14 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
               makingOfferRef.current = true;
               await pc.setLocalDescription(await pc.createOffer());
               hasOfferedRef.current = true;
+              voiceAuditCount('signalingOffersSent');
+              voiceLifecycleMark('offerCreated');
+              voiceAudit('signaling', 'offer created (renegotiate)', {
+                offerFrom: currentWallet,
+                offererWallet,
+                answererWallet,
+                sdpLength: pc.localDescription?.sdp?.length ?? 0,
+              });
               await setDoc(signalRef, {
                 offer: pc.localDescription,
                 offerFrom: currentWallet,
@@ -450,8 +608,11 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
           const offerAlreadyProcessed = pc.currentRemoteDescription?.sdp === data.offer?.sdp;
           if (data.offer && data.offerFrom !== currentWallet && !offerAlreadyProcessed) {
             const isRenegotiation = !!pc.currentRemoteDescription;
-            if (isRenegotiation) console.log("📞 Renegotiation: received new offer, creating answer...");
-            else console.log("📞 Received offer, creating answer...");
+            voiceAuditCount('signalingOffersReceived');
+            voiceAudit('signaling', isRenegotiation ? 'renegotiation offer received' : 'initial offer received', {
+              offerFrom: data.offerFrom,
+              signalingState: pc.signalingState,
+            });
 
             // 1) Only handle offers in valid state
             if (pc.signalingState !== "stable" && pc.signalingState !== "have-remote-offer") {
@@ -487,6 +648,11 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
               return;
             }
             await pc.setLocalDescription(answer);
+            voiceAuditCount('signalingAnswersSent');
+            voiceAudit('signaling', 'answer sent to Firestore', {
+              answerFrom: currentWallet,
+              sdpLength: answer.sdp?.length ?? 0,
+            });
             await setDoc(signalRef, {
               answer: pc.localDescription,
               answerFrom: currentWallet,
@@ -496,8 +662,16 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
           // Check for answer from other player (only if we created the offer)
           else if (data.answer && data.answerFrom !== currentWallet && data.offerFrom === currentWallet) {
             if (pc.signalingState === 'have-local-offer') {
-              console.log("✅ Received answer, setting remote description...");
+              voiceAuditCount('signalingAnswersReceived');
+              voiceLifecycleMark('answerReceived');
+              voiceAudit('signaling', 'answer received — setRemoteDescription', {
+                answerFrom: data.answerFrom,
+              });
               await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+            } else {
+              voiceAuditWarn('signaling', 'answer ignored — wrong signalingState', {
+                signalingState: pc.signalingState,
+              });
             }
           }
 
@@ -513,10 +687,12 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
                 if (cand && typeof cand === 'object') {
                   await pc.addIceCandidate(new RTCIceCandidate(cand));
                   iceCandidatesAddedRef.current.add(key);
+                  voiceAuditCount('iceCandidatesReceived');
+                  voiceAudit('ice-candidate', 'remote ICE candidate added', { key });
                 }
               } catch (err) {
                 if (err instanceof Error && !err.message?.includes('ignored')) {
-                  console.warn("[Voice] addIceCandidate error:", err.message);
+                  voiceAuditWarn('ice-candidate', 'addIceCandidate error', { key, message: err.message });
                 }
               }
             }
@@ -534,11 +710,11 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
             await renegotiate();
           }
         } catch (error) {
-          console.error("❌ Error handling WebRTC signal:", error);
+          voiceAuditError('signaling', 'WebRTC signal handler error', error);
         }
       }, (error) => {
         if ((error as any)?.code === 'resource-exhausted') {
-          console.warn('[Firestore] quota hit — switching to fail-soft mode');
+          voiceAuditWarn('signaling', 'Firestore quota exhausted — signaling listener stopped');
           unsubscribe();
           unsubscribeSignalRef.current = null;
           if (!quotaRetryUsed) {
@@ -570,7 +746,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
       if (quotaRetryTimer) clearTimeout(quotaRetryTimer);
 
     } catch (error) {
-      console.error("❌ Voice chat init failed:", error);
+      voiceAuditError('error', 'Voice chat init failed', error);
       setConnected(false);
       
       // Provide user-friendly error messages
@@ -612,6 +788,12 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
   }, [isListenOnly, mutedByCreator]);
 
   const cleanup = (deleteSignalsDoc: boolean) => {
+    voiceAudit('cleanup', 'teardown', {
+      deleteSignalsDoc,
+      challengeId: memoizedChallengeId || challengeId,
+      peer: auditPeerConnection(peerConnection.current),
+      local: auditLocalStream(localStream.current),
+    });
     if (recoveryTimeoutRef.current) {
       clearTimeout(recoveryTimeoutRef.current);
       recoveryTimeoutRef.current = null;
@@ -658,7 +840,86 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
     iceCandidatesAddedRef.current.clear();
   };
 
-  // No auto getUserMedia from effects (iOS requires user gesture for mic). Approved speakers use "Enable mic" button.
+  // No auto getUserMedia from effects (iOS requires user gesture). Use Enable mic button.
+
+  const enableMicWithGesture = async () => {
+    try {
+      setStatus("Requesting mic...");
+      voiceAuditCount('getUserMediaAttempts');
+      voiceAudit('getUserMedia', 'Enable mic button — requesting audio', {
+        isSpectator,
+        isParticipant: !isSpectator,
+        isApprovedSpeaker,
+      });
+      const permState = await auditMicPermissionState();
+      voiceAudit('permission', 'microphone permission before enable', { permState });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      voiceAuditCount('getUserMediaSuccess');
+      voiceLifecycleMark('getUserMediaSucceeded');
+      voiceAudit('getUserMedia', 'Enable mic success', auditLocalStream(stream));
+      localStream.current = stream;
+      const pc = peerConnection.current;
+      if (pc) {
+        const hasLiveAudio = pc.getSenders().some(
+          (s) => s.track?.kind === 'audio' && s.track.readyState === 'live'
+        );
+        if (!hasLiveAudio) {
+          stream.getTracks().forEach((track) => {
+            pc.addTrack(track, stream);
+            voiceAudit('local-track', 'addTrack after Enable mic', {
+              trackId: track.id,
+              kind: track.kind,
+            });
+          });
+        }
+        const signalRef = doc(db, 'voice_signals', memoizedChallengeId || challengeId);
+        setTimeout(() => {
+          if (!peerConnection.current) return;
+          const pcNow = peerConnection.current;
+          if (pcNow.signalingState !== 'stable') return;
+          if (makingOfferRef.current || hasOfferedRef.current) return;
+          const roles = resolveVoiceRoles(participantsRef.current, currentWallet);
+          voiceAudit('signaling', 'post-enable-mic renegotiation check', roles);
+          if (!roles.amOfferer) return;
+          (async () => {
+            try {
+              makingOfferRef.current = true;
+              const offer = await pcNow.createOffer();
+              await pcNow.setLocalDescription(offer);
+              hasOfferedRef.current = true;
+              voiceLifecycleMark('offerCreated');
+              voiceAuditCount('signalingOffersSent');
+              voiceAudit('signaling', 'offer created after Enable mic', {
+                offerFrom: currentWallet,
+                offererWallet: roles.offererWallet,
+              });
+              await setDoc(
+                signalRef,
+                { offer, offerFrom: currentWallet, timestamp: Date.now() },
+                { merge: true }
+              );
+            } catch (e) {
+              voiceAuditError('signaling', 'renegotiation after Enable mic failed', e);
+            } finally {
+              makingOfferRef.current = false;
+            }
+          })();
+        }, 150);
+      }
+      setConnected(true);
+      setMuted(false);
+      setMicEnabledByGesture(true);
+      setStatus(peerConnected ? 'Voice connected!' : 'Mic ready, waiting for opponent...');
+    } catch (e) {
+      voiceAuditCount('getUserMediaErrors');
+      voiceLifecycleSetGetUserMediaError(e);
+      voiceAuditError('getUserMedia', 'Enable mic button failed', e, {
+        isSpectator,
+        isParticipant: !isSpectator,
+      });
+      setStatus('Error: Could not enable mic');
+    }
+  };
 
   if (voiceDisabled) {
     return (
@@ -751,56 +1012,10 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
     );
   }
 
-  // Approved speaker but mic not enabled yet (user gesture required on iOS – no getUserMedia from effects)
-  if (inSpeakerList && !micEnabledByGesture) {
-    const handleEnableMic = async () => {
-      try {
-        setStatus("Requesting mic...");
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        localStream.current = stream;
-        const pc = peerConnection.current;
-        if (pc) {
-          // 5) Mic toggle fix: add track first, then renegotiate after short delay
-          stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-          const signalRef = doc(db, "voice_signals", challengeId!);
-          setTimeout(() => {
-            if (!peerConnection.current) return;
-            const pcNow = peerConnection.current;
-            if (pcNow.signalingState !== "stable") {
-              console.log("Skipping renegotiation, not stable");
-              return;
-            }
-            if (makingOfferRef.current) return;
-            if (hasOfferedRef.current) {
-              console.log("Offer already created, skipping");
-              return;
-            }
-            // Only the deterministic offerer should initiate
-            const sortedWallets = [...participants].map((p) => p?.toLowerCase()).filter(Boolean).sort();
-            const amOfferer = sortedWallets.length === 0 || (currentWallet && currentWallet.toLowerCase() === sortedWallets[0]);
-            if (!amOfferer) return;
-            (async () => {
-              try {
-                makingOfferRef.current = true;
-                const offer = await pcNow.createOffer();
-                await pcNow.setLocalDescription(offer);
-                hasOfferedRef.current = true;
-                await setDoc(signalRef, { offer, offerFrom: currentWallet, timestamp: Date.now() }, { merge: true });
-              } catch (e) {
-                console.error("❌ renegotiation after mic enable failed:", e);
-              } finally {
-                makingOfferRef.current = false;
-              }
-            })();
-          }, 150);
-        }
-        setConnected(true);
-        setMuted(false);
-        setMicEnabledByGesture(true);
-        setStatus("Voice connected!");
-      } catch (e) {
-        setStatus("Error: Could not enable mic");
-      }
+  // Participants + approved speakers: explicit user gesture (Safari/iOS)
+  if (publishMic && !micEnabledByGesture) {
+    const handleTapToHearPending = () => {
+      remoteAudioRef.current?.play().then(() => setNeedTapToHear(false)).catch(() => {});
     };
     return (
       <div className="p-3 rounded-lg border border-purple-700/50 bg-purple-900/20">
@@ -808,7 +1023,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
         {needTapToHear && peerConnected && (
           <button
             type="button"
-            onClick={() => remoteAudioRef.current?.play().then(() => setNeedTapToHear(false)).catch(() => {})}
+            onClick={handleTapToHearPending}
             className="w-full mb-2 py-1.5 px-2 rounded bg-[#0B0C12]/90 border border-white/10 text-white text-xs font-medium"
           >
             🔊 Tap to hear voice
@@ -818,13 +1033,19 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <div className={`w-2 h-2 rounded-full flex-shrink-0 ${peerConnected ? 'bg-green-500 animate-pulse' : 'bg-orange-400'}`} />
             <div className="flex flex-col min-w-0">
-              <span className="text-purple-200 text-sm font-medium">Approved – listen only until you enable mic</span>
-              <span className="text-[10px] text-purple-300/80">Tap below to speak.</span>
+              <span className="text-purple-200 text-sm font-medium">
+                {isApprovedSpeaker
+                  ? 'Approved – listen only until you enable mic'
+                  : 'Enable mic to speak'}
+              </span>
+              <span className="text-[10px] text-purple-300/80 truncate">
+                {peerConnected ? 'Connected – tap Enable mic to talk' : status || 'Tap Enable mic to allow microphone access'}
+              </span>
             </div>
           </div>
           <button
             type="button"
-            onClick={handleEnableMic}
+            onClick={enableMicWithGesture}
             className="px-3 py-2 rounded-lg bg-green-600/40 hover:bg-green-600/60 border border-green-500/50 text-green-200 text-sm font-medium flex-shrink-0"
           >
             Enable mic
@@ -906,13 +1127,20 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
   );
 };
 
-// Memoize component to prevent unnecessary re-renders
+function voiceParticipantsKey(list?: string[]): string {
+  return [...(list || [])].map((p) => p?.toLowerCase()).filter(Boolean).sort().join('|');
+}
+
+// Memoize component — must re-render when participants/spectators change (signaling roles).
 export const VoiceChat = React.memo(VoiceChatComponent, (prevProps, nextProps) => {
-  // Re-render if challengeId, currentWallet, status, or role changed
-  return prevProps.challengeId === nextProps.challengeId && 
-         prevProps.currentWallet === nextProps.currentWallet &&
-         prevProps.challengeStatus === nextProps.challengeStatus &&
-         prevProps.isSpectator === nextProps.isSpectator &&
-         prevProps.isCreator === nextProps.isCreator;
+  return (
+    prevProps.challengeId === nextProps.challengeId &&
+    prevProps.currentWallet === nextProps.currentWallet &&
+    prevProps.challengeStatus === nextProps.challengeStatus &&
+    prevProps.isSpectator === nextProps.isSpectator &&
+    prevProps.isCreator === nextProps.isCreator &&
+    voiceParticipantsKey(prevProps.participants) === voiceParticipantsKey(nextProps.participants) &&
+    voiceParticipantsKey(prevProps.spectators) === voiceParticipantsKey(nextProps.spectators)
+  );
 });
 
