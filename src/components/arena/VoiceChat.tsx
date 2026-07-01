@@ -701,12 +701,7 @@ const VoiceChatComponent: React.FC<VoiceChatProps> = ({
           // If we just became able to publish (e.g. mic enabled), kick off negotiation if we're stable.
           // Only the deterministic offerer initiates; collisions are still handled above.
           if (pc.signalingState !== "stable") return;
-          if (
-            amOfferer &&
-            !data.offer &&
-            !hasOfferedRef.current
-          ) {
-            hasOfferedRef.current = true;
+          if (amOfferer && !data.offer && !hasOfferedRef.current) {
             await renegotiate();
           }
         } catch (error) {
